@@ -552,6 +552,7 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
               Generate
             </button>
+            <button onclick="resetForge()" class="w-full py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-primary hover:bg-surface-tertiary transition-colors mt-2">Reset All Fields</button>
             </div><!-- /briefPanel -->
           </div>
 
@@ -2553,12 +2554,15 @@ async function connectMetaApi() {
 
             const spend = parseFloat(row.spend || 0);
             // Try all common lead action types — Cuemath may use custom conversions
-            const ql = getAction(row.actions, 'lead')
-              || getAction(row.actions, 'offsite_conversion.fb_pixel_lead')
-              || getAction(row.actions, 'onsite_conversion.lead_grouped')
-              || getAction(row.actions, 'offsite_conversion.custom.lead')
-              || getAction(row.actions, 'complete_registration')
-              || getAction(row.actions, 'offsite_conversion.fb_pixel_complete_registration');
+            // Try all common lead action types — log which one matched
+            const QL_ACTIONS = ['lead','offsite_conversion.fb_pixel_lead','onsite_conversion.lead_grouped','offsite_conversion.custom.lead','complete_registration','offsite_conversion.fb_pixel_complete_registration'];
+            let ql = 0; let qlSource = '';
+            for (const act of QL_ACTIONS) {
+              const v = getAction(row.actions, act);
+              if (v) { ql = v; qlSource = act; break; }
+            }
+            if (!state._qlSourceLog) state._qlSourceLog = {};
+            if (qlSource) state._qlSourceLog[qlSource] = (state._qlSourceLog[qlSource] || 0) + 1;
             const impressions = parseInt(row.impressions || 0);
             const clicks = parseInt(row.clicks || 0);
 
@@ -2637,6 +2641,7 @@ async function connectMetaApi() {
   const pullsLeft = META_MAX_DAILY_PULLS - (dailyInfo.count || 0);
   if (statusEl) statusEl.textContent = `✓ Pulled ${allAds.length} ads from ${accounts.length} accounts. ${pullsLeft} pull${pullsLeft !== 1 ? 's' : ''} remaining today.`;
   showToast(`Pulled ${allAds.length} ads from Meta (${accounts.length} accounts)`);
+  if (state._qlSourceLog) console.log('QL action type distribution:', state._qlSourceLog);
 
   if (btn) { btn.disabled = false; btn.textContent = 'Connect & Pull Data'; }
 
@@ -2736,8 +2741,19 @@ function mergeCRMWithMeta() {
   state.taggerData.forEach(c => { const m = extractMarket(c); mktDist[m] = (mktDist[m]||0)+1; if (c['thumbnail_url'] || c['image_url']) thumbCount++; });
   console.log('Tagger market distribution:', mktDist);
   console.log('Tagger thumbnails:', thumbCount, 'of', state.taggerData.length, 'have image URLs');
-  const rows = state._crmLeads;
+  let rows = state._crmLeads;
   if (!rows?.length) return;
+  // Deduplicate CRM leads by prospectid to prevent double-counting
+  const seenProspects = new Set();
+  const preDedup = rows.length;
+  rows = rows.filter(r => {
+    const pid = r['prospectid'] || r['ProspectId'] || '';
+    if (!pid) return true; // keep rows without prospectid
+    if (seenProspects.has(pid)) return false;
+    seenProspects.add(pid);
+    return true;
+  });
+  if (preDedup !== rows.length) console.log(`CRM dedup: ${preDedup} → ${rows.length} (removed ${preDedup - rows.length} duplicate prospect IDs)`);
 
   // ── NORMALIZATION HELPERS ──
   const NOISE_TOKENS = new Set(['pfx','paren','old','new','lp','na','fb','ig','v2','v3','v4','akt','all','manual','conv','leads','lead','exp','int','signup','enrolled','slotbook','lpfop','fop']);
@@ -6817,8 +6833,7 @@ async function visionScanCreators() {
 
   // Find influencer ads with thumbnails that haven't been scanned
   const candidates = (state.taggerData || []).filter(c => {
-    const campName = c['Campaign name'] || c['campaign name'] || '';
-    if (!_isInfluencerCampaign(campName)) return false;
+    if (!_isInfluencerAd(c)) return false;
     const thumb = c['thumbnail_url'] || c['image_url'] || '';
     if (!thumb) return false;
     const adName = c['Ad name'] || c['ad name'] || '';
@@ -9555,7 +9570,7 @@ function renderSentinelTable() {
     const name = r['Ad name'] || r['ad name'] || 'Unknown';
     const pl = indent ? 'pl-' + (indent * 4 + 3) : 'pl-3';
     return `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
-      <td class="px-3 py-2 ${pl}"><span class="font-medium" title="${name}">${shortAdName(name)}</span></td>
+      <td class="px-3 py-2 ${pl} sticky-col bg-white"><span class="font-medium" title="${name}">${shortAdName(name)}</span></td>
       <td class="px-2 py-2 text-center"><span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${r.type==='video' ? 'bg-accent-purple-light text-accent-purple' : 'bg-accent-blue-light text-accent-blue'}">${r.type}</span></td>
       <td class="px-2 py-2 text-right">${formatCurrency(m.spend)}</td>
       <td class="px-2 py-2 text-right">${m.ctr ? m.ctr.toFixed(2)+'%' : '-'}</td>
@@ -9785,6 +9800,24 @@ function markdownToHtml(md) {
 state.generateMode = 'brief'; // 'brief' or 'freeform'
 state.freeformHistory = [];
 
+function resetForge() {
+  // Reset all Forge brief inputs to defaults
+  document.getElementById('forgeKeyAngle').value = '';
+  document.getElementById('forgeOffer').value = '';
+  const mktSel = document.getElementById('forgeMarket'); if (mktSel) mktSel.value = 'US';
+  const segSel = document.getElementById('forgeSegment'); if (segSel) segSel.value = 'Foundation Rebuilder';
+  const funnelSel = document.getElementById('forgeFunnel'); if (funnelSel) funnelSel.value = 'TOFU';
+  // Reset pills to first option
+  document.querySelectorAll('#briefPanel .pill-btn').forEach((btn, i, arr) => {
+    const group = btn.parentElement;
+    const isFirst = btn === group?.querySelector('.pill-btn');
+    btn.classList.toggle('active', isFirst);
+  });
+  // Hide winning formula
+  const wf = document.getElementById('winningFormulaIndicator'); if (wf) wf.classList.add('hidden');
+  showToast('Forge reset');
+}
+
 function setGenerateMode(mode) {
   state.generateMode = mode;
   const briefBtn = document.getElementById('modeBriefBtn');
@@ -9999,45 +10032,90 @@ function _cleanHandle(raw) {
 }
 
 // ---- INFLUENCER AD IDENTIFICATION ----
-// Primary gate: campaign name contains "Influencer" or "Influ"
+// Gate: campaign name contains "Influencer"/"Influ", OR tagger tagged as F-INFLU/F-CONTENT-UGC
 // Creator name: extracted from end of ad name before date suffix (DDMMYY)
 // Roster: used for metadata enrichment (handle, ethnicity) only
 
+function _isInfluencerAd(c) {
+  const campName = (c['Campaign name'] || c['campaign name'] || '').toLowerCase();
+  // Primary: campaign name contains "influencer"
+  if (campName.includes('influencer') || campName.includes('influ')) return true;
+  // Secondary: tagger format tag is influencer/UGC (catches India campaigns where campaign name doesn't say "Influencer")
+  const fmt = c.tags?.format || '';
+  if (fmt === 'F-INFLU' || fmt === 'F-CONTENT-UGC') return true;
+  // Tertiary: ad name contains "influencer" or "postboost" (common in influencer ad names)
+  const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
+  if (adName.includes('influencer') || adName.includes('postboost')) return true;
+  return false;
+}
+
+// For backward compat — used by renderInfluCompare
 function _isInfluencerCampaign(campName) {
   const c = (campName || '').toLowerCase();
   return c.includes('influencer') || c.includes('influ');
 }
 
-// Extract creator label from ad name — it's the last meaningful segment(s) before the date suffix
-// Examples:
+// Extract creator label from ad name — last meaningful segment(s) before date suffix
+// Tested against ground truth:
 //   ..._Video_Priyanshul_060126 → Priyanshul
 //   ..._Video_Gujarati_Payal_Jethwa_090126 → Gujarati_Payal_Jethwa
-//   ...Inhouse-edited-video-Rituja_140126 → edited-video-Rituja
+//   ...Signup-Inhouse-edited-video-Rituja_140126 → Inhouse-edited-video-Rituja
 //   ..._Video_Priyanshul-IG-video_280126 → Priyanshul-IG-video
-//   ..._Video_Priyanshul-2_060126 → Priyanshul-2
+//   ..._Engaged_Priyanshul_131025 → Priyanshul
 function _extractCreatorFromAdName(adName) {
   if (!adName) return 'Unknown';
   // Strip date suffix (6 digits at end, optionally preceded by _ or -)
   let cleaned = adName.replace(/[-_]\d{6}$/, '');
-  // Find the creator portion — everything after the last recognized structural token
-  // Structural tokens that precede the creator name:
-  const STRUCT = /(?:_Video_|_Signup_|_Signup-|_LP_Signup_|_NA_)/i;
-  const structMatch = cleaned.match(STRUCT);
-  if (structMatch) {
-    const idx = cleaned.lastIndexOf(structMatch[0]);
-    cleaned = cleaned.substring(idx + structMatch[0].length);
-  } else {
-    // Fallback: take last segment(s) after Video/Signup/LP
-    const parts = cleaned.split(/[_]/);
-    // Walk backward to find the creator portion
-    let startIdx = parts.length;
-    const NOISE = new Set(['video','signup','lp','na','shortform','advantage','postboost','leads','conv','int','new','inhouse','edit','edited','fb','ig','old','parents','35','55','0','2%','engaged','lal','leadgen','pfx','usa','ind','aus','mea','uk','apac','v2','v3']);
-    for (let i = parts.length - 1; i >= 0; i--) {
-      const p = parts[i].toLowerCase().replace(/[-]/g, '');
-      if (NOISE.has(p) || /^\d+$/.test(p)) { startIdx = i; break; }
-    }
-    cleaned = parts.slice(startIdx).join('_');
+
+  // Strategy: find the LAST occurrence of _Video_ or similar structural token, take everything after it
+  // Then strip any remaining structural prefixes
+  const STRUCT_TOKENS = ['_Video_', '_Signup_', '_NA_'];
+  let bestIdx = -1;
+  let bestLen = 0;
+  for (const tok of STRUCT_TOKENS) {
+    const idx = cleaned.toLowerCase().lastIndexOf(tok.toLowerCase());
+    if (idx > bestIdx) { bestIdx = idx; bestLen = tok.length; }
   }
+
+  if (bestIdx >= 0) {
+    cleaned = cleaned.substring(bestIdx + bestLen);
+  } else {
+    // No structural token found — try splitting by last underscore-delimited meaningful segment
+    // Handle cases like: ...Engaged_Priyanshul or ...Signup-Inhouse-edited-video-Rituja
+    const parts = cleaned.split(/_/);
+    const NOISE = new Set(['video','signup','lp','na','shortform','advantage','postboost','leads','conv','int','new','fb','ig','old','parents','engaged','lal','leadgen','pfx','usa','ind','aus','mea','uk','apac','v2','v3','paren']);
+    // Walk backward: find where noise ends and creator name begins
+    let creatorStart = parts.length;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      // Split this part further by hyphens to check individual tokens
+      const subparts = parts[i].split(/-/);
+      const allNoise = subparts.every(sp => {
+        const low = sp.toLowerCase();
+        return NOISE.has(low) || /^\d+$/.test(low) || /^\d+-\d+%?$/.test(low) || low.length <= 1;
+      });
+      if (allNoise) { creatorStart = i + 1; break; }
+      // If we hit a noise token, everything after it is the creator
+      if (NOISE.has(parts[i].toLowerCase().replace(/[-]/g, '')) || /^\d+$/.test(parts[i])) {
+        creatorStart = i + 1; break;
+      }
+    }
+    if (creatorStart < parts.length) {
+      cleaned = parts.slice(creatorStart).join('_');
+    }
+    // If we still have the full string, try taking everything after last hyphen-delimited noise
+    if (creatorStart >= parts.length) {
+      const hparts = cleaned.split(/-/);
+      let hStart = hparts.length;
+      for (let i = hparts.length - 1; i >= 0; i--) {
+        const low = hparts[i].toLowerCase().replace(/_/g, '');
+        if (NOISE.has(low) || /^\d+$/.test(low)) { hStart = i + 1; break; }
+      }
+      if (hStart < hparts.length) cleaned = hparts.slice(hStart).join('-');
+    }
+  }
+
+  // Strip leading structural words that leaked through (Video_, Signup_, etc.)
+  cleaned = cleaned.replace(/^(Video|Signup|LP|NA|ShortForm)[_-]/i, '');
   // Clean up remaining separators
   cleaned = cleaned.replace(/^[-_]+|[-_]+$/g, '').trim();
   return cleaned || 'Unknown';
@@ -10098,9 +10176,8 @@ function getInfluencerAds(geoFilter, dateRange) {
   const creators = {};
 
   data.forEach(c => {
-    const campName = c['Campaign name'] || c['campaign name'] || '';
-    // PRIMARY GATE: campaign name must contain "Influencer"
-    if (!_isInfluencerCampaign(campName)) return;
+    // Gate: campaign name contains "Influencer", OR tagger tagged F-INFLU, OR ad name contains "influencer"/"postboost"
+    if (!_isInfluencerAd(c)) return;
 
     const adName = c['Ad name'] || c['ad name'] || '';
     const creatorLabel = _extractCreatorFromAdName(adName);
@@ -10140,6 +10217,14 @@ function getInfluencerAds(geoFilter, dateRange) {
 function renderInfluencerView() {
   const geoFilter = document.getElementById('influencerGeo')?.value || 'all';
   const dateRange = document.getElementById('influencerDateRange')?.value || 'all';
+  // Show empty state if no tagger data loaded at all
+  if (!state.taggerData?.length) {
+    const emptyHtml = `<div class="text-center py-16"><div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent-purple/20 to-accent-pink/20 flex items-center justify-center"><svg class="w-8 h-8 text-accent-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div><h3 class="text-base font-bold text-text-primary mb-2">No Performance Data</h3><p class="text-sm text-text-muted mb-4">Load Meta Ads data via Tagger (CSV or API) to see influencer performance.</p><button onclick="navigateTo('tagger')" class="px-4 py-2 rounded-lg text-sm font-semibold bg-accent-purple text-white hover:bg-accent-purple/80">Go to Tagger</button></div>`;
+    ['infTab-leaderboard','infTab-content','infTab-compare'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = emptyHtml; });
+    const el = document.getElementById('influencerStatus');
+    el.textContent = 'No data'; el.className = 'status-badge disconnected';
+    return;
+  }
   const creators = getInfluencerAds(geoFilter, dateRange);
   const el = document.getElementById('influencerStatus');
   const totalAds = creators.reduce((s, c) => s + c.ads.length, 0);
@@ -10225,9 +10310,10 @@ function renderInfluLeaderboard(filteredCreators) {
     const hasAdSets = r.adSetList.length > 1;
     const expandId = 'influ-expand-' + idx;
     html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50 ${hasAdSets ? 'cursor-pointer' : ''}" ${hasAdSets ? `onclick="document.getElementById('${expandId}').classList.toggle('hidden')"` : ''}>
-      <td class="px-3 py-2.5 font-semibold sticky-col">
+      <td class="px-3 py-2.5 font-semibold sticky-col bg-white">
         <div class="flex items-center gap-2">
           ${hasAdSets ? '<span class="text-[9px] text-text-muted">▶</span>' : ''}
+          ${r.bestAd?.['thumbnail_url'] || r.bestAd?.['image_url'] ? `<img src="${r.bestAd['thumbnail_url'] || r.bestAd['image_url']}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : ''}
           <div>
             <span>${r.displayName}</span>
             ${r.handle ? `<span class="text-[9px] text-text-muted ml-1">@${r.handle}</span>` : ''}
@@ -10372,8 +10458,7 @@ function renderInfluCompare(geoFilterParam, dateRangeParam) {
   const inhouse = { spend: 0, ql: 0, td: 0, count: 0 };
 
   allData.forEach(c => {
-    const campName = c['Campaign name'] || c['campaign name'] || '';
-    const bucket = _isInfluencerCampaign(campName) ? influ : inhouse;
+    const bucket = _isInfluencerAd(c) ? influ : inhouse;
     bucket.spend += parseNumber(c['Spent']||c['spent']||0);
     bucket.ql += parseNumber(c['QL']||c['ql']||0);
     bucket.td += parseNumber(c['TD']||c['td']||0);
@@ -10386,8 +10471,7 @@ function renderInfluCompare(geoFilterParam, dateRangeParam) {
     const geo = extractMarket(c);
     if (geo === 'Unknown') return;
     if (!byMarket[geo]) byMarket[geo] = { influ: {spend:0,ql:0,td:0,count:0}, inhouse: {spend:0,ql:0,td:0,count:0} };
-    const campName = c['Campaign name'] || c['campaign name'] || '';
-    const bucket = _isInfluencerCampaign(campName) ? byMarket[geo].influ : byMarket[geo].inhouse;
+    const bucket = _isInfluencerAd(c) ? byMarket[geo].influ : byMarket[geo].inhouse;
     bucket.spend += parseNumber(c['Spent']||c['spent']||0);
     bucket.ql += parseNumber(c['QL']||c['ql']||0);
     bucket.td += parseNumber(c['TD']||c['td']||0);

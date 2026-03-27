@@ -42,6 +42,30 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Pre-Deployment QA Pass (2026-03-28, 1:30am)
+
+### Phase 1: Influencer pipeline fixes
+- `_isInfluencerAd(c)` replaces `_isInfluencerCampaign()` as primary gate — now checks: (1) campaign name contains "influencer", (2) tagger format F-INFLU/F-CONTENT-UGC, (3) ad name contains "influencer"/"postboost"
+- India campaigns now captured — they don't have "Influencer" in campaign name but DO have F-INFLU format tags
+- Creator name extraction rewritten: finds LAST structural token (_Video_, _Signup_, _NA_), strips prefix words (Video_, Signup_ etc.) from extracted portion
+- Fallback logic handles hyphen-delimited noise words properly
+
+### Phase 2: Number discrepancy fixes
+- CRM leads deduplicated by `prospectid` before merge — prevents double-counting TDs/NRI
+- QL action type now logged: tracks which Meta API action type matched (lead, offsite_conversion, etc.)
+- QL source distribution logged after each Meta API pull
+
+### Phase 3: UI/UX fixes
+- Influencer tab: proper empty state when no tagger data loaded (icon + "Go to Tagger" button)
+- Forge: "Reset All Fields" button added below Generate button
+- Sentinel drill-down table: sticky first column (Creative) with bg-white for scroll visibility
+
+### Phase 4: Thumbnails
+- Re-added thumbnail display in influencer leaderboard (uses bestAd's thumbnail_url)
+- Sticky creator column has bg-white to prevent overlap transparency issues
+
+---
+
 ## Influencer Matching — Campaign-Name Gate (2026-03-28, 1:15am)
 
 ### Fundamental approach change
