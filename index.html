@@ -747,14 +747,7 @@
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="combos" onclick="switchTaggerTab('combos')">Combos</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="grid" onclick="switchTaggerTab('grid')">Grid</button>
             </div>
-            <select id="taggerDateRange" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
-              <option value="all">All Time</option>
-              <option value="30" selected>Last 30 days</option>
-              <option value="60">Last 60 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="14">Last 14 days</option>
-              <option value="7">Last 7 days</option>
-            </select>
+            <span class="text-[10px] text-text-muted font-medium" id="taggerDateLabel"></span>
             <select id="taggerFilterCountry" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
               <option value="all">All Countries</option>
               <option value="US">US</option>
@@ -1262,14 +1255,7 @@
                 <option value="static">Static Only</option>
                 <option value="video">Video Only</option>
               </select>
-              <select id="sentinelDateRange" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="runSentinelView()">
-                <option value="all" selected>All Time</option>
-                <option value="7">Last 7 days</option>
-                <option value="14">Last 14 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="60">Last 60 days</option>
-                <option value="90">Last 90 days</option>
-              </select>
+              <span class="text-[10px] text-text-muted font-medium px-2" id="sentinelDateLabel">Date: set on Oracle</span>
               <button onclick="runSentinelView()" class="btn-primary px-4 py-1.5 rounded-lg text-xs font-semibold">Refresh</button>
               <input type="hidden" id="sentinelSpendFilter" value="0" />
             </div>
@@ -1411,14 +1397,7 @@
                 <option value="India">India</option>
                 <option value="APAC">APAC</option>
               </select>
-              <select id="influencerDateRange" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="renderInfluencerView()">
-                <option value="all" selected>All Time</option>
-                <option value="7">Last 7 days</option>
-                <option value="14">Last 14 days</option>
-                <option value="30">Last 30 days</option>
-                <option value="60">Last 60 days</option>
-                <option value="90">Last 90 days</option>
-              </select>
+              <span class="text-[10px] text-text-muted font-medium px-2" id="influencerDateLabel">Date: set on Oracle</span>
               <span class="status-badge disconnected" id="influencerStatus">No data</span>
               <button onclick="visionScanCreators()" class="px-3 py-1.5 rounded-lg text-[10px] font-semibold bg-accent-purple-light text-accent-purple hover:bg-accent-purple/20 transition-colors" title="Scan influencer thumbnails via Claude Vision to identify unique creators by face. Uses Haiku (cheapest model), results cached permanently.">Vision ID</button>
             </div>
@@ -2351,13 +2330,9 @@ function renderHealthPanel() {
   // Date range check across tabs
   const oracleDateFrom = document.getElementById('dashboardDateFrom')?.value || 'not set';
   const oracleDateTo = document.getElementById('dashboardDateTo')?.value || 'not set';
-  const sentinelDate = document.getElementById('sentinelDateRange')?.value || 'all';
-  const taggerDate = document.getElementById('taggerDateRange')?.value || 'all';
-  const influDate = document.getElementById('influencerDateRange')?.value || 'all';
-  html += row('INFO', 'Oracle date range', `${oracleDateFrom} to ${oracleDateTo}`);
-  html += row('INFO', 'Sentinel date range', sentinelDate === 'all' ? 'All Time' : `Last ${sentinelDate} days`);
-  html += row('INFO', 'Lens:Tag date range', taggerDate === 'all' ? 'All Time' : `Last ${taggerDate} days`);
-  html += row('INFO', 'Influencer date range', influDate === 'all' ? 'All Time' : `Last ${influDate} days`);
+  const globalLabel = (oracleDateFrom !== 'not set' && oracleDateTo !== 'not set') ? `${oracleDateFrom} to ${oracleDateTo}` : 'All Time (set dates on Oracle)';
+  html += row('PASS', 'Global date range', globalLabel);
+  html += row('INFO', 'All tabs unified', 'Sentinel, Lens, Influencer all read Oracle date picker');
 
   // Geo filter check
   const oracleGeo = document.getElementById('dashboardCountryFilter')?.value || 'all';
@@ -3880,6 +3855,7 @@ function syncGeoFilter(sourceId) {
 
 function onDashboardFilterChange() {
   syncGeoFilter('dashboardCountryFilter');
+  syncDateLabels();
   renderRegionalCards();
   // Don't clear insightsGrid/briefsGrid — let re-render overwrite them
   // If runAnalysis times out, old content stays visible instead of blank
@@ -7463,27 +7439,50 @@ function showTaggerResults() {
 }
 
 // Country + date filter + data quality filter — returns taggerData filtered and cleaned
+// Date range reads from Oracle's global date picker (dashboardDateFrom/To)
 const LENS_MIN_SPEND = 5000;  // ₹5K minimum — anything below is noise
 const LENS_MIN_CPTD = 5000;  // ₹5K CPTD floor — portfolio avg is ~₹40K, below ₹5K is CRM false match
+function getGlobalDateRange() {
+  const from = document.getElementById('dashboardDateFrom')?.value || '';
+  const to = document.getElementById('dashboardDateTo')?.value || '';
+  return { from, to };
+}
+function filterByGlobalDate(data) {
+  const { from, to } = getGlobalDateRange();
+  if (!from && !to) return data;
+  return data.filter(c => {
+    const d = c['_date'] || c['date'] || c['Date'] || '';
+    if (!d) return false;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+}
+// Update date labels across all tabs
+function syncDateLabels() {
+  const { from, to } = getGlobalDateRange();
+  const label = (from || to) ? `${from || '...'} to ${to || '...'}` : 'All Time';
+  ['taggerDateLabel','sentinelDateLabel','influencerDateLabel'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = label;
+  });
+}
 function getFilteredTaggerData(filterElId) {
   const country = document.getElementById(filterElId || 'taggerFilterCountry')?.value || 'all';
-  const dateRange = document.getElementById('taggerDateRange')?.value || 'all';
+  const { from, to } = getGlobalDateRange();
   let data = state.taggerData.filter(c => {
     const spend = parseNumber(c['Spent']||c['spent']||0);
     if (spend < LENS_MIN_SPEND) return false;
     return true;
   });
-  // Apply date range filter
-  if (dateRange && dateRange !== 'all') {
-    const days = parseInt(dateRange);
-    if (days > 0) {
-      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
-      data = data.filter(c => {
-        const d = c['_date'] || c['date'] || c['Date'] || '';
-        return d && d >= cutoffStr;
-      });
-    }
+  // Apply global date range from Oracle date picker
+  if (from || to) {
+    data = data.filter(c => {
+      const d = c['_date'] || c['date'] || c['Date'] || '';
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      return true;
+    });
   }
   // Sanitize CRM false matches — don't mutate originals
   data = data.map(c => {
@@ -9626,8 +9625,9 @@ function runSentinelView() {
   const geoFilter = document.getElementById('sentinelGeo').value;
   const spendMin = parseNumber(document.getElementById('sentinelSpendFilter')?.value || '0');
   const formatFilter = document.getElementById('sentinelFormatFilterHeader')?.value || 'all';
-  const dateRange = document.getElementById('sentinelDateRange')?.value || 'all';
   let data = state.taggerData.length ? [...state.taggerData] : [];
+  // Apply global date range from Oracle
+  data = filterByGlobalDate(data);
 
   if (!data.length) {
     document.getElementById('sentinelEmpty').classList.remove('hidden');
@@ -9638,21 +9638,6 @@ function runSentinelView() {
   // Filter by geo
   if (geoFilter !== 'all') {
     data = data.filter(c => extractMarket(c) === geoFilter);
-  }
-  // Filter by date range
-  if (dateRange && dateRange !== 'all') {
-    const today = new Date();
-    const days = parseInt(dateRange);
-    if (days > 0) {
-      const cutoff = new Date(today);
-      cutoff.setDate(cutoff.getDate() - days);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
-      data = data.filter(c => {
-        const d = c['_date'] || c['date'] || c['Date'] || '';
-        if (!d) return false; // Exclude undated rows from date-filtered results
-        return d >= cutoffStr;
-      });
-    }
   }
   // Filter by minimum spend
   if (spendMin > 0) {
@@ -10318,11 +10303,10 @@ function switchInfluencerTab(tab) {
   const hints = { leaderboard: 'Creator performance ranked by CPTD. Click a row to see ad-set breakdown.', content: 'Hook and format performance per creator.', compare: 'Influencer campaign ads vs all other (in-house) ads. Winner decided by CPTD with min 3 TDs.' };
   const hintEl = document.getElementById('infTabHint'); if (hintEl) hintEl.textContent = hints[tab] || '';
   const geoFilter = document.getElementById('influencerGeo')?.value || 'all';
-  const dateRange = document.getElementById('influencerDateRange')?.value || 'all';
-  const creators = getInfluencerAds(geoFilter, dateRange);
+  const creators = getInfluencerAds(geoFilter);
   if (tab === 'leaderboard') renderInfluLeaderboard(creators);
   if (tab === 'content') renderInfluContent(creators);
-  if (tab === 'compare') renderInfluCompare(geoFilter, dateRange);
+  if (tab === 'compare') renderInfluCompare(geoFilter);
 }
 
 // ---- Influencer data extraction from Meta Ads ----
@@ -10455,7 +10439,7 @@ function _enrichCreatorFromRoster(creatorLabel, rosterLookup) {
   return null;
 }
 
-function getInfluencerAds(geoFilter, dateRange) {
+function getInfluencerAds(geoFilter) {
   let data = [...(state.taggerData || [])];
   if (!data.length) return [];
 
@@ -10463,20 +10447,8 @@ function getInfluencerAds(geoFilter, dateRange) {
   if (geoFilter && geoFilter !== 'all') {
     data = data.filter(c => extractMarket(c) === geoFilter);
   }
-  // Filter by date range
-  if (dateRange && dateRange !== 'all') {
-    const today = new Date();
-    const days = parseInt(dateRange);
-    if (days > 0) {
-      const cutoff = new Date(today);
-      cutoff.setDate(cutoff.getDate() - days);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
-      data = data.filter(c => {
-        const d = c['_date'] || c['date'] || c['Date'] || '';
-        return d && d >= cutoffStr;
-      });
-    }
-  }
+  // Filter by global date range (same as Oracle)
+  data = filterByGlobalDate(data);
 
   const rosterLookup = _buildRosterLookup();
   const creators = {};
@@ -10522,7 +10494,7 @@ function getInfluencerAds(geoFilter, dateRange) {
 
 function renderInfluencerView() {
   const geoFilter = document.getElementById('influencerGeo')?.value || 'all';
-  const dateRange = document.getElementById('influencerDateRange')?.value || 'all';
+
   // Show empty state if no tagger data loaded at all
   if (!state.taggerData?.length) {
     const emptyHtml = `<div class="text-center py-16"><div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent-purple/20 to-accent-pink/20 flex items-center justify-center"><svg class="w-8 h-8 text-accent-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div><h3 class="text-base font-bold text-text-primary mb-2">No Performance Data</h3><p class="text-sm text-text-muted mb-4">Load Meta Ads data via Tagger (CSV or API) to see influencer performance.</p><button onclick="navigateTo('tagger')" class="px-4 py-2 rounded-lg text-sm font-semibold bg-accent-purple text-white hover:bg-accent-purple/80">Go to Tagger</button></div>`;
@@ -10531,14 +10503,14 @@ function renderInfluencerView() {
     el.textContent = 'No data'; el.className = 'status-badge disconnected';
     return;
   }
-  const creators = getInfluencerAds(geoFilter, dateRange);
+  const creators = getInfluencerAds(geoFilter);
   const el = document.getElementById('influencerStatus');
   const totalAds = creators.reduce((s, c) => s + c.ads.length, 0);
   el.textContent = creators.length ? `${creators.length} creators · ${totalAds} ads` : 'No influencer ads found';
   el.className = 'status-badge ' + (creators.length ? 'connected' : 'disconnected');
   renderInfluLeaderboard(creators);
   renderInfluContent(creators);
-  renderInfluCompare(geoFilter, dateRange);
+  renderInfluCompare(geoFilter);
 }
 
 function saveInfluencerType(name, type) {
@@ -10550,8 +10522,8 @@ function saveInfluencerType(name, type) {
 function renderInfluLeaderboard(filteredCreators) {
   const container = document.getElementById('infTab-leaderboard');
   const geoFilter = document.getElementById('influencerGeo')?.value || 'all';
-  const dateRange = document.getElementById('influencerDateRange')?.value || 'all';
-  const creators = filteredCreators || getInfluencerAds(geoFilter, dateRange);
+
+  const creators = filteredCreators || getInfluencerAds(geoFilter);
   if (!creators.length) { container.innerHTML = '<div class="text-center py-12 text-text-muted text-sm">No influencer ads found. Ensure the creator roster sheet is connected and Meta data is loaded.</div>'; return; }
 
   // Compute metrics per creator
@@ -10671,8 +10643,8 @@ function renderInfluLeaderboard(filteredCreators) {
 function renderInfluContent(filteredCreators) {
   const container = document.getElementById('infTab-content');
   const geoFilter = document.getElementById('influencerGeo')?.value || 'all';
-  const dateRange = document.getElementById('influencerDateRange')?.value || 'all';
-  const creators = filteredCreators || getInfluencerAds(geoFilter, dateRange);
+
+  const creators = filteredCreators || getInfluencerAds(geoFilter);
   if (!creators.length) { container.innerHTML = '<div class="text-center py-12 text-text-muted text-sm">No influencer ads found.</div>'; return; }
 
   let html = '<h3 class="text-sm font-bold mb-4">Content Performance by Creator</h3>';
@@ -10735,28 +10707,12 @@ function renderInfluContent(filteredCreators) {
   container.innerHTML = html;
 }
 
-function renderInfluCompare(geoFilterParam, dateRangeParam) {
+function renderInfluCompare(geoFilterParam) {
   const container = document.getElementById('infTab-compare');
   const geoFilter = geoFilterParam || document.getElementById('influencerGeo')?.value || 'all';
-  const dateRange = dateRangeParam || document.getElementById('influencerDateRange')?.value || 'all';
-  let allData = [...(state.taggerData || [])];
-  // Apply same geo + date filters to the comparison baseline
+  let allData = filterByGlobalDate([...(state.taggerData || [])]);
   if (geoFilter && geoFilter !== 'all') {
     allData = allData.filter(c => extractMarket(c) === geoFilter);
-  }
-  if (dateRange && dateRange !== 'all') {
-    const today = new Date();
-    const days = parseInt(dateRange);
-    if (days > 0) {
-      const cutoff = new Date(today);
-      cutoff.setDate(cutoff.getDate() - days);
-      const cutoffStr = cutoff.toISOString().slice(0, 10);
-      allData = allData.filter(c => {
-        const d = c['_date'] || c['date'] || c['Date'] || '';
-        if (!d) return false;
-        return d >= cutoffStr;
-      });
-    }
   }
   if (!allData.length) { container.innerHTML = '<div class="text-center py-12 text-text-muted text-sm">No tagged data available.</div>'; return; }
 
