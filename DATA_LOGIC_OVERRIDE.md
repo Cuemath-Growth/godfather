@@ -26,24 +26,22 @@ Filter: where G='meta' → confirmed correct. Column G = utm_medium.
 | L | landing_type | — | ❌ README wrong — QL column is elsewhere |
 | U | paid | paid | ✓ Correct (enrollment flag 0/1) |
 
-### ⚠️ MUST VERIFY — QL Count Column
-The README states ql_count is at column L. Column L is actually landing_type.
-Action required: Open the CRM Leads tab, find the column that contains 0 or 1 indicating whether a lead qualified. Record the exact header name and column letter here before building any CRM portfolio total logic.
+### ✅ RESOLVED — QL Count Column
+- QL column header: `qls` (column M, position 13)
+- Value: 0 or 1 per lead
+- Every row where utm_medium='meta' has qls=1 (8800 meta leads = 8800 QLs)
+- So for Meta leads, QL count = row count (every Meta lead is a QL)
 
-Placeholder (replace after verification):
-- QL column header: UNKNOWN
-- QL column letter: UNKNOWN
-
-### ⚠️ MUST VERIFY — Revenue / net_booking Column
-The README states net_booking is at column U. Column U is actually paid.
-Action required: Open the CRM Leads tab, find the column containing revenue value for enrolled students (will be a numeric value in thousands or lakh range). Record exact header and column letter.
-
-Placeholder (replace after verification):
-- Revenue column header: UNKNOWN
-- Revenue column letter: UNKNOWN
-- Revenue unit: UNKNOWN (paise / rupees / lakhs — determines whether ×100 multiplier applies)
-
-Risk if unresolved: Revenue and ROAS will be wrong. Do not display revenue or ROAS metrics in any tab until this is verified.
+### ✅ RESOLVED — Revenue / net_booking Column
+- net_booking column header: `net_booking` (column V, position 22)
+- Revenue column header: `Revenue` (column AV, position 47)
+- **net_booking unit: CRORES** (e.g., 0.019403 = ₹1.94L = ₹194,000)
+- **Revenue unit: LAKHS** (e.g., 1.9403 = ₹1.94L = ₹194,000)
+- **Revenue = net_booking × 100** (confirmed from data)
+- Average revenue per enrolled student: ~₹60,000
+- Total revenue (663 paid meta students): ~₹3.98Cr
+- **Use `Revenue` column directly (in lakhs) × 100000 to get INR value**
+- Or use `net_booking` column × 10000000 (crores to rupees)
 
 ### Confirmed CRM columns (cross-referenced as reliable):
 ```
@@ -173,13 +171,13 @@ Current state: Oracle WoW comparison reads from Perf Tracker Daily (old pipeline
 Correct state: Oracle WoW should read from tagger data filtered to current week vs previous week — same source as Sentinel.
 Action: Replace getOracleMetrics() calls in WoW with tagger data filtered by date range.
 
-## SECTION 9 — Revenue & ROAS
-Do not display revenue or ROAS until the following is resolved:
-1. The net_booking column location in the CRM sheet is unknown (see Section 2)
-2. The unit of net_booking is unknown — could be paise, rupees, or lakhs
-3. The README specifies revenue = sum of net_booking × 100 but the ×100 multiplier is undocumented
-
-Once the column is identified: verify unit, document formula, then ship.
+## SECTION 9 — Revenue & ROAS (RESOLVED)
+- `net_booking` (col 22): in CRORES. Multiply by 10,000,000 to get INR.
+- `Revenue` (col 47): in LAKHS. Multiply by 100,000 to get INR.
+- Revenue = net_booking × 100 (crores to lakhs conversion, confirmed)
+- **Use in code:** `parseNumber(r['Revenue']) * 100000` for INR, or `parseNumber(r['net_booking']) * 10000000`
+- ROAS = Revenue (INR) / Spend (INR)
+- Total: 663 paid Meta students, ₹3.98Cr revenue, avg ₹60K/student
 
 ## SECTION 10 — Items Confirmed Correct (No Change Needed)
 - utm_medium at column G → where G='meta' filter is correct ✓
@@ -191,10 +189,30 @@ Once the column is identified: verify unit, document formula, then ship.
 - All monetary values in ₹ — never USD, never AUD ✓
 
 ## OPEN ITEMS — Must resolve before full build
-| # | Item | Blocker for |
-|---|---|---|
-| OI-1 | QL count column name + letter in CRM Leads tab | All CRM portfolio totals |
-| OI-2 | net_booking column name + letter in CRM Leads tab | Revenue, ROAS, CAC |
-| OI-3 | Revenue unit (paise / rupees / lakhs) | Revenue multiplier logic |
-| OI-4 | Verify Oracle WoW is on tagger data or still on old pipeline | WoW accuracy |
-| OI-5 | Confirm LENS_MIN_CPTD market-specific floors are implemented | India creative-layer TD count |
+| # | Item | Blocker for | Status |
+|---|---|---|---|
+| OI-1 | QL count column name + letter | All CRM portfolio totals | ✅ RESOLVED: `qls` col 13, value 0/1 |
+| OI-2 | net_booking column name + letter | Revenue, ROAS, CAC | ✅ RESOLVED: `net_booking` col 22 (crores), `Revenue` col 47 (lakhs) |
+| OI-3 | Revenue unit | Revenue multiplier logic | ✅ RESOLVED: net_booking=crores, Revenue=lakhs, Revenue=net_booking×100 |
+| OI-4 | Oracle WoW pipeline | WoW accuracy | 🔶 CONFIRMED: still on getOracleMetrics. Must migrate to tagger data. |
+| OI-5 | LENS_MIN_CPTD market floors | India creative-layer TD count | 🔶 NOT YET IMPLEMENTED: US ₹5K, India ₹1.5K, AUS ₹5K, MEA ₹3K |
+| OI-6 | TQL for India/MEA uses board filter | India/MEA CPTQL | 🔶 NOT YET IMPLEMENTED: code uses QL, should use IB+IGCSE only |
+| OI-7 | APAC sub-country parsing | Geo accuracy | 🔶 NOT YET IMPLEMENTED |
+| OI-8 | Revenue in code uses wrong multiplier | ROAS display | 🔶 NOT YET IMPLEMENTED |
+
+## GROUND TRUTH FROM CSV (2026-03-28)
+Source: `Perf Tracker - International - leads.csv` (complete CRM export)
+
+| Market | Meta QLs | TQL | TDs | Paid | TQL Definition |
+|---|---|---|---|---|---|
+| US | 4,338 | 2,373 (NRI) | — | — | ethnicity = 'NRI' |
+| APAC | 2,221 | 2,221 (all) | — | — | all QLs qualify |
+| ME | 1,557 | 345 (IB+IGCSE) | — | — | board(ME) = IB or IGCSE |
+| UK | 260 | 260 (all) | — | — | all QLs qualify |
+| India | 154 | 11 (IB+IGCSE) | — | — | board(ME) = IB or IGCSE |
+| Canada | 263 | — | — | — | (follows US rules?) |
+| **Total** | **8,800** | — | **2,160** | **667** | |
+
+Column G = utm_medium ✅ confirmed.
+Board column = `board (ME)` (col 52). India: 7 IB + 4 IGCSE = 11 TQL out of 154 QL.
+Ethnicity values for US: 2373 NRI, 1036 Non NRI, 710 Asian(Others), etc.
