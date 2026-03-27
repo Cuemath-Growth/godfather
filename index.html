@@ -747,6 +747,14 @@
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="combos" onclick="switchTaggerTab('combos')">Combos</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="grid" onclick="switchTaggerTab('grid')">Grid</button>
             </div>
+            <select id="taggerDateRange" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
+              <option value="all">All Time</option>
+              <option value="30" selected>Last 30 days</option>
+              <option value="60">Last 60 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="14">Last 14 days</option>
+              <option value="7">Last 7 days</option>
+            </select>
             <select id="taggerFilterCountry" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
               <option value="all">All Countries</option>
               <option value="US">US</option>
@@ -7392,16 +7400,29 @@ function showTaggerResults() {
   }
 }
 
-// Country filter + data quality filter — returns taggerData filtered and cleaned
+// Country + date filter + data quality filter — returns taggerData filtered and cleaned
 const LENS_MIN_SPEND = 5000;  // ₹5K minimum — anything below is noise
 const LENS_MIN_CPTD = 5000;  // ₹5K CPTD floor — portfolio avg is ~₹40K, below ₹5K is CRM false match
 function getFilteredTaggerData(filterElId) {
   const country = document.getElementById(filterElId || 'taggerFilterCountry')?.value || 'all';
+  const dateRange = document.getElementById('taggerDateRange')?.value || 'all';
   let data = state.taggerData.filter(c => {
     const spend = parseNumber(c['Spent']||c['spent']||0);
     if (spend < LENS_MIN_SPEND) return false;
     return true;
   });
+  // Apply date range filter
+  if (dateRange && dateRange !== 'all') {
+    const days = parseInt(dateRange);
+    if (days > 0) {
+      const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
+      const cutoffStr = cutoff.toISOString().slice(0, 10);
+      data = data.filter(c => {
+        const d = c['_date'] || c['date'] || c['Date'] || '';
+        return d && d >= cutoffStr;
+      });
+    }
+  }
   // Sanitize CRM false matches — don't mutate originals
   data = data.map(c => {
     const spend = parseNumber(c['Spent']||c['spent']||0);
@@ -7548,7 +7569,7 @@ function renderTaggerInsights() {
           <span class="text-xs font-bold text-accent-red">${formatCurrency(ins.worstMetric)}</span>
         </div>
       </div>
-      <p class="text-[10px] text-text-muted mt-2">${ins.metricLabel}: "${tagLabel(ins.best)}" costs ${savingsLabel} than "${tagLabel(ins.worst)}" across ${ins.bestCount + ins.worstCount} creatives</p>
+      <p class="text-[10px] text-text-muted mt-2">${ins.metricLabel}: "${tagLabel(ins.best)}" (${ins.bestCount} ads) costs ${savingsLabel} than "${tagLabel(ins.worst)}" (${ins.worstCount} ads)</p>
     </div>`;
   });
 }
