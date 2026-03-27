@@ -3299,7 +3299,8 @@ function mergeCRMWithMeta() {
     const market = extractMarket(c);
     const nriVal = parseNumber(c['NRI']||c['nri']||0);
     const qlVal = parseNumber(c['QL']||c['ql']||0);
-    c['TQL'] = market === 'US' ? nriVal : qlVal;
+    const board = c['board'] || c['board (ME)'] || '';
+    c['TQL'] = computeTQL(qlVal, nriVal, market, board);
   });
 
   console.log(`CRM merge: ${directMatched} direct ad matches, ${campaignMatched} campaign fallbacks, ${unmatched} unmatched (${(100*directMatched/state.taggerData.length).toFixed(1)}% direct)`);
@@ -4292,8 +4293,24 @@ function renderOracleActions() {
         const lwEndStr = new Date(twStart); lwEndStr.setDate(twStart.getDate() - 1);
         const lwEndStr2 = lwEndStr.toISOString().slice(0,10);
 
-        const tw = getOracleMetrics(twStartStr, twEndStr, dashCountryWoW);
-        const lw = getOracleMetrics(lwStartStr, lwEndStr2, dashCountryWoW);
+        // WoW from tagger data — same source as Sentinel/Lens (DATA_LOGIC_OVERRIDE Section 8)
+        const wowFilter = (d, from, to) => d.filter(c => {
+          const dt = c['_date'] || c['date'] || '';
+          return dt && dt >= from && dt <= to;
+        });
+        const geoTagger = dashCountryWoW === 'all' ? state.taggerData : state.taggerData.filter(c => extractMarket(c) === dashCountryWoW);
+        const twData = wowFilter(geoTagger, twStartStr, twEndStr);
+        const lwData = wowFilter(geoTagger, lwStartStr, lwEndStr2);
+        const wowMetrics = (d) => {
+          const spend = d.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+          const ql = d.reduce((s,c) => s + parseNumber(c['QL']||c['ql']||0), 0);
+          const nri = d.reduce((s,c) => s + parseNumber(c['NRI']||c['nri']||0), 0);
+          const td = d.reduce((s,c) => s + parseNumber(c['TD']||c['td']||0), 0);
+          const tql = d.reduce((s,c) => { const m = extractMarket(c); const b = c['board']||c['board (ME)']||''; return s + computeTQL(parseNumber(c['QL']||c['ql']||0), parseNumber(c['NRI']||c['nri']||0), m, b); }, 0);
+          return { spend, tql, cptql: tql > 0 ? spend/tql : 0, td, cptd: td > 0 ? spend/td : 0, tqlTd: tql > 0 ? Math.min(td/tql*100,100) : 0 };
+        };
+        const tw = wowMetrics(twData);
+        const lw = wowMetrics(lwData);
 
         const pct = (c,p) => c&&p ? ((c-p)/p*100) : null;
         const cptqlP=pct(tw.cptql,lw.cptql), cptdP=pct(tw.cptd,lw.cptd), tqlTdP=pct(tw.tqlTd,lw.tqlTd), spendP=pct(tw.spend,lw.spend);
@@ -5316,7 +5333,8 @@ function renderMetricTicker() {
     totalQL += parseNumber(c['QL']||c['ql']||0);
     const market = extractMarket(c);
     const nri = parseNumber(c['NRI']||c['nri']||0);
-    totalTQL += (market === 'US') ? nri : parseNumber(c['QL']||c['ql']||0);
+    const _board = c['board'] || c['board (ME)'] || '';
+    totalTQL += computeTQL(parseNumber(c['QL']||c['ql']||0), nri, market, _board);
   });
   const avgCPQL = totalQL > 0 ? totalSpend / totalQL : 0;
   const avgCPTQL = totalTQL > 0 ? totalSpend / totalTQL : 0;
@@ -6753,13 +6771,10 @@ function runSentinelAnalysis(data, geo) {
     const roas = spend > 0 && revenue > 0 ? revenue / spend : null;
     const cac = paid > 0 ? spend / paid : null;
 
-    // TQL: compute per creative's own market. US = NRI, others = QL.
-    // Ignore pre-computed TQL from sheet (unreliable — may contain fractional/raw values)
-    const creativeGeo = (c._market || '').toUpperCase();
-    let tql;
-    if (creativeGeo === 'US' || (geo === 'US' && !creativeGeo)) tql = nri;
-    else tql = ql;
-    // TQL can never exceed QL
+    // TQL: market-aware (DATA_LOGIC_OVERRIDE Section 3)
+    const creativeMarket = extractMarket(c);
+    const board = c['board'] || c['board (ME)'] || '';
+    let tql = computeTQL(ql, nri, creativeMarket, board);
     if (tql > ql && ql > 0) tql = ql;
     const cptql = tql > 0 ? spend / tql : null;
     const ql_tql_pct = ql > 0 && tql > 0 ? Math.min((tql / ql) * 100, 100) : null;
@@ -7543,6 +7558,26 @@ function showTaggerResults() {
 //   getFilteredTaggerData() — WITH quality filters, for creative insights (Lens, heatmap, combos)
 // Both use same date range (Oracle date picker) and geo filter.
 
+// TQL computation — market-aware, authoritative definition (DATA_LOGIC_OVERRIDE Section 3)
+// US: NRI only. India: IB+IGCSE board. MEA: IB+IGCSE+Cambridge+US+British boards. APAC/UK: all QLs.
+const MEA_TQL_BOARDS = new Set(['IB','IGCSE','CAMBRIDGE','USCS','US Curriculum','International Baccalaureate (IB)','British/UK Curriculum','British curriculum','UKNC']);
+const INDIA_TQL_BOARDS = new Set(['IB','IGCSE']);
+// Revenue conversion — net_booking is in CRORES, Revenue is in LAKHS (DATA_LOGIC_OVERRIDE Section 9)
+function parseRevenue(row) {
+  const rev = parseNumber(row['Revenue'] || 0);
+  if (rev > 0 && rev < 1000) return rev * 100000; // lakhs → INR
+  const nb = parseNumber(row['net_booking'] || 0);
+  if (nb > 0 && nb < 100) return nb * 10000000; // crores → INR
+  return 0;
+}
+
+function computeTQL(ql, nri, market, board) {
+  if (market === 'US' || market === 'Canada') return nri;
+  if (market === 'India') return (board && INDIA_TQL_BOARDS.has(board)) ? ql : 0;
+  if (market === 'MEA' || market === 'ME') return (board && MEA_TQL_BOARDS.has(board)) ? ql : 0;
+  return ql; // APAC, UK, others — all QLs qualify
+}
+
 // Portfolio layer — unfiltered except date + geo. Used by Oracle KPIs and Sentinel.
 function getGlobalFilteredTaggerData(geoElId) {
   const country = document.getElementById(geoElId || 'dashboardCountryFilter')?.value || 'all';
@@ -7572,7 +7607,24 @@ function getCRMPortfolioTotals(geoFilter) {
   }
   const ql = filtered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
   const nri = filtered.filter(r => (r['ethnicity'] || '').toLowerCase().includes('nri')).length;
-  const tql = geoFilter === 'US' ? nri : ql;
+  // TQL: market-aware board filtering per DATA_LOGIC_OVERRIDE Section 3
+  let tql;
+  if (geoFilter === 'US' || geoFilter === 'Canada') { tql = nri; }
+  else if (geoFilter === 'India') { tql = filtered.filter(r => INDIA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
+  else if (geoFilter === 'MEA' || geoFilter === 'ME') { tql = filtered.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
+  else if (geoFilter === 'all') {
+    // Mixed geos — compute TQL per lead's own market
+    tql = filtered.filter(r => {
+      const cb = (r['country_bucket'] || '').trim();
+      const eth = (r['ethnicity'] || '').toLowerCase();
+      const board = r['board (ME)'] || r['board'] || '';
+      if (cb === 'US' || cb === 'Canada') return eth.includes('nri');
+      if (cb === 'India') return INDIA_TQL_BOARDS.has(board);
+      if (cb === 'ME') return MEA_TQL_BOARDS.has(board);
+      return true; // APAC, UK — all qualify
+    }).length;
+  }
+  else { tql = ql; } // APAC, UK — all QLs qualify
   // TD uses trial_done_date
   let tdFiltered = state._crmLeads || [];
   if (from) tdFiltered = tdFiltered.filter(r => (r['trial_done_date'] || '') >= from);
@@ -7593,13 +7645,15 @@ function getCRMPortfolioTotals(geoFilter) {
     paidFiltered = paidFiltered.filter(r => { const cb = (r['country_bucket'] || r['region'] || '').trim(); return geoTerms.some(g => cb.toLowerCase().includes(g.toLowerCase())); });
   }
   const paid = paidFiltered.filter(r => parseNumber(r['paid'] || 0) > 0).length;
-  const revenue = paidFiltered.reduce((s, r) => s + parseNumber(r['net_booking'] || r['Revenue'] || 0), 0);
+  const revenue = paidFiltered.reduce((s, r) => s + parseRevenue(r), 0);
   return { ql, tql, nri, td, paid, revenue };
 }
 
 // Creative layer — quality-filtered for Lens insights. ₹5K spend minimum, TD sanitization.
 const LENS_MIN_SPEND = 5000;  // ₹5K minimum — anything below is noise
-const LENS_MIN_CPTD = 5000;  // ₹5K CPTD floor — portfolio avg is ~₹40K, below ₹5K is CRM false match
+// Market-aware CPTD sanity floors (DATA_LOGIC_OVERRIDE Section 5)
+const LENS_MIN_CPTD_BY_MARKET = { 'US': 5000, 'India': 1500, 'AUS': 5000, 'APAC': 5000, 'MEA': 3000, 'ME': 3000, 'UK': 5000 };
+const LENS_MIN_CPTD = 5000; // fallback
 function getGlobalDateRange() {
   const from = document.getElementById('dashboardDateFrom')?.value || '';
   const to = document.getElementById('dashboardDateTo')?.value || '';
@@ -7648,7 +7702,7 @@ function getFilteredTaggerData(filterElId) {
     const td = parseNumber(c['TD']||c['td']||0);
     const metaQL = parseNumber(c['QL']||c['ql']||0);
     const needsFix =
-      (td > 0 && spend / td < LENS_MIN_CPTD) ||  // CPTD below floor = false match
+      (td > 0 && spend / td < (LENS_MIN_CPTD_BY_MARKET[extractMarket(c)] || LENS_MIN_CPTD)) ||  // CPTD below market floor = false match
       (td > 0 && metaQL === 0) ||                  // 0 Meta QLs but has TDs = no confirmation
       (td > metaQL && metaQL > 0 && metaQL <= 3);  // More TDs than QLs on low-QL creatives = inflated
     if (needsFix) {
@@ -10624,9 +10678,10 @@ function getInfluencerAds(geoFilter) {
     const td = parseNumber(c['TD']||c['td']||0);
     const nri = parseNumber(c['NRI']||c['nri']||0);
     const paid = parseNumber(c['Paid']||c['paid']||0);
-    // Compute TQL same as Oracle/Sentinel: US = NRI, others = QL
+    // Compute TQL — market-aware (DATA_LOGIC_OVERRIDE Section 3)
     const market = extractMarket(c);
-    const tql = (market === 'US') ? nri : ql;
+    const _board = c['board'] || c['board (ME)'] || '';
+    const tql = computeTQL(ql, nri, market, _board);
     cr.spend += spend; cr.ql += ql; cr.td += td; cr.nri += nri; cr.paid += paid; cr.tql = (cr.tql || 0) + tql;
 
     // Group by ad set for audience breakdown
