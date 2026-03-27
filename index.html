@@ -1661,7 +1661,7 @@ function saveState(key, value) {
   }
 }
 
-const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','thumbnail_url','image_url','ad_body','ad_title','Frequency','Reach','Video_P25','Video_P50','Video_P75','Video_P100','net_booking','board','ethnicity'];
+const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','thumbnail_url','image_url','ad_body','ad_title','ad_description','ad_cta','Frequency','Reach','Video_P25','Video_P50','Video_P75','Video_P100','net_booking','board','ethnicity'];
 function compressTaggerData(data) {
   return data.map(c => {
     const slim = {};
@@ -2715,7 +2715,7 @@ async function backfillThumbnails() {
   let matched = 0;
   for (const account of accounts) {
     try {
-      let url = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url,body,title}&limit=500&access_token=${token}`;
+      let url = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url,body,title,description,call_to_action_type}&limit=500&access_token=${token}`;
       let page = 1;
       while (url && page <= 10) {
         const resp = await fetch(url);
@@ -2871,7 +2871,7 @@ async function connectMetaApi() {
   if (allAds.length && statusEl) statusEl.textContent = 'Fetching creative thumbnails...';
   for (const account of accounts) {
     try {
-      let thumbUrl = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url,body,title}&limit=500&date_preset=${datePreset}&access_token=${token}`;
+      let thumbUrl = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url,body,title,description,call_to_action_type}&limit=500&date_preset=${datePreset}&access_token=${token}`;
       let thumbPage = 1;
       while (thumbUrl && thumbPage <= 10) {
         const resp = await fetch(thumbUrl);
@@ -2885,6 +2885,8 @@ async function connectMetaApi() {
               match.image_url = ad.creative.image_url || '';
               match.ad_body = ad.creative.body || '';
               match.ad_title = ad.creative.title || '';
+              match.ad_description = ad.creative.description || '';
+              match.ad_cta = ad.creative.call_to_action_type || '';
             }
           });
         }
@@ -7217,11 +7219,15 @@ function buildTaggerPrompt(batch) {
     const cpql = c['CPQL'] || c['cpql'] || '';
     const body = c['ad_body'] || '';
     const title = c['ad_title'] || '';
+    const desc = c['ad_description'] || '';
+    const cta = c['ad_cta'] || '';
     const freq = c['Frequency'] || '';
-    const bodyLine = body ? ` | Copy: "${body.slice(0, 150)}"` : '';
-    const titleLine = title ? ` | Title: "${title.slice(0, 80)}"` : '';
+    const titleLine = title ? ` | Headline: "${title.slice(0, 80)}"` : '';
+    const bodyLine = body ? ` | Primary text: "${body.slice(0, 150)}"` : '';
+    const descLine = desc ? ` | Description: "${desc.slice(0, 80)}"` : '';
+    const ctaLine = cta ? ` | CTA: ${cta.replace(/_/g, ' ')}` : '';
     const freqLine = freq ? ` | Freq: ${freq}` : '';
-    return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}${titleLine}${bodyLine}${freqLine}`;
+    return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}${titleLine}${bodyLine}${descLine}${ctaLine}${freqLine}`;
   }).join('\n');
 
   return `You are Lens, Cuemath's creative audit AI. Tag these ad creatives using Cuemath's EXACT coded taxonomy.
