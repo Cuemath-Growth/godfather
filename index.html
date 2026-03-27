@@ -665,6 +665,7 @@
         <div class="flex items-center justify-between mb-4">
           <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-purple-light text-accent-purple" id="taggerCount">0 creatives</span>
           <span class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-surface-tertiary text-text-muted" id="taggerThumbCount"></span>
+          <button onclick="backfillThumbnails()" class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-accent-purple-light text-accent-purple hover:bg-accent-purple/20 hidden" id="taggerThumbBtn" title="Fetch thumbnails from Meta API for existing creatives">Fetch Thumbnails</button>
           <div class="flex items-center gap-1.5">
             <button onclick="exportTaggerCSV()" class="p-1.5 rounded-lg hover:bg-surface-tertiary border border-gray-200 transition" id="taggerExportBtn" style="display:none" title="Export CSV"><svg class="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></button>
             <button onclick="backupTaggedData()" class="p-1.5 rounded-lg hover:bg-surface-tertiary border border-gray-200 transition" id="taggerBackupBtn" style="display:none" title="Backup tagged data"><svg class="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg></button>
@@ -1622,7 +1623,7 @@ const DEFAULT_SHEETS = {
 };
 const state = {
   apiKey: API_KEY,
-  sheetConfig: { ...DEFAULT_SHEETS, ...(JSON.parse(localStorage.getItem('gf_sheetConfig') || 'null') || {}), libraryTabs: DEFAULT_SHEETS.libraryTabs },
+  sheetConfig: (() => { const saved = JSON.parse(localStorage.getItem('gf_sheetConfig') || 'null') || {}; const filtered = {}; Object.entries(saved).forEach(([k,v]) => { if (v && v !== '') filtered[k] = v; }); return { ...DEFAULT_SHEETS, ...filtered, libraryTabs: DEFAULT_SHEETS.libraryTabs }; })(),
   preferences: JSON.parse(localStorage.getItem('gf_preferences') || '{"defaultMarket":"US","refreshInterval":1800000}'),
   rawData: JSON.parse(localStorage.getItem('gf_rawData') || '{"metaAds":null}'),
   _crmLeads: null,       // CRM leads sheet — fetched fresh each session
@@ -2635,6 +2636,53 @@ function recordMetaPull() {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Backfill thumbnails for existing tagger data without re-pulling all ads
+async function backfillThumbnails() {
+  const token = state.metaApi?.token || META_API_TOKEN;
+  if (!token) { showToast('Enter Meta API token in Settings first'); return; }
+  const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
+  if (!accounts.length) { showToast('No Meta ad accounts configured'); return; }
+  if (!state.taggerData.length) { showToast('No tagger data to backfill'); return; }
+
+  const existing = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+  if (existing > state.taggerData.length * 0.5) { showToast(`Already have ${existing}/${state.taggerData.length} thumbnails`); return; }
+
+  showToast('Fetching thumbnails from Meta API...');
+  const adNameIndex = {};
+  state.taggerData.forEach((c, i) => { const n = c['Ad name'] || c['ad name'] || ''; if (n) adNameIndex[n] = i; });
+
+  let matched = 0;
+  for (const account of accounts) {
+    try {
+      let url = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url}&limit=500&access_token=${token}`;
+      let page = 1;
+      while (url && page <= 10) {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.error) { console.error('Thumbnail fetch error:', data.error.message); break; }
+        if (data.data) {
+          data.data.forEach(ad => {
+            const idx = adNameIndex[ad.name];
+            if (idx !== undefined && ad.creative) {
+              state.taggerData[idx]['thumbnail_url'] = ad.creative.thumbnail_url || '';
+              state.taggerData[idx]['image_url'] = ad.creative.image_url || '';
+              matched++;
+            }
+          });
+        }
+        url = data.paging?.next || null;
+        page++;
+      }
+    } catch(e) { console.error(`Thumbnails ${account.name}:`, e.message); }
+  }
+
+  saveTaggerData();
+  showToast(`Thumbnails backfilled: ${matched} ads matched`);
+  if (state.currentView === 'tagger') showTaggerResults();
+  runDiagnostics();
+}
+window.backfillThumbnails = backfillThumbnails;
 
 async function connectMetaApi() {
   // Rate limit check
@@ -6978,7 +7026,9 @@ async function tagCreatives(rawData) {
   document.getElementById('taggerBackupBtn').style.display = '';
   const _tc = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
   const _te = document.getElementById('taggerThumbCount');
-  if (_te) _te.textContent = _tc > 0 ? `${_tc} with thumbnails` : 'No thumbnails — re-pull via Meta API';
+  if (_te) _te.textContent = _tc > 0 ? `${_tc} with thumbnails` : 'No thumbnails';
+  const _tb = document.getElementById('taggerThumbBtn');
+  if (_tb) _tb.classList.toggle('hidden', _tc > state.taggerData.length * 0.5);
 
   const savings = cachedResults.length > 0 ? ` (${cachedResults.length} from cache, saved ${Math.ceil(cachedResults.length/batchSize)} API calls)` : '';
   showToast(`Tagged ${state.taggerData.length} creatives${savings}`);
