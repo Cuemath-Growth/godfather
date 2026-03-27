@@ -6699,8 +6699,9 @@ function runSentinelAnalysis(data, geo) {
     const cptql = tql > 0 ? spend / tql : null;
     const ql_tql_pct = ql > 0 && tql > 0 ? Math.min((tql / ql) * 100, 100) : null;
 
-    // Composite: CPTD 40%, CPQL 30%, QL→TD% 20%, Spend 10%
-    const compositeScore = (cpql ? (1 / cpql) * 0.3 : 0) +
+    // Composite: CPTD 40%, CPTQL 30%, QL→TD% 20%, Spend 10%
+    // Uses CPTQL (not CPQL) so US scoring reflects NRI quality, not raw lead count
+    const compositeScore = (cptql ? (1 / cptql) * 0.3 : (cpql ? (1 / cpql) * 0.15 : 0)) +
                           (cptd ? (1 / cptd) * 0.4 : 0) +
                           (ql_td_pct ? ql_td_pct * 0.002 : 0) +
                           (spend > 0 ? Math.min(spend / 100000, 1) * 0.1 : 0);
@@ -6741,9 +6742,9 @@ function runSentinelAnalysis(data, geo) {
   const statics = rows.filter(r => r.type === 'static');
   const videos = rows.filter(r => r.type === 'video');
 
-  // Rank by composite score, min 5 QLs for inclusion (D-07), split by format (D-06)
-  const rankableStatics = statics.filter(r => r.metrics.ql >= 5 && r.metrics.td >= 1).sort((a, b) => b.compositeScore - a.compositeScore);
-  const rankableVideos = videos.filter(r => r.metrics.ql >= 5 && r.metrics.td >= 1).sort((a, b) => b.compositeScore - a.compositeScore);
+  // Rank by composite score, min 5 TQLs + 1 TD for inclusion (D-07), split by format (D-06)
+  const rankableStatics = statics.filter(r => r.metrics.tql >= 5 && r.metrics.td >= 1).sort((a, b) => b.compositeScore - a.compositeScore);
+  const rankableVideos = videos.filter(r => r.metrics.tql >= 5 && r.metrics.td >= 1).sort((a, b) => b.compositeScore - a.compositeScore);
 
   // Top: 5 statics + 4 videos (over-fetch so dedup still yields 5); fill from other format if short
   let topStatics = rankableStatics.slice(0, 5);
@@ -9743,8 +9744,9 @@ function runSentinelView() {
   document.getElementById('sentinelEmpty').classList.add('hidden');
   document.getElementById('sentinelContent').classList.remove('hidden');
   const desc = [geoFilter==='all'?'All Markets':geoFilter, spendMin>0?'Spend>'+formatCurrency(spendMin):null, formatFilter!=='all'?formatFilter:null].filter(Boolean).join(' · ');
-  const kpiSource = state._perfTrackerDaily?.length ? 'KPIs: Perf Tracker + CRM' : 'KPIs: Meta API (tagger)';
-  document.getElementById('sentinelSubtitle').textContent = `${data.length} creatives · ${desc} · ${kpiSource} · Updated ${new Date().toLocaleTimeString()}`;
+  const { from: dateFrom, to: dateTo } = getGlobalDateRange();
+  const dateDesc = dateFrom && dateTo ? `${dateFrom} to ${dateTo}` : 'All Time';
+  document.getElementById('sentinelSubtitle').textContent = `${data.length} creatives · ${desc} · ${dateDesc} · Updated ${new Date().toLocaleTimeString()}`;
 
   renderSentinelKPIs();
   renderSentinelAnomalies();
@@ -9766,32 +9768,23 @@ function clearSentinelCache() {
 
 function renderSentinelKPIs() {
   const s = state.sentinelOutput.summary;
-  const sc = state.sentinelOutput.summary_scores;
   const container = document.getElementById('sentinelKPIs');
   const geoFilter = document.getElementById('sentinelGeo')?.value || 'all';
 
-  // All tabs use Perf Tracker + CRM (getOracleMetrics) as single source of truth
-  // Costs Tracker NOT used — its date filters are set manually on the Google Sheet
-  // and numbers change depending on whoever last changed the sheet filter
-  const oracleFrom = document.getElementById('dashboardDateFrom')?.value || '';
-  const oracleTo = document.getElementById('dashboardDateTo')?.value || '';
-  const oracleGeo = geoFilter === 'all' ? 'all' : geoFilter;
-  const hasOracleData = state._perfTrackerDaily?.length > 0 || state._crmLeads?.length > 0;
-  const om = hasOracleData ? getOracleMetrics(oracleFrom, oracleTo, oracleGeo) : null;
+  // UNIFIED: Spend from tagger (ad-level), funnel from CRM (100% of leads)
+  const taggerData = getGlobalFilteredTaggerData('sentinelGeo');
+  const spend = taggerData.reduce((sum, c) => sum + parseNumber(c['Spent']||c['spent']||0), 0);
+  const crm = getCRMPortfolioTotals(geoFilter);
+  const tql = crm.tql || Math.round(s.total_tql);
+  const td = crm.td || s.total_td;
+  const cptql = tql > 0 && spend > 0 ? spend / tql : (s.avg_cptql || 0);
+  const cptd = td > 0 && spend > 0 ? spend / td : (s.avg_cptd || 0);
+  const tqlTd = tql > 0 ? Math.min(td / tql * 100, 100) : (s.avg_ql_td_pct || 0);
+  const enrolled = crm.paid || s.total_paid;
+  const cac = enrolled > 0 && spend > 0 ? spend / enrolled : 0;
+  const roas = crm.revenue > 0 && spend > 0 ? crm.revenue / spend : (s.roas || 0);
 
-  // Single source: Perf Tracker + CRM > tagger fallback
-  const spend = om?.spend || s.total_spend;
-  const tql = om?.tql || Math.round(s.total_tql);
-  const cptql = om?.cptql || s.avg_cptql;
-  const td = om?.td || s.total_td;
-  const cptd = om?.cptd || s.avg_cptd;
-  const tqlTd = om?.tqlTd || s.avg_ql_td_pct;
-  const enrolled = om?.paid || s.total_paid;
-  const cac = enrolled > 0 ? spend / enrolled : (s.cac || 0);
-  const roas = om?.roas || s.roas;
-  const source = om ? 'Perf Tracker + CRM' : 'Meta API (tagger)';
-
-  // Traffic metrics only available from tagger
+  // Traffic metrics from tagger (only source with impressions/clicks)
   const ctr = s.avg_ctr;
   const clickToQl = s.click_to_ql;
   const qlTsPct = s.ql_ts_pct;
@@ -9803,7 +9796,7 @@ function renderSentinelKPIs() {
 
   const kpis = [
     // Row 1: Spend & traffic
-    { label: 'Spend', value: formatCurrency(spend), score: 'gray', sub: source },
+    { label: 'Spend', value: formatCurrency(spend), score: 'gray', sub: `${taggerData.length} ads` },
     { label: 'CTR', value: (ctr||0).toFixed(2) + '%', score: 'gray', sub: 'Meta API' },
     { label: 'Click→QL%', value: (clickToQl||0).toFixed(1) + '%', score: 'gray', sub: 'Meta API' },
     { label: 'CPQL', value: spend > 0 && tql > 0 ? formatCurrency(spend/tql) : '-', score: scoreMetric(tql > 0 ? spend/tql : null, thresholds.cpql, false) },
@@ -9866,12 +9859,12 @@ function renderSentinelTop5() {
         <td class="px-3 py-2"><div class="flex items-center gap-2">${sThumb ? `<img src="${sThumb}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : ''}<span class="font-medium" title="${name}">${shortAdName(name)}</span></div></td>
         <td class="px-2 py-2 text-right">${formatCurrency(m.spend)}</td>
         <td class="px-2 py-2 text-right">${m.ctr ? m.ctr.toFixed(2)+'%' : '-'}</td>
-        <td class="px-2 py-2 text-right font-bold ${SCORE_STYLES[sc.cpql].text}">${m.cptql ? formatCurrency(m.cptql) : (m.cpql ? formatCurrency(m.cpql) : '-')}</td>
-        <td class="px-2 py-2 text-right font-bold ${SCORE_STYLES[sc.cptd].text}">${m.cptd ? formatCurrency(m.cptd) : '-'}</td>
+        <td class="px-2 py-2 text-right font-bold ${SCORE_STYLES[sc.cpql].text}">${m.cptql && m.cptql < 1000000 ? formatCurrency(m.cptql) : (m.cpql && m.cpql < 1000000 ? formatCurrency(m.cpql) : '-')}</td>
+        <td class="px-2 py-2 text-right font-bold ${SCORE_STYLES[sc.cptd].text}">${m.cptd && m.cptd < 10000000 ? formatCurrency(m.cptd) : '-'}</td>
         <td class="px-2 py-2 text-right">${Math.round(m.td||0)}</td>
         <td class="px-2 py-2 text-right">${m.ql_td_pct ? m.ql_td_pct.toFixed(1)+'%' : '-'}</td>
       </tr>`;
-    }).join('') : '<tr><td colspan="6" class="px-3 py-4 text-center text-xs text-text-muted">Ranked by composite score: 40% CPTD + 30% CPQL + 20% QL→TD% + 10% Spend. Min 5 QLs required.</td></tr>';
+    }).join('') : '<tr><td colspan="7" class="px-3 py-4 text-center text-xs text-text-muted">Ranked by composite: 40% CPTD + 30% CPTQL + 20% QL→TD% + 10% Spend. Min 5 TQLs + 1 TD.</td></tr>';
   };
 
   renderRows(state.sentinelOutput.top5, 'sentinelTop5');
