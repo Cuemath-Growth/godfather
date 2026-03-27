@@ -2917,9 +2917,51 @@ async function connectMetaApi() {
     state.rawData.metaAds = allAds;
     saveState('rawData', state.rawData);
 
-    // Auto-navigate to tagger and start tagging
-    navigateTo('tagger');
-    tagCreatives(allAds);
+    // Merge new fields (thumbnails, body, frequency etc.) into existing tagger data WITHOUT re-tagging
+    if (state.taggerData.length) {
+      const adIndex = {};
+      state.taggerData.forEach((c, i) => { const n = (c['Ad name'] || c['ad name'] || '').toLowerCase(); if (n) adIndex[n] = i; });
+      let enriched = 0;
+      allAds.forEach(ad => {
+        const n = (ad['Ad name'] || '').toLowerCase();
+        const idx = adIndex[n];
+        if (idx !== undefined) {
+          const t = state.taggerData[idx];
+          // Merge new fields without overwriting existing tags or metrics
+          if (ad.thumbnail_url && !t.thumbnail_url) { t.thumbnail_url = ad.thumbnail_url; enriched++; }
+          if (ad.image_url && !t.image_url) t.image_url = ad.image_url;
+          if (ad.ad_body && !t.ad_body) t.ad_body = ad.ad_body;
+          if (ad.ad_title && !t.ad_title) t.ad_title = ad.ad_title;
+          if (ad.ad_description && !t.ad_description) t.ad_description = ad.ad_description;
+          if (ad.ad_cta && !t.ad_cta) t.ad_cta = ad.ad_cta;
+          if (ad.Frequency) t.Frequency = ad.Frequency;
+          if (ad.Reach) t.Reach = ad.Reach;
+          if (ad.Video_P25) t.Video_P25 = ad.Video_P25;
+          if (ad.Video_P50) t.Video_P50 = ad.Video_P50;
+          if (ad.Video_P75) t.Video_P75 = ad.Video_P75;
+          if (ad.Video_P100) t.Video_P100 = ad.Video_P100;
+        }
+      });
+      saveTaggerData();
+      showToast(`Enriched ${enriched} existing ads with new fields. No re-tagging needed.`);
+      // Only tag genuinely NEW ads (not in tagger data at all)
+      const existingNames = new Set(state.taggerData.map(c => (c['Ad name'] || c['ad name'] || '').toLowerCase()));
+      const newAds = allAds.filter(a => !existingNames.has((a['Ad name'] || '').toLowerCase()));
+      if (newAds.length > 0) {
+        if (confirm(`${newAds.length} new ads found. Tag them now? (Uses Claude credits)\n\nExisting ${state.taggerData.length} ads already have tags — not re-tagged.`)) {
+          navigateTo('tagger');
+          tagCreatives([...state.taggerData, ...newAds]);
+        } else {
+          showToast(`${newAds.length} new ads saved but not tagged. Tag later in Lens: Tag.`);
+        }
+      } else {
+        showToast(`All ${allAds.length} ads already in tagger data. Enriched with new fields.`);
+      }
+    } else {
+      // No existing tagger data — full tag run needed
+      navigateTo('tagger');
+      tagCreatives(allAds);
+    }
   }
 }
 
