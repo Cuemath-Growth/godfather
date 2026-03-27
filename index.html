@@ -7655,8 +7655,21 @@ const LENS_MIN_SPEND = 5000;  // ₹5K minimum — anything below is noise
 const LENS_MIN_CPTD_BY_MARKET = { 'US': 5000, 'India': 1500, 'AUS': 5000, 'APAC': 5000, 'MEA': 3000, 'ME': 3000, 'UK': 5000 };
 const LENS_MIN_CPTD = 5000; // fallback
 function getGlobalDateRange() {
-  const from = document.getElementById('dashboardDateFrom')?.value || '';
-  const to = document.getElementById('dashboardDateTo')?.value || '';
+  let from = document.getElementById('dashboardDateFrom')?.value || '';
+  let to = document.getElementById('dashboardDateTo')?.value || '';
+  // Fallback: if Oracle hasn't set dates yet, compute from tagger data's own range
+  if (!from && !to && state.taggerData?.length) {
+    const dates = state.taggerData.map(c => c['_date'] || c['date'] || '').filter(d => d && d.length >= 10).sort();
+    if (dates.length) {
+      from = dates[0];
+      to = dates[dates.length - 1];
+      // Set the Oracle pickers so all tabs stay synced
+      const fromEl = document.getElementById('dashboardDateFrom');
+      const toEl = document.getElementById('dashboardDateTo');
+      if (fromEl && !fromEl.value) fromEl.value = from;
+      if (toEl && !toEl.value) toEl.value = to;
+    }
+  }
   return { from, to };
 }
 function filterByGlobalDate(data) {
