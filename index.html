@@ -160,20 +160,15 @@
   <!-- Main Content -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Header -->
-    <header class="bg-white border-b border-gray-200/80 px-6 py-3.5 flex items-center justify-between shrink-0" id="mainHeader">
-      <div class="whitespace-nowrap">
-        <h2 class="text-lg font-bold" id="headerTitle">Dashboard</h2>
-        <p class="text-xs text-text-muted" id="headerSubtitle">Performance insights & content recommendations</p>
+    <header class="hidden" id="mainHeader">
+      <div>
+        <h2 id="headerTitle"></h2>
+        <p id="headerSubtitle"></p>
       </div>
-      <div class="flex items-center gap-3">
-        <span class="status-badge disconnected" id="statusBadge">
-          <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
-          No data
-        </span>
+      <div>
+        <span class="status-badge disconnected" id="statusBadge"><span class="w-1.5 h-1.5 rounded-full bg-current"></span>No data</span>
         <span id="supabaseSyncBadge" style="display:none"></span>
-        <button onclick="refreshData()" class="p-2 rounded-lg hover:bg-surface-tertiary transition" title="Refresh">
-          <svg class="w-4 h-4 text-text-secondary" id="refreshIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-        </button>
+        <button onclick="refreshData()" id="refreshIcon" class="hidden"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
       </div>
     </header>
 
