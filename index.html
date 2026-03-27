@@ -7369,6 +7369,14 @@ function renderLensAggregateMetrics() {
 
 function showTaggerResults() {
   document.getElementById('taggerResults').classList.remove('hidden');
+  // Show export/backup buttons + thumbnail status
+  const _expBtn = document.getElementById('taggerExportBtn'); if (_expBtn) _expBtn.style.display = '';
+  const _bkpBtn = document.getElementById('taggerBackupBtn'); if (_bkpBtn) _bkpBtn.style.display = '';
+  const _tc = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+  const _te = document.getElementById('taggerThumbCount');
+  if (_te) _te.textContent = _tc > 0 ? `${_tc} thumbnails` : 'No thumbnails';
+  const _tb = document.getElementById('taggerThumbBtn');
+  if (_tb) _tb.classList.toggle('hidden', _tc > state.taggerData.length * 0.5);
   // Render accurate aggregate metrics from perf tracker + CRM
   renderLensAggregateMetrics();
   // Match tagged ads to Library source assets
