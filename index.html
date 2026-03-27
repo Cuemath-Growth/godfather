@@ -160,17 +160,13 @@
   <!-- Main Content -->
   <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Header -->
-    <header class="hidden" id="mainHeader">
-      <div>
-        <h2 id="headerTitle"></h2>
-        <p id="headerSubtitle"></p>
-      </div>
-      <div>
-        <span class="status-badge disconnected" id="statusBadge"><span class="w-1.5 h-1.5 rounded-full bg-current"></span>No data</span>
-        <span id="supabaseSyncBadge" style="display:none"></span>
-        <button onclick="refreshData()" id="refreshIcon" class="hidden"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
-      </div>
-    </header>
+    <!-- Header elements hidden — each view has its own. These exist for JS references only -->
+    <span id="mainHeader" style="display:none"></span>
+    <span id="headerTitle" style="display:none"></span>
+    <span id="headerSubtitle" style="display:none"></span>
+    <span id="statusBadge" style="display:none"></span>
+    <span id="supabaseSyncBadge" style="display:none"></span>
+    <span id="refreshIcon" style="display:none"></span>
 
     <!-- Views Container -->
     <main class="flex-1 overflow-y-auto">
