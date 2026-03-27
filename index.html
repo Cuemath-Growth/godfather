@@ -2342,13 +2342,28 @@ function renderHealthPanel() {
   const geoSync = (oracleGeo === sentinelGeo && sentinelGeo === taggerGeo && taggerGeo === influGeo);
   html += row(geoSync ? 'PASS' : 'WARN', 'Geo filters synced', geoSync ? `All: ${oracleGeo}` : `Oracle:${oracleGeo} Sentinel:${sentinelGeo} Lens:${taggerGeo} Influ:${influGeo}`);
 
-  // Number sanity across sources
-  if (state.taggerData?.length && state._perfTrackerDaily?.length) {
+  // Portfolio vs Creative layer comparison
+  html += '<div class="mt-3 pt-3 border-t border-gray-200"><p class="font-bold text-xs mb-2">Data Layers</p>';
+  if (state.taggerData?.length) {
+    const taggerTD = state.taggerData.reduce((s,c) => s + parseNumber(c['TD']||c['td']||0), 0);
+    const crm = getCRMPortfolioTotals('all');
+    html += row('INFO', 'Portfolio TDs (CRM direct)', `${crm.td} TDs — counts all Meta leads`);
+    html += row('INFO', 'Creative TDs (tagger merge)', `${Math.round(taggerTD)} TDs — matched to specific ads`);
+    if (crm.td > 0) {
+      const matchRate = Math.round(taggerTD / crm.td * 100);
+      html += row(matchRate >= 70 ? 'PASS' : 'WARN', 'CRM match rate', `${matchRate}% — ${matchRate >= 70 ? 'healthy' : 'check mergeCRMWithMeta()'}`);
+    }
+  }
+  if (state._perfTrackerDaily?.length) {
     const taggerSpend = state.taggerData.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
     const perfSpend = state._perfTrackerDaily.reduce((s,r) => s + parseNumber(r['spend']||r['Spend']||0), 0);
     const delta = Math.abs(taggerSpend - perfSpend) / Math.max(taggerSpend, perfSpend) * 100;
-    html += row(delta < 10 ? 'PASS' : 'WARN', 'Tagger vs PerfTracker spend', `${formatCurrency(taggerSpend)} vs ${formatCurrency(perfSpend)} (${delta.toFixed(1)}% delta)`);
+    html += row(delta < 10 ? 'PASS' : 'WARN', 'Spend: tagger vs perf tracker', `${formatCurrency(taggerSpend)} vs ${formatCurrency(perfSpend)} (${delta.toFixed(1)}% delta)`);
   }
+  const lensData = getFilteredTaggerData();
+  html += row('INFO', 'Lens (quality-filtered)', `${lensData.length} creatives (≥₹5K spend + TD sanitization)`);
+  html += row('INFO', 'Oracle/Sentinel (unfiltered)', `${getGlobalFilteredTaggerData().length} creatives (all spend levels)`);
+  html += '</div>';
 
   html += '</div>';
   panel.innerHTML = html;
@@ -4444,7 +4459,7 @@ function renderOracleActions() {
   if (creators.length) {
     const ranked = creators.map(cr => ({
       ...cr,
-      cpql: cr.ql > 0 ? cr.spend / cr.ql : null,
+      cpql: (cr.tql || cr.ql) > 0 ? cr.spend / (cr.tql || cr.ql) : null,
       cptd: cr.td > 0 ? cr.spend / cr.td : null,
       displayName: cr.name,
       type: cr.ethnicity || state._influencerTypes?.[cr.name] || ''
@@ -5192,43 +5207,51 @@ function renderPipeline() {
 }
 
 function renderMetricTicker() {
-  const data = getDashboardFilteredData();
   const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
   const container = document.getElementById('metricTicker');
+  const { from, to } = getGlobalDateRange();
+  const dateLabel = from && to ? `${from} to ${to}` : 'All time';
 
-  // Date-filtered metrics from perf tracker (spend) + CRM (funnel) — every row has a date
-  if (state._perfTrackerDaily?.length || state._crmLeads?.length) {
-    const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
-    const toDate = document.getElementById('dashboardDateTo')?.value || '';
-    const m = getOracleMetrics(fromDate, toDate, dashCountry);
-    const dateLabel = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All time';
+  // UNIFIED: Spend from tagger data (ad-level), funnel from CRM (100% of leads)
+  const taggerData = getGlobalFilteredTaggerData();
+  const totalSpend = taggerData.reduce((s, c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+  const taggerTD = taggerData.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
 
+  // CRM portfolio totals — counts ALL Meta leads, not just matched ones
+  const crm = getCRMPortfolioTotals(dashCountry);
+  const matchRate = crm.td > 0 ? Math.round(taggerTD / crm.td * 100) : 0;
+
+  // Use CRM TDs for portfolio CPTD (most accurate), tagger spend (most granular)
+  const portfolioCPTD = crm.td > 0 && totalSpend > 0 ? totalSpend / crm.td : 0;
+  const portfolioCPTQL = crm.tql > 0 && totalSpend > 0 ? totalSpend / crm.tql : 0;
+  const portfolioCAC = crm.paid > 0 && totalSpend > 0 ? totalSpend / crm.paid : 0;
+  const tqlTdPct = crm.tql > 0 ? Math.min(crm.td / crm.tql * 100, 100) : 0;
+
+  if (totalSpend > 0 || crm.td > 0) {
     const tickers = [
-      { label: 'Meta Spend', value: m.spend > 0 ? formatCurrency(m.spend) : '-', sub: dateLabel, color: 'purple' },
-      { label: 'CPTQL', value: m.cptql > 0 ? formatCurrency(m.cptql) : '-', sub: `${m.tql} TQLs · ${m.ql} QLs · ${m.nri} NRI`, color: m.cptql > 0 ? (m.cptql < 12000 ? 'green' : m.cptql < 20000 ? 'orange' : 'red') : 'blue' },
-      { label: 'CPTD', value: m.td > 0 && m.spend > 0 ? formatCurrency(m.cptd) : '-', sub: `${Math.round(m.td)} TDs · TQL→TD ${m.tqlTd.toFixed(1)}%`, color: m.cptd > 0 ? (m.cptd < 50000 ? 'green' : m.cptd < 100000 ? 'orange' : 'red') : 'blue' },
-      { label: 'Enrolled', value: m.paid > 0 ? m.paid.toString() : '-', sub: m.paid > 0 && m.spend > 0 ? `CAC ${formatCurrency(m.cac)}` : '-', color: m.paid > 0 ? 'green' : 'blue' }
+      { label: 'Meta Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '-', sub: `${dateLabel} · ${taggerData.length} ads`, color: 'purple' },
+      { label: 'CPTQL', value: portfolioCPTQL > 0 ? formatCurrency(portfolioCPTQL) : '-', sub: `${crm.tql} TQLs · ${crm.ql} QLs · ${crm.nri} NRI`, color: portfolioCPTQL > 0 ? (portfolioCPTQL < 12000 ? 'green' : portfolioCPTQL < 20000 ? 'orange' : 'red') : 'blue' },
+      { label: 'CPTD', value: portfolioCPTD > 0 ? formatCurrency(portfolioCPTD) : '-', sub: `${crm.td} TDs (CRM) · TQL→TD ${tqlTdPct.toFixed(1)}%`, color: portfolioCPTD > 0 ? (portfolioCPTD < 50000 ? 'green' : portfolioCPTD < 100000 ? 'orange' : 'red') : 'blue' },
+      { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toString() : '-', sub: crm.paid > 0 ? `CAC ${formatCurrency(portfolioCAC)}` : '-', color: crm.paid > 0 ? 'green' : 'blue' }
     ];
+    // Match rate indicator
+    const matchBadge = crm.td > 0 ? `<div class="col-span-2 lg:col-span-4 text-[10px] text-text-muted bg-surface-secondary rounded-lg px-3 py-1.5">Portfolio: CRM has ${crm.td} TDs · Tagger matched ${taggerTD} (${matchRate}%) · <span class="font-semibold">${matchRate >= 80 ? 'Good match' : matchRate >= 60 ? 'Acceptable' : 'Low match — check CRM merge'}</span></div>` : '';
     container.innerHTML = tickers.map(t => `
       <div class="metric-card bg-white rounded-xl p-4">
         <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">${t.label}</p>
         <p class="text-xl font-black text-accent-${t.color}">${t.value}</p>
         <p class="text-[10px] text-text-muted mt-1">${t.sub}</p>
-      </div>`).join('');
+      </div>`).join('') + matchBadge;
     return;
   }
 
-  if (!data.length) return;
-
-  // Fallback: compute from tagger data
-  let totalSpend = 0, totalQL = 0, totalTQL = 0, totalCreatives = data.length;
-  data.forEach(c => {
-    totalSpend += parseNumber(c['Spent']||c['spent']||0);
+  // Fallback: compute from tagger data only (no CRM loaded)
+  let totalQL = 0, totalTQL = 0;
+  taggerData.forEach(c => {
     totalQL += parseNumber(c['QL']||c['ql']||0);
     const market = extractMarket(c);
     const nri = parseNumber(c['NRI']||c['nri']||0);
-    if (market === 'US' && nri > 0) totalTQL += nri;
-    else totalTQL += parseNumber(c['QL']||c['ql']||0);
+    totalTQL += (market === 'US') ? nri : parseNumber(c['QL']||c['ql']||0);
   });
   const avgCPQL = totalQL > 0 ? totalSpend / totalQL : 0;
   const avgCPTQL = totalTQL > 0 ? totalSpend / totalTQL : 0;
@@ -7438,8 +7461,67 @@ function showTaggerResults() {
   }
 }
 
-// Country + date filter + data quality filter — returns taggerData filtered and cleaned
-// Date range reads from Oracle's global date picker (dashboardDateFrom/To)
+// ==================== UNIFIED DATA ACCESS ====================
+// Two layers by design:
+//   getGlobalFilteredTaggerData() — NO thresholds, for portfolio totals (Oracle KPIs, Sentinel)
+//   getFilteredTaggerData() — WITH quality filters, for creative insights (Lens, heatmap, combos)
+// Both use same date range (Oracle date picker) and geo filter.
+
+// Portfolio layer — unfiltered except date + geo. Used by Oracle KPIs and Sentinel.
+function getGlobalFilteredTaggerData(geoElId) {
+  const country = document.getElementById(geoElId || 'dashboardCountryFilter')?.value || 'all';
+  let data = filterByGlobalDate([...state.taggerData]);
+  if (country === 'all') return data;
+  if (country === 'ROW') return data.filter(c => { const m = extractMarket(c); return m === 'ROW' || m === 'APAC' || m === 'Unknown'; });
+  return data.filter(c => extractMarket(c) === country);
+}
+
+// CRM portfolio totals — direct count from CRM leads, filtered by date + geo. 100% of leads, no matching gaps.
+function getCRMPortfolioTotals(geoFilter) {
+  const rows = state._crmLeads || [];
+  if (!rows.length) return { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, revenue: 0 };
+  const { from, to } = getGlobalDateRange();
+  let filtered = rows;
+  // Filter by date (use lead_created_date for QL, trial_done_date for TD)
+  if (from) filtered = filtered.filter(r => (r['lead_created_date'] || '') >= from);
+  if (to) filtered = filtered.filter(r => (r['lead_created_date'] || '') <= to);
+  // Filter by geo
+  if (geoFilter && geoFilter !== 'all') {
+    const geoMap = { 'US': ['US','USA','United States'], 'India': ['India','IN'], 'AUS': ['AUS','Australia','ANZ'], 'MEA': ['MEA','Middle East','UAE','Saudi'], 'UK': ['UK','United Kingdom'] };
+    const geoTerms = geoMap[geoFilter] || [geoFilter];
+    filtered = filtered.filter(r => {
+      const cb = (r['country_bucket'] || r['region'] || '').trim();
+      return geoTerms.some(g => cb.toLowerCase().includes(g.toLowerCase()));
+    });
+  }
+  const ql = filtered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
+  const nri = filtered.filter(r => (r['ethnicity'] || '').toLowerCase().includes('nri')).length;
+  const tql = geoFilter === 'US' ? nri : ql;
+  // TD uses trial_done_date
+  let tdFiltered = state._crmLeads || [];
+  if (from) tdFiltered = tdFiltered.filter(r => (r['trial_done_date'] || '') >= from);
+  if (to) tdFiltered = tdFiltered.filter(r => (r['trial_done_date'] || '') <= to);
+  if (geoFilter && geoFilter !== 'all') {
+    const geoMap = { 'US': ['US','USA','United States'], 'India': ['India','IN'], 'AUS': ['AUS','Australia','ANZ'], 'MEA': ['MEA','Middle East','UAE','Saudi'], 'UK': ['UK','United Kingdom'] };
+    const geoTerms = geoMap[geoFilter] || [geoFilter];
+    tdFiltered = tdFiltered.filter(r => { const cb = (r['country_bucket'] || r['region'] || '').trim(); return geoTerms.some(g => cb.toLowerCase().includes(g.toLowerCase())); });
+  }
+  const td = tdFiltered.filter(r => parseNumber(r['trials_done'] || 0) > 0).length;
+  // Paid uses paid_date
+  let paidFiltered = state._crmLeads || [];
+  if (from) paidFiltered = paidFiltered.filter(r => (r['paid_date'] || '') >= from);
+  if (to) paidFiltered = paidFiltered.filter(r => (r['paid_date'] || '') <= to);
+  if (geoFilter && geoFilter !== 'all') {
+    const geoMap = { 'US': ['US','USA','United States'], 'India': ['India','IN'], 'AUS': ['AUS','Australia','ANZ'], 'MEA': ['MEA','Middle East','UAE','Saudi'], 'UK': ['UK','United Kingdom'] };
+    const geoTerms = geoMap[geoFilter] || [geoFilter];
+    paidFiltered = paidFiltered.filter(r => { const cb = (r['country_bucket'] || r['region'] || '').trim(); return geoTerms.some(g => cb.toLowerCase().includes(g.toLowerCase())); });
+  }
+  const paid = paidFiltered.filter(r => parseNumber(r['paid'] || 0) > 0).length;
+  const revenue = paidFiltered.reduce((s, r) => s + parseNumber(r['net_booking'] || r['Revenue'] || 0), 0);
+  return { ql, tql, nri, td, paid, revenue };
+}
+
+// Creative layer — quality-filtered for Lens insights. ₹5K spend minimum, TD sanitization.
 const LENS_MIN_SPEND = 5000;  // ₹5K minimum — anything below is noise
 const LENS_MIN_CPTD = 5000;  // ₹5K CPTD floor — portfolio avg is ~₹40K, below ₹5K is CRM false match
 function getGlobalDateRange() {
@@ -8231,7 +8313,7 @@ state.activeWinningFormula = null;
 function extractMarket(c) {
   // 1. Check explicit _market field (set by Meta API pull from account mapping)
   // ROW account contains mixed geos — fall through to name-based detection
-  if (c['_market'] && c['_market'] !== 'ROW') return c['_market'];
+  if (c['_market']) { const m = c['_market'] === 'ROW' ? 'APAC' : c['_market']; return m; }
 
   // 2. Check direct column
   const direct = c['Market']||c['market']||c['Geo']||c['geo']||c['Region']||c['region'];
@@ -9625,19 +9707,13 @@ function runSentinelView() {
   const geoFilter = document.getElementById('sentinelGeo').value;
   const spendMin = parseNumber(document.getElementById('sentinelSpendFilter')?.value || '0');
   const formatFilter = document.getElementById('sentinelFormatFilterHeader')?.value || 'all';
-  let data = state.taggerData.length ? [...state.taggerData] : [];
-  // Apply global date range from Oracle
-  data = filterByGlobalDate(data);
+  // Use unified data access — same date + geo as Oracle
+  let data = getGlobalFilteredTaggerData('sentinelGeo');
 
   if (!data.length) {
     document.getElementById('sentinelEmpty').classList.remove('hidden');
     document.getElementById('sentinelContent').classList.add('hidden');
     return;
-  }
-
-  // Filter by geo
-  if (geoFilter !== 'all') {
-    data = data.filter(c => extractMarket(c) === geoFilter);
   }
   // Filter by minimum spend
   if (spendMin > 0) {
@@ -10480,13 +10556,16 @@ function getInfluencerAds(geoFilter) {
     const td = parseNumber(c['TD']||c['td']||0);
     const nri = parseNumber(c['NRI']||c['nri']||0);
     const paid = parseNumber(c['Paid']||c['paid']||0);
-    cr.spend += spend; cr.ql += ql; cr.td += td; cr.nri += nri; cr.paid += paid;
+    // Compute TQL same as Oracle/Sentinel: US = NRI, others = QL
+    const market = extractMarket(c);
+    const tql = (market === 'US') ? nri : ql;
+    cr.spend += spend; cr.ql += ql; cr.td += td; cr.nri += nri; cr.paid += paid; cr.tql = (cr.tql || 0) + tql;
 
     // Group by ad set for audience breakdown
     const adSetName = c['Ad set name'] || c['ad set name'] || 'Unknown Ad Set';
-    if (!cr.adSets[adSetName]) cr.adSets[adSetName] = { name: adSetName, ads: [], spend: 0, ql: 0, td: 0 };
+    if (!cr.adSets[adSetName]) cr.adSets[adSetName] = { name: adSetName, ads: [], spend: 0, ql: 0, td: 0, tql: 0 };
     const as = cr.adSets[adSetName];
-    as.ads.push(c); as.spend += spend; as.ql += ql; as.td += td;
+    as.ads.push(c); as.spend += spend; as.ql += ql; as.td += td; as.tql += tql;
   });
 
   return Object.values(creators);
@@ -10535,9 +10614,9 @@ function renderInfluLeaderboard(filteredCreators) {
     const adSetList = Object.values(cr.adSets || {}).sort((a,b) => b.spend - a.spend);
     return {
       ...cr,
-      cpql: cr.ql > 0 ? cr.spend / cr.ql : null,
+      cpql: (cr.tql || cr.ql) > 0 ? cr.spend / (cr.tql || cr.ql) : null,
       cptd: cr.td > 0 ? cr.spend / cr.td : null,
-      qlTd: cr.ql > 0 ? Math.min((cr.td / cr.ql * 100), 100) : null,
+      qlTd: (cr.tql || cr.ql) > 0 ? Math.min((cr.td / (cr.tql || cr.ql) * 100), 100) : null,
       displayName: cr.name,
       primaryMarket, marketBadge, adSetList,
       bestAd: cr.ads.reduce((best, ad) => {
