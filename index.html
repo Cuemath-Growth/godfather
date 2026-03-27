@@ -1661,7 +1661,7 @@ function saveState(key, value) {
   }
 }
 
-const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','thumbnail_url','image_url','net_booking','board','ethnicity'];
+const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','thumbnail_url','image_url','ad_body','ad_title','Frequency','Reach','Video_P25','Video_P50','Video_P75','Video_P100','net_booking','board','ethnicity'];
 function compressTaggerData(data) {
   return data.map(c => {
     const slim = {};
@@ -2715,7 +2715,7 @@ async function backfillThumbnails() {
   let matched = 0;
   for (const account of accounts) {
     try {
-      let url = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url}&limit=500&access_token=${token}`;
+      let url = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url,body,title}&limit=500&access_token=${token}`;
       let page = 1;
       while (url && page <= 10) {
         const resp = await fetch(url);
@@ -2778,7 +2778,7 @@ async function connectMetaApi() {
     if (statusEl) statusEl.textContent = `Pulling from ${account.name}...`;
 
     try {
-      const fields = 'campaign_name,adset_name,ad_name,spend,impressions,clicks,actions,cost_per_action_type';
+      const fields = 'campaign_name,adset_name,ad_name,spend,impressions,clicks,actions,cost_per_action_type,frequency,reach,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
       let url = `https://graph.facebook.com/v21.0/${account.id}/insights?level=${level}&fields=${fields}&date_preset=${datePreset}&limit=500&access_token=${token}`;
       let page = 1;
 
@@ -2816,6 +2816,19 @@ async function connectMetaApi() {
             if (adName.includes('video') || adName.includes('reel') || adName.includes('_vid') || adName.includes('-15s') || adName.includes('-30s') || adName.includes('-60s')) creativeType = 'Video';
             else if (adName.includes('static') || adName.includes('_img') || adName.includes('image') || adName.includes('carousel')) creativeType = 'Static';
 
+            // Video completion metrics
+            const getVideoAction = (actions, type) => {
+              if (!actions) return 0;
+              const a = actions.find(a => a.action_type === type);
+              return a ? parseInt(a.value) : 0;
+            };
+            const frequency = parseFloat(row.frequency || 0);
+            const reach = parseInt(row.reach || 0);
+            const videoP25 = getVideoAction(row.video_p25_watched_actions, 'video_view');
+            const videoP50 = getVideoAction(row.video_p50_watched_actions, 'video_view');
+            const videoP75 = getVideoAction(row.video_p75_watched_actions, 'video_view');
+            const videoP100 = getVideoAction(row.video_p100_watched_actions, 'video_view');
+
             return {
               'Campaign name': row.campaign_name || '',
               'Ad set name': row.adset_name || '',
@@ -2826,6 +2839,12 @@ async function connectMetaApi() {
               'QL': ql,
               'CPQL': ql > 0 ? spend / ql : 0,
               'Creative type': creativeType,
+              'Frequency': frequency,
+              'Reach': reach,
+              'Video_P25': videoP25,
+              'Video_P50': videoP50,
+              'Video_P75': videoP75,
+              'Video_P100': videoP100,
               '_account': account.name,
               '_market': account.market,
               '_source': 'meta_api',
@@ -2852,7 +2871,7 @@ async function connectMetaApi() {
   if (allAds.length && statusEl) statusEl.textContent = 'Fetching creative thumbnails...';
   for (const account of accounts) {
     try {
-      let thumbUrl = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url}&limit=500&date_preset=${datePreset}&access_token=${token}`;
+      let thumbUrl = `https://graph.facebook.com/v21.0/${account.id}/ads?fields=name,creative{thumbnail_url,image_url,body,title}&limit=500&date_preset=${datePreset}&access_token=${token}`;
       let thumbPage = 1;
       while (thumbUrl && thumbPage <= 10) {
         const resp = await fetch(thumbUrl);
@@ -2860,10 +2879,12 @@ async function connectMetaApi() {
         if (data.error) break;
         if (data.data) {
           data.data.forEach(ad => {
-            const match = allAds.find(a => a['Ad name'] === ad.name);
+            const match = allAds.find(a => a['Ad name'] === ad.name || a['Ad name']?.toLowerCase() === ad.name?.toLowerCase());
             if (match && ad.creative) {
               match.thumbnail_url = ad.creative.thumbnail_url || '';
               match.image_url = ad.creative.image_url || '';
+              match.ad_body = ad.creative.body || '';
+              match.ad_title = ad.creative.title || '';
             }
           });
         }
@@ -3777,7 +3798,7 @@ async function fullRefresh() {
       for (const account of accounts) {
         btn.innerHTML = `<div class="w-3.5 h-3.5 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin"></div> ${account.name}...`;
         try {
-          const fields = 'campaign_name,adset_name,ad_name,spend,impressions,clicks,actions,cost_per_action_type';
+          const fields = 'campaign_name,adset_name,ad_name,spend,impressions,clicks,actions,cost_per_action_type,frequency,reach,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
           let url = `https://graph.facebook.com/v21.0/${account.id}/insights?level=${level}&fields=${fields}&date_preset=${datePreset}&limit=500&access_token=${token}`;
           let page = 1;
           while (url && page <= 20) {
@@ -7194,7 +7215,13 @@ function buildTaggerPrompt(batch) {
     const spend = c['Spent'] || c['spent'] || '';
     const ql = c['QL'] || c['ql'] || '';
     const cpql = c['CPQL'] || c['cpql'] || '';
-    return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}`;
+    const body = c['ad_body'] || '';
+    const title = c['ad_title'] || '';
+    const freq = c['Frequency'] || '';
+    const bodyLine = body ? ` | Copy: "${body.slice(0, 150)}"` : '';
+    const titleLine = title ? ` | Title: "${title.slice(0, 80)}"` : '';
+    const freqLine = freq ? ` | Freq: ${freq}` : '';
+    return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}${titleLine}${bodyLine}${freqLine}`;
   }).join('\n');
 
   return `You are Lens, Cuemath's creative audit AI. Tag these ad creatives using Cuemath's EXACT coded taxonomy.
