@@ -93,9 +93,9 @@
 <!-- No setup needed — API key and sheets are pre-configured -->
 
 <!-- Main Layout -->
-<div class="flex h-screen">
+<div class="flex h-screen overflow-hidden">
   <!-- Sidebar Navigation -->
-  <nav class="w-[220px] bg-gradient-sidebar flex flex-col py-5 shrink-0 fixed top-0 left-0 h-screen overflow-y-auto z-20">
+  <nav class="w-[220px] bg-gradient-sidebar flex flex-col py-5 shrink-0">
     <!-- Logo -->
     <div class="px-5 mb-8">
       <div class="flex items-center gap-3">
@@ -158,13 +158,14 @@
   </nav>
 
   <!-- Main Content -->
-  <div class="flex-1 flex flex-col overflow-hidden ml-[220px]">
+  <div class="flex-1 flex flex-col overflow-hidden">
     <!-- Header -->
-    <header class="bg-white border-b border-gray-200/80 px-6 py-2 flex items-center gap-4 shrink-0 z-10" id="mainHeader">
+    <header class="bg-white border-b border-gray-200/80 px-6 py-3.5 flex items-center justify-between shrink-0" id="mainHeader">
       <div>
-        <h2 class="text-sm font-bold whitespace-nowrap" id="headerTitle">Dashboard</h2>
+        <h2 class="text-lg font-bold" id="headerTitle">Dashboard</h2>
+        <p class="text-xs text-text-muted" id="headerSubtitle">Performance insights & content recommendations</p>
       </div>
-      <div class="flex items-center gap-2 ml-auto">
+      <div class="flex items-center gap-3">
         <span class="status-badge disconnected" id="statusBadge">
           <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
           No data
@@ -2429,7 +2430,7 @@ function navigateTo(view) {
   const titles = { dashboard:'Oracle — Dashboard', generate:'Forge — Content Studio', tagger:'Lens — Creative Tagger', intel:'Lens — Creative Intelligence', library:'Library', leads:'Sentinel — Performance Analytics', influencer:'Influencer Intelligence', settings:'Settings' };
   const subs = { dashboard:'Cross-agent synthesis: what to do right now', generate:'AI copy generation grounded in brand + data', tagger:'Auto-tag creatives with H/F/PB codes & analyze performance', intel:'Data-driven creative strategy from tagged performance data', library:'Creative library synced from GSheet — auto-refreshes every 10 min', leads:'Funnel analysis with threshold scoring & anomaly detection', influencer:'Organic + Paid creator performance across US and India', settings:'Configure data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
-  const subEl = document.getElementById('headerSubtitle'); if (subEl) subEl.textContent = subs[view] || '';
+  document.getElementById('headerSubtitle').textContent = subs[view] || '';
   // Show saved tagger results when switching to tagger
   if (view === 'tagger' && state.taggerData.length) {
     document.getElementById('taggerUpload').style.display = 'none';
