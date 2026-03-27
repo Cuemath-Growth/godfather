@@ -1569,14 +1569,16 @@ async function loadTagCacheFromSupabase() {
   return null;
 }
 
+// Sheet URLs loaded from localStorage only — no hardcoded URLs in source
+// User configures these in Settings on first use
 const DEFAULT_SHEETS = {
-  metaUrl: 'https://docs.google.com/spreadsheets/d/11q8zU3mRa1RzD8WSjanRVAzXBXXoiFsZNXo_R4OwbKk/edit?gid=1805066969#gid=1805066969',
-  crmLeadsUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=2057861499#gid=2057861499',
-  costsTrackerUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1269911854#gid=1269911854',
-  regionalUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1622533630#gid=1622533630',
-  influencerUrl: 'https://docs.google.com/spreadsheets/d/1laJcSF7qcHiaKgze0032poaT7QBSNGk99k0ZJXTFZ-Q/gviz/tq?tqx=out:csv&gid=645685654',
-  creatorRosterUrl: 'https://docs.google.com/spreadsheets/d/1mhntjIuXl1DQnKd3SzlJczsNlqsAd1wWoZ_4hYmMif0/gviz/tq?tqx=out:csv&gid=1892749954',
-  libraryUrl: 'https://docs.google.com/spreadsheets/d/1PCIBvtS5xoNUECaaU7ZQJhf6ST96jzlfSvXPX3pOk0o/edit?gid=0#gid=0',
+  metaUrl: '',
+  crmLeadsUrl: '',
+  costsTrackerUrl: '',
+  regionalUrl: '',
+  influencerUrl: '',
+  creatorRosterUrl: '',
+  libraryUrl: '',
   libraryTabs: [
     { gid: '0', type: 'Video' },
     { gid: '927168945', type: 'Static' },
@@ -2366,11 +2368,8 @@ const CREATIVE_ASSETS = [
 
 // ==================== META ADS API ====================
 const META_API_TOKEN = localStorage.getItem('gf_metaToken') || '';
-const META_AD_ACCOUNTS_DEFAULT = [
-  { id: 'act_925205080936963', name: 'Cuemath - Intel - ROW', market: 'ROW' },
-  { id: 'act_5215842511824318', name: 'Cuemath - US & Canada', market: 'US' },
-  { id: 'act_888586384639855', name: 'Cuemath-Demand-India', market: 'India' }
-];
+// Ad accounts loaded from localStorage — configure in Settings
+const META_AD_ACCOUNTS_DEFAULT = [];
 const META_AD_ACCOUNTS = JSON.parse(localStorage.getItem('gf_metaAccounts') || 'null') || META_AD_ACCOUNTS_DEFAULT;
 state.metaApi = JSON.parse(localStorage.getItem('gf_metaApi') || JSON.stringify({token:META_API_TOKEN,accounts:META_AD_ACCOUNTS,datePreset:'last_30d',level:'ad'}));
 // Use localStorage token if available
@@ -9801,19 +9800,15 @@ state.generateMode = 'brief'; // 'brief' or 'freeform'
 state.freeformHistory = [];
 
 function resetForge() {
-  // Reset all Forge brief inputs to defaults
-  document.getElementById('forgeKeyAngle').value = '';
-  document.getElementById('forgeOffer').value = '';
-  const mktSel = document.getElementById('forgeMarket'); if (mktSel) mktSel.value = 'US';
-  const segSel = document.getElementById('forgeSegment'); if (segSel) segSel.value = 'Foundation Rebuilder';
-  const funnelSel = document.getElementById('forgeFunnel'); if (funnelSel) funnelSel.value = 'TOFU';
-  // Reset pills to first option
-  document.querySelectorAll('#briefPanel .pill-btn').forEach((btn, i, arr) => {
-    const group = btn.parentElement;
-    const isFirst = btn === group?.querySelector('.pill-btn');
+  const angle = document.getElementById('briefAngle'); if (angle) angle.value = '';
+  const offer = document.getElementById('briefOffer'); if (offer) offer.value = '';
+  const mkt = document.getElementById('briefMarket'); if (mkt) mkt.value = 'US';
+  const seg = document.getElementById('briefSegment'); if (seg) seg.value = 'Foundation Rebuilder';
+  const funnel = document.getElementById('briefFunnel'); if (funnel) funnel.value = 'TOFU';
+  document.querySelectorAll('#briefPanel .pill-btn').forEach(btn => {
+    const isFirst = btn === btn.parentElement?.querySelector('.pill-btn');
     btn.classList.toggle('active', isFirst);
   });
-  // Hide winning formula
   const wf = document.getElementById('winningFormulaIndicator'); if (wf) wf.classList.add('hidden');
   showToast('Forge reset');
 }
