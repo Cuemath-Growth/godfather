@@ -1452,12 +1452,9 @@ const SUPABASE_KEY = localStorage.getItem('gf_supabaseKey') || '';
 let _supabaseSyncStatus = 'offline'; // 'synced' | 'syncing' | 'offline'
 function updateSyncBadge(status) {
   _supabaseSyncStatus = status;
-  const el = document.getElementById('supabaseSyncBadge');
-  if (!el) return;
-  const labels = { synced: '☁️ Synced', syncing: '☁️ Syncing...', offline: '☁️ Offline' };
-  const colors = { synced: 'background:#D1FAE5;color:#065F46', syncing: 'background:#FEF3C7;color:#92400E', offline: 'background:#FEE2E2;color:#991B1B' };
-  el.style.cssText = colors[status] || colors.offline;
-  el.textContent = labels[status] || labels.offline;
+  // Supabase badge is internal — keep hidden per CHANGELOG (user-facing detail removed)
+  // Status logged to console for debugging only
+  console.log('Supabase:', status);
 }
 
 async function supabaseGet(table, query) {
@@ -2428,7 +2425,7 @@ function navigateTo(view) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`.nav-item[data-view="${view}"]`).classList.add('active');
   const titles = { dashboard:'Oracle — Dashboard', generate:'Forge — Content Studio', tagger:'Lens — Creative Tagger', intel:'Lens — Creative Intelligence', library:'Library', leads:'Sentinel — Performance Analytics', influencer:'Influencer Intelligence', settings:'Settings' };
-  const subs = { dashboard:'Cross-agent synthesis: what to do right now', generate:'AI copy generation grounded in brand + data', tagger:'Auto-tag creatives with H/F/PB codes & analyze performance', intel:'Data-driven creative strategy from tagged performance data', library:'Creative library synced from GSheet — auto-refreshes every 10 min', leads:'Funnel analysis with threshold scoring & anomaly detection', influencer:'Organic + Paid creator performance across US and India', settings:'Configure data sources & preferences' };
+  const subs = { dashboard:'What to do right now', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', intel:'What\'s working & why', library:'Your creative assets', leads:'Funnel scoring & alerts', influencer:'Creator performance', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
   document.getElementById('headerSubtitle').textContent = subs[view] || '';
   // Show saved tagger results when switching to tagger
