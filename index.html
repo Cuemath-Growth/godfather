@@ -1211,6 +1211,15 @@
           </div>
           <button onclick="savePreferences()" class="mt-4 btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold">Save Preferences</button>
         </div>
+
+        <!-- System Health Panel -->
+        <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 mt-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-bold">System Health</h3>
+            <button onclick="renderHealthPanel()" class="text-[10px] px-3 py-1 rounded-lg font-semibold bg-accent-purple-light text-accent-purple hover:bg-accent-purple/20">Run Check</button>
+          </div>
+          <div id="healthPanel" class="text-[11px] space-y-1"></div>
+        </div>
       </div>
 
       <!-- ========== LEAD ANALYSIS / SENTINEL VIEW ========== -->
@@ -2318,6 +2327,59 @@ function runDiagnostics() {
 // Make available globally
 window.runDiagnostics = runDiagnostics;
 
+function renderHealthPanel() {
+  const r = runDiagnostics();
+  const panel = document.getElementById('healthPanel');
+  if (!panel) return;
+
+  let html = '';
+  const row = (status, label, detail) => {
+    const color = status === 'PASS' ? 'text-accent-green' : status === 'FAIL' ? 'text-accent-red' : 'text-accent-orange';
+    const bg = status === 'FAIL' ? 'bg-red-50' : status === 'WARN' ? 'bg-amber-50' : '';
+    return `<div class="flex items-center justify-between py-1.5 px-2 rounded ${bg}"><span><span class="font-bold ${color}">${status}</span> ${label}</span><span class="text-text-muted">${detail}</span></div>`;
+  };
+
+  // Summary
+  html += `<div class="flex gap-3 mb-3 text-xs font-bold"><span class="text-accent-green">${r.pass} PASS</span><span class="text-accent-red">${r.fail} FAIL</span><span class="text-accent-orange">${r.warn} WARN</span></div>`;
+
+  // All results
+  r.log.forEach(l => { html += row(l.status, l.name, l.detail); });
+
+  // Cross-tab consistency check
+  html += '<div class="mt-4 pt-3 border-t border-gray-200"><p class="font-bold text-xs mb-2">Cross-Tab Consistency</p>';
+
+  // Date range check across tabs
+  const oracleDateFrom = document.getElementById('dashboardDateFrom')?.value || 'not set';
+  const oracleDateTo = document.getElementById('dashboardDateTo')?.value || 'not set';
+  const sentinelDate = document.getElementById('sentinelDateRange')?.value || 'all';
+  const taggerDate = document.getElementById('taggerDateRange')?.value || 'all';
+  const influDate = document.getElementById('influencerDateRange')?.value || 'all';
+  html += row('INFO', 'Oracle date range', `${oracleDateFrom} to ${oracleDateTo}`);
+  html += row('INFO', 'Sentinel date range', sentinelDate === 'all' ? 'All Time' : `Last ${sentinelDate} days`);
+  html += row('INFO', 'Lens:Tag date range', taggerDate === 'all' ? 'All Time' : `Last ${taggerDate} days`);
+  html += row('INFO', 'Influencer date range', influDate === 'all' ? 'All Time' : `Last ${influDate} days`);
+
+  // Geo filter check
+  const oracleGeo = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const sentinelGeo = document.getElementById('sentinelGeo')?.value || 'all';
+  const taggerGeo = document.getElementById('taggerFilterCountry')?.value || 'all';
+  const influGeo = document.getElementById('influencerGeo')?.value || 'all';
+  const geoSync = (oracleGeo === sentinelGeo && sentinelGeo === taggerGeo && taggerGeo === influGeo);
+  html += row(geoSync ? 'PASS' : 'WARN', 'Geo filters synced', geoSync ? `All: ${oracleGeo}` : `Oracle:${oracleGeo} Sentinel:${sentinelGeo} Lens:${taggerGeo} Influ:${influGeo}`);
+
+  // Number sanity across sources
+  if (state.taggerData?.length && state._perfTrackerDaily?.length) {
+    const taggerSpend = state.taggerData.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+    const perfSpend = state._perfTrackerDaily.reduce((s,r) => s + parseNumber(r['spend']||r['Spend']||0), 0);
+    const delta = Math.abs(taggerSpend - perfSpend) / Math.max(taggerSpend, perfSpend) * 100;
+    html += row(delta < 10 ? 'PASS' : 'WARN', 'Tagger vs PerfTracker spend', `${formatCurrency(taggerSpend)} vs ${formatCurrency(perfSpend)} (${delta.toFixed(1)}% delta)`);
+  }
+
+  html += '</div>';
+  panel.innerHTML = html;
+}
+window.renderHealthPanel = renderHealthPanel;
+
 // ==================== INIT ====================
 function init() {
   // Free localStorage space — evict recomputable keys on every boot
@@ -2394,7 +2456,7 @@ function navigateTo(view) {
   if (view === 'intel' && state.taggerData.length) { try { renderCreativeIntel(); } catch(e) { console.error('renderCreativeIntel crashed:', e); } }
   if (view === 'leads' && state.taggerData.length) { try { runSentinelView(); } catch(e) { console.error('runSentinelView crashed:', e); } }
   if (view === 'influencer') renderInfluencerView();
-  if (view === 'settings') loadSettingsFields();
+  if (view === 'settings') { loadSettingsFields(); setTimeout(renderHealthPanel, 100); }
   if (view === 'library') { fetchLibrarySheet(); startLibraryPolling(); } else { stopLibraryPolling(); }
   // Auto-compute winning formula when switching to generate
   if (view === 'generate' && state.taggerData.length) {
