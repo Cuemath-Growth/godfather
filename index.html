@@ -664,6 +664,7 @@
         <!-- Compact utility bar -->
         <div class="flex items-center justify-between mb-4">
           <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-purple-light text-accent-purple" id="taggerCount">0 creatives</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full font-medium bg-surface-tertiary text-text-muted" id="taggerThumbCount"></span>
           <div class="flex items-center gap-1.5">
             <button onclick="exportTaggerCSV()" class="p-1.5 rounded-lg hover:bg-surface-tertiary border border-gray-200 transition" id="taggerExportBtn" style="display:none" title="Export CSV"><svg class="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></button>
             <button onclick="backupTaggedData()" class="p-1.5 rounded-lg hover:bg-surface-tertiary border border-gray-200 transition" id="taggerBackupBtn" style="display:none" title="Backup tagged data"><svg class="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg></button>
@@ -1605,16 +1606,14 @@ async function loadTagCacheFromSupabase() {
   return null;
 }
 
-// Sheet URLs loaded from localStorage only — no hardcoded URLs in source
-// User configures these in Settings on first use
 const DEFAULT_SHEETS = {
-  metaUrl: '',
-  crmLeadsUrl: '',
-  costsTrackerUrl: '',
-  regionalUrl: '',
-  influencerUrl: '',
-  creatorRosterUrl: '',
-  libraryUrl: '',
+  metaUrl: 'https://docs.google.com/spreadsheets/d/11q8zU3mRa1RzD8WSjanRVAzXBXXoiFsZNXo_R4OwbKk/edit?gid=1805066969#gid=1805066969',
+  crmLeadsUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=2057861499#gid=2057861499',
+  costsTrackerUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1269911854#gid=1269911854',
+  regionalUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1622533630#gid=1622533630',
+  influencerUrl: 'https://docs.google.com/spreadsheets/d/1laJcSF7qcHiaKgze0032poaT7QBSNGk99k0ZJXTFZ-Q/gviz/tq?tqx=out:csv&gid=645685654',
+  creatorRosterUrl: 'https://docs.google.com/spreadsheets/d/1mhntjIuXl1DQnKd3SzlJczsNlqsAd1wWoZ_4hYmMif0/gviz/tq?tqx=out:csv&gid=1892749954',
+  libraryUrl: 'https://docs.google.com/spreadsheets/d/1PCIBvtS5xoNUECaaU7ZQJhf6ST96jzlfSvXPX3pOk0o/edit?gid=0#gid=0',
   libraryTabs: [
     { gid: '0', type: 'Video' },
     { gid: '927168945', type: 'Static' },
@@ -2212,6 +2211,104 @@ function renderBrandViolations(violations) {
   </div>`;
 }
 
+// ==================== DIAGNOSTICS ====================
+// Run via console: runDiagnostics() — or auto-runs on init
+function runDiagnostics() {
+  const r = { pass: 0, fail: 0, warn: 0, log: [] };
+  const check = (name, ok, detail) => {
+    const status = ok ? 'PASS' : 'FAIL';
+    if (ok) r.pass++; else r.fail++;
+    r.log.push({ status, name, detail: detail || '' });
+  };
+  const warn = (name, detail) => { r.warn++; r.log.push({ status: 'WARN', name, detail }); };
+
+  // ── Data Sources ──
+  check('Tagger data loaded', state.taggerData?.length > 0, `${state.taggerData?.length || 0} creatives`);
+  check('CRM leads loaded', state._crmLeads?.length > 0, `${state._crmLeads?.length || 0} leads`);
+  check('Regional data loaded', state._regionalData?.length > 0, `${state._regionalData?.length || 0} rows`);
+
+  if (state.taggerData?.length) {
+    // ── Thumbnails ──
+    const withThumb = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+    const thumbPct = Math.round(withThumb / state.taggerData.length * 100);
+    check('Thumbnails present', thumbPct > 10, `${withThumb}/${state.taggerData.length} (${thumbPct}%)`);
+    if (thumbPct === 0) warn('Zero thumbnails', 'Meta API thumbnail fetch may have failed. Re-pull data or check API token.');
+
+    // ── Tags ──
+    const tagged = state.taggerData.filter(c => c.tags && Object.keys(c.tags).length > 0).length;
+    const tagPct = Math.round(tagged / state.taggerData.length * 100);
+    check('Creatives tagged', tagPct > 50, `${tagged}/${state.taggerData.length} (${tagPct}%)`);
+
+    // ── Key Metrics ──
+    const withSpend = state.taggerData.filter(c => parseNumber(c['Spent']||c['spent']||0) > 0).length;
+    check('Creatives with spend', withSpend > 0, `${withSpend} with spend > 0`);
+
+    const withQL = state.taggerData.filter(c => parseNumber(c['QL']||c['ql']||0) > 0).length;
+    check('Creatives with QLs', withQL > 0, `${withQL} with QL > 0`);
+
+    const withTD = state.taggerData.filter(c => parseNumber(c['TD']||c['td']||0) > 0).length;
+    check('Creatives with TDs', withTD > 0, `${withTD} with TD > 0 (CRM merge needed)`);
+
+    // ── Market Distribution ──
+    const markets = {};
+    state.taggerData.forEach(c => { const m = extractMarket(c); markets[m] = (markets[m]||0) + 1; });
+    check('Multiple markets', Object.keys(markets).length > 1, JSON.stringify(markets));
+
+    // ── Influencer Pipeline ──
+    const influAds = state.taggerData.filter(c => _isInfluencerAd(c));
+    check('Influencer ads detected', influAds.length > 0, `${influAds.length} influencer ads`);
+    if (influAds.length > 0) {
+      const influSpend = influAds.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+      const totalSpend = state.taggerData.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+      const influPct = Math.round(influSpend / totalSpend * 100);
+      check('Influencer spend reasonable', influPct < 30, `₹${Math.round(influSpend/100000)}L / ₹${Math.round(totalSpend/100000)}L (${influPct}%)`);
+      if (influPct > 50) warn('Influencer spend >50%', 'Matching may be too greedy. Check _isInfluencerAd logic.');
+    }
+
+    // ── Number Sanity ──
+    const totalSpend = state.taggerData.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+    const totalQL = state.taggerData.reduce((s,c) => s + parseNumber(c['QL']||c['ql']||0), 0);
+    const totalTD = state.taggerData.reduce((s,c) => s + parseNumber(c['TD']||c['td']||0), 0);
+    if (totalQL > 0) {
+      const avgCPQL = totalSpend / totalQL;
+      check('Avg CPQL sane', avgCPQL > 1000 && avgCPQL < 200000, `₹${Math.round(avgCPQL).toLocaleString()}`);
+    }
+    if (totalTD > 0) {
+      const avgCPTD = totalSpend / totalTD;
+      check('Avg CPTD sane', avgCPTD > 5000 && avgCPTD < 500000, `₹${Math.round(avgCPTD).toLocaleString()}`);
+      const qlTdPct = (totalTD / totalQL * 100);
+      check('QL→TD% sane', qlTdPct > 1 && qlTdPct < 80, `${qlTdPct.toFixed(1)}%`);
+    }
+  }
+
+  // ── DOM Render Targets ──
+  const domChecks = ['dashboardEmpty','dashboardContent','taggerGrid','taggerTableBody','libraryGrid',
+    'sentinelKPIs','sentinelTop5','sentinelBottom5','sentinelTableBody','infTab-leaderboard',
+    'infTab-content','infTab-compare','resultContent','oracleChatMessages'];
+  domChecks.forEach(id => check(`DOM: #${id}`, !!document.getElementById(id), ''));
+
+  // ── Sheet Config ──
+  check('Meta sheet URL set', !!state.sheetConfig.metaUrl, state.sheetConfig.metaUrl ? 'configured' : 'EMPTY');
+  check('CRM sheet URL set', !!state.sheetConfig.crmLeadsUrl, state.sheetConfig.crmLeadsUrl ? 'configured' : 'EMPTY');
+
+  // ── Creator Roster ──
+  check('Creator roster loaded', state._creatorRoster?.length > 0, `${state._creatorRoster?.length || 0} creators`);
+
+  // ── Print Report ──
+  console.log('\n%c GODFATHER DIAGNOSTICS ', 'background:#7C3AED;color:white;font-weight:bold;padding:4px 8px;border-radius:4px;');
+  console.log(`%c ${r.pass} PASS  %c ${r.fail} FAIL  %c ${r.warn} WARN`, 'color:green;font-weight:bold', 'color:red;font-weight:bold', 'color:orange;font-weight:bold');
+  r.log.forEach(l => {
+    const color = l.status === 'PASS' ? 'color:green' : l.status === 'FAIL' ? 'color:red' : 'color:orange';
+    console.log(`%c${l.status}%c ${l.name} ${l.detail ? '— ' + l.detail : ''}`, color + ';font-weight:bold;width:40px;display:inline-block', 'color:inherit');
+  });
+  console.log('');
+  // Store for UI access
+  state._diagnostics = r;
+  return r;
+}
+// Make available globally
+window.runDiagnostics = runDiagnostics;
+
 // ==================== INIT ====================
 function init() {
   // Free localStorage space — evict recomputable keys on every boot
@@ -2405,8 +2502,11 @@ const CREATIVE_ASSETS = [
 
 // ==================== META ADS API ====================
 const META_API_TOKEN = localStorage.getItem('gf_metaToken') || '';
-// Ad accounts loaded from localStorage — configure in Settings
-const META_AD_ACCOUNTS_DEFAULT = [];
+const META_AD_ACCOUNTS_DEFAULT = [
+  { id: 'act_925205080936963', name: 'Cuemath - Intel - ROW', market: 'ROW' },
+  { id: 'act_5215842511824318', name: 'Cuemath - US & Canada', market: 'US' },
+  { id: 'act_888586384639855', name: 'Cuemath-Demand-India', market: 'India' }
+];
 const META_AD_ACCOUNTS = JSON.parse(localStorage.getItem('gf_metaAccounts') || 'null') || META_AD_ACCOUNTS_DEFAULT;
 state.metaApi = JSON.parse(localStorage.getItem('gf_metaApi') || JSON.stringify({token:META_API_TOKEN,accounts:META_AD_ACCOUNTS,datePreset:'last_30d',level:'ad'}));
 // Use localStorage token if available
@@ -3184,6 +3284,8 @@ async function refreshData() {
     // Trigger full dashboard render including date label and metric ticker
     onDashboardFilterChange();
   }
+  // Run diagnostics after every data refresh
+  setTimeout(() => { try { runDiagnostics(); } catch(e) { console.error('Diagnostics error:', e); } }, 500);
 }
 
 // ==================== COSTS TRACKER (SOURCE OF TRUTH) ====================
@@ -6873,7 +6975,10 @@ async function tagCreatives(rawData) {
   document.getElementById('taggerProgress').classList.add('hidden');
   document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
   document.getElementById('taggerExportBtn').style.display = '';
-    document.getElementById('taggerBackupBtn').style.display = '';
+  document.getElementById('taggerBackupBtn').style.display = '';
+  const _tc = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+  const _te = document.getElementById('taggerThumbCount');
+  if (_te) _te.textContent = _tc > 0 ? `${_tc} with thumbnails` : 'No thumbnails — re-pull via Meta API';
 
   const savings = cachedResults.length > 0 ? ` (${cachedResults.length} from cache, saved ${Math.ceil(cachedResults.length/batchSize)} API calls)` : '';
   showToast(`Tagged ${state.taggerData.length} creatives${savings}`);
@@ -7887,7 +7992,7 @@ function renderCreativeGrid() {
 
     const thumbUrl = c['thumbnail_url'] || c['image_url'] || '';
     return `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-      ${thumbUrl ? `<div class="h-36 bg-surface-tertiary overflow-hidden"><img src="${thumbUrl}" class="w-full h-full object-cover" onerror="this.parentElement.style.display='none'" /></div>` : ''}
+      ${thumbUrl ? `<div class="h-36 bg-surface-tertiary overflow-hidden"><img src="${thumbUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-text-muted\\'>No preview</div>'" /></div>` : `<div class="h-36 bg-surface-tertiary flex items-center justify-center"><span class="text-[10px] text-text-muted">${type === 'Video' ? '🎬' : '🖼️'} ${type || 'Creative'}</span></div>`}
       <div class="p-4">
       <div class="flex items-center justify-between mb-2">
         <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${type==='Video'?'bg-accent-purple-light text-accent-purple':'bg-accent-blue-light text-accent-blue'}">${type}</span>
