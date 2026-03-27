@@ -62,13 +62,13 @@ adset                 → Ad set name
 ## SECTION 3 — TQL Definitions (Authoritative)
 This overrides ALL previous TQL definitions in the vault.
 
-| Market | TQL Definition | Source Column |
-|---|---|---|
-| US | NRI QLs only | ethnicity contains 'nri' |
-| India | IB + IGCSE board leads only | board = 'IB' OR 'IGCSE' |
-| MEA | IB + IGCSE board leads only | board = 'IB' OR 'IGCSE' |
-| APAC (AUS/NZ/SG) | Total QL count | No filter — all QLs qualify |
-| UK | Total QL count | No filter — all QLs qualify |
+| Market           | TQL Definition                                                     | Source Column               |
+| ---------------- | ------------------------------------------------------------------ | --------------------------- |
+| US               | NRI QLs only                                                       | ethnicity contains 'nri'    |
+| India            | IB + IGCSE board leads only                                        | board = 'IB' OR 'IGCSE'     |
+| MEA              | IB + IGCSE + Cambridge + American school board leads only. No CBSE | board = 'IB' OR 'IGCSE'     |
+| APAC (AUS/NZ/SG) | Total QL count                                                     | No filter — all QLs qualify |
+| UK               | Total QL count                                                     | No filter — all QLs qualify |
 
 Business logic: Leads from other boards (CBSE etc.) in India/MEA are unqualified. The board filter is live. TQL < QL is expected and correct for India/MEA — do not treat this as a data error.
 
@@ -171,13 +171,46 @@ Current state: Oracle WoW comparison reads from Perf Tracker Daily (old pipeline
 Correct state: Oracle WoW should read from tagger data filtered to current week vs previous week — same source as Sentinel.
 Action: Replace getOracleMetrics() calls in WoW with tagger data filtered by date range.
 
-## SECTION 9 — Revenue & ROAS (RESOLVED)
-- `net_booking` (col 22): in CRORES. Multiply by 10,000,000 to get INR.
-- `Revenue` (col 47): in LAKHS. Multiply by 100,000 to get INR.
-- Revenue = net_booking × 100 (crores to lakhs conversion, confirmed)
-- **Use in code:** `parseNumber(r['Revenue']) * 100000` for INR, or `parseNumber(r['net_booking']) * 10000000`
-- ROAS = Revenue (INR) / Spend (INR)
-- Total: 663 paid Meta students, ₹3.98Cr revenue, avg ₹60K/student
+## SECTION 9 — Revenue & ROAS (FULLY VERIFIED from Excel)
+Units verified against US_MTD tab totals:
+- `net_booking` (leads col V): **CRORES** → × 10,000,000 for INR
+- `Revenue` (leads col AU): **LAKHS** → × 100,000 for INR
+- `Revenue (L)` in MTD tabs: **LAKHS** → × 100,000 for INR
+- `ABV (K)` in MTD tabs: **RUPEES** (K is just a label, not thousands)
+- `CAC (K)` in MTD tabs: **RUPEES** (Spend ÷ Enrolled)
+- `ROAS`: ratio (Revenue INR ÷ Spend INR)
+
+Verified: US MTD Spend ₹19.5L, Enrolled 16, Revenue 12.1L → ABV ₹75,808 ✓, CAC ₹1.22L ✓, ROAS 0.62 ✓
+
+Code: `parseNumber(r['Revenue']) * 100000` for INR, or `parseNumber(r['net_booking']) * 10000000`
+
+## SECTION 9b — Perf Tracker Spreadsheet Structure (VERIFIED from Excel)
+Source: `1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs`
+37 tabs total. Key tabs for Godfather:
+
+| Tab | GID | Rows | Purpose | Used by |
+|---|---|---|---|---|
+| `leads` | 2057861499 | 13,753 | CRM leads (all channels) | CRM merge, portfolio totals |
+| `cost` | 827992753 | 16,197 | Daily spend by campaign | Perf Tracker Daily (spend validation) |
+| `US_MTD` | ? | 1,213 | US month-to-date performance | Reference only (team's view) |
+| `ME_MTD` | ? | 1,014 | MEA month-to-date | Reference only |
+| `APAC_MTD` | ? | 1,097 | APAC month-to-date | Reference only |
+| `UK_MTD` | ? | 986 | UK month-to-date | Reference only |
+| `summary` | 1622533630 | 32 | Monthly summary by geo | Regional cards |
+| `mappingV2` | ? | 5,176 | Campaign name → category mapping | Could use for campaign classification |
+| `USL_Adcontent_Data` | ? | 5,216 | US lead → ad content mapping | Better CRM matching? |
+
+### `cost` tab columns (confirmed):
+`month, day, region, country_segment, landing_type, campaign_name, medium, amount_spent, impressions, link_clicks, whatsapp category, Campaign Category, Final Campaign Category, Campaign Check`
+
+### `cost` tab meta spend by geo (all-time):
+- US: ₹503.0L
+- APAC: ₹206.0L
+- ME: ₹103.5L
+- India: ₹58.3L
+- UK: ₹19.3L
+- **Total: ₹8.90Cr** (matches dashboard)
+- Date range: 2025-11-01 to 2026-03-26
 
 ## SECTION 10 — Items Confirmed Correct (No Change Needed)
 - utm_medium at column G → where G='meta' filter is correct ✓
