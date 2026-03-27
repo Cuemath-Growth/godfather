@@ -4,6 +4,101 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Layout & UI Fixes (2026-03-28, 3:30am–4:00am)
+
+### Supabase "Synced" badge was visible on all tabs (BUG)
+- `updateSyncBadge()` overwrote `style.cssText` which removed `display:none`
+- Badge appeared on every tab after first Supabase sync, never hidden again
+- Fix: function now only logs to console, never modifies DOM
+- Per CHANGELOG rule from March 27: "Supabase sync badge hidden by default"
+
+### Header subtitles shortened
+- Long subtitles caused header wrapping on narrow screens
+- "Creative library synced from GSheet — auto-refreshes every 10 min" → "Your creative assets"
+- All subtitles now 3-4 words max
+
+### Layout reverted to original
+- Sidebar: back to flex child with `shrink-0` (not fixed position)
+- Parent: `flex h-screen overflow-hidden` (original)
+- Header: original `py-3.5`, `text-lg` title, `text-xs` subtitle
+- Attempted fixes (fixed sidebar, ml-220, truncate, compact header) all reverted — they broke scroll and visibility across tabs
+
+---
+
+## Data Logic Fixes (2026-03-28, 3:00am–3:30am)
+
+### TQL board filter — India/MEA were WRONG
+- Old: US = NRI, all others = all QLs
+- New: US = NRI, India = IB+IGCSE only, MEA = IB+IGCSE+Cambridge+British+US boards, APAC/UK = all QLs
+- Shared function `computeTQL(ql, nri, market, board)` used by all tabs
+- India TQL drops from 154 to 11 (93% reduction — only 7% of India leads qualify)
+- MEA TQL drops from 1557 to 617 (60% reduction)
+- Board values: `INDIA_TQL_BOARDS` = IB, IGCSE. `MEA_TQL_BOARDS` = IB, IGCSE, CAMBRIDGE, USCS, US Curriculum, International Baccalaureate (IB), British/UK Curriculum, British curriculum, UKNC
+
+### LENS_MIN_CPTD now market-aware
+- Was: flat ₹5,000 everywhere — zeroing out legitimate India TDs
+- Now: US/AUS/UK ₹5,000, MEA ₹3,000, India ₹1,500
+- `LENS_MIN_CPTD_BY_MARKET` constant, falls back to ₹5,000 for unknown markets
+
+### Revenue multiplier fixed
+- `parseRevenue()` helper: net_booking (crores) × 10M, Revenue (lakhs) × 100K
+- Verified against US_MTD: 16 enrolled, ₹12.1L revenue, ₹75.8K ABV, 0.62 ROAS
+
+### Oracle WoW migrated to tagger data
+- Was: `getOracleMetrics()` (Perf Tracker + CRM — separate pipeline)
+- Now: tagger data filtered by week ranges, uses `computeTQL` for proper scoring
+- Same source as Sentinel/Lens — no more pipeline inconsistency
+
+### Date range auto-populates on first load
+- `getGlobalDateRange()` computes from tagger `_date` fields when Oracle picker is empty
+- Sets Oracle date pickers so all tabs start with the same range
+- Fixes Lens insight CPTDs being in lakhs (was computing all-time)
+
+---
+
+## Meta API Enrichment (2026-03-28, 3:15am)
+
+### New fields from Meta API
+- Frequency (creative fatigue signal), Reach (unique people)
+- Video completion: P25, P50, P75, P100
+- Ad creative text: body (primary text), title (headline), description, call_to_action_type
+- All added to `TAGGER_KEEP_FIELDS` — survive compression
+
+### Smart pull — no re-tagging
+- Meta API pull now merges new fields into existing tagger data by ad name
+- Case-insensitive matching (fixes zero-thumbnail bug)
+- Only genuinely NEW ads trigger tagging — with user confirmation
+- Existing 2237 ads get thumbnails + copy + frequency without spending Claude credits
+
+### Tagger prompt includes real ad copy
+- Claude now sees: Headline, Primary text, Description, CTA, Frequency
+- Tags from actual content, not just ad name guessing
+
+---
+
+## Unified Data Architecture (2026-03-28, 2:30am)
+
+### Two intentional layers
+- Portfolio (Oracle KPIs): Spend from tagger, TD/TQL/Paid from CRM direct
+- Creative (Sentinel/Lens/Influencer): All from tagger data with CRM merge
+- Match rate badge: "CRM has X TDs, tagger matched Y (Z%)"
+
+### Sentinel unified
+- KPIs: tagger spend + CRM portfolio totals (not getOracleMetrics)
+- Composite score: CPTQL (not CPQL) for 30% weight
+- Top/Bottom 5: require 5 TQLs + 1 TD (was 5 QLs)
+- Absurd values (CPTQL > ₹10L) shown as "—"
+- Subtitle: date range + creative count (not "Perf Tracker + CRM")
+
+### CRM dedup
+- Leads deduplicated by `prospectid` before merge
+
+### Diagnostics
+- `runDiagnostics()` — console + visual health panel in Settings
+- Checks: data sources, thumbnails, tags, metrics, influencer pipeline, cross-tab sync
+
+---
+
 ## Influencer Tab — Roster-Based Rebuild (2026-03-28, 12:45am)
 
 ### Creator Roster as single source of truth
