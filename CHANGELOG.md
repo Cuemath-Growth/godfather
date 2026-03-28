@@ -4,6 +4,269 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## CMO Cockpit Transformation (2026-03-29, ~3:45am)
+
+### Oracle → Dashboard: Complete UX overhaul
+- **TL;DR auto-summary**: 3-sentence narrative card at top. Status + top win + top risk + action. Pure template logic.
+- **Hero CPTD + ROAS**: 2 large cards with border-left threshold color, 3xl font, vs-prior-period trend arrows.
+- **Trend arrows on all KPIs**: Every card shows ↑↓ percentage vs same-length prior period. Green for good direction, red for bad.
+- **Visual funnel**: Replaced 13-column table with horizontal flow QL→TQL→TS→TD→Enrolled. Conversion rates as colored connectors. NRI/Asian/Invalid behind expandable detail.
+- **Unhidden Modules 1+2**: Top 5 Performers/Drains + Country Breakdown now visible. Was rendering to hidden divs.
+- **CMO Decisions section**: Two new cards — "Why is CPTD where it is?" (audience breakdown) + "Budget Reallocation" (shift from red geos to green, with amounts).
+
+### Navigation renamed to plain English
+- Oracle → **Dashboard** (What to do right now)
+- Lens: Intel → **Insights** (What's working & why) — moved to position 2
+- Forge → **Create** (Generate copy & visuals) — moved to position 3
+- Lens: Tag → **Tagger** (Tag & analyze creatives)
+- Library → **Library** (unchanged)
+- Sentinel → **Performance** (Funnel scoring & drill-down)
+- Influencer → **Creators** (Influencer performance)
+- Tab order now matches analysis-first workflow: Dashboard → Insights → Create → Tagger → Library → Performance → Creators
+
+### RULES
+- CPTD is ALWAYS the hero metric. Largest card, first position.
+- Every KPI must show vs-prior-period trend. No flat numbers without direction.
+- Tab names must be plain English. No mythology, no namespaces.
+- The first thing a CMO sees must answer: "Are we on track?"
+
+---
+
+## Deep Audit Fixes — 6 Criticals + 3 Highs (2026-03-29, ~3:15am)
+
+### C1: Sentinel CPQL was actually CPTQL
+- "CPQL" card used spend/TQL — identical to the CPTQL card. Now uses spend/QL (crm.ql).
+- **RULE:** CPQL = spend ÷ ALL QLs. CPTQL = spend ÷ TQLs. Never confuse denominators.
+
+### C2: Influencer QL column vs CPQL denominator mismatch
+- QL column showed raw Meta QLs but CPQL divided by TQL (NRI-only for US). Caused "0 QLs, ₹4.2K CPQL".
+- Renamed column to "TQLs", display now shows `tql || ql`, matching the CPQL denominator.
+
+### C3: AUS geo filter no longer includes all APAC spend
+- Removed APAC fallback from AUS matching in getOracleMetrics. Only AUS-specific rows now.
+
+### C4: oracleInfluScaleList → oracleInfluencerList
+- Empty-state diagnostic message now reaches the actual Influencer section DOM element.
+
+### C5: Brief generation crash guard
+- `bestPB[0]` no longer crashes when bestPB is undefined. Null-guarded.
+
+### C6: India TQL now matches 'IN' in all-geo path
+- Both getOracleMetrics and getCRMPortfolioTotals "all" path now check `cb === 'India' || cb === 'IN'`.
+- Also added `cb === 'MEA'` alongside `cb === 'ME'` for MEA consistency.
+
+### H1: Dead WoW computation disabled
+- 100 lines of week-over-week code rendered to non-existent oracleWoWContent element. Now `if (false)`.
+
+### H2: refreshIcon null guard + bogus Gemini model removed
+- refreshData() no longer crashes if refreshIcon element is missing.
+- Removed 'nano-banana-pro-preview' from GEMINI_MODELS (was wasting 1 API call per image gen).
+
+### H3: Layout — min-w-0 + overflow-x-auto
+- Content column now has min-w-0 (prevents flex overflow from wide tables).
+- Funnel table now wrapped in overflow-x-auto (prevents clipping on narrow screens).
+
+---
+
+## Layout + Blank Recommendations Fix (2026-03-29, ~2:45am)
+
+### Fix 4: Content shifted right — white column on left side
+- **Root cause:** All 7 view containers had `max-w-7xl mx-auto` which capped content at 1280px and centered it. On wider screens, this created visible white/gray padding on left and right.
+- **Fix:** Removed `max-w-7xl mx-auto` from all views. Content now fills the full width after sidebar.
+- **RULE:** Never use `max-w-7xl mx-auto` on view containers — the sidebar already constrains width. Content should fill available space.
+
+### Fix 5: Blank recommendation boxes (Pause Now, Make More, Deploy, Influencer)
+- **Root cause:** `renderOracleActions()` returned silently at line 4364 when `getDashboardFilteredData()` was empty, leaving original placeholder HTML ("e.g." text) untouched.
+- **Fix:** When data is empty, now shows explicit diagnostic message — either "No creative data loaded" (tagger empty) or "No creatives match filters" (filtered to zero).
+- **RULE:** Never silently return from a render function — always update the DOM with an appropriate empty/error state.
+
+---
+
+## Three Root Cause Fixes (2026-03-29, session recovery)
+
+### Fix 1: Sentinel CPQL ₹46.1L → correct values (line ~10157)
+- **Root cause:** `crm.tql || Math.round(s.total_tql)` fell back to tagger TQL when CRM returned 0. Tagger TQL is near-zero (no CRM ethnicity data), so CPQL = huge spend ÷ tiny TQL = lakhs.
+- **Fix:** Removed all fallbacks to tagger-derived funnel metrics. If CRM isn't loaded, show 0/dash — never a misleading number.
+- **RULE:** NEVER fall back from CRM funnel data to tagger funnel data. Tagger lacks CRM ethnicity/board data needed for TQL computation.
+
+### Fix 2: Tag Combos "not enough data" despite 2292 creatives (line ~7932)
+- **Root cause:** TD sanitization rule `(td > 0 && metaQL === 0)` zeroed TD on nearly ALL creatives. Most creatives have metaQL=0 (Meta pixel fires less than CRM lead creation) but valid CRM TDs via UTM matching.
+- **Fix:** Removed the metaQL===0 sanitization rule. Kept CPTD floor check and low-QL inflation check.
+- **RULE:** Do not assume metaQL=0 means the creative had no real leads. CRM UTM matching is the authoritative lead source, not Meta pixel.
+
+### Fix 3: "All Time" date picker overwritten on every refresh (line ~3530)
+- **Root cause:** `refreshData()` auto-filled empty date pickers with perf tracker date range on EVERY refresh cycle, not just first load. "All Time" clears pickers → next refresh stuffs dates back → single-day window.
+- **Fix:** Added `state._dateAutoSetDone` flag. Auto-fill only fires once on first boot.
+- **RULE:** Never overwrite user's date selection. Check `_dateAutoSetDone` flag before auto-setting dates.
+
+---
+
+## Production Polish for 20-Person Team Launch (2026-03-29, 12:30am–3:00am)
+
+### Global Filter Bar
+- Persistent bar at top of all data views: date pickers, presets (This Month/30d/90d/All Time), geo filter, freshness indicator
+- Per-view geo/date filters hidden (display:none) — global bar is single source of truth
+- Library added to syncGeoFilter system
+- onGlobalFilterChange() re-renders active view on any filter change
+- navigateTo('dashboard') now re-renders dashboard with current filters
+- RULE: All date/geo filtering goes through the global bar. Never add per-view date/geo controls.
+
+### Metric Glossary & Tooltips
+- Floating "?" button (bottom-right) opens glossary modal with all metric definitions + benchmarks
+- Oracle funnel table headers have title tooltips explaining each metric
+- Glossary includes: QL, TQL (with per-geo rules), NRI, TS, TD, CPQL, CPTQL, CPTD (primary), CAC, ROAS, CTR, QL→TD%, T2P%
+- Data sources section explains: Spend from Perf Tracker, Funnel from CRM, Creative from Tagger
+
+### Thumbnail Fallbacks
+- All `onerror="this.style.display='none'"` replaced with styled "No img" placeholder
+- RULE: Never hide broken images. Always show a placeholder so user knows data is missing.
+
+### Actionable Recommendations
+- Pause Now cards: "Pause" span → "Copy & Pause" button with copyToClipboard
+- Fatigued creatives: "Refresh" span → "Copy Name" button
+- copyToClipboard() utility function added — used across Oracle, available for Sentinel/Influencer
+
+### First-Time Onboarding
+- 4-step welcome overlay for new users (Welcome → Oracle → Views → Help)
+- Triggered on first visit (checks localStorage 'gf_onboarded')
+- "Don't show again" checkbox persists preference
+- Step dots + back/next navigation
+
+### UI Consistency Polish
+- Sidebar subtitle opacity: text-white/30 → text-white/50 (more readable)
+- Export buttons added: Oracle (3-tab XLSX), Intel (3-tab), Influencer (2-tab)
+- Loading states: Sentinel, Intel, Influencer, Library (standard bouncing dots)
+- Refresh buttons: Intel, Influencer, Library
+- Format filter: Influencer (Video/Static/All)
+- UK added to Tag/Intel/Influencer geo filters (was missing from 3 views)
+- All view headers standardized: w-9 h-9 rounded-lg + text-lg font-bold
+- All cards: rounded-2xl border-gray-200/80
+- Metric cards: text-xl font-black value, text-[10px] font-bold uppercase label
+
+### Data Logic Fixes
+- getOracleMetrics unified with getCRMPortfolioTotals: count rows (not sum), parseRevenue(), identical GEO_MAP
+- AUS/ROW/MEA geo filters fixed in both functions
+- renderMetricTicker: spend from Perf Tracker Daily, funnel from getCRMPortfolioTotals
+- Meta API errors shown in UI; failed pulls don't count against rate limit
+
+---
+
+## Oracle Data Unification (2026-03-28, 6:30pm)
+
+### Problem: getOracleMetrics and getCRMPortfolioTotals produced different numbers
+- getOracleMetrics SUMMED values (qls column), getCRMPortfolioTotals COUNTED ROWS — diverge if any row has qls > 1
+- Revenue: raw parse vs parseRevenue() with lakh/crore conversion — wildly different ROAS
+- AUS geo filter searched for 'AUS' but CRM uses country_bucket='APAC' — showed 0
+- ROW not in getCRMPortfolioTotals geoMap — showed 0
+- Header summary used getOracleMetrics, KPI cards used getCRMPortfolioTotals — different TQL numbers
+- renderMetricTicker fallback had undefined `data` variable (crash) and `totalCreatives` (crash)
+- Three different TQL calculation paths across the codebase
+
+### Fix: Unified both functions
+- **getOracleMetrics** now counts rows (not sums), uses parseRevenue(), uses identical CRM_GEO_MAP
+- **getCRMPortfolioTotals** refactored: single GEO_MAP (includes ROW, MEA→ME), shared geoMatch/dateIn helpers, no triplicated geo filter code
+- Both GEO_MAPs are identical: `{ US, India, AUS, MEA (includes ME), UK, ROW, APAC }`
+- renderMetricTicker fallback: `data` → `taggerData`, added `totalCreatives`, `taggerSpend` for self-contained fallback
+- getOracleMetrics now returns `asian`, `invalid`, `ts` fields (matches getCRMPortfolioTotals)
+- Empty return in getCRMPortfolioTotals includes all fields (prevents undefined access)
+
+### RULES
+- NEVER sum qls/trials_done/paid columns — always COUNT ROWS where value > 0
+- NEVER use raw parseFloat for revenue — always use parseRevenue() which handles lakh/crore
+- All CRM geo filtering must use the shared GEO_MAP pattern with .includes() matching
+- getOracleMetrics = spend from Perf Tracker Daily + funnel from CRM (row-counted)
+- getCRMPortfolioTotals = funnel from CRM only (row-counted, reads dates from DOM)
+
+---
+
+## Date extraction for tagger data (2026-03-28, 5:50pm)
+
+### Problem: Oracle Spend/CPTD/CPTQL/ROAS showed "—" when date range was set
+- Root cause: tagger data from Google Sheets had no `_date` field — only Meta API pulls set it
+- `filterByGlobalDate()` dropped all rows without `_date`, so 0 ads matched any date range
+- CRM data had dates (lead_created_date, trial_done_date) so TQLs/TDs/Enrolled still showed
+
+### Root cause deeper: tagger data = one row per ad with lifetime spend, no monthly breakdown
+- `extractDateFromAdName()` added (parses `_DDMMYY` suffix → `YYYY-MM-DD`) but this is the LAUNCH date, not spend date
+- An ad launched in Aug 2025 still has spend in Mar 2026 — can't date-filter tagger rows meaningfully
+
+### Real fix: `renderMetricTicker()` now uses `getOracleMetrics()` for KPI cards
+- `getOracleMetrics()` already used Perf Tracker Daily (15K+ daily rows with date/geo/spend) for date-filtered spend
+- `renderMetricTicker()` was the ONLY place still using `getGlobalFilteredTaggerData()` for spend
+- Now KPI cards: spend from Perf Tracker Daily, funnel from CRM — both properly date-filtered
+- Funnel breakdown table still uses `getCRMPortfolioTotals()` for extra fields (asian, invalid)
+- RULE: Never use tagger data for date-filtered spend. Use Perf Tracker Daily via `getOracleMetrics()`
+
+---
+
+## Data Bug: NRI Over-Count (2026-03-28, 3:45pm)
+
+### "Non NRI" leads counted as NRI — inflated NRI by 651 (Jan-Feb 2026)
+- Root cause: `eth.includes('nri')` matched "Non NRI" (651 leads) alongside actual "NRI" (1599) and "NRI / Non Native English Speaker" (1172)
+- Fix: all 6 NRI detection points now use `eth.includes('nri') && !eth.startsWith('non')`
+- Lines fixed: 3172, 3227, 3603, 3690, 7608, 7620
+- First fix: `includes('nri') && !startsWith('non')` → dropped from 3422 to 2771
+- But 2771 still 2x Pulse (882). "NRI / Non Native English Speaker" (734 in Feb) was being counted as NRI but Pulse does NOT count it.
+- Final fix: strict `=== 'nri'` match only. NRI now: 814 for Feb (Pulse: 882, diff ~68 — acceptable)
+- RULE: NRI detection must be STRICT EQUALITY: `eth === 'nri'`. Never use `.includes('nri')`.
+
+### WoW section removed from Oracle
+- Raw float leaks (1150.812..., 130.418...), CPTD 10x off (₹2.0L vs ₹38.5K), "vs ₹0" everywhere
+- HTML removed, JS left as dead code (wowEl check returns false)
+- RULE: Do not re-add WoW until data pipeline is verified end-to-end
+
+### Spend discrepancy: Oracle ₹2.6Cr vs Cost Tab ₹4.84Cr (KNOWN, NOT FIXED)
+- Oracle spend = tagger data (Meta API pull) — only ads imported into Godfather
+- Cost tab spend = ALL Meta spend across all accounts/campaigns
+- Gap: ~₹2.2Cr of spend from campaigns not pulled into tagger
+- This is by design (tagger = creative-level analysis) but Oracle KPI cards should note this
+
+---
+
+## Layout & Loading Fixes (2026-03-28, 4:30am–5:00am)
+
+### Table white columns — ALL views (15 tables total)
+- Root cause: tables used `w-full` without `table-fixed`, first column (Creator/Creative/Tag) expanded to fill remaining space
+- Fix: `table-fixed` + explicit `style="width:X%"` on first column of every table
+- Views: Lens:Tag, Sentinel (top5, bottom5, full), Oracle (top5, drains), Lens:Intel (heatmap, formula, declining, audience), Influencer (leaderboard, ad sets, content analysis x2, cross-ref, by-market)
+
+### Forge brief panel too narrow
+- Was: `w-[320px]` — created narrow white left column
+- Now: `w-1/2` — even 50/50 split between brief and output panels
+
+### Main background bleed
+- `<main>` had no background, showed white in some browsers
+- Fix: added `bg-[#F8F9FC]` to match body background
+
+### Empty states flashed white on load
+- `dashboardEmpty`, `ciEmpty`, `sentinelEmpty`, `libraryEmpty` were visible by default
+- Fix: all start `hidden`, shown only when JS determines no data exists
+- Dashboard: added else branch to show empty state when no tagger/meta data
+
+### Library loading states
+- `libraryLoading` div added (spinner visible by default, hidden when renderLibrary runs)
+- `fetchLibrarySheet` inline spinner given `min-height:60vh` to fill viewport
+- On every navigate-to-library: loading shown, grid cleared, empty hidden — prevents white flash on revisit
+
+### Sidebar Meta Ads indicator overflow
+- Was hanging below sidebar on short viewports
+- Fix: nav gets `overflow-y-auto overflow-x-hidden`, logo margin `mb-8`→`mb-5`, status gap `mt-4`→`mt-2`
+
+### REVERTED: body overflow-hidden (BROKE SCROLLING — AGAIN)
+- Changed body to `h-screen overflow-hidden` — killed scrolling on all views
+- **This was already attempted and reverted earlier in the same night (see "Layout reverted to original" entry above)**
+- RULE: NEVER change body from `min-h-screen`. NEVER add overflow-hidden to body.
+
+### Scroll + Sticky Sidebar fix (SOLVED — 5:15am)
+- Root cause: outer container had `overflow-hidden` which clipped ALL scroll. Content wrapper hacks (min-h-0, overflow-y-auto, height:0) all failed.
+- Fix: TWO changes required together:
+  1. Outer div: `flex h-screen overflow-y-auto` (NOT overflow-hidden)
+  2. Nav: `sticky top-0 h-screen` (stays pinned while content scrolls)
+- Content wrapper: plain `flex-1 flex flex-col` (no overflow or min-h tricks)
+- RULE: NEVER change outer div back to `overflow-hidden`. NEVER remove `sticky top-0 h-screen` from nav. These two work together.
+
+---
+
 ## Layout & UI Fixes (2026-03-28, 3:30am–4:00am)
 
 ### Supabase "Synced" badge was visible on all tabs (BUG)
