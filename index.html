@@ -270,7 +270,7 @@
 
           <!-- Performance Snapshot -->
           <div class="mb-6" id="tickerSection">
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3" id="metricTicker"></div>
+            <div id="metricTicker"></div>
             <div id="funnelTable" class="mt-4"></div>
           </div>
 
@@ -2468,7 +2468,7 @@ function init() {
     document.getElementById('dashboardEmpty').classList.add('hidden');
     document.getElementById('dashboardContent').classList.remove('hidden');
     document.getElementById('dataTimestamp').textContent = 'Loading fresh data from sheets...';
-    document.getElementById('metricTicker').innerHTML = '<div class="col-span-4 text-center py-8"><div class="w-6 h-6 border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mx-auto mb-2"></div><p class="text-xs text-text-muted">Fetching perf tracker + CRM data...</p></div>';
+    document.getElementById('metricTicker').innerHTML = '<div class="text-center py-8"><div class="w-6 h-6 border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mx-auto mb-2"></div><p class="text-xs text-text-muted">Fetching perf tracker + CRM data...</p></div>';
   } else {
     document.getElementById('dashboardEmpty').classList.remove('hidden');
   }
@@ -5892,13 +5892,13 @@ function renderMetricTicker() {
     { label: 'Format Mix', value: `${staticPct}% Static`, trend: { arrow: '', title: '' }, sub: `${staticCount}S / ${videoCount}V of ${totalCreatives}`, color: 'blue' }
   ];
 
-  container.innerHTML = tickers.map(t => `
+  container.innerHTML = `<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">` + tickers.map(t => `
     <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4">
       <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">${t.label}</p>
       <p class="text-xl font-black text-accent-${t.color}">${t.value}${t.trend && t.trend.arrow ? `<span title="${t.trend.title}" class="text-sm font-semibold ${t.trend.arrow.includes('↑') ? 'text-green-600' : t.trend.arrow.includes('↓') ? 'text-red-500' : 'text-gray-400'}">${t.trend.arrow}</span>` : ''}</p>
       <p class="text-[10px] text-text-muted mt-0.5">${t.sub}</p>
     </div>
-  `).join('');
+  `).join('') + `</div>`;
 }
 
 function updateSyncTimestamp() {
