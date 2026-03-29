@@ -1155,9 +1155,9 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-semibold text-red-700">Reset Tagger Data (if spend is inflated)</p>
-                <p class="text-[10px] text-text-muted">Clears corrupted cached data. You'll need to re-pull from Meta API or re-upload CSV after reset.</p>
+                <p class="text-[10px] text-text-muted">Clears localStorage + Supabase. Tags preserved in tag_cache. Re-pull from Meta API after reset.</p>
               </div>
-              <button onclick="if(confirm('This clears ALL tagged creative data from cache. Tags are preserved in Supabase. You will need to re-pull data. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];showToast('Tagger data cleared. Re-pull from Meta API or upload CSV.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
+              <button onclick="if(confirm('This clears ALL tagged creative data from localStorage AND Supabase. Tags are preserved in tag_cache. You will need to re-pull from Meta API. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];supabaseDeleteAll('tagged_creatives').then(ok=>{showToast(ok?'Tagger data cleared (localStorage + Supabase). Re-pull from Meta API.':'localStorage cleared but Supabase delete failed — check console.');runGroundTruthQA();});}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
             </div>
           </div>
         </div>
@@ -1652,6 +1652,26 @@ async function supabaseUpsert(table, rows) {
   }
 }
 
+async function supabaseDeleteAll(table) {
+  try {
+    // PostgREST DELETE with a filter that matches all rows
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=gt.0`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=minimal'
+      }
+    });
+    if (!res.ok) throw new Error(`Supabase DELETE ${res.status}: ${await res.text()}`);
+    console.log(`Supabase: deleted all rows from ${table}`);
+    return true;
+  } catch(e) {
+    console.warn('supabaseDeleteAll error:', e.message);
+    return false;
+  }
+}
+
 // Map tagger row fields to Supabase column names
 function hashCode(s) { let h1 = 0, h2 = 5381; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = ((h1 << 5) - h1 + c) | 0; h2 = ((h2 << 5) + h2 + c) | 0; } return Math.abs(h1 * 65536 + (h2 & 0xFFFF)); }
 function taggerRowToSupabase(c) {
@@ -1973,7 +1993,7 @@ function saveState(key, value) {
   }
 }
 
-const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','thumbnail_url','image_url','ad_body','ad_title','ad_description','ad_cta','Frequency','Reach','Video_P25','Video_P50','Video_P75','Video_P100','net_booking','board','ethnicity'];
+const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','_source','thumbnail_url','image_url','ad_body','ad_title','ad_description','ad_cta','Frequency','Reach','Video_P25','Video_P50','Video_P75','Video_P100','net_booking','board','ethnicity'];
 function compressTaggerData(data) {
   return data.map(c => {
     const slim = {};
@@ -1988,8 +2008,9 @@ function ensureDerivedMetrics(data) {
     let ql = parseNumber(c['QL']||c['ql']||0);
     const nri = parseNumber(c['NRI']||c['nri']||0);
     const td = parseNumber(c['TD']||c['td']||c['Trial Done']||c['trial_done']||0);
-    // Floor: QL must be >= TD (can't do a trial without being a lead)
-    if (td > 0 && ql < td) { ql = td; c['QL'] = td; }
+    // Note: Do NOT floor QL to TD here. Meta QL and CRM TD come from different sources.
+    // CRM can attribute TDs to ads that Meta didn't report as leads (attribution mismatch).
+    // Forcing QL=TD when TD>QL causes 100% QL→TD across the board.
     const ts = parseNumber(c['TS']||c['ts']||c['Trial Scheduled']||0);
     const paid = parseNumber(c['Paid']||c['paid']||0);
     const impressions = parseNumber(c['Impressions']||c['impressions']||0);
@@ -3460,6 +3481,8 @@ async function connectMetaApi() {
     // Tags are preserved via tag_cache — rehydrated automatically.
     // This prevents spend inflation from multiple pulls.
     state.taggerData = deduplicateByAdName(ensureDerivedMetrics(allAds));
+    // Flag: localStorage has a fresh Meta API pull — Supabase must NOT override on next boot
+    localStorage.setItem('gf_freshPull', Date.now().toString());
     // Rehydrate tags from cache — preserves all previously-tagged creatives
     const restored = rehydrateTagsFromCache(state.taggerData);
     // Backfill unknown tags locally
@@ -3698,12 +3721,12 @@ function mergeCRMWithMeta() {
         if (r['ethnicity']) ethnicities[r['ethnicity']] = (ethnicities[r['ethnicity']]||0) + 1;
       });
 
-      // A trial done implies a qualified lead — CRM sometimes has qls=0 but trials_done=1
-      if (td > 0 && ql < td) ql = td;
+      // Note: Do NOT floor CRM ql to td. CRM qls and trials_done are independent counts.
+      // Flooring caused QL=TD (100% conversion) across the board.
 
       // Sanity checks: reject likely false matches
       const metaQL = parseNumber(c['QL']||c['ql']||0);
-      const effectiveQL = Math.max(metaQL, ql); // CRM ql (now floored to TD) or Meta QL
+      const effectiveQL = Math.max(metaQL, ql); // CRM ql or Meta QL (whichever is higher)
       const metaSpend = parseNumber(c['Spent']||c['spent']||0);
       if (
         (effectiveQL > 0 && td > effectiveQL * 5) ||  // TDs vastly exceed total QLs (Meta + CRM)
@@ -8752,12 +8775,20 @@ if (_immediateRestored > 0) saveTaggerData();
 if (state.taggerData.length && state._crmLeads?.length) mergeCRMWithMeta();
 
 // Async: try loading from Supabase — if it has more/newer data, use it
+// GUARD: If localStorage has a recent fresh Meta API pull, trust it over Supabase.
+// Supabase may contain old corrupted rows from pre-fix accumulation.
+const _freshPullTimestamp = parseInt(localStorage.getItem('gf_freshPull') || '0');
+const _localHasFreshPull = (Date.now() - _freshPullTimestamp < 7 * 24 * 60 * 60 * 1000); // within 7 days — blocks Supabase override even if localStorage was just cleared
 state._supabaseLoadPending = true;
 (async () => {
   try {
     const sbData = await loadTaggerFromSupabase();
     state._supabaseLoadPending = false;
-    if (sbData && sbData.length > _localTaggerCount) {
+    if (_localHasFreshPull) {
+      console.log(`Supabase has ${sbData?.length || 0} rows but localStorage has ${_localTaggerCount} fresh-pull rows — keeping localStorage, syncing clean data UP to Supabase`);
+      updateSyncBadge('synced');
+      syncTaggerToSupabase(state.taggerData).catch(() => {});
+    } else if (sbData && sbData.length > _localTaggerCount) {
       // One-time spend deflation: old dedup SUMMED spend across duplicates.
       // If _dedupCount > 1, spend was inflated by that factor. Divide to restore.
       sbData.forEach(c => {

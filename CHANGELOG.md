@@ -4,6 +4,25 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Spend Inflation Fix — Supabase Clear (2026-03-30, ~2:30am)
+
+### Fix: QL→TD 100% across all ads — removed QL=TD floor
+- **Root cause:** `ensureDerivedMetrics()` line 2012 and `mergeCRMWithMeta()` line 3722 both had `if (td > 0 && ql < td) ql = td`. This floored QL to TD whenever CRM Trial Dones exceeded Meta's reported leads. Since CRM catches leads that Meta attribution misses (especially for India/MEA small-volume ads), this fired on most ads → every ad showed 100% QL→TD.
+- **Fix:** Removed both floor statements. Meta QL and CRM TD are independent sources — CRM TDs don't imply Meta should have reported a lead. QL_TD_PCT display already caps at 100%.
+- **RULE:** NEVER force equality between Meta-sourced and CRM-sourced metrics. They have different attribution windows, matching, and coverage. Let the real numbers show.
+
+### Supabase no longer overrides fresh Meta API pull data
+- **Root cause:** On boot, Supabase (12K+ corrupted rows) > localStorage (1152 clean rows) → Supabase REPLACED clean data with corrupted data every single boot. `sbData.length > _localTaggerCount` condition always true.
+- **Fix:** Added `_localHasFreshPull` guard: if localStorage has rows with `_source === 'meta_api'`, Supabase load is skipped and clean data is synced UP to Supabase instead. Added `_source` to `TAGGER_KEEP_FIELDS` so it survives compression.
+- **RULE:** Fresh Meta API pull data in localStorage ALWAYS wins over Supabase. Supabase is a backup, not the authority. Never let row count alone determine which data source to trust.
+
+### Reset Tagger Data now clears Supabase too
+- **Root cause:** Corrupted tagger data (103x spend inflation from old SUM-based dedup + accumulation across pulls) was persisted in BOTH localStorage AND Supabase. Reset button only cleared localStorage — on next boot, inflated data rehydrated from Supabase.
+- **Fix:** Added `supabaseDeleteAll()` helper. Reset button now clears `tagged_creatives` table in Supabase alongside localStorage. Tags preserved in separate `tag_cache` table.
+- **RULE:** Any data reset that clears localStorage MUST also clear the corresponding Supabase table — they are mirrors, not independent stores.
+
+---
+
 ## 7-Bug Fix Session (2026-03-29, ~10:00am)
 
 ### Bug 1: Duplicate KPI cards on Dashboard
