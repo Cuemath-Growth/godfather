@@ -2653,7 +2653,9 @@ function renderHealthPanel() {
     html += row('INFO', 'Creative TDs (tagger merge)', `${Math.round(taggerTD)} TDs — matched to specific ads`);
     if (crm.td > 0) {
       const matchRate = Math.round(taggerTD / crm.td * 100);
-      html += row(matchRate >= 70 ? 'PASS' : 'WARN', 'CRM match rate', `${matchRate}% — ${matchRate >= 70 ? 'healthy' : 'check mergeCRMWithMeta()'}`);
+      const matchStatus = matchRate > 120 ? 'FAIL' : matchRate >= 70 ? 'PASS' : 'WARN';
+      const matchLabel = matchRate > 120 ? `INFLATED — creative TDs ${(matchRate/100).toFixed(1)}x portfolio TDs (double-counting in CRM merge)` : matchRate >= 70 ? 'healthy' : 'check mergeCRMWithMeta()';
+      html += row(matchStatus, 'CRM match rate', `${matchRate}% — ${matchLabel}`);
     }
   }
   if (state._perfTrackerDaily?.length) {
@@ -3570,6 +3572,8 @@ function mergeCRMWithMeta() {
   // Match tagger creatives to CRM leads via mx_utm_adcontent ↔ Ad name token overlap
   let directMatched = 0, campaignMatched = 0, unmatched = 0;
   const sampleDirect = [], sampleCampaign = [], sampleMisses = [];
+  // Track consumed CRM leads to prevent double-counting in campaign fallback
+  const consumedLeadIds = new Set();
 
   // Pre-compute token sets for each tagger creative's Ad name
   const taggerAdTokens = state.taggerData.map(c => {
@@ -3634,6 +3638,11 @@ function mergeCRMWithMeta() {
       c._crmMatchScore = bestAdScore;
       c._crmLeadCount = leads.length;
       c._crmLeads = leads; // store for date-filtered re-computation
+      // Mark these CRM leads as consumed — prevents double-counting in campaign fallback
+      leads.forEach(r => {
+        const pid = r['prospectid'] || r['ProspectId'] || '';
+        if (pid) consumedLeadIds.add(pid);
+      });
       const topEth = Object.entries(ethnicities).sort((a,b)=>b[1]-a[1])[0];
       if (topEth) c['ethnicity'] = topEth[0];
       directMatched++;
@@ -3645,13 +3654,43 @@ function mergeCRMWithMeta() {
     c._crmMatchType = 'unmatched'; // will be updated if campaign match found
   });
 
+  // ── STEP 2B: CONSUME LEADS FOR SHEET-PRELOADED TDs ──
+  // Creatives that already have TDs from the Google Sheet (previous CRM merge baked in)
+  // need their corresponding CRM leads consumed to prevent double-counting in campaign fallback.
+  // Use a softer match (0.4 threshold) since we're not writing data, just consuming leads.
+  state.taggerData.forEach((c, idx) => {
+    if (c._crmMatchType === 'ad_content') return; // already handled
+    const existingTD = parseNumber(c['TD']||c['td']||0);
+    if (existingTD <= 0) return; // no sheet data to protect
+    const adTokens = taggerAdTokens[idx];
+    if (adTokens.length < 2) return;
+    // Find best CRM ad-content match even below 0.65
+    let bestScore = 0, bestKey = '';
+    for (const ak of adContentKeys) {
+      const score = tokenOverlap(adTokens, crmByAdContent[ak].tokens);
+      if (score > bestScore) { bestScore = score; bestKey = ak; }
+    }
+    if (bestScore >= 0.4 && bestKey) {
+      // Consume these leads — they're already counted in the sheet's TD column
+      crmByAdContent[bestKey].leads.forEach(r => {
+        const pid = r['prospectid'] || r['ProspectId'] || '';
+        if (pid) consumedLeadIds.add(pid);
+      });
+    }
+  });
+  console.log(`CRM merge: ${consumedLeadIds.size} leads consumed (direct matches + sheet-preloaded TDs)`);
+
   // ── STEP 3: CAMPAIGN-LEVEL FALLBACK for unmatched creatives ──
   // Aggregate remaining (unmatched by ad content) CRM leads at campaign level
   const unmatchedCreatives = state.taggerData.filter(c => c._crmMatchType === 'unmatched');
   if (unmatchedCreatives.length > 0) {
-    // Build campaign aggregation from ALL CRM leads (some may have been ad-matched too, that's OK for ratios)
+    // Build campaign aggregation from UNCONSUMED CRM leads only — leads already attributed via direct match are excluded to prevent double-counting
     const campaignAgg = {};
+    let _skippedConsumed = 0;
     rows.forEach(r => {
+      // Skip leads already consumed by direct ad-content matches or sheet-preloaded TDs
+      const pid = r['prospectid'] || r['ProspectId'] || '';
+      if (pid && consumedLeadIds.has(pid)) { _skippedConsumed++; return; }
       const rawCamp = r['mx_utm_campaign'] || '';
       const core = campaignCore(rawCamp);
       if (!core || core.length < 10) return;
@@ -3668,6 +3707,7 @@ function mergeCRMWithMeta() {
       a.revenue += parseNumber(r['net_booking'] || r['Revenue'] || 0);
       if (r['ethnicity']) a.ethnicities[r['ethnicity']] = (a.ethnicities[r['ethnicity']]||0) + 1;
     });
+    if (_skippedConsumed > 0) console.log(`CRM campaign fallback: skipped ${_skippedConsumed} leads already consumed by direct matches`);
     const campCores = Object.keys(campaignAgg);
     const crmTokenMap = {};
     campCores.forEach(ck => {
