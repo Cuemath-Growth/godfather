@@ -4,6 +4,321 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Major Data + Intelligence Overhaul (2026-03-29, 7:00am–8:45am)
+
+### Root cause: sanitizeTaggerData() not applied to 4 of 8 data access paths. Multiple pages running on dirty data with false CRM matches.
+
+### Data Layer: Global Sanitizer (THE fix)
+- **Created `sanitizeTaggerData()`** — single function, zeroes TDs when: CPTD < market floor (US/AUS/UK: ₹5K, India: ₹1.5K, MEA: ₹3K), OR TD > QL on low-QL creatives, OR ghost rows (spend < ₹100)
+- **Applied in ALL 8 data access paths**: getDashboardFilteredData, getGlobalFilteredTaggerData, getFilteredTaggerData, getInfluencerAds, renderInfluCompare, matchLibraryToLens, _runSentinelViewInner, WoW trends
+- **Deleted duplicate sanitizer** from renderInfluLeaderboard (had 50% lower thresholds: US ₹1.5K vs global ₹5K)
+- **Fixed Dashboard "Make More"** — was using raw state.taggerData, now uses filtered+sanitized `data` variable
+
+### Architecture: DOM Race Condition
+- **Refactored `getCRMPortfolioTotals()`** to accept `dateOverride` param
+- **Eliminated 3 DOM mutation sites** where code temporarily changed date inputs to read prior-period CRM data
+- Prior-period CRM now reads via `getCRMPortfolioTotals(geo, {from, to})` — no DOM mutation
+
+### CRM Merge Fix
+- **CRM QL floor**: `mergeCRMWithMeta()` now floors CRM QL to TD (trial done implies qualified lead)
+- **Removed false-rejection**: sanity check `effectiveQL === 0 && td > 2` was killing valid CRM matches
+- **India NRI/Non-NRI remap**: `backfillUnknownTags()` remaps India market NRI/Non-NRI → language-based or "All Audiences"
+
+### Performance Page
+- **KPIs cut from 12→6**: Spend, CPTQL, CPTD, QL→TD%, ROAS, CAC. Killed noise cards (CTR, Click→QL%, QL→TS%, T2P%, TQL raw count)
+- **Verdict banner**: "2 metrics in alert — review budget burners" / "All healthy — scale winners"
+- **Format filter honesty**: when format active, uses tagger funnel (not CRM) to avoid mixed-source CPTD
+- **Format filter sync**: bidirectional — table always reads from header
+- **Creative Fatigue + Audience Saturation** added to "What Changed" narrative
+- **Geo filter unhidden** (was display:none)
+- **WoW trends re-enabled** with sanitized data + rounded TQLs
+- **Top 5/Bottom 5**: now show tag context (hook + benefit per ad)
+
+### Tagger Page
+- **Geo filter unhidden**
+- **"What Separates Winners from Losers"**: contrast pairs with example ads (was showing identical frequency lists)
+- **Tag pairs → "Winning Combos" / "Money Pits"**: with example ads, 5-ad minimum
+- **Tag pills limited to 4** with +N overflow (was cramming 10+ into one cell)
+- **Deep Dive matrix**: 5-ad minimum per cell, "Other"/"Unknown" filtered out, explanation text
+
+### Creators Page
+- **Geo filter unhidden**
+- **"What Makes Winners Different"**: creative-only tags (hook, tone, angle), excludes language/format/audience
+- **Scale/Watch/Drop cards**: actionable verdicts ("Best: Priyanshul-2 — increase budget")
+- **Leaderboard verdict**: one-line summary above table
+- **Content Analysis**: Script Playbook + per-creator best/worst ad
+
+### Dashboard
+- **Market Health: all 6 geos** (was showing only US, India, APAC, MEA — hiding AUS/UK)
+- **Market Health: action per geo** ("Scale / Optimize / Investigate")
+- **Action Log nav badge**: purple count on sidebar
+- **document.title**: updates on every navigation
+
+### Library
+- **matchLibraryToLens sanitized**: Deploy Queue now uses clean CPTD data
+- **Grid thumbnails**: object-contain instead of object-cover (no more blur)
+
+### Utility
+- **shortAdName() rewritten**: strips dates, noise tokens, geo prefixes, age ranges
+- **Creative Health**: placeholder for missing thumbnails
+
+### RULES (updated)
+- `sanitizeTaggerData()` MUST be called in every function that reads `state.taggerData` for display or analysis
+- `getCRMPortfolioTotals()` MUST use `dateOverride` param for non-current dates — NEVER mutate DOM inputs
+- Performance KPIs MUST show tagger-derived funnel when format filter active — NEVER mix filtered spend with unfiltered CRM
+- Market Health MUST show all 6 geos — NEVER hardcode a subset
+- Every verdict/action card MUST include a specific action ("scale X", "pause Y", "shift budget from A to B")
+
+---
+
+## Cross-Tab Data Consistency Fix (2026-03-29, ~6:15am)
+
+### Root cause: TD sanitization and date filtering applied inconsistently across tabs
+
+**Problem:** Same creative showed different TD/CPTD on Tagger vs Library vs Performance. Verdict thresholds were hardcoded instead of using SENTINEL_THRESHOLDS.
+
+### Fix 1: Tagger verdict uses SENTINEL_THRESHOLDS
+- Was: hardcoded 50K/80K for CPTD, 15K/25K for CPQL
+- Now: `scoreMetric(cptd_val, SENTINEL_THRESHOLDS[market].cptd, false)` — matches Performance tab exactly
+
+### Fix 2: Library applies TD sanitization + date filtering
+- `matchLibraryToLens()` now runs `filterByGlobalDate()` on tagger data before matching
+- Applies same TD sanitization logic (CPTD floor check, TD>QL check) as `getFilteredTaggerData()`
+- Library numbers now match Tagger table for same creative
+
+### Fix 3: Performance applies TD sanitization
+- `getGlobalFilteredTaggerData()` now applies same TD sanitization as `getFilteredTaggerData()`
+- Performance drill-down numbers now match Tagger table
+
+### Fix 4: Undated row handling aligned
+- `getFilteredTaggerData()` inline date filter was INCLUDING undated rows
+- `filterByGlobalDate()` was EXCLUDING them
+- Now both EXCLUDE undated rows when date range is set
+- All tabs behave identically when "This Month" / "Last 30d" is selected
+
+### Fix 5: Audience recommendation cached
+- `recommendAudienceForCreative()` was O(2200 * 233) = 500K+ iterations
+- Now cached by `(hookType, format)` key — runs once per unique combo
+
+### RULES
+- TD sanitization MUST be applied in ALL data access functions: `getFilteredTaggerData`, `getGlobalFilteredTaggerData`, `matchLibraryToLens`
+- Verdict thresholds MUST come from `SENTINEL_THRESHOLDS[market]` — NEVER hardcode
+- Date filtering MUST exclude undated rows when a date range is set — ALL tabs, no exceptions
+- Same creative MUST show same TD/CPTD/QL→TD% on every tab it appears
+
+---
+
+## Critical Overhaul: Tagger + Library (2026-03-29, ~6:00am)
+
+### Tagger Table: Now answers "which creative on which audience"
+- **Added Audience column** — extracted from campaign name via `extractAudience()`. Shows NRI/Expats/Interests/Lookalike/Broad/etc. as colored pills.
+- **Added QL and TD count columns** — raw numbers visible, not just cost-per metrics. Removed CPTQL column (was showing "—" everywhere because TQL=0 without CRM).
+- **Added QL→TD% column** — conversion rate per creative, green if >5%.
+- **Added row verdict** — green/amber/red left border based on CPTD (if ≥3 TDs) or CPQL (if ≥5 QLs). Gray if insufficient data.
+- **Removed CPTQL** — was broken (0 TQL from missing CRM data). Replaced with actual QL count + TD count which are always available from Meta API.
+- **Compacted layout** — smaller text (11px/10px), tighter padding, more columns fit without scroll.
+
+### Library Cards: Now recommend targeting
+- **Fixed "0 TQLs" mislabel** — was displaying `lm.ql` (raw QL) but labeling it "TQLs". Now shows "X QLs" (correct label).
+- **Added TQL aggregation** — `matchLibraryToLens()` now aggregates TQL from matched tagger rows.
+- **Added QL→TD% on cards** — conversion rate visible on every card with performance data.
+- **Added "Best on: [Audience]" badge** — for each library creative with Lens match, shows which audience it performed best on + CPTD. Also shows "Also ran:" for other tested audiences.
+- **Added "Recommended: [Audience]" for new creatives** — cards WITHOUT performance data get a targeting recommendation based on similar creatives (matched by hook type + format). Shows expected CPTD and supporting data.
+- **New helper: `recommendAudienceForCreative(hookType, format)`** — cross-references all tagger data by audience, returns the audience with lowest CPTD for matching creative profile.
+- **Audience tracking in `_lensMatch`** — now stores `audiences` map, `bestAudience`, `bestAudCPTD` per library card.
+
+### RULES
+- Tagger table MUST show: Creative, Format, **Audience**, Spend, QL, TD, CPTD, QL→TD%, Tags, Edit
+- Library cards MUST show actual QL count (not mislabeled as TQL)
+- Library cards MUST show audience recommendation (from performance data OR from similar creative analysis)
+- Every page must answer "which creative on which audience and why" — not just show data
+- Row verdicts (green/amber/red) are mandatory on all data tables
+
+---
+
+## Bug Fixes: Header, QL→TD%, Sort, Date Presets (2026-03-29)
+
+### Fix 1: Global header overflow
+- Filter bar was overflowing horizontally. Reduced padding, compacted date inputs (width:110px), shortened preset labels (Mo/30d/90d/All), removed country filter icon, added `flex-wrap`.
+- Active preset button now highlighted with purple background.
+
+### Fix 2: QL→TD% was using wrong denominator
+- Performance summary KPI and Dashboard ticker both computed QL→TD% using `crm.tql` (NRI-only for US) instead of `crm.ql` (all qualified leads).
+- For US market this produced inflated percentages since TQL << QL but TDs come from all leads.
+- Fixed both locations to use `crm.ql` as denominator.
+
+### Fix 3: Sort dropdown ignored in Campaign/AdSet views
+- Performance table Campaign view always sorted by spend desc regardless of sort dropdown selection.
+- Same for AdSet view. Only Ad (flat) view respected the sort.
+- Fixed: Campaign and AdSet groupings now sort by the selected criterion (Best CPQL, Best CPTD, Highest Spend, Most QLs).
+
+### Fix 4: Date presets (This Month, Last 30d) not filtering
+- `filterByGlobalDate()` included ALL rows without `_date` field, even when a date range was active. Since many tagger rows (from Meta Ads sheet) lack dates, every preset showed identical data.
+- Fix: when a date range IS set, exclude undated rows. Only include them in "All Time" mode.
+- CHANGELOG rule updated below.
+
+### RULES
+- QL→TD% denominator is ALWAYS `crm.ql` (all QLs), never `crm.tql`. Label and math must match.
+- Sort dropdown must be respected in ALL view levels (Campaign, AdSet, Ad).
+- `filterByGlobalDate()`: when date range is set, EXCLUDE undated rows. When All Time (no dates), include everything.
+- Filter bar must use `flex-wrap` to prevent horizontal overflow.
+
+---
+
+## Page-by-Page Intelligence Overhaul (2026-03-29, ~5:00am)
+
+### Plain English Tags (affects ALL pages)
+- TAG_DISPLAY rewritten: "H-STAT" → "Surprising statistic", "PB-FOUND" → "Deep understanding", "F-INFLU" → "Influencer / UGC"
+- Every tag pill, insight card, combo, heatmap now shows labels an intern can understand
+- RULE: Tag labels must describe what the creative DOES, not its internal code
+
+### Insights: Monday Playbook (added ~4:30am)
+- Replaced "Key Insight: Best audience Other" data dump with 4-step actionable playbook
+- 1. SCALE: best audience + hook + format with exact combo to replicate
+- 2. KILL: worst audience with spend waste quantified
+- 3. CREATIVE PATTERN: winning vs losing hook types with cost multiplier
+- 4. BLIND SPOTS: audiences with spend but zero trials
+
+### Creators: ROI Verdict
+- Added tier classification: SCALE (green), WATCH (amber), DROP (red)
+- Verdict summary card above table: "Scale these 5, drop these 10"
+- Each table row gets colored left border + tier badge
+- Fixed TQL display wrapping with Math.round()
+
+### Performance: "What Changed" Narrative
+- New `renderSentinelNarrative()` — shows CPTD vs average with direction
+- Top 3 campaigns by spend with their CPTD
+- 3 worst campaigns with "Pause" button (copies to clipboard)
+
+### Dashboard: Action Log
+- "Done ✓" button on every recommendation item (Pause/Make More/Deploy/Influencer)
+- Completed actions move to Action Log with timestamp
+- Counter shows "X of Y actions taken"
+- Persisted in localStorage
+
+### Create: Recommended Briefs
+- `computeRecommendedBriefs()` finds top 3 audience+hook combos by CPTD
+- Shows cards in output panel: "NRI + Testimonial → ₹20K CPTD (12 ads) — Generate This"
+- One click pre-fills brief form and triggers generation
+- Only shows when no content generated yet
+
+### RULES
+- Every insight must be in plain English an intern understands
+- Every page must answer "what should I do?" not just "here's data"
+- Every table must have a verdict (green/amber/red)
+- Every recommendation must have a "Done" action button
+- Create page must never cold-start — show data-driven briefs
+
+---
+
+## Godmode: Full CMO-Ready Overhaul (2026-03-29, ~4:30am)
+
+### Dashboard P0 Fixes
+- **CPTD hero card restored** — now largest card, first position, with threshold coloring
+- **Recommendation cards populated** — Pause Now, Make More, Deploy These, Influencer Scaling, Market Health all render real data. Fixed variable scope crash in fatigued loop, added oracleMarketHealthList to cleanup.
+- **TD float display fixed** — All TD counts wrapped in Math.round() in CMO Decisions section
+- **Budget Reallocation US-protected** — US and India never suggested for budget cuts. Shows "Optimize within" guidance instead.
+
+### P1 Fixes
+- **Header overlap eliminated** — Page titles now render in global filter bar via `filterBarTitle` span. In-page header blocks removed/hidden.
+- **Synced badge** — Added shrink-0 to prevent overlap
+- **Date filter fix** — `filterByGlobalDate()` now includes rows WITHOUT `_date` field instead of dropping them. This was hiding 95% of creatives.
+- **Page naming** — Performance (was "Sentinel"), Creators (was "Influencer Performance")
+
+### Intelligence Overhaul
+- **Monday Playbook** replaces "Key Insight" on Insights page. Four numbered sections:
+  1. **Scale** — best audience + hook + format combo with specific action
+  2. **Kill** — worst audience with spend waste quantified
+  3. **Creative pattern** — winning vs losing hooks with cost multiplier
+  4. **Blind spots** — audiences with spend but zero trials
+
+### RULES
+- CPTD must ALWAYS be the first and largest card on Dashboard
+- Recommendation cards must NEVER show placeholder text — show diagnostic message if no data
+- Budget Reallocation must NEVER suggest cutting US or India — these are protected markets
+- `filterByGlobalDate()` must INCLUDE rows without `_date`, not exclude them
+- Insights must lead with actionable playbook, not raw data
+
+---
+
+## CRITICAL: Boot crash fix — blank page on load (2026-03-29, ~4:15am)
+
+### Root cause: JavaScript Temporal Dead Zone (TDZ) crash
+- `rehydrateTagsFromCache()` was called at boot (line ~7549) but referenced:
+  1. `_tagCacheData` (a `let` variable defined at line ~7637) — **TDZ crash**
+  2. `TAG_MIGRATION` (a `const` defined at line ~7661) — **TDZ crash**
+- Both are `let`/`const` declarations which are NOT hoisted past their declaration point
+- This threw a `ReferenceError` that killed the entire `<script>` block — no navigation, no rendering, completely blank page
+
+### Fix
+- Moved `TAG_MIGRATION`, `_tagCacheLoaded`, `_tagCacheData`, `getTagCache()`, and `saveTagCache()` BEFORE the tagger boot sequence
+- Removed duplicate declarations that were left at their original locations
+- Verified boot order: TAG_CATEGORIES → TAG_MIGRATION → _tagCacheData → rehydrate call
+
+### RULES
+- **NEVER add `const`/`let` declarations that are referenced during boot AFTER the boot sequence.** `function` declarations are hoisted; `const`/`let` are NOT.
+- Before adding any code to the boot sequence (~line 7497-7555), check that ALL referenced variables are already declared above.
+- The boot sequence order is: dependencies → load localStorage → rehydrate tags → merge CRM → async Supabase
+
+---
+
+## Full Pre-Pull Audit + Fixes (2026-03-29, ~4:00am)
+
+### Phase 1 Fixes (Data Pipeline)
+- **UK geo mapping bug** in `getLibraryContext()` — UK was mapped to APAC. Fixed to UK.
+- **CRM false match threshold** raised from ₹500 to ₹1,500 CPTD floor. Prevents unrealistic matches.
+- **TQL computation**: Verified identical across all 5 locations. No fix needed.
+- **Date filtering**: Verified correct. `_dateAutoSetDone` flag working. No fix needed.
+- **Geo filtering**: All GEO_MAPs consistent. No fix needed.
+
+### Phase 2 Fixes (Tagging System)
+- **Claude response Array.isArray guard** — if Claude returns object instead of array, wraps it. Prevents silent tag loss.
+- **TAG_CATEGORIES secondary fields** — verified `validateTags()` already strips `_secondary` suffix correctly. No fix needed.
+
+### Phase 3 Fixes (Page Rendering)
+- **Insights sort bug** — `a.tdCount` → `a.td` in `renderWinningByAudience()`. Audiences with TDs were not prioritized in sort.
+- **Sentinel format filter sync** — `sentinelFormatFilterHeader` now syncs to `sentinelFormatFilter` in `runSentinelView()`. Prevents header filter change from being ignored in drill-down.
+- **Library card thumbnails** — `matchLibraryToLens()` now includes `thumbnail_url` from best tagger match. Library grid renders thumbnail images when available.
+- **Influencer empty state** — Added HTML empty state div with diagnostic message. Wired into `_renderInfluencerViewInner()`.
+
+### Phase 4 Fixes (Visual Consistency)
+- **Tagger + Insights headers** — Added w-9 h-9 icon + title + subtitle matching all other views.
+- **Dashboard subtitle** — Added "What to do right now" under Dashboard header. Renamed "Oracle Dashboard" → "Dashboard".
+- **Library subtitle** — Added "Your creative assets". Renamed "Content Library" → "Library".
+- **Settings subtitle** — Added "Data sources & API keys".
+
+### RULES
+- Every view MUST have: header with w-9 h-9 icon + text-lg font-bold title + text-xs subtitle.
+- Every data view MUST have: loading state + empty state with diagnostic message.
+- Sentinel: header format filter must sync to table format filter via `runSentinelView()`.
+- CRM false match threshold: CPTD < ₹1,500 = rejected. Never lower this.
+
+---
+
+## Tag Rehydration + Supabase Pagination + Layout Fix (2026-03-29, ~3:30am)
+
+### CRITICAL: Tag data loss — root cause + fix
+- **Root cause 1:** `loadTaggerFromSupabase()` and `loadTagCacheFromSupabase()` had NO row limit. Supabase REST API defaults to 1000 rows. With 2200+ creatives, only 1000 loaded.
+- **Root cause 2:** Tag cache (which stores all tags) was only applied during `tagCreatives()` flow — never on boot. If tagger data loaded from Supabase with null tags, or was overwritten by tagless Meta sheet data, tags were permanently lost.
+- **Root cause 3:** Three code paths (`refreshData`, `connectMetaApi`, `useDashboardData`) could overwrite tagged `state.taggerData` with raw Meta data (no tags) without checking the tag cache first.
+
+### Fixes applied
+1. **`rehydrateTagsFromCache()`** — New function that applies tag_cache to any rows missing tags. Called:
+   - Immediately on boot (from localStorage tag cache)
+   - After Supabase tag cache loads (catches entries not in localStorage)
+   - After Supabase tagger data loads (if Supabase rows have null tags)
+   - In `refreshData()` and `connectMetaApi()` fallback paths (prevents tag loss)
+2. **Supabase pagination** — Both `loadTaggerFromSupabase()` and `loadTagCacheFromSupabase()` now paginate with limit=1000 + offset loop. Loads ALL rows regardless of count.
+3. **Tagger table layout** — Removed `table-fixed` (was causing truncation). Gave Tags column 40% width with min-width:200px. Added min-widths to all columns for breathing room.
+4. **Create view padding** — Added `p-6` and `rounded-2xl border` to match all other view containers.
+
+### RULES
+- NEVER assign `state.taggerData = rawData` without calling `rehydrateTagsFromCache()` immediately after. The tag cache is the source of truth for tags.
+- All Supabase queries that could return >1000 rows MUST paginate with limit+offset.
+- Every view container must have `view p-6` classes for consistent layout.
+
+---
+
 ## CMO Cockpit Transformation (2026-03-29, ~3:45am)
 
 ### Oracle → Dashboard: Complete UX overhaul
