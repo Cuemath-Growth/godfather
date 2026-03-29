@@ -3954,9 +3954,11 @@ async function refreshData() {
   // Merge CRM data into tagger data
   if (state._crmLeads?.length && state.taggerData.length) mergeCRMWithMeta();
 
-  // Update indicators
-  document.getElementById('metaDot').className = `w-2 h-2 rounded-full ${metaOk ? 'bg-green-400' : 'bg-red-400'}`;
-  document.getElementById('metaLabel').className = `text-[11px] ${metaOk ? 'text-green-400' : 'text-white/40'}`;
+  // Update indicators — green if sheet loaded OR tagger data exists (from Meta API pull)
+  const dataOk = metaOk || state.taggerData.length > 0;
+  document.getElementById('metaDot').className = `w-2 h-2 rounded-full ${dataOk ? 'bg-green-400' : 'bg-red-400'}`;
+  document.getElementById('metaLabel').className = `text-[11px] ${dataOk ? 'text-green-400' : 'text-white/40'}`;
+  document.getElementById('metaLabel').textContent = dataOk ? `Meta Ads (${state.taggerData.length.toLocaleString()})` : 'Meta Ads';
 
   const badge = document.getElementById('statusBadge');
   if (metaOk || state.taggerData.length) { badge.className = 'status-badge connected'; badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-current"></span>Connected'; }
