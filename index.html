@@ -1151,6 +1151,15 @@
           </div>
           <p class="text-xs text-text-muted mb-3">Compares computed CRM numbers against known ground truth (DATA_LOGIC_OVERRIDE). Run after data loads.</p>
           <div id="qaResultsPanel"><p class="text-xs text-text-muted italic">Click "Run QA" after data loads to validate numbers.</p></div>
+          <div class="mt-3 pt-3 border-t border-gray-100">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-xs font-semibold text-red-700">Reset Tagger Data (if spend is inflated)</p>
+                <p class="text-[10px] text-text-muted">Clears corrupted cached data. You'll need to re-pull from Meta API or re-upload CSV after reset.</p>
+              </div>
+              <button onclick="if(confirm('This clears ALL tagged creative data from cache. Tags are preserved in Supabase. You will need to re-pull data. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];showToast('Tagger data cleared. Re-pull from Meta API or upload CSV.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
+            </div>
+          </div>
         </div>
 
         <!-- Google Sheets -->
@@ -2019,9 +2028,10 @@ function deduplicateByAdName(data) {
       byName[key] = { ...c, _dedupCount: 1 };
     } else {
       const existing = byName[key];
-      // Sum numeric metrics
+      // KEEP MAX (not sum) — each duplicate is a lifetime snapshot from a different API pull.
+      // Summing inflates spend by Nx. Max = most recent/complete snapshot.
       ['Spent','spent','QL','ql','NRI','nri','TD','td','TS','ts','Paid','paid','Impressions','impressions','Clicks','clicks','net_booking'].forEach(f => {
-        if (c[f] !== undefined) existing[f] = (parseNumber(existing[f]||0)) + (parseNumber(c[f]||0));
+        if (c[f] !== undefined) existing[f] = Math.max(parseNumber(existing[f]||0), parseNumber(c[f]||0));
       });
       // Keep tags from whichever has them
       if (!existing.tags && c.tags) existing.tags = c.tags;
@@ -2042,14 +2052,14 @@ function deduplicateByAdName(data) {
       if (!existing['image_url'] && c['image_url']) existing['image_url'] = c['image_url'];
       if (!existing['ad_body'] && c['ad_body']) existing['ad_body'] = c['ad_body'];
       if (!existing['ad_title'] && c['ad_title']) existing['ad_title'] = c['ad_title'];
-      // Keep the earliest date
-      if (c['_date'] && (!existing['_date'] || c['_date'] < existing['_date'])) existing['_date'] = c['_date'];
+      // Keep the most recent date (latest snapshot is most complete)
+      if (c['_date'] && (!existing['_date'] || c['_date'] > existing['_date'])) existing['_date'] = c['_date'];
       existing._dedupCount = (existing._dedupCount || 1) + 1;
     }
   });
   const deduped = Object.values(byName);
   if (deduped.length < data.length) {
-    console.log(`Dedup: ${data.length} ad-level rows → ${deduped.length} unique creatives (${data.length - deduped.length} duplicates merged)`);
+    console.log(`Dedup: ${data.length} ad-level rows → ${deduped.length} unique creatives (${data.length - deduped.length} duplicates merged via MAX)`);
   }
   return deduped;
 }
@@ -12257,10 +12267,12 @@ function _runSentinelViewInner() {
     const _diagGeo = (document.getElementById('sentinelGeo')?.value || 'all') === 'all' ? 'US' : document.getElementById('sentinelGeo').value;
     const _diagData = getGlobalFilteredTaggerData('sentinelGeo');
     if (_diagData.length >= 5) {
-      // Compute KPI-consistent CPTD (tagger spend / CRM TDs) to pass to diagnosis
-      const _diagSpend = _diagData.reduce((t,c) => t + parseNumber(c['Spent']||c['spent']||0), 0);
-      const _diagCRM = getCRMPortfolioTotals(document.getElementById('sentinelGeo').value);
-      const _diagCPTD = _diagCRM.td > 0 ? _diagSpend / _diagCRM.td : 0;
+      // Use oracle spend (Perf Tracker Daily — matches KPI cards) not inflated tagger spend
+      const _sentGeo = document.getElementById('sentinelGeo').value;
+      const { from: _dFrom, to: _dTo } = getGlobalDateRange();
+      const _diagOracle = getOracleMetrics(_dFrom, _dTo, _sentGeo);
+      const _diagCRM = getCRMPortfolioTotals(_sentGeo);
+      const _diagCPTD = _diagCRM.td > 0 && _diagOracle.spend > 0 ? _diagOracle.spend / _diagCRM.td : 0;
       const _diag = diagnoseCPTD(_diagData, _diagGeo, { overrideCPTD: _diagCPTD });
       if (_diag.factors.length) {
         const _diagEl = document.getElementById('sentinelKPIs');
@@ -12422,9 +12434,12 @@ function renderSentinelNarrative() {
   const geoFilter = document.getElementById('sentinelGeo')?.value || 'all';
   const formatFilter = document.getElementById('sentinelFormatFilterHeader')?.value || 'all';
   const isFormatFiltered = formatFilter !== 'all';
-  // Use format-filtered tagger data for spend (consistent with KPIs)
-  const filteredTagger = getGlobalFilteredTaggerData('sentinelGeo', formatFilter);
-  const totalSpend = filteredTagger.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0);
+  // Use oracle spend (Perf Tracker Daily — matches KPI cards) not inflated tagger spend
+  const { from: _nFrom, to: _nTo } = getGlobalDateRange();
+  const _narrativeOracle = getOracleMetrics(_nFrom, _nTo, geoFilter);
+  const totalSpend = isFormatFiltered
+    ? getGlobalFilteredTaggerData('sentinelGeo', formatFilter).reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0)
+    : (_narrativeOracle.spend || 0);
   // Use CRM TDs for CPTD (consistent with KPI cards) — tagger TDs only when format-filtered
   const _narrativeCRM = isFormatFiltered ? null : getCRMPortfolioTotals(geoFilter);
   const td = isFormatFiltered ? rows.reduce((t, r) => t + (r.metrics?.td || 0), 0) : (_narrativeCRM?.td || 0);
