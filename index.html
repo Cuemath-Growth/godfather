@@ -8728,7 +8728,19 @@ function saveTagCache(cache) {
 }
 
 // Load tagger data: localStorage immediately, then try Supabase async
-state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(JSON.parse(localStorage.getItem('gf_taggerData') || '[]'))));
+// One-time spend deflation: old dedup SUMMED spend across duplicates — divide by _dedupCount to fix
+const _rawLocal = JSON.parse(localStorage.getItem('gf_taggerData') || '[]');
+_rawLocal.forEach(c => {
+  const dc = c._dedupCount || 1;
+  if (dc > 1 && !c._spendDeflated) {
+    ['Spent','spent','QL','ql','NRI','nri','TD','td','TS','ts','Paid','paid','Impressions','impressions','Clicks','clicks','net_booking'].forEach(f => {
+      if (c[f] !== undefined && parseNumber(c[f]) > 0) c[f] = Math.round(parseNumber(c[f]) / dc);
+    });
+    c._dedupCount = 1;
+    c._spendDeflated = true;
+  }
+});
+state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(_rawLocal)));
 // Backfill _date from campaign names for existing data missing dates
 let _dateBackfilled = 0;
 state.taggerData.forEach(c => { if (!c['_date']) { extractDateFromAdName(c); if (c['_date']) _dateBackfilled++; } });
@@ -8771,6 +8783,18 @@ state._supabaseLoadPending = true;
     const sbData = await loadTaggerFromSupabase();
     state._supabaseLoadPending = false;
     if (sbData && sbData.length > _localTaggerCount) {
+      // One-time spend deflation: old dedup SUMMED spend across duplicates.
+      // If _dedupCount > 1, spend was inflated by that factor. Divide to restore.
+      sbData.forEach(c => {
+        const dc = c._dedupCount || 1;
+        if (dc > 1) {
+          ['Spent','spent','QL','ql','NRI','nri','TD','td','TS','ts','Paid','paid','Impressions','impressions','Clicks','clicks','net_booking'].forEach(f => {
+            if (c[f] !== undefined && parseNumber(c[f]) > 0) c[f] = Math.round(parseNumber(c[f]) / dc);
+          });
+          c._dedupCount = 1; // Reset after deflation
+          c._spendDeflated = true;
+        }
+      });
       state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(sbData)));
       // Rehydrate tags from cache for any Supabase rows missing tags
       const sbRestored = rehydrateTagsFromCache(state.taggerData);
