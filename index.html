@@ -5250,7 +5250,7 @@ function renderOracleActions() {
         ${thumb ? `<img src="${thumb}" class="w-12 h-12 rounded-lg object-cover shrink-0 border border-red-200" onerror="this.outerHTML='<div class=\'w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px]\'>No img</div>'" />` : '<div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>'}
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold truncate" title="${name}">${shortAdName(name)}</p>
-          <p class="text-[10px] text-red-700">${market} · ${audience} · ${formatCurrency(spend(c))} spent · ${ql(c) > 0 ? ql(c) + ' TQLs' : 'No TQLs'}</p>
+          <p class="text-[10px] text-red-700">${market} · ${audience} · ${formatCurrency(spend(c))} spent · ${ql(c) > 0 ? Math.round(ql(c)) + ' TQLs' : 'No TQLs'}</p>
         </div>
         <div class="flex flex-col gap-1 shrink-0 items-end">
           <button onclick="copyAndLog('${name.replace(/'/g, "\\'")}','pause',${spend(c)},${ql(c)},'${market}');renderActionLog()" class="text-[10px] px-3 py-1 rounded-full bg-red-600 text-white font-bold hover:bg-red-700" title="Copy ad name to find in Meta Ads Manager">Copy & Pause</button>
@@ -9299,10 +9299,11 @@ function parseRevenue(row) {
 }
 
 function computeTQL(ql, nri, market, board) {
-  if (market === 'US' || market === 'Canada') return nri;
-  if (market === 'India') return (board && INDIA_TQL_BOARDS.has(board)) ? ql : 0;
-  if (market === 'MEA' || market === 'ME') return (board && MEA_TQL_BOARDS.has(board)) ? ql : 0;
-  return ql; // APAC, UK, others — all QLs qualify
+  // Always return integer — people counts can't be fractional
+  if (market === 'US' || market === 'Canada') return Math.round(nri);
+  if (market === 'India') return (board && INDIA_TQL_BOARDS.has(board)) ? Math.round(ql) : 0;
+  if (market === 'MEA' || market === 'ME') return (board && MEA_TQL_BOARDS.has(board)) ? Math.round(ql) : 0;
+  return Math.round(ql); // APAC, UK, others — all QLs qualify
 }
 
 // Portfolio layer — unfiltered except date + geo. Used by Oracle KPIs and Sentinel.
@@ -14549,7 +14550,7 @@ function renderActionLog() {
     let metrics = '';
     if (a.context?.market) metrics += ' &middot; ' + a.context.market;
     if (currentSpend !== null) metrics += ' &middot; Now: ' + formatCurrency(currentSpend) + ' spend';
-    if (currentTD !== null) metrics += ', ' + currentTD + ' TDs';
+    if (currentTD !== null) metrics += ', ' + Math.round(currentTD) + ' TDs';
     const doneBtn = !isDone ? ` <button onclick="markExistingActionDone(${i})" class="shrink-0 text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done &#10003;</button>` : '';
     return `<div class="flex items-center gap-3 p-2.5 rounded-lg border ${borderCls}">
       <span class="text-[9px] px-2 py-0.5 rounded-full font-bold bg-accent-${actionColor}-light text-${colorText}-700 uppercase">${isDone ? 'done' : a.action}</span>
