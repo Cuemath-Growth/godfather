@@ -172,18 +172,18 @@
     <main class="flex-1 bg-[#F8F9FC]">
 
       <!-- ========== GLOBAL FILTER BAR ========== -->
-      <div id="globalFilterBar" class="bg-white border-b border-gray-200/80 px-4 py-1.5 flex items-center gap-2 text-xs sticky top-0 z-10 overflow-hidden" style="min-height:36px;max-height:36px">
+      <div id="globalFilterBar" class="bg-white border-b border-gray-200/80 px-4 py-2 flex items-center gap-3 text-xs sticky top-0 z-10" style="min-height:40px">
         <span id="filterBarTitle" class="text-xs font-bold text-text-primary shrink-0 hidden"></span>
         <div class="h-4 w-px bg-gray-200 hidden" id="filterBarTitleDivider"></div>
-        <input type="date" id="dashboardDateFrom" class="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-surface-secondary font-medium shrink-0" style="width:105px" onchange="onGlobalFilterChange()" />
+        <input type="date" id="dashboardDateFrom" class="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-semibold shrink-0" style="width:120px" onchange="onGlobalFilterChange()" />
         <span class="text-text-muted text-[10px] shrink-0">–</span>
-        <input type="date" id="dashboardDateTo" class="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-surface-secondary font-medium shrink-0" style="width:105px" onchange="onGlobalFilterChange()" />
-        <button onclick="setDatePreset('thisMonth')" data-preset="thisMonth" class="date-preset-btn px-1.5 py-0.5 rounded text-[10px] font-semibold text-text-muted hover:bg-surface-tertiary shrink-0">Mo</button>
-        <button onclick="setDatePreset('last30')" data-preset="last30" class="date-preset-btn px-1.5 py-0.5 rounded text-[10px] font-semibold text-text-muted hover:bg-surface-tertiary shrink-0">30d</button>
-        <button onclick="setDatePreset('last90')" data-preset="last90" class="date-preset-btn px-1.5 py-0.5 rounded text-[10px] font-semibold text-text-muted hover:bg-surface-tertiary shrink-0">90d</button>
-        <button onclick="setDatePreset('allTime')" data-preset="allTime" class="date-preset-btn px-1.5 py-0.5 rounded text-[10px] font-semibold text-accent-purple hover:bg-accent-purple-light shrink-0">All</button>
+        <input type="date" id="dashboardDateTo" class="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-semibold shrink-0" style="width:120px" onchange="onGlobalFilterChange()" />
+        <button onclick="setDatePreset('thisMonth')" data-preset="thisMonth" class="date-preset-btn px-2.5 py-1 rounded-lg text-xs font-bold text-text-muted hover:bg-surface-tertiary shrink-0 transition">Mo</button>
+        <button onclick="setDatePreset('last30')" data-preset="last30" class="date-preset-btn px-2.5 py-1 rounded-lg text-xs font-bold text-text-muted hover:bg-surface-tertiary shrink-0 transition">30d</button>
+        <button onclick="setDatePreset('last90')" data-preset="last90" class="date-preset-btn px-2.5 py-1 rounded-lg text-xs font-bold text-text-muted hover:bg-surface-tertiary shrink-0 transition">90d</button>
+        <button onclick="setDatePreset('allTime')" data-preset="allTime" class="date-preset-btn px-2.5 py-1 rounded-lg text-xs font-bold text-accent-purple bg-accent-purple-light hover:bg-purple-200 shrink-0 transition">All</button>
         <div class="h-3 w-px bg-gray-200 shrink-0"></div>
-        <select id="dashboardCountryFilter" class="px-1 py-0.5 border border-gray-200 rounded text-[10px] bg-surface-secondary font-medium shrink-0" onchange="onGlobalFilterChange()">
+        <select id="dashboardCountryFilter" class="px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-bold shrink-0 cursor-pointer" onchange="onGlobalFilterChange()">
           <option value="all">All Geo</option>
           <option value="US">US</option>
           <option value="India">India</option>
