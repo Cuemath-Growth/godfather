@@ -8205,6 +8205,8 @@ function computeCrossCombo(data, geo) {
   const entries = Object.values(combos)
     .filter(c => c.count >= 2 && c.spend >= 5000)
     .map(c => {
+      c.td = Math.round(c.td); // TDs must always be integers
+      c.ql = Math.round(c.ql);
       c.cptd = c.td > 0 ? c.spend / c.td : Infinity;
       c.cptql = c.ql > 0 ? c.spend / c.ql : Infinity;
       c.confidence = c.count >= 6 && c.td >= 3 ? 'high' : c.count >= 3 ? 'medium' : 'low';
@@ -8225,18 +8227,20 @@ function computeCrossCombo(data, geo) {
 
 function computeBudgetAllocation(combos, totalBudget) {
   if (!combos.length || !totalBudget) return [];
-  // Allocate inversely proportional to CPTD (cheaper combos get more)
-  const validCombos = combos.filter(c => c.cptd > 0 && c.cptd < Infinity).slice(0, 5);
+  // Only use combos with at least 3 TDs (reliable CPTD) for budget allocation
+  const validCombos = combos.filter(c => c.cptd > 0 && c.cptd < Infinity && c.td >= 3).slice(0, 5);
   if (!validCombos.length) return [];
   const inverseCPTD = validCombos.map(c => 1 / c.cptd);
   const totalInverse = inverseCPTD.reduce((s, v) => s + v, 0);
   const explorationPct = 0.10;
-  const allocBudget = totalBudget * (1 - explorationPct);
 
   const allocations = validCombos.map((c, i) => {
     const pct = inverseCPTD[i] / totalInverse * (1 - explorationPct);
     const amount = Math.round(totalBudget * pct / 1000) * 1000;
-    const expectedTD = c.cptd > 0 ? Math.round(amount / c.cptd * 10) / 10 : 0;
+    // Cap projected TDs: never project more than 3x actual TDs (can't extrapolate infinitely from small samples)
+    const rawExpected = c.cptd > 0 ? amount / c.cptd : 0;
+    const maxProjected = Math.round(c.td) * 3;
+    const expectedTD = Math.round(Math.min(rawExpected, maxProjected));
     return { combo: c, pct: Math.round(pct * 100), amount, expectedTD };
   });
 
@@ -8273,7 +8277,7 @@ function renderCrossDimensionalCMO(data, geo, container) {
         </div>
         <div class="text-center p-3 rounded-lg ${URGENCY.scale.bg} border ${URGENCY.scale.border}">
           <p class="text-[9px] ${URGENCY.scale.text} uppercase font-bold mb-1">Optimized (Weighted)</p>
-          <p class="text-lg font-black ${URGENCY.scale.text}">${totalExpectedTD.toFixed(1)} TDs</p>
+          <p class="text-lg font-black ${URGENCY.scale.text}">${Math.round(totalExpectedTD)} TDs</p>
           <p class="text-[10px] ${URGENCY.scale.text}">${improvement > 0 ? '+' + improvement + '% more' : 'same'} from same spend</p>
         </div>
       </div>
@@ -8283,7 +8287,7 @@ function renderCrossDimensionalCMO(data, geo, container) {
       <div class="space-y-1">
         ${allocations.map((a, i) => `<div class="flex items-center justify-between text-[9px]">
           <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full ${barColors[i] || barColors[5]}"></span>${tagLabel(a.combo.audience)} × ${tagLabel(a.combo.hook)} × ${tagLabel(a.combo.format)}</span>
-          <span class="font-bold">${a.pct}% · ${formatCurrency(a.amount)} · ~${a.expectedTD.toFixed(1)} TDs</span>
+          <span class="font-bold">${a.pct}% · ${formatCurrency(a.amount)} · ~${Math.round(a.expectedTD)} TDs</span>
         </div>`).join('')}
       </div>
     </div>`;
