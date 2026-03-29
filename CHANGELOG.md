@@ -4,6 +4,45 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## 7-Bug Fix Session (2026-03-29, ~10:00am)
+
+### Bug 1: Duplicate KPI cards on Dashboard
+- **Root cause:** `renderMetricTicker()` called from BOTH `onDashboardFilterChange()` AND `renderOracleModules()` — double render to same container
+- **Fix:** Removed redundant call from `renderOracleModules()` (line ~5909)
+- **RULE:** `renderMetricTicker()` is ONLY called from `onDashboardFilterChange()` and `fullRefresh()` — never from sub-render functions
+
+### Bug 2: WoW (Week-over-Week) confusing layout
+- **Root cause:** Tiny "vs X" text at bottom, no clear week labels, no verdict
+- **Fix:** Added THIS WEEK / LAST WEEK date range headers (e.g. "Mar 23 – Mar 29"), verdict banner ("stable or improving" / "CPTD up X%"), each card now has bordered "Last week: value" row
+- **RULE:** WoW section MUST lead with verdict banner and show explicit date ranges for both weeks
+
+### Bug 3: Tagger page loads with no spinner
+- **Root cause:** `showTaggerResults()` runs heavy computation synchronously — UI freezes with no feedback
+- **Fix:** Added loading overlay with spinner + `requestAnimationFrame()` defer so spinner paints before compute starts
+- **RULE:** Any view switch that triggers heavy compute MUST show loading state first
+
+### Bug 4: QL→TD% showing 100% on low-volume ads
+- **Root cause:** Ads with 1 QL + 1 TD show 100% in bold green — technically correct but misleading
+- **Fix:** QL < 3 now shows greyed percentage with asterisk and tooltip "Low volume — not reliable"
+- **RULE:** QL→TD% display MUST grey out and annotate when QL < 3
+
+### Bug 5: Tag edit button using raw JSON prompt
+- **Root cause:** `editTags()` used `prompt()` with raw JSON — one misplaced character breaks tags silently
+- **Fix:** Replaced with proper modal dialog with dropdown selects per tag category, save/cancel buttons
+- **RULE:** User-facing edit UIs MUST use structured inputs, never raw JSON/text prompts
+
+### Bug 6: Sentinel narrative "60% vs 0%" — self-referential CPTD
+- **Root cause:** `allTimeCPTD = currentCPTD` (line ~12007) — comparing a number to itself. "CPTD is ₹40K — in line with all-time average of ₹40K" is meaningless
+- **Fix:** `allTimeCPTD` now computed from ALL unfiltered+sanitized tagger data. Direction shows actual % change with 5% tolerance band. Colors: red if up >5%, green if down >5%, neutral otherwise
+- **RULE:** `allTimeCPTD` MUST be computed from `sanitizeTaggerData(state.taggerData)` (unfiltered), NEVER from the same filtered dataset as currentCPTD
+
+### Bug 7: Thumbnail display gaps
+- **Root cause:** Missing thumbnails showed empty space; broken images silently disappeared (`onerror="this.style.display='none'"`)
+- **Fix:** Missing thumbnails show dashed placeholder "?" icon; broken images show image-icon fallback instead of disappearing
+- **RULE:** Thumbnail cells MUST always show something — never empty space
+
+---
+
 ## Major Data + Intelligence Overhaul (2026-03-29, 7:00am–8:45am)
 
 ### Root cause: sanitizeTaggerData() not applied to 4 of 8 data access paths. Multiple pages running on dirty data with false CRM matches.
