@@ -1143,6 +1143,16 @@
           </div>
         </div>
 
+        <!-- QA Ground Truth Panel -->
+        <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-bold">Data QA Validation</h3>
+            <button onclick="runGroundTruthQA()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-purple text-white hover:opacity-90">Run QA</button>
+          </div>
+          <p class="text-xs text-text-muted mb-3">Compares computed CRM numbers against known ground truth (DATA_LOGIC_OVERRIDE). Run after data loads.</p>
+          <div id="qaResultsPanel"><p class="text-xs text-text-muted italic">Click "Run QA" after data loads to validate numbers.</p></div>
+        </div>
+
         <!-- Google Sheets -->
         <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 mb-4">
           <h3 class="text-sm font-bold mb-1">Google Sheets Integration</h3>
@@ -4252,15 +4262,8 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
     });
   }
 
-  // CRM funnel — COUNT ROWS (not sum values), matching getCRMPortfolioTotals exactly
-  // Geo filter uses same .includes() approach as getCRMPortfolioTotals
-  const CRM_GEO_MAP = { 'US': ['US','USA','United States'], 'India': ['India','IN'], 'AUS': ['AUS','Australia','ANZ'], 'MEA': ['MEA','Middle East','UAE','Saudi','ME'], 'UK': ['UK','United Kingdom'], 'ROW': ['APAC','Others'], 'APAC': ['APAC','Others'] };
-  const crmGeoMatch = (r) => {
-    if (!geoFilter || geoFilter === 'all') return true;
-    const cb = (r['country_bucket'] || r['region'] || '').trim();
-    const geoTerms = CRM_GEO_MAP[geoFilter] || [geoFilter];
-    return geoTerms.some(g => cb.toLowerCase().includes(g.toLowerCase()));
-  };
+  // CRM funnel — uses shared crmGeoMatchRow() for consistent AUS/MEA handling
+  const crmGeoMatch = (r) => crmGeoMatchRow(r, geoFilter);
   const inRange = (date) => {
     if (!date) return false;
     if (fromDate && date < fromDate) return false;
@@ -5120,19 +5123,19 @@ function renderOracleActions() {
           const d = r[dateField] || '';
           return d && d >= from && d <= to;
         });
-        const crmRows = (state._crmLeads || []).filter(r => {
-          if (dashCountryWoW === 'all') return true;
-          const cb = (r['country_bucket']||r['region']||'').trim();
-          const geoMap = {'US':['US','USA'],'India':['India','IN'],'AUS':['AUS','Australia','ANZ'],'MEA':['MEA','Middle East','UAE','ME'],'UK':['UK']};
-          return (geoMap[dashCountryWoW]||[]).some(g => cb.toLowerCase().includes(g.toLowerCase()));
-        });
+        const crmRows = (state._crmLeads || []).filter(r => crmGeoMatchRow(r, dashCountryWoW));
         const wowMetrics = (from, to) => {
           const qlRows = wowCrmFilter(crmRows, from, to, 'lead_created_date');
           const tdRows = wowCrmFilter(crmRows, from, to, 'trial_done_date');
           const ql = qlRows.reduce((s,r) => s + parseNumber(r['qls']||0), 0);
           const nri = qlRows.filter(r => (r['ethnicity']||'').toLowerCase().includes('nri') && !(r['ethnicity']||'').toLowerCase().startsWith('non')).length;
           const td = tdRows.reduce((s,r) => s + parseNumber(r['trials_done']||0), 0);
-          const tql = dashCountryWoW === 'US' ? nri : ql;
+          // Market-aware TQL: US=NRI, India/MEA=board filter, others=all QLs
+          let tql;
+          if (dashCountryWoW === 'US' || dashCountryWoW === 'Canada') { tql = nri; }
+          else if (dashCountryWoW === 'India') { tql = qlRows.filter(r => INDIA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
+          else if (dashCountryWoW === 'MEA' || dashCountryWoW === 'ME') { tql = qlRows.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
+          else { tql = ql; }
           // Spend from perf tracker if available, otherwise estimate from tagger
           let spend = 0;
           if (hasPerfWoW) {
@@ -6872,9 +6875,59 @@ function generateFromBrief(brief) {
   setTimeout(() => generateContent(), 100);
 }
 
+// ── TEMPLATE-BASED COPY GENERATION — works without API key ──
+function generateFromTemplate() {
+  const brief = {
+    market: document.getElementById('briefMarket')?.value || 'US',
+    platform: getActivePill('platformPills') || 'Meta',
+    format: getActivePill('formatPills') || 'Static Ad',
+    icpType: getActivePill('icpPills') || 'NRI',
+    segment: document.getElementById('briefSegment')?.value || 'Foundation Rebuilder',
+    funnel: document.getElementById('briefFunnel')?.value || 'TOFU',
+    angle: document.getElementById('briefAngle')?.value || '',
+    offer: document.getElementById('briefOffer')?.value || ''
+  };
+  const SEGMENT_HOOKS = {
+    'Foundation Rebuilder': { trigger: 'child passes tests through memorization', angle: 'understand the WHY behind math', cta: 'Book a free MathFit\u2122 assessment' },
+    'Personalisation Seeker': { trigger: 'child doesn\u2019t fit one-size-fits-all', angle: 'a learning system built around your child', cta: 'See your child\u2019s personalized plan' },
+    'Confidence Builder': { trigger: 'child is hesitant, doesn\u2019t volunteer', angle: 'watch your child become confident in math', cta: 'Start your child\u2019s confidence journey' },
+    'Accelerator': { trigger: 'exam pressure, advanced aspirations', angle: 'challenge your child to think deeper', cta: 'Explore advanced math coaching' }
+  };
+  const MARKET_TONE = {
+    'US': { tone: 'Warm, community-focused', proof: 'Join 50,000+ NRI families', lang: '' },
+    'India': { tone: 'Board-exam aware, aspirational', proof: 'Trusted by IB & IGCSE families', lang: '' },
+    'AUS': { tone: 'Achievement-focused', proof: 'NAPLAN & selective school ready', lang: '' },
+    'MEA': { tone: 'Premium, international', proof: 'Built for IB & Cambridge families', lang: '' },
+    'UK': { tone: 'Thoughtful, understated', proof: 'Loved by British curriculum families', lang: '' }
+  };
+  const seg = SEGMENT_HOOKS[brief.segment] || SEGMENT_HOOKS['Foundation Rebuilder'];
+  const mkt = MARKET_TONE[brief.market] || MARKET_TONE['US'];
+  const customAngle = brief.angle ? `\n\n**Custom angle:** ${brief.angle}` : '';
+  const offerLine = brief.offer ? `\n**Offer:** ${brief.offer}` : '';
+  const isInfluencer = brief.platform === 'Influencer';
+  let content = '';
+  if (isInfluencer) {
+    content = `### Influencer Script (30 seconds)\n\n**Hook (0-3s):**\n"Does your child ${seg.trigger}? Here\u2019s what changed everything for mine."\n\n**Problem (3-8s):**\n"I noticed my child could solve problems but couldn\u2019t explain WHY. That\u2019s when I knew something was missing."\n\n**Solution (8-18s):**\n"We started Cuemath \u2014 and within weeks, the difference was real. ${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}. The tutor doesn\u2019t just teach \u2014 they make my child THINK."\n\n**Proof (18-25s):**\n"${mkt.proof}. MathFit\u2122 isn\u2019t about shortcuts. It\u2019s about building real understanding."\n\n**CTA (25-30s):**\n"${seg.cta} \u2014 link in bio. Trust me, your child will thank you."${customAngle}${offerLine}\n\n---\n*Tone: ${mkt.tone}. Segment: ${brief.segment}.*`;
+  } else {
+    content = `### Headline Options\n\n1. **"Your child deserves to ${seg.angle}"**\n2. **"MathFit\u2122: Where ${seg.trigger.replace('child ', 'kids who ')} learn to think"**\n3. **"Tricks fade. Understanding compounds. Make your child MathFit\u2122"**\n\n### Primary Text\n\n**Option A (Emotional lead):**\nEvery parent wants their child to succeed in math. But ${seg.trigger}.\n\nCuemath\u2019s MathFit\u2122 system pairs your child with a top 1% tutor who specializes in building deep understanding \u2014 not memorization. ${mkt.proof}.\n\n${seg.cta}.\n\n**Option B (Proof lead):**\n${mkt.proof} chose Cuemath for one reason: it works.\n\nOur personalized ecosystem \u2014 handpicked tutor + smart platform + conceptual curriculum \u2014 helps your child ${seg.angle}.\n\n"MathFit\u2122 isn\u2019t about getting answers faster. It\u2019s about thinking better."\n\n${seg.cta}.\n\n**Option C (Question lead):**\nWhat if your child could explain math, not just solve it?\n\nThat\u2019s what MathFit\u2122 means. Deep understanding. Real confidence. A system built around YOUR child.\n\n${seg.cta}.${customAngle}${offerLine}\n\n### Description\n- Making Kids MathFit\u2122 | 1:1 Expert Tutoring\n- Deep understanding beats memorization. Book a free trial.\n- Top 1% tutors. Personalized plans. Real results.\n\n---\n*Template mode \u2014 add Claude API key in Settings for AI-generated copy with performance context.*\n*Tone: ${mkt.tone}. Segment: ${brief.segment}. Platform: ${brief.platform}.*`;
+  }
+  // Show result
+  document.getElementById('generateEmpty')?.classList.add('hidden');
+  document.getElementById('generateLoading')?.classList.add('hidden');
+  document.getElementById('generateResult')?.classList.remove('hidden');
+  document.getElementById('resultPlatform').textContent = brief.platform;
+  document.getElementById('resultMarket').textContent = brief.market;
+  document.getElementById('resultSegment').textContent = brief.segment;
+  document.getElementById('resultContent').innerHTML = markdownToHtml(content);
+  document.getElementById('refinementBar').style.display = 'none';
+  document.getElementById('imageGenSection').style.display = 'none';
+  state.lastGeneratedContent = content;
+  showToast('Generated from templates \u2014 add API key for AI copy');
+}
+
 async function generateContent() {
   if (state.isGenerating) return;
-  if (!state.apiKey) { showToast('API key not configured'); return; }
+  if (!state.apiKey) { generateFromTemplate(); return; }
   state.isGenerating = true;
   const btn = document.getElementById('generateBtn');
   btn.disabled = true;
@@ -8057,20 +8110,22 @@ function renderSparkline(metric, geo, opts = {}) {
 // ==================== P1: DIAGNOSIS ENGINE ====================
 // Decomposes "why is CPTD bad?" into audience/hook/format/funnel factors
 
-function diagnoseCPTD(data, geo) {
+function diagnoseCPTD(data, geo, opts) {
   if (!data || data.length < 3) return { factors: [], actionable: 'Not enough data for diagnosis' };
   const thresholds = SENTINEL_THRESHOLDS[geo] || SENTINEL_THRESHOLDS['US'];
   const totalSpend = data.reduce((s, c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
   const totalTD = data.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
   const totalQL = data.reduce((s, c) => s + parseNumber(c['QL']||c['ql']||0), 0);
-  const overallCPTD = totalTD > 0 ? totalSpend / totalTD : 0;
+  // Use KPI-consistent CPTD when provided (tagger spend / CRM TDs) to match KPI cards
+  const overallCPTD = (opts?.overrideCPTD > 0) ? opts.overrideCPTD : (totalTD > 0 ? totalSpend / totalTD : 0);
   const greenCPTD = thresholds.cptd?.green || 35000;
 
   const factors = [];
 
-  // Decompose by dimension
+  // Decompose by dimension — Audience only relevant for US (NRI vs non-NRI)
+  const NRI_RELEVANT_GEOS = new Set(['US', 'all']);
   const dimensions = [
-    { key: 'icp_target', label: 'Audience', extract: c => c.tags?.icp_target || 'Unknown' },
+    ...(NRI_RELEVANT_GEOS.has(geo) ? [{ key: 'icp_target', label: 'Audience', extract: c => c.tags?.icp_target || 'Unknown' }] : []),
     { key: 'hook_type', label: 'Hook', extract: c => c.tags?.hook_type || 'Unknown' },
     { key: 'format', label: 'Format', extract: c => c.tags?.format || c['Creative type'] || 'Unknown' },
   ];
@@ -9310,7 +9365,7 @@ function showTaggerResults() {
 
 // TQL computation — market-aware, authoritative definition (DATA_LOGIC_OVERRIDE Section 3)
 // US: NRI only. India: IB+IGCSE board. MEA: IB+IGCSE+Cambridge+US+British boards. APAC/UK: all QLs.
-const MEA_TQL_BOARDS = new Set(['IB','IGCSE','CAMBRIDGE','USCS','US Curriculum','International Baccalaureate (IB)','British/UK Curriculum','British curriculum','UKNC']);
+const MEA_TQL_BOARDS = new Set(['IB','IGCSE']); // Ground truth: board='IB' OR 'IGCSE' only (DATA_LOGIC_OVERRIDE Section 3)
 const INDIA_TQL_BOARDS = new Set(['IB','IGCSE']);
 // Revenue conversion — net_booking is in CRORES, Revenue is in LAKHS (DATA_LOGIC_OVERRIDE Section 9)
 function parseRevenue(row) {
@@ -9327,6 +9382,82 @@ function computeTQL(ql, nri, market, board) {
   if (market === 'India') return (board && INDIA_TQL_BOARDS.has(board)) ? Math.round(ql) : 0;
   if (market === 'MEA' || market === 'ME') return (board && MEA_TQL_BOARDS.has(board)) ? Math.round(ql) : 0;
   return Math.round(ql); // APAC, UK, others — all QLs qualify
+}
+
+// ── SHARED CRM GEO MATCHING — single source of truth for all CRM geo filtering ──
+// AUS leads have country_bucket='APAC' in CRM — use campaign prefix to identify sub-country
+function crmGeoMatchRow(row, geoFilter) {
+  if (!geoFilter || geoFilter === 'all') return true;
+  const cb = (row['country_bucket'] || row['region'] || '').trim().toLowerCase();
+  if (geoFilter === 'AUS') {
+    if (cb === 'aus' || cb === 'australia' || cb === 'anz') return true;
+    if (cb === 'apac' || cb === 'others') {
+      const camp = (row['mx_utm_campaign'] || '').toUpperCase();
+      return camp.startsWith('ANZ_') || camp.includes('_ANZ_') || /\bAUS\b/.test(camp) || camp.includes('NAPLAN') || camp.includes('SELECTIVE');
+    }
+    return false;
+  }
+  const CRM_GEO_TERMS = { 'US':['us','usa','united states'], 'India':['india','in'], 'MEA':['mea','middle east','uae','saudi','me'], 'UK':['uk','united kingdom'], 'ROW':['apac','others'], 'APAC':['apac','others'], 'Canada':['canada'] };
+  const terms = CRM_GEO_TERMS[geoFilter] || [geoFilter.toLowerCase()];
+  return terms.some(g => cb.includes(g));
+}
+
+// ── QA GROUND TRUTH VALIDATION — run from console or Settings to verify numbers ──
+function runGroundTruthQA() {
+  const allTime = { from: '2000-01-01', to: '2099-12-31' };
+  const results = [];
+  const check = (label, actual, expected, tolerance) => {
+    const tol = tolerance || 0.15; // 15% tolerance for date-filtered data
+    const pass = Math.abs(actual - expected) / Math.max(expected, 1) <= tol;
+    results.push({ label, actual, expected, pass });
+    return pass;
+  };
+  const us = getCRMPortfolioTotals('US', allTime);
+  check('US QL', us.ql, 4338, 0.05);
+  check('US TQL (NRI)', us.tql, 2373, 0.05);
+  const india = getCRMPortfolioTotals('India', allTime);
+  check('India QL', india.ql, 154, 0.1);
+  check('India TQL (IB+IGCSE)', india.tql, 11, 0.2);
+  const mea = getCRMPortfolioTotals('MEA', allTime);
+  check('MEA QL', mea.ql, 1557, 0.05);
+  check('MEA TQL (board)', mea.tql, 345, 0.1);
+  const uk = getCRMPortfolioTotals('UK', allTime);
+  check('UK QL', uk.ql, 260, 0.1);
+  check('UK TQL (all)', uk.tql, 260, 0.1);
+  const aus = getCRMPortfolioTotals('AUS', allTime);
+  check('AUS QL (>0)', aus.ql, 1900, 0.2); // ~86% of APAC (2221) — AUS is primary APAC market
+  const allMkt = getCRMPortfolioTotals('all', allTime);
+  check('Total QL', allMkt.ql, 8800, 0.05);
+  check('Total TD', allMkt.td, 2160, 0.05);
+  check('Total Paid', allMkt.paid, 667, 0.05);
+  // Tagger spend validation — ground truth ₹8.9Cr = 89,000,000
+  const taggerSpend = (state.taggerData||[]).reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+  check('Tagger Total Spend (₹)', taggerSpend, 89000000, 0.15);
+  // Diagnose: unique ad names vs total rows
+  const uniqueAds = new Set((state.taggerData||[]).map(c => c['Ad name']||c['ad name']||'')).size;
+  results.push({ label: 'Tagger rows', actual: (state.taggerData||[]).length, expected: uniqueAds, pass: true });
+  // Dedup diagnostics — how many times was each ad merged?
+  const dedupCounts = (state.taggerData||[]).map(c => c._dedupCount || 1);
+  const avgDedup = dedupCounts.length ? (dedupCounts.reduce((s,n) => s+n, 0) / dedupCounts.length).toFixed(1) : 0;
+  const maxDedup = Math.max(...dedupCounts, 0);
+  results.push({ label: 'Avg dedup count per creative', actual: avgDedup, expected: '1-2', pass: parseFloat(avgDedup) <= 3 });
+  if (taggerSpend > 89000000 * 1.5) {
+    results.push({ label: 'SPEND INFLATED ' + Math.round(taggerSpend/10000000) + 'Cr vs ~8.9Cr (avg ' + avgDedup + ' dupes/ad, max ' + maxDedup + ')', actual: 0, expected: 1, pass: false });
+  }
+  // Display results
+  const passCount = results.filter(r => r.pass).length;
+  const total = results.length;
+  let html = `<div class="p-4 rounded-xl border ${passCount === total ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'} mb-4">
+    <h3 class="font-bold text-sm mb-2">QA Ground Truth: ${passCount}/${total} passed</h3>
+    <div class="space-y-1 text-xs font-mono">`;
+  results.forEach(r => {
+    html += `<div class="${r.pass ? 'text-green-700' : 'text-red-700 font-bold'}">${r.pass ? '✓' : '✗'} ${r.label}: got ${Math.round(r.actual)}, expected ~${r.expected}</div>`;
+  });
+  html += '</div></div>';
+  const container = document.getElementById('qaResultsPanel');
+  if (container) container.innerHTML = html;
+  console.table(results);
+  return { passCount, total, results };
 }
 
 // Portfolio layer — unfiltered except date + geo. Used by Oracle KPIs and Sentinel.
@@ -9353,14 +9484,8 @@ function getCRMPortfolioTotals(geoFilter, dateOverride) {
   const rows = state._crmLeads || [];
   if (!rows.length) return { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, asian: 0, revenue: 0, invalid: 0, ts: 0 };
   const { from, to } = dateOverride || getGlobalDateRange();
-  // Shared geo filter — single source of truth, includes ROW
-  const GEO_MAP = { 'US': ['US','USA','United States'], 'India': ['India','IN'], 'AUS': ['AUS','Australia','ANZ'], 'MEA': ['MEA','Middle East','UAE','Saudi','ME'], 'UK': ['UK','United Kingdom'], 'ROW': ['APAC','Others'], 'APAC': ['APAC','Others'] };
-  const geoMatch = (r) => {
-    if (!geoFilter || geoFilter === 'all') return true;
-    const cb = (r['country_bucket'] || r['region'] || '').trim();
-    const geoTerms = GEO_MAP[geoFilter] || [geoFilter];
-    return geoTerms.some(g => cb.toLowerCase().includes(g.toLowerCase()));
-  };
+  // Uses shared crmGeoMatchRow() for consistent AUS/MEA handling
+  const geoMatch = (r) => crmGeoMatchRow(r, geoFilter);
   const dateIn = (date, f, t) => {
     if (!date) return false;
     if (f && date < f) return false;
@@ -10435,7 +10560,7 @@ function extractMarket(c) {
 function matchMarketFromText(text) {
   if (text.includes('ANZ') || /\bAUS\b/.test(text) || text.includes('AUSTRALIA') || text.includes('NAPLAN') || text.includes('SELECTIVE')) return 'AUS';
   if (text.includes('INDIA') || /\bIND[_\s-]/.test(text) || text.includes('DEMAND-IND') || text.includes('CBSE') || text.includes('ICSE')) return 'India';
-  if (text.includes('MEA') || text.includes('MIDDLE EAST') || text.includes('DUBAI') || text.includes('UAE') || text.includes('SAUDI')) return 'MEA';
+  if (text.includes('MEA') || /\bME[_\s-]/.test(text) || text.includes('MIDDLE EAST') || text.includes('DUBAI') || text.includes('UAE') || text.includes('SAUDI') || text.includes('QATAR') || text.includes('KUWAIT') || text.includes('BAHRAIN') || text.includes('OMAN')) return 'MEA';
   if (/\bUSA\b/.test(text) || /USA[_\s-]/.test(text) || /\bUS[_\s-]/.test(text) || text.includes('UNITED STATES') || text.includes('CANADA') || text.includes('STAAR') || text.includes('AMC')) return 'US';
   if (/\bUK\b/.test(text) || text.includes('UNITED KINGDOM')) return 'UK';
   if (text.includes('APAC') || text.includes('ROW')) return 'APAC';
@@ -10779,12 +10904,15 @@ function renderWinningByAudience() {
     <h3 class="text-base font-bold mb-3">Monday Playbook</h3>
     <div class="space-y-3 text-sm text-text-primary">`;
 
+  let _pbNum = 0; // auto-incrementing playbook numbering
+
   // 1. Scale signal — ternary combo (P3)
   if (withTD.length > 0) {
+    _pbNum++;
     const best = withTD[0];
     const comboStr = [best.aud, best.bestHook ? tagLabel(best.bestHook[0]) : null, best.bestFmt ? tagLabel(best.bestFmt[0]) : null].filter(Boolean);
     html += `<div class="flex items-start gap-2">
-      <span class="text-accent-green font-bold text-lg leading-none mt-0.5">1</span>
+      <span class="text-accent-green font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
       <div><strong>Scale:</strong> ${comboStr.length >= 3
         ? `<span class="text-accent-green font-semibold">${comboStr.join(' + ')}</span> is your winning combo`
         : `<span class="text-accent-green font-semibold">${best.aud}</span> audience is your best performer`} —
@@ -10798,8 +10926,9 @@ function renderWinningByAudience() {
     const worst = withSpend[withSpend.length - 1];
     const wastedSpend = worst.td === 0 ? worst.spend : (worst.cptd && worst.cptd > avgCPTD * 2 ? worst.spend : 0);
     if (wastedSpend > 0) {
+      _pbNum++;
       html += `<div class="flex items-start gap-2">
-        <span class="text-accent-red font-bold text-lg leading-none mt-0.5">2</span>
+        <span class="text-accent-red font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
         <div><strong>Kill:</strong> <span class="text-accent-red font-semibold">${worst.aud}</span> audience —
           ${formatCurrency(worst.spend)} spent${worst.td === 0 ? ', <strong>zero trials</strong>' : ', ' + formatCurrency(worst.cptd) + ' CPTD (2x+ above average)'}.
           ${worst.worstHook ? ' Worst hook: <strong>' + tagLabel(worst.worstHook[0]) + '</strong>.' : ''}
@@ -10813,10 +10942,11 @@ function renderWinningByAudience() {
   data.forEach(c => { const h = c.tags?.hook_type; if (h && h !== 'Unknown') { if (!allHooks[h]) allHooks[h] = {spend:0,td:0,count:0}; allHooks[h].spend += parseNumber(c['Spent']||c['spent']||0); allHooks[h].td += parseNumber(c['TD']||c['td']||0); allHooks[h].count++; }});
   const hooksSorted = Object.entries(allHooks).filter(([,v]) => v.td >= 3).sort((a,b) => (a[1].spend/a[1].td) - (b[1].spend/b[1].td));
   if (hooksSorted.length >= 2) {
+    _pbNum++;
     const winHook = hooksSorted[0];
     const loseHook = hooksSorted[hooksSorted.length - 1];
     html += `<div class="flex items-start gap-2">
-      <span class="text-accent-blue font-bold text-lg leading-none mt-0.5">3</span>
+      <span class="text-accent-blue font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
       <div><strong>Creative pattern:</strong> <span class="text-accent-green font-semibold">${tagLabel(winHook[0])}</span> hooks cost ${formatCurrency(winHook[1].spend/winHook[1].td)} CPTD (${winHook[1].count} ads).
         <span class="text-accent-red font-semibold">${tagLabel(loseHook[0])}</span> hooks cost ${formatCurrency(loseHook[1].spend/loseHook[1].td)} CPTD — ${Math.round(loseHook[1].spend/loseHook[1].td / (winHook[1].spend/winHook[1].td))}x more expensive.
         <span class="text-text-muted">Shift new creative production toward ${tagLabel(winHook[0])} hooks.</span></div>
@@ -10826,8 +10956,9 @@ function renderWinningByAudience() {
   // 4. Volume check
   const noTDAuds = audRows.filter(r => r.td === 0 && r.spend >= 50000);
   if (noTDAuds.length > 0) {
+    _pbNum++;
     html += `<div class="flex items-start gap-2">
-      <span class="text-accent-orange font-bold text-lg leading-none mt-0.5">4</span>
+      <span class="text-accent-orange font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
       <div><strong>Blind spots:</strong> ${noTDAuds.length} audience${noTDAuds.length > 1 ? 's' : ''} with ${formatCurrency(noTDAuds.reduce((s,r) => s+r.spend, 0))} total spend but <strong>zero trials</strong>:
         ${noTDAuds.slice(0,3).map(r => r.aud).join(', ')}${noTDAuds.length > 3 ? '...' : ''}.
         <span class="text-text-muted">Either fix the funnel or cut the spend.</span></div>
@@ -10837,8 +10968,9 @@ function renderWinningByAudience() {
   // P1: Signal #5 — Root Cause diagnosis
   const _pbDiag = diagnoseCPTD(data, countryFilter === 'all' ? 'US' : countryFilter);
   if (_pbDiag.factors.length) {
+    _pbNum++;
     html += `<div class="flex items-start gap-2 mt-2 pt-2 border-t border-gray-100">
-      <span class="text-accent-purple font-bold text-lg leading-none mt-0.5">5</span>
+      <span class="text-accent-purple font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
       <div><strong>Root cause:</strong> ${_pbDiag.factors.slice(0,2).map(f => f.evidence).join('. ')}. <span class="font-medium text-accent-purple">${_pbDiag.actionable}</span></div>
     </div>`;
   }
@@ -12082,6 +12214,7 @@ function _runSentinelViewInner() {
   if (!data.length) {
     document.getElementById('sentinelEmpty').classList.remove('hidden');
     document.getElementById('sentinelContent').classList.add('hidden');
+    document.getElementById('sentinelSubtitle').textContent = `0 creatives · ${geoFilter === 'all' ? 'All Markets' : geoFilter} · No tagged data for this market. Pull data via Tagger or adjust geo/date range.`;
     return;
   }
   // Sanitize bad data BEFORE any analysis
@@ -12124,7 +12257,11 @@ function _runSentinelViewInner() {
     const _diagGeo = (document.getElementById('sentinelGeo')?.value || 'all') === 'all' ? 'US' : document.getElementById('sentinelGeo').value;
     const _diagData = getGlobalFilteredTaggerData('sentinelGeo');
     if (_diagData.length >= 5) {
-      const _diag = diagnoseCPTD(_diagData, _diagGeo);
+      // Compute KPI-consistent CPTD (tagger spend / CRM TDs) to pass to diagnosis
+      const _diagSpend = _diagData.reduce((t,c) => t + parseNumber(c['Spent']||c['spent']||0), 0);
+      const _diagCRM = getCRMPortfolioTotals(document.getElementById('sentinelGeo').value);
+      const _diagCPTD = _diagCRM.td > 0 ? _diagSpend / _diagCRM.td : 0;
+      const _diag = diagnoseCPTD(_diagData, _diagGeo, { overrideCPTD: _diagCPTD });
       if (_diag.factors.length) {
         const _diagEl = document.getElementById('sentinelKPIs');
         if (_diagEl) _diagEl.insertAdjacentHTML('beforeend', `<div class="col-span-full">${renderDiagnosisCard(_diag)}</div>`);
@@ -12155,12 +12292,15 @@ function renderSentinelKPIs() {
   const geoFilter = document.getElementById('sentinelGeo')?.value || 'all';
   const formatFilter = document.getElementById('sentinelFormatFilterHeader')?.value || 'all';
 
-  // UNIFIED: Spend from tagger (format-aware), funnel from CRM (date-filtered, no format)
+  // UNIFIED: Spend from Perf Tracker Daily (matches Dashboard), funnel from CRM
+  // Tagger spend is inflated from accumulated API pulls — use Perf Tracker as source of truth
   const isFormatFiltered = formatFilter !== 'all';
   const taggerData = getGlobalFilteredTaggerData('sentinelGeo', formatFilter);
-  const spend = taggerData.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0);
+  const { from: _kpiFrom, to: _kpiTo } = getGlobalDateRange();
+  const oracle = getOracleMetrics(_kpiFrom, _kpiTo, geoFilter);
+  // Spend: Perf Tracker when available, tagger fallback when format-filtered (relative only)
+  const spend = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0) : (oracle.spend || 0);
   // CRM data CANNOT be format-filtered — when format active, CRM metrics are invalid
-  // Show CRM metrics only when format = All, otherwise show "—" to avoid lying
   const crm = isFormatFiltered ? { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, revenue: 0, ts: 0 } : getCRMPortfolioTotals(geoFilter);
   // When format-filtered, derive funnel from tagger data (approximate but honest)
   const tql = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['TQL']||0), 0) : (crm.tql || 0);
@@ -12281,11 +12421,13 @@ function renderSentinelNarrative() {
 
   const geoFilter = document.getElementById('sentinelGeo')?.value || 'all';
   const formatFilter = document.getElementById('sentinelFormatFilterHeader')?.value || 'all';
+  const isFormatFiltered = formatFilter !== 'all';
   // Use format-filtered tagger data for spend (consistent with KPIs)
   const filteredTagger = getGlobalFilteredTaggerData('sentinelGeo', formatFilter);
   const totalSpend = filteredTagger.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0);
-  const totalTD = rows.reduce((t, r) => t + (r.metrics?.td || 0), 0);
-  const td = totalTD;
+  // Use CRM TDs for CPTD (consistent with KPI cards) — tagger TDs only when format-filtered
+  const _narrativeCRM = isFormatFiltered ? null : getCRMPortfolioTotals(geoFilter);
+  const td = isFormatFiltered ? rows.reduce((t, r) => t + (r.metrics?.td || 0), 0) : (_narrativeCRM?.td || 0);
   const currentCPTD = td > 0 && totalSpend > 0 ? totalSpend / td : 0;
 
   // All-time average CPTD from ALL tagger data (unfiltered) — true baseline comparison
