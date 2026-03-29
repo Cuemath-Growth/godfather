@@ -8255,43 +8255,47 @@ function renderCrossDimensionalCMO(data, geo, container) {
   const result = computeCrossCombo(data, geo);
   if (!result.top.length) { container.innerHTML = '<p class="text-xs text-text-muted py-3">Not enough tagged data for cross-dimensional analysis. Tag more creatives first.</p>'; return; }
 
-  const allocations = computeBudgetAllocation(result.top, result.totalSpend);
-  const totalExpectedTD = allocations.reduce((s, a) => s + a.expectedTD, 0);
-  // Fair comparison: only count TDs from the same combos used in allocation (not ALL data)
-  const allocCombos = new Set(allocations.filter(a => a.combo.audience !== 'New').map(a => `${a.combo.audience}|${a.combo.hook}|${a.combo.format}`));
-  const currentTD_sameCombos = result.top.filter(c => allocCombos.has(`${c.audience}|${c.hook}|${c.format}`)).reduce((s, c) => s + c.td, 0);
-  const currentTD = currentTD_sameCombos || data.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
-  const improvement = currentTD > 0 ? Math.round((totalExpectedTD / currentTD - 1) * 100) : 0;
-
   let html = '';
 
-  // Budget allocation: current vs optimized comparison
-  if (allocations.length > 1) {
-    const barColors = ['bg-accent-green', 'bg-accent-blue', 'bg-accent-purple', 'bg-accent-orange', 'bg-accent-pink', 'bg-surface-tertiary'];
-    html += `<div class="mb-4 p-4 rounded-xl border border-purple-100" style="background:linear-gradient(135deg,rgba(124,58,237,0.03),rgba(59,130,246,0.03))">
-      <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-3">Budget Allocation — Current vs Optimized</p>
-      <div class="grid grid-cols-2 gap-4 mb-3">
-        <div class="text-center p-3 rounded-lg bg-surface-secondary border border-gray-200">
-          <p class="text-[9px] text-text-muted uppercase font-bold mb-1">Current Mix (Same Combos)</p>
-          <p class="text-lg font-black">${Math.round(currentTD)} TDs</p>
-          <p class="text-[10px] text-text-muted">from ${formatCurrency(result.totalSpend)}</p>
+  // Budget shift: move money from worst combos to best combos (within same market)
+  if (result.top.length >= 2 && result.bottom.length >= 1) {
+    const scaleTargets = result.top.filter(c => c.td >= 3 && c.confidence !== 'low').slice(0, 3);
+    const pauseTargets = result.bottom.filter(c => c.cptd > result.avgCPTD * 1.3).slice(0, 3);
+    // Also find zero-TD combos burning money
+    const burnTargets = result.noTD ? result.noTD.slice(0, 2) : [];
+    const recoverableSpend = [...pauseTargets, ...burnTargets].reduce((s, c) => s + c.spend * 0.3, 0);
+
+    if (scaleTargets.length && (pauseTargets.length || burnTargets.length)) {
+      html += `<div class="mb-4 p-4 rounded-xl border border-purple-100" style="background:linear-gradient(135deg,rgba(124,58,237,0.03),rgba(59,130,246,0.03))">
+        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-3">Budget Shift — Move From Worst to Best</p>
+        ${recoverableSpend > 0 ? `<p class="text-xs mb-3">Shift <strong class="text-accent-purple">${formatCurrency(recoverableSpend)}</strong> (30% of underperforming spend) within the same market:</p>` : ''}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div>
+            <p class="text-[9px] font-bold text-red-700 uppercase tracking-wider mb-2">Reduce spend on:</p>
+            <div class="space-y-1.5">
+              ${pauseTargets.map(c => `<div class="flex items-center justify-between py-1.5 px-2 rounded-lg bg-red-50 border border-red-100">
+                <span class="text-[10px]"><strong>${tagLabel(c.audience)}</strong> × ${tagLabel(c.hook)} × ${tagLabel(c.format)}</span>
+                <span class="text-[10px] text-red-700 font-bold">${formatCurrency(c.cptd)} CPTD · ${c.count} ads</span>
+              </div>`).join('')}
+              ${burnTargets.map(c => `<div class="flex items-center justify-between py-1.5 px-2 rounded-lg bg-red-50 border border-red-100">
+                <span class="text-[10px]"><strong>${tagLabel(c.audience)}</strong> × ${tagLabel(c.hook)} × ${tagLabel(c.format)}</span>
+                <span class="text-[10px] text-red-700 font-bold">${formatCurrency(c.spend)} spent · 0 TDs</span>
+              </div>`).join('')}
+            </div>
+          </div>
+          <div>
+            <p class="text-[9px] font-bold text-green-700 uppercase tracking-wider mb-2">Increase spend on:</p>
+            <div class="space-y-1.5">
+              ${scaleTargets.map(c => `<div class="flex items-center justify-between py-1.5 px-2 rounded-lg bg-green-50 border border-green-100">
+                <span class="text-[10px]"><strong>${tagLabel(c.audience)}</strong> × ${tagLabel(c.hook)} × ${tagLabel(c.format)}</span>
+                <span class="text-[10px] text-green-700 font-bold">${formatCurrency(c.cptd)} CPTD · ${Math.round(c.td)} TDs</span>
+              </div>`).join('')}
+            </div>
+          </div>
         </div>
-        <div class="text-center p-3 rounded-lg ${URGENCY.scale.bg} border ${URGENCY.scale.border}">
-          <p class="text-[9px] ${URGENCY.scale.text} uppercase font-bold mb-1">Optimized (Weighted)</p>
-          <p class="text-lg font-black ${URGENCY.scale.text}">${Math.round(totalExpectedTD)} TDs</p>
-          <p class="text-[10px] ${URGENCY.scale.text}">${improvement > 0 ? '+' + improvement + '% more' : 'same'} from same spend</p>
-        </div>
-      </div>
-      <div class="flex h-5 rounded-full overflow-hidden border border-gray-200 mb-2">
-        ${allocations.map((a, i) => `<div class="${barColors[i] || barColors[5]}" style="width:${Math.max(a.pct, 3)}%" title="${tagLabel(a.combo.audience)} × ${tagLabel(a.combo.hook)} × ${tagLabel(a.combo.format)}: ${a.pct}% (${formatCurrency(a.amount)})"></div>`).join('')}
-      </div>
-      <div class="space-y-1">
-        ${allocations.map((a, i) => `<div class="flex items-center justify-between text-[9px]">
-          <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full ${barColors[i] || barColors[5]}"></span>${tagLabel(a.combo.audience)} × ${tagLabel(a.combo.hook)} × ${tagLabel(a.combo.format)}</span>
-          <span class="font-bold">${a.pct}% · ${formatCurrency(a.amount)} · ~${Math.round(a.expectedTD)} TDs</span>
-        </div>`).join('')}
-      </div>
-    </div>`;
+        <p class="text-[9px] text-text-muted">Based on ${result.top.length + (result.bottom?.length||0)} combos with ${result.top.reduce((s,c) => s+c.count, 0)} ads · Avg CPTD: ${formatCurrency(result.avgCPTD)}</p>
+      </div>`;
+    }
   }
 
   // Top combo cards
