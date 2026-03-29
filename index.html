@@ -3933,7 +3933,8 @@ async function refreshData() {
   }
 
   // Auto-tag from Meta sheet if tagger data is empty but sheet data exists
-  if (!state.taggerData.length && state.rawData.metaAds?.length) {
+  // Skip if Supabase load is still pending — it may have 12K+ creatives
+  if (!state.taggerData.length && !state._supabaseLoadPending && state.rawData.metaAds?.length) {
     console.log('Meta sheet has data but tagger is empty:', state.rawData.metaAds.length, 'rows');
     const raw = state.rawData.metaAds.filter(r => parseNumber(r['Spent']||r['spent']||0) > 0);
     raw.forEach(r => extractDateFromAdName(r));
@@ -8619,9 +8620,11 @@ if (_immediateRestored > 0) saveTaggerData();
 if (state.taggerData.length && state._crmLeads?.length) mergeCRMWithMeta();
 
 // Async: try loading from Supabase — if it has more/newer data, use it
+state._supabaseLoadPending = true;
 (async () => {
   try {
     const sbData = await loadTaggerFromSupabase();
+    state._supabaseLoadPending = false;
     if (sbData && sbData.length > _localTaggerCount) {
       state.taggerData = backfillUnknownTags(ensureDerivedMetrics(sbData));
       // Rehydrate tags from cache for any Supabase rows missing tags
@@ -8632,6 +8635,11 @@ if (state.taggerData.length && state._crmLeads?.length) mergeCRMWithMeta();
       console.log(`Loaded ${sbData.length} creatives from Supabase (was ${_localTaggerCount} in localStorage)${sbRestored ? `, rehydrated ${sbRestored} tags` : ''}`);
       updateSyncBadge('synced');
       // Re-render the active view now that data is loaded
+      // Update sidebar label with correct count
+      const _metaLabel = document.getElementById('metaLabel');
+      if (_metaLabel) _metaLabel.textContent = `Meta Ads (${state.taggerData.length.toLocaleString()})`;
+      const _metaDot = document.getElementById('metaDot');
+      if (_metaDot) _metaDot.className = 'w-2 h-2 rounded-full bg-green-400';
       const activeView = state.currentView || 'dashboard';
       try { navigateTo(activeView); } catch(e) { console.warn('Post-Supabase render:', e); }
     } else if (sbData) {
@@ -8640,6 +8648,7 @@ if (state.taggerData.length && state._crmLeads?.length) mergeCRMWithMeta();
       if (_localTaggerCount > sbData.length) syncTaggerToSupabase(state.taggerData);
     }
   } catch(e) {
+    state._supabaseLoadPending = false;
     console.warn('Supabase load failed, using localStorage:', e.message);
     updateSyncBadge('offline');
   }
