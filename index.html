@@ -5114,25 +5114,48 @@ function renderOracleActions() {
         const lwEndStr = new Date(twStart); lwEndStr.setDate(twStart.getDate() - 1);
         const lwEndStr2 = lwEndStr.toISOString().slice(0,10);
 
-        // WoW from tagger data — same source as Sentinel/Lens (DATA_LOGIC_OVERRIDE Section 8)
-        const wowFilter = (d, from, to) => d.filter(c => {
-          const dt = c['_date'] || c['date'] || '';
-          return dt && dt >= from && dt <= to;
+        // WoW from CRM data (has real dates: lead_created_date, trial_done_date)
+        // Tagger _date is creation date from ad name — unreliable for WoW
+        const wowCrmFilter = (rows, from, to, dateField) => rows.filter(r => {
+          const d = r[dateField] || '';
+          return d && d >= from && d <= to;
         });
-        const sanitizedTagger = sanitizeTaggerData(state.taggerData);
-        const geoTagger = dashCountryWoW === 'all' ? sanitizedTagger : sanitizedTagger.filter(c => extractMarket(c) === dashCountryWoW);
-        const twData = wowFilter(geoTagger, twStartStr, twEndStr);
-        const lwData = wowFilter(geoTagger, lwStartStr, lwEndStr2);
-        const wowMetrics = (d) => {
-          const spend = d.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
-          const ql = d.reduce((s,c) => s + parseNumber(c['QL']||c['ql']||0), 0);
-          const nri = d.reduce((s,c) => s + parseNumber(c['NRI']||c['nri']||0), 0);
-          const td = d.reduce((s,c) => s + parseNumber(c['TD']||c['td']||0), 0);
-          const tql = d.reduce((s,c) => { const m = extractMarket(c); const b = c['board']||c['board (ME)']||''; return s + computeTQL(parseNumber(c['QL']||c['ql']||0), parseNumber(c['NRI']||c['nri']||0), m, b); }, 0);
+        const crmRows = (state._crmLeads || []).filter(r => {
+          if (dashCountryWoW === 'all') return true;
+          const cb = (r['country_bucket']||r['region']||'').trim();
+          const geoMap = {'US':['US','USA'],'India':['India','IN'],'AUS':['AUS','Australia','ANZ'],'MEA':['MEA','Middle East','UAE','ME'],'UK':['UK']};
+          return (geoMap[dashCountryWoW]||[]).some(g => cb.toLowerCase().includes(g.toLowerCase()));
+        });
+        const wowMetrics = (from, to) => {
+          const qlRows = wowCrmFilter(crmRows, from, to, 'lead_created_date');
+          const tdRows = wowCrmFilter(crmRows, from, to, 'trial_done_date');
+          const ql = qlRows.reduce((s,r) => s + parseNumber(r['qls']||0), 0);
+          const nri = qlRows.filter(r => (r['ethnicity']||'').toLowerCase().includes('nri') && !(r['ethnicity']||'').toLowerCase().startsWith('non')).length;
+          const td = tdRows.reduce((s,r) => s + parseNumber(r['trials_done']||0), 0);
+          const tql = dashCountryWoW === 'US' ? nri : ql;
+          // Spend from perf tracker if available, otherwise estimate from tagger
+          let spend = 0;
+          if (hasPerfWoW) {
+            state._perfTrackerDaily.forEach(r => {
+              const d = r.day || r.Day || r.date || '';
+              if (d >= from && d <= to) spend += parseNumber(r['spend']||r['Spend']||r['amount_spent']||0);
+            });
+          }
+          if (!spend) {
+            // Fallback: estimate from tagger data that has dates in range
+            const taggerInRange = sanitizeTaggerData(state.taggerData).filter(c => {
+              const d = c['_date']||''; return d && d >= from && d <= to;
+            });
+            if (dashCountryWoW !== 'all') {
+              spend = taggerInRange.filter(c => extractMarket(c) === dashCountryWoW).reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+            } else {
+              spend = taggerInRange.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+            }
+          }
           return { spend, tql, cptql: tql > 0 ? spend/tql : 0, td, cptd: td > 0 ? spend/td : 0, tqlTd: tql > 0 ? Math.min(td/tql*100,100) : 0 };
         };
-        const tw = wowMetrics(twData);
-        const lw = wowMetrics(lwData);
+        const tw = wowMetrics(twStartStr, twEndStr);
+        const lw = wowMetrics(lwStartStr, lwEndStr2);
 
         const pct = (c,p) => c&&p ? ((c-p)/p*100) : null;
         const cptqlP=pct(tw.cptql,lw.cptql), cptdP=pct(tw.cptd,lw.cptd), tqlTdP=pct(tw.tqlTd,lw.tqlTd), spendP=pct(tw.spend,lw.spend);
@@ -8236,9 +8259,9 @@ function diagnoseTrend(data, geo) {
 function computeCrossCombo(data, geo) {
   const combos = {};
   data.forEach(c => {
-    const aud = c.tags?.icp_target; if (!aud || aud === 'Unknown') return;
-    const hook = c.tags?.hook_type; if (!hook || hook === 'Unknown') return;
-    const fmt = c.tags?.format || c['Creative type'] || ''; if (!fmt || fmt === 'Unknown') return;
+    const aud = c.tags?.icp_target || extractAudience(c) || ''; if (!aud || aud === 'Unknown' || aud === 'Other') return;
+    const hook = c.tags?.hook_type || ''; if (!hook || hook === 'Unknown') return;
+    const fmt = c.tags?.format || c['Creative type'] || ''; if (!fmt || fmt === 'Unknown' || fmt === '-') { return; }
     const key = `${aud}|${hook}|${fmt}`;
     if (!combos[key]) combos[key] = { audience: aud, hook, format: fmt, spend: 0, ql: 0, td: 0, nri: 0, count: 0 };
     combos[key].spend += parseNumber(c['Spent']||c['spent']||0);
