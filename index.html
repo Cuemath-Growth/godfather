@@ -1196,8 +1196,9 @@
               Not connected
             </span>
           </div>
-          <p class="text-xs text-text-muted mb-4">Connect to Meta Marketing API to pull ad performance data automatically. Token is valid for 60 days.</p>
-          <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Access Token</label>
+          <p class="text-xs text-text-muted mb-2">Connect to Meta Marketing API to pull ad performance data automatically. Token is valid for 60 days.</p>
+          <div id="metaProxyNote" class="hidden mb-3 p-2 bg-green-50 border border-green-200 rounded-lg text-[11px] text-green-800">Token is configured on the server (Netlify env var). No need to enter it here — all team members share the same connection.</div>
+          <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Access Token <span id="metaTokenHint" class="font-normal normal-case text-text-muted">(only needed for local dev)</span></label>
           <input id="settingsMetaToken" type="password" placeholder="EAAxxxxxxx..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 mb-3 font-mono" />
           <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Ad Account ID</label>
           <input id="settingsMetaAccountId" type="text" placeholder="act_123456789" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 mb-3 font-mono" />
@@ -2919,6 +2920,11 @@ function initMetaApiSettings() {
   const accountEl = document.getElementById('settingsMetaAccountId');
   if (tokenEl) tokenEl.value = META_API_TOKEN ? META_API_TOKEN.substring(0, 20) + '...' : '';
   if (accountEl) accountEl.value = META_AD_ACCOUNTS.map(a => `${a.name} (${a.id})`).join(', ');
+  // Show proxy note when deployed
+  const proxyNote = document.getElementById('metaProxyNote');
+  const tokenHint = document.getElementById('metaTokenHint');
+  if (_IS_DEPLOYED && proxyNote) { proxyNote.classList.remove('hidden'); }
+  if (_IS_DEPLOYED && tokenHint) { tokenHint.textContent = '(server-side via Netlify — shared by all team members)'; }
   if (state.metaApi.datePreset) { const el = document.getElementById('settingsMetaDatePreset'); if (el) el.value = state.metaApi.datePreset; }
   if (state.metaApi.level) { const el = document.getElementById('settingsMetaLevel'); if (el) el.value = state.metaApi.level; }
   updateMetaApiBadge();
@@ -2940,7 +2946,11 @@ function initMetaApiSettings() {
 function updateMetaApiBadge() {
   const badge = document.getElementById('metaApiBadge');
   if (!badge) return;
-  if (META_API_TOKEN && META_AD_ACCOUNTS.length) {
+  if (_IS_DEPLOYED) {
+    // When deployed, Meta API goes through Netlify proxy — no local token needed
+    badge.className = 'status-badge connected text-[10px]';
+    badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-current"></span>${META_AD_ACCOUNTS.length} accounts (via proxy)`;
+  } else if (META_API_TOKEN && META_AD_ACCOUNTS.length) {
     badge.className = 'status-badge connected text-[10px]';
     badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-current"></span>${META_AD_ACCOUNTS.length} accounts`;
   } else {
@@ -2983,17 +2993,16 @@ async function testMetaApi() {
   const token = state.metaApi.token || META_API_TOKEN;
   const accounts = state.metaApi.accounts || META_AD_ACCOUNTS;
   const statusEl = document.getElementById('metaApiStatus');
-  if (!token) { showToast('No token'); return; }
+  if (!_IS_DEPLOYED && !token) { showToast('No token — enter one above or deploy to Netlify'); return; }
 
   statusEl.textContent = 'Testing all accounts...';
   let results = [];
   for (const account of accounts) {
     try {
-      const resp = await fetch(`https://graph.facebook.com/v21.0/${account.id}?fields=name,account_status&access_token=${token}`);
-      const data = await resp.json();
-      if (data.error) { results.push(`✗ ${account.name}: ${data.error.message}`); }
-      else { results.push(`✓ ${data.name} (${data.account_status === 1 ? 'Active' : 'Status ' + data.account_status})`); }
-    } catch(e) { results.push(`✗ ${account.name}: ${e.message}`); }
+      const data = await callMetaAPI(account.id, { fields: 'name,account_status' });
+      if (data.error) { results.push(`\u2717 ${account.name}: ${data.error.message}`); }
+      else { results.push(`\u2713 ${data.name} (${data.account_status === 1 ? 'Active' : 'Status ' + data.account_status})`); }
+    } catch(e) { results.push(`\u2717 ${account.name}: ${e.message}`); }
   }
   statusEl.innerHTML = results.join('<br>');
   updateMetaApiBadge();
@@ -3177,7 +3186,7 @@ async function connectMetaApi() {
   const datePreset = document.getElementById('settingsMetaDatePreset')?.value || state.metaApi.datePreset || 'last_30d';
   const level = document.getElementById('settingsMetaLevel')?.value || state.metaApi.level || 'ad';
 
-  if (!token) { showToast('No API token configured — enter it above'); return; }
+  if (!_IS_DEPLOYED && !token) { showToast('No API token configured — enter it above or deploy to Netlify'); return; }
 
   const btn = document.getElementById('metaApiConnectBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Pulling data...'; }
@@ -3192,7 +3201,44 @@ async function connectMetaApi() {
 
     try {
       const fields = 'campaign_name,adset_name,ad_name,spend,impressions,clicks,actions,cost_per_action_type,frequency,reach,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
-      let url = `https://graph.facebook.com/v21.0/${account.id}/insights?level=${level}&fields=${fields}&date_preset=${datePreset}&limit=500&access_token=${token}`;
+      let url;
+      if (_IS_DEPLOYED) {
+        // Use proxy — token is server-side, not in browser
+        const proxyParams = { level, fields, date_preset: datePreset, limit: '500' };
+        const proxyRes = await callMetaAPI(`${account.id}/insights`, proxyParams);
+        // Wrap in pagination-compatible format
+        url = null; // skip direct fetch, process proxyRes below
+        if (proxyRes.error) throw new Error(proxyRes.error.message || JSON.stringify(proxyRes.error));
+        const _processPage = (pageData) => {
+          if (!pageData?.data) return;
+          pageData.data.forEach(row => {
+            row._account = account.id;
+            row._accountName = account.name;
+            row._market = account.market || '';
+            allAds.push(row);
+          });
+        };
+        _processPage(proxyRes);
+        // Handle pagination via proxy
+        let nextUrl = proxyRes?.paging?.next;
+        let page = 1;
+        while (nextUrl && page < 20) {
+          page++;
+          if (statusEl) statusEl.textContent = `${account.name}: page ${page}...`;
+          await new Promise(r => setTimeout(r, 2000));
+          // Extract endpoint + params from next URL
+          const _nu = new URL(nextUrl);
+          const _ep = _nu.pathname.replace('/v21.0/', '');
+          const _params = {};
+          _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
+          const _nextRes = await callMetaAPI(_ep, _params);
+          if (_nextRes.error) break;
+          _processPage(_nextRes);
+          nextUrl = _nextRes?.paging?.next;
+        }
+        continue; // skip the direct-fetch path below
+      }
+      url = `https://graph.facebook.com/v21.0/${account.id}/insights?level=${level}&fields=${fields}&date_preset=${datePreset}&limit=500&access_token=${token}`;
       let page = 1;
 
       while (url && page <= 20) {
@@ -6527,13 +6573,12 @@ function checkStaleData() {
   if (!warning) return;
 
   if (!lastRefresh) {
-    // Only show getting-started if user has configured keys (not on first-ever load)
-    if (!state.taggerData.length && !API_KEY && !META_API_TOKEN) {
+    if (!state.taggerData.length) {
       warning.classList.add('hidden'); // Don't clutter first-time empty state
       return;
     }
     warning.classList.remove('hidden');
-    document.getElementById('staleDataMessage').innerHTML = 'Getting started: <strong>1)</strong> Go to Settings and add your API keys <strong>2)</strong> Hit "Refresh Now" to pull data <strong>3)</strong> Visit Lens: Tag to auto-tag creatives <strong>4)</strong> Come back here for insights';
+    document.getElementById('staleDataMessage').innerHTML = 'Data has never been refreshed. Click <strong>Refresh Data</strong> above to pull latest from Google Sheets + CRM.';
     return;
   }
 
