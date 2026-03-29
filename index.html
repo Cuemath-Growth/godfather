@@ -9695,10 +9695,10 @@ function renderTaggerTable() {
     let tagHtml = '';
     const isAllFilter = catFilter === 'all';
     const catsToShow = isAllFilter
-      ? ['hook_type','format','pain_benefit','emotional_tone','icp_target','segment']
+      ? ['hook_type','format','icp_target']  // Default: just 3 key tags for clarity
       : [catFilter];
     let tagCount = 0;
-    const MAX_VISIBLE = isAllFilter ? 4 : 20;
+    const MAX_VISIBLE = isAllFilter ? 3 : 20;
     let hiddenCount = 0;
     catsToShow.forEach(cat => {
       const val = tags[cat];
@@ -13802,100 +13802,117 @@ function renderInfluContent(filteredCreators) {
 function renderInfluCompare(geoFilterParam) {
   const container = document.getElementById('infTab-compare');
   const geoFilter = geoFilterParam || document.getElementById('influencerGeo')?.value || 'all';
-  let allData = sanitizeTaggerData(filterByGlobalDate([...(state.taggerData || [])]));
-  if (geoFilter && geoFilter !== 'all') {
-    allData = allData.filter(c => extractMarket(c) === geoFilter);
-  }
-  if (!allData.length) { container.innerHTML = '<div class="text-center py-12 text-text-muted text-sm">No tagged data available.</div>'; return; }
+  const creators = getInfluencerAds(geoFilter, document.getElementById('influencerFormat')?.value || 'all');
+  if (!creators.length) { container.innerHTML = '<div class="text-center py-12 text-text-muted text-sm">No creator data available.</div>'; return; }
 
-  const influ = { spend: 0, ql: 0, td: 0, count: 0 };
-  const inhouse = { spend: 0, ql: 0, td: 0, count: 0 };
+  // Per-creator: split ads into PARTNERSHIP (original) vs IN-HOUSE EDIT (recut)
+  const EDIT_MARKERS = ['inhouse', 'edited', 'recut', 'inhouse-edit', 'inhouse_edit'];
+  const perCreator = [];
 
-  allData.forEach(c => {
-    const bucket = _isInfluencerAd(c) ? influ : inhouse;
-    bucket.spend += parseNumber(c['Spent']||c['spent']||0);
-    bucket.ql += parseNumber(c['QL']||c['ql']||0);
-    bucket.td += parseNumber(c['TD']||c['td']||0);
-    bucket.count++;
-  });
+  creators.forEach(creator => {
+    const partnership = { spend: 0, ql: 0, td: 0, count: 0, bestAd: null, bestCptd: Infinity };
+    const recut = { spend: 0, ql: 0, td: 0, count: 0, bestAd: null, bestCptd: Infinity };
 
-  // By market
-  const byMarket = {};
-  allData.forEach(c => {
-    const geo = extractMarket(c);
-    if (geo === 'Unknown') return;
-    if (!byMarket[geo]) byMarket[geo] = { influ: {spend:0,ql:0,td:0,count:0}, inhouse: {spend:0,ql:0,td:0,count:0} };
-    const bucket = _isInfluencerAd(c) ? byMarket[geo].influ : byMarket[geo].inhouse;
-    bucket.spend += parseNumber(c['Spent']||c['spent']||0);
-    bucket.ql += parseNumber(c['QL']||c['ql']||0);
-    bucket.td += parseNumber(c['TD']||c['td']||0);
-    bucket.count++;
-  });
-
-  const metricCard = (label, v) => `
-    <div class="text-center">
-      <p class="text-[9px] text-text-muted">${label}</p>
-      <p class="text-lg font-black">${v}</p>
-    </div>`;
-
-  let html = `<h3 class="text-sm font-bold mb-4">Influencer Creatives vs In-House Creatives</h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-      <div class="bg-white rounded-xl border-2 border-accent-purple/20 shadow-sm p-5">
-        <p class="text-xs font-bold text-accent-purple mb-3">Influencer Creatives (${influ.count} ads)</p>
-        <div class="grid grid-cols-4 gap-2">
-          ${metricCard('Spend', formatCurrency(influ.spend))}
-          ${metricCard('CPQL', influ.ql > 0 ? formatCurrency(influ.spend/influ.ql) : '\u2014')}
-          ${metricCard('CPTD', influ.td > 0 ? formatCurrency(influ.spend/influ.td) : '\u2014')}
-          ${metricCard('QL\u2192TD%', influ.ql > 0 ? Math.min(influ.td/influ.ql*100,100).toFixed(1)+'%' : '\u2014')}
-        </div>
-      </div>
-      <div class="bg-white rounded-xl border-2 border-accent-blue/20 shadow-sm p-5">
-        <p class="text-xs font-bold text-accent-blue mb-3">In-House Creatives (${inhouse.count} ads)</p>
-        <div class="grid grid-cols-4 gap-2">
-          ${metricCard('Spend', formatCurrency(inhouse.spend))}
-          ${metricCard('CPQL', inhouse.ql > 0 ? formatCurrency(inhouse.spend/inhouse.ql) : '\u2014')}
-          ${metricCard('CPTD', inhouse.td > 0 ? formatCurrency(inhouse.spend/inhouse.td) : '\u2014')}
-          ${metricCard('QL\u2192TD%', inhouse.ql > 0 ? Math.min(inhouse.td/inhouse.ql*100,100).toFixed(1)+'%' : '\u2014')}
-        </div>
-      </div>
-    </div>`;
-
-  // Winner callout — use CPTD as primary metric, require min 3 TDs
-  const influCPTD = influ.td >= 3 ? influ.spend/influ.td : null;
-  const inhouseCPTD = inhouse.td >= 3 ? inhouse.spend/inhouse.td : null;
-  const influCPQL = influ.ql > 0 ? influ.spend/influ.ql : null;
-  const inhouseCPQL = inhouse.ql > 0 ? inhouse.spend/inhouse.ql : null;
-  if (influCPTD && inhouseCPTD) {
-    const cptdWinner = influCPTD < inhouseCPTD ? 'Influencer' : 'In-House';
-    const cptdGap = Math.abs(((influCPTD - inhouseCPTD) / Math.max(influCPTD, inhouseCPTD)) * 100).toFixed(0);
-    let insightParts = [`<strong class="text-accent-purple">${cptdWinner} creatives</strong> have ${cptdGap}% better CPTD (${cptdWinner === 'Influencer' ? formatCurrency(influCPTD) : formatCurrency(inhouseCPTD)} vs ${cptdWinner === 'Influencer' ? formatCurrency(inhouseCPTD) : formatCurrency(influCPTD)}).`];
-    if (influCPQL && inhouseCPQL) {
-      const cpqlWinner = influCPQL < inhouseCPQL ? 'Influencer' : 'In-House';
-      const cpqlGap = Math.abs(((influCPQL - inhouseCPQL) / Math.max(influCPQL, inhouseCPQL)) * 100).toFixed(0);
-      if (cpqlWinner !== cptdWinner) insightParts.push(`However, ${cpqlWinner} leads on CPQL by ${cpqlGap}%.`);
-    }
-    insightParts.push(cptdWinner === 'Influencer' ? 'Scale influencer spend — strong trial conversion.' : 'Influencer content needs optimization before scaling.');
-    html += `<div class="bg-surface-secondary rounded-xl p-4 mb-6"><p class="text-sm font-bold">Key Insight</p><p class="text-xs text-text-secondary">${insightParts.join(' ')}</p></div>`;
-  } else {
-    html += `<div class="bg-surface-secondary rounded-xl p-4 mb-6"><p class="text-sm font-bold">Key Insight</p><p class="text-xs text-text-secondary">Insufficient trial data (need 3+ TDs per side) for a reliable comparison.</p></div>`;
-  }
-
-  // By market breakdown
-  if (Object.keys(byMarket).length) {
-    html += '<h4 class="text-xs font-bold mb-3">By Market</h4><div class="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden"><table class="w-full text-[11px] table-fixed"><thead><tr class="bg-surface-tertiary border-b border-gray-200"><th class="text-left px-3 py-2 font-bold text-text-muted" style="width:16%">Market</th><th class="text-right px-2 py-2 font-bold text-text-muted">Influ Ads</th><th class="text-right px-2 py-2 font-bold text-text-muted">Influ CPQL</th><th class="text-right px-2 py-2 font-bold text-text-muted">Influ CPTD</th><th class="text-right px-2 py-2 font-bold text-text-muted">In-House Ads</th><th class="text-right px-2 py-2 font-bold text-text-muted">In-House CPQL</th><th class="text-right px-2 py-2 font-bold text-text-muted">In-House CPTD</th><th class="text-right px-2 py-2 font-bold text-text-muted">Winner</th></tr></thead><tbody>';
-    Object.entries(byMarket).sort((a,b) => b[1].influ.spend - a[1].influ.spend).forEach(([geo, v]) => {
-      const iCpql = v.influ.ql > 0 ? v.influ.spend/v.influ.ql : null;
-      const hCpql = v.inhouse.ql > 0 ? v.inhouse.spend/v.inhouse.ql : null;
-      const iCptd = v.influ.td >= 3 ? v.influ.spend/v.influ.td : null;
-      const hCptd = v.inhouse.td >= 3 ? v.inhouse.spend/v.inhouse.td : null;
-      // Winner by CPTD (primary), fallback to CPQL only if both sides lack TDs
-      let winner = '\u2014';
-      if (iCptd && hCptd) { winner = iCptd < hCptd ? '<span class="text-accent-purple font-bold">Influencer</span>' : '<span class="text-accent-blue font-bold">In-House</span>'; }
-      else if (!iCptd && !hCptd && iCpql && hCpql) { winner = iCpql < hCpql ? '<span class="text-accent-purple font-bold">Influencer</span>' : '<span class="text-accent-blue font-bold">In-House</span>'; }
-      html += `<tr class="border-b border-gray-50"><td class="px-3 py-2 font-semibold">${geo}</td><td class="px-2 py-2 text-right">${v.influ.count}</td><td class="px-2 py-2 text-right font-bold">${iCpql ? formatCurrency(iCpql) : '\u2014'}</td><td class="px-2 py-2 text-right">${iCptd ? formatCurrency(iCptd) : '\u2014'}</td><td class="px-2 py-2 text-right">${v.inhouse.count}</td><td class="px-2 py-2 text-right font-bold">${hCpql ? formatCurrency(hCpql) : '\u2014'}</td><td class="px-2 py-2 text-right">${hCptd ? formatCurrency(hCptd) : '\u2014'}</td><td class="px-2 py-2 text-right">${winner}</td></tr>`;
+    creator.ads.forEach(c => {
+      const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
+      const isRecut = EDIT_MARKERS.some(m => adName.includes(m));
+      const bucket = isRecut ? recut : partnership;
+      const spend = parseNumber(c['Spent']||c['spent']||0);
+      const ql = parseNumber(c['QL']||c['ql']||0);
+      const td = parseNumber(c['TD']||c['td']||0);
+      bucket.spend += spend;
+      bucket.ql += ql;
+      bucket.td += td;
+      bucket.count++;
+      // Track best ad by CPTD
+      if (td > 0 && spend/td < bucket.bestCptd) {
+        bucket.bestCptd = spend/td;
+        bucket.bestAd = c['Ad name'] || c['ad name'] || '';
+      }
     });
-    html += '</tbody></table></div>';
+
+    const pCptd = partnership.td >= 1 ? partnership.spend / partnership.td : null;
+    const rCptd = recut.td >= 1 ? recut.spend / recut.td : null;
+    const hasBoth = partnership.count > 0 && recut.count > 0;
+
+    perCreator.push({
+      name: creator.name,
+      handle: creator.handle,
+      totalAds: creator.ads.length,
+      partnership, recut,
+      pCptd, rCptd, hasBoth,
+      totalSpend: partnership.spend + recut.spend,
+      totalTd: partnership.td + recut.td,
+    });
+  });
+
+  // Sort: creators with both variants first (by total TDs), then single-variant
+  perCreator.sort((a, b) => {
+    if (a.hasBoth && !b.hasBoth) return -1;
+    if (!a.hasBoth && b.hasBoth) return 1;
+    return b.totalTd - a.totalTd;
+  });
+
+  let html = `<h3 class="text-sm font-bold mb-1">Partnership vs In-House Edits</h3>
+    <p class="text-xs text-text-muted mb-4">Same creator, different editing \u2014 does their organic style outperform your in-house cuts?</p>`;
+
+  // Summary verdict
+  const withBoth = perCreator.filter(c => c.hasBoth && c.pCptd && c.rCptd);
+  if (withBoth.length > 0) {
+    const partnershipWins = withBoth.filter(c => c.pCptd < c.rCptd).length;
+    const recutWins = withBoth.length - partnershipWins;
+    const verdict = partnershipWins > recutWins
+      ? `Partnership content outperforms in ${partnershipWins}/${withBoth.length} creators \u2014 let creators write their own scripts.`
+      : partnershipWins < recutWins
+      ? `In-house edits outperform in ${recutWins}/${withBoth.length} creators \u2014 keep editing creator footage.`
+      : `Split results across ${withBoth.length} creators \u2014 decide per creator.`;
+    html += `<div class="mb-4 px-4 py-3 rounded-xl ${partnershipWins > recutWins ? 'bg-purple-50 border border-purple-200' : 'bg-blue-50 border border-blue-200'}">
+      <p class="text-xs font-bold">${verdict}</p>
+    </div>`;
   }
+
+  // Per-creator cards
+  html += '<div class="space-y-3">';
+  perCreator.slice(0, 15).forEach(c => {
+    const winner = c.hasBoth && c.pCptd && c.rCptd
+      ? (c.pCptd < c.rCptd ? 'partnership' : 'recut')
+      : null;
+    const gap = winner && c.pCptd && c.rCptd
+      ? Math.abs(((c.pCptd - c.rCptd) / Math.max(c.pCptd, c.rCptd)) * 100).toFixed(0)
+      : 0;
+
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <span class="text-sm font-bold">${c.name}</span>
+          ${c.handle ? `<span class="text-[10px] text-text-muted ml-1">@${c.handle}</span>` : ''}
+        </div>
+        <span class="text-[10px] text-text-muted">${c.totalAds} ads \u00B7 ${formatCurrency(c.totalSpend)} \u00B7 ${Math.round(c.totalTd)} TDs</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div class="p-3 rounded-lg ${winner === 'partnership' ? 'bg-purple-50 border-2 border-purple-300' : 'bg-surface-secondary border border-gray-200'}">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold text-accent-purple uppercase">Partnership</span>
+            ${winner === 'partnership' ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-800 font-bold">${gap}% better</span>` : ''}
+          </div>
+          <p class="text-lg font-black">${c.pCptd ? formatCurrency(c.pCptd) : '\u2014'}</p>
+          <p class="text-[10px] text-text-muted">${c.partnership.count} ads \u00B7 ${Math.round(c.partnership.td)} TDs \u00B7 ${formatCurrency(c.partnership.spend)}</p>
+          ${c.partnership.bestAd ? `<p class="text-[9px] text-text-muted mt-1 truncate" title="${c.partnership.bestAd}">Best: ${shortAdName(c.partnership.bestAd)}</p>` : ''}
+        </div>
+        <div class="p-3 rounded-lg ${winner === 'recut' ? 'bg-blue-50 border-2 border-blue-300' : 'bg-surface-secondary border border-gray-200'}">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold text-accent-blue uppercase">In-House Edit</span>
+            ${winner === 'recut' ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-200 text-blue-800 font-bold">${gap}% better</span>` : ''}
+          </div>
+          <p class="text-lg font-black">${c.rCptd ? formatCurrency(c.rCptd) : '\u2014'}</p>
+          <p class="text-[10px] text-text-muted">${c.recut.count} ads \u00B7 ${Math.round(c.recut.td)} TDs \u00B7 ${formatCurrency(c.recut.spend)}</p>
+          ${c.recut.bestAd ? `<p class="text-[9px] text-text-muted mt-1 truncate" title="${c.recut.bestAd}">Best: ${shortAdName(c.recut.bestAd)}</p>` : ''}
+        </div>
+      </div>
+      ${!c.hasBoth ? `<p class="text-[10px] text-amber-600 mt-2">\u26A0 Only ${c.partnership.count > 0 ? 'partnership' : 'in-house'} ads found \u2014 no comparison available</p>` : ''}
+    </div>`;
+  });
+  html += '</div>';
 
   container.innerHTML = html;
 }
