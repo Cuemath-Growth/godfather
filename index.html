@@ -4833,6 +4833,29 @@ function renderOracleActions() {
 
     // 2. Budget Reallocation — shift from red to green
     const geos = dashCountry === 'all' ? ['US','India','AUS','MEA','UK'] : [dashCountry];
+
+    // Single-market: show within-market audience/hook optimization
+    if (dashCountry !== 'all' && audEntries.length >= 2) {
+      const bestAud = audEntries.filter(a => a.td > 0);
+      const worstAud = audEntries.filter(a => a.td === 0 && a.spend > 20000);
+      if (bestAud.length > 0) {
+        cmoHtml += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
+          <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Optimize Within ${dashCountry}</p>
+          <div class="space-y-2">
+            ${bestAud.slice(0, 3).map(a => `<div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-accent-green shrink-0"></span>
+              <p class="text-xs"><strong>Scale: ${a.aud}</strong> — ${formatCurrency(a.cptd)} CPTD (${a.count} ads, ${Math.round(a.td)} TDs)</p>
+            </div>`).join('')}
+            ${worstAud.slice(0, 2).map(a => `<div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-accent-red shrink-0"></span>
+              <p class="text-xs"><strong>Pause: ${a.aud}</strong> — ${formatCurrency(a.spend)} spent, 0 TDs</p>
+            </div>`).join('')}
+            <p class="text-[10px] text-text-muted mt-1">Do NOT cut ${dashCountry} budget — optimize audiences, hooks, and creatives within ${dashCountry} instead.</p>
+          </div>
+        </div>`;
+      }
+    }
+
     if (dashCountry === 'all' && geos.length > 1) {
       const geoPerf = geos.map(g => {
         const gSpend = getOracleMetrics(fromDate, toDate, g).spend;
@@ -8181,7 +8204,10 @@ function renderCrossDimensionalCMO(data, geo, container) {
 
   const allocations = computeBudgetAllocation(result.top, result.totalSpend);
   const totalExpectedTD = allocations.reduce((s, a) => s + a.expectedTD, 0);
-  const currentTD = data.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
+  // Fair comparison: only count TDs from the same combos used in allocation (not ALL data)
+  const allocCombos = new Set(allocations.filter(a => a.combo.audience !== 'New').map(a => `${a.combo.audience}|${a.combo.hook}|${a.combo.format}`));
+  const currentTD_sameCombos = result.top.filter(c => allocCombos.has(`${c.audience}|${c.hook}|${c.format}`)).reduce((s, c) => s + c.td, 0);
+  const currentTD = currentTD_sameCombos || data.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
   const improvement = currentTD > 0 ? Math.round((totalExpectedTD / currentTD - 1) * 100) : 0;
 
   let html = '';
@@ -8193,7 +8219,7 @@ function renderCrossDimensionalCMO(data, geo, container) {
       <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-3">Budget Allocation — Current vs Optimized</p>
       <div class="grid grid-cols-2 gap-4 mb-3">
         <div class="text-center p-3 rounded-lg bg-surface-secondary border border-gray-200">
-          <p class="text-[9px] text-text-muted uppercase font-bold mb-1">Current (Even Split)</p>
+          <p class="text-[9px] text-text-muted uppercase font-bold mb-1">Current Mix (Same Combos)</p>
           <p class="text-lg font-black">${Math.round(currentTD)} TDs</p>
           <p class="text-[10px] text-text-muted">from ${formatCurrency(result.totalSpend)}</p>
         </div>
