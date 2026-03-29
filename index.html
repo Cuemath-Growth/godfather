@@ -1996,6 +1996,54 @@ function ensureDerivedMetrics(data) {
   return data;
 }
 
+// Deduplicate tagger data by ad name — same creative in multiple ad sets gets aggregated
+// This prevents spend/QL inflation (12K ad-level rows → ~2K unique creatives)
+function deduplicateByAdName(data) {
+  const byName = {};
+  data.forEach(c => {
+    const name = (c['Ad name'] || c['ad name'] || '').trim();
+    if (!name) return;
+    // Normalize: strip trailing placement suffixes that Meta adds
+    const key = name.replace(/_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds)_(ig|fb|an)$/i, '');
+    if (!byName[key]) {
+      byName[key] = { ...c, _dedupCount: 1 };
+    } else {
+      const existing = byName[key];
+      // Sum numeric metrics
+      ['Spent','spent','QL','ql','NRI','nri','TD','td','TS','ts','Paid','paid','Impressions','impressions','Clicks','clicks','net_booking'].forEach(f => {
+        if (c[f] !== undefined) existing[f] = (parseNumber(existing[f]||0)) + (parseNumber(c[f]||0));
+      });
+      // Keep tags from whichever has them
+      if (!existing.tags && c.tags) existing.tags = c.tags;
+      else if (existing.tags && c.tags) {
+        // Merge: prefer non-Unknown values
+        Object.entries(c.tags).forEach(([k,v]) => {
+          if (v && v !== 'Unknown' && (!existing.tags[k] || existing.tags[k] === 'Unknown')) existing.tags[k] = v;
+        });
+      }
+      // Keep CRM data from whichever has it
+      if (!existing._crmMatchType && c._crmMatchType) {
+        existing._crmMatchType = c._crmMatchType;
+        existing._crmLeads = c._crmLeads;
+        existing._crmMatchScore = c._crmMatchScore;
+      }
+      // Keep thumbnail/image from whichever has it
+      if (!existing['thumbnail_url'] && c['thumbnail_url']) existing['thumbnail_url'] = c['thumbnail_url'];
+      if (!existing['image_url'] && c['image_url']) existing['image_url'] = c['image_url'];
+      if (!existing['ad_body'] && c['ad_body']) existing['ad_body'] = c['ad_body'];
+      if (!existing['ad_title'] && c['ad_title']) existing['ad_title'] = c['ad_title'];
+      // Keep the earliest date
+      if (c['_date'] && (!existing['_date'] || c['_date'] < existing['_date'])) existing['_date'] = c['_date'];
+      existing._dedupCount = (existing._dedupCount || 1) + 1;
+    }
+  });
+  const deduped = Object.values(byName);
+  if (deduped.length < data.length) {
+    console.log(`Dedup: ${data.length} ad-level rows → ${deduped.length} unique creatives (${data.length - deduped.length} duplicates merged)`);
+  }
+  return deduped;
+}
+
 // Backfill Unknown CTA/Feature/Pillar tags locally — no API calls
 function backfillUnknownTags(data) {
   data.forEach(c => {
@@ -2736,7 +2784,7 @@ function navigateTo(view) {
   document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
   // Show/hide global filter bar (hidden on Settings and Forge)
   const filterBar = document.getElementById('globalFilterBar');
-  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate') ? 'none' : '';
+  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'leads') ? 'none' : '';
   const titles = { dashboard:'Dashboard', generate:'Create', tagger:'Tagger', intel:'Insights', library:'Library', leads:'Performance', influencer:'Creators', settings:'Settings' };
   const subs = { dashboard:'What to do right now', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', intel:'What\'s working & why', library:'Your creative assets', leads:'Funnel scoring & performance', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
@@ -8592,7 +8640,7 @@ function saveTagCache(cache) {
 }
 
 // Load tagger data: localStorage immediately, then try Supabase async
-state.taggerData = backfillUnknownTags(ensureDerivedMetrics(JSON.parse(localStorage.getItem('gf_taggerData') || '[]')));
+state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(JSON.parse(localStorage.getItem('gf_taggerData') || '[]'))));
 // Backfill _date from campaign names for existing data missing dates
 let _dateBackfilled = 0;
 state.taggerData.forEach(c => { if (!c['_date']) { extractDateFromAdName(c); if (c['_date']) _dateBackfilled++; } });
@@ -8635,7 +8683,7 @@ state._supabaseLoadPending = true;
     const sbData = await loadTaggerFromSupabase();
     state._supabaseLoadPending = false;
     if (sbData && sbData.length > _localTaggerCount) {
-      state.taggerData = backfillUnknownTags(ensureDerivedMetrics(sbData));
+      state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(sbData)));
       // Rehydrate tags from cache for any Supabase rows missing tags
       const sbRestored = rehydrateTagsFromCache(state.taggerData);
       state.taggerData.forEach(c => { if (!c['_date']) extractDateFromAdName(c); });
@@ -8786,7 +8834,7 @@ async function tagCreatives(rawData) {
 
   // If all cached, skip tagging entirely — go straight to results
   if (needsTagging.length === 0) {
-    state.taggerData = backfillUnknownTags(ensureDerivedMetrics(cachedResults));
+    state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(cachedResults)));
     saveTaggerData();
     document.getElementById('taggerProgress').classList.add('hidden');
     document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
@@ -8846,7 +8894,7 @@ async function tagCreatives(rawData) {
   saveTagCache(tagCache);
 
   // Merge cached + newly tagged
-  state.taggerData = backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged]));
+  state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged])));
   saveTaggerData();
   document.getElementById('taggerProgress').classList.add('hidden');
   document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
@@ -10293,7 +10341,7 @@ function restoreTaggedData() {
       const backup = JSON.parse(text);
       if (!backup.taggerData?.length) { showToast('Invalid backup file'); return; }
       if (!confirm(`Restore ${backup.creativeCount} creatives from ${backup.exportDate}? This will replace current data.`)) return;
-      state.taggerData = backfillUnknownTags(ensureDerivedMetrics(backup.taggerData));
+      state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(backup.taggerData)));
       saveTaggerData();
       if (backup.tagCache) localStorage.setItem('gf_tagCache', JSON.stringify(backup.tagCache));
       if (backup.influencerTypes) { state._influencerTypes = backup.influencerTypes; localStorage.setItem('gf_influencerTypes', JSON.stringify(backup.influencerTypes)); }
