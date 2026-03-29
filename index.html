@@ -5023,18 +5023,24 @@ function renderOracleActions() {
         const safeBadge = (p,inv) => lowData ? '' : badge(p,inv);
 
         if (tw.spend > 0 || lw.spend > 0) {
-          let wH = lowData ? '<p class="text-[10px] text-amber-600 mb-2">⚠ Low data for this geo/period — percentages may be unreliable</p>' : '';
+          let wH = lowData ? '<p class="text-[10px] text-amber-600 mb-2">\u26A0 Low data for this geo/period \u2014 percentages may be unreliable</p>' : '';
           const _wGeo = dashCountryWoW === 'all' ? 'all' : dashCountryWoW;
+          // Incomplete data detection: if this week's spend is <10% of last week, data is likely partial
+          const _incompleteWeek = lw.spend > 0 && tw.spend > 0 && tw.spend < lw.spend * 0.1;
           // WoW verdict banner
-          const _wowIssues = [];
-          if (!lowData) {
-            if (cptdP !== null && cptdP > 10) _wowIssues.push('CPTD up ' + Math.abs(cptdP).toFixed(0) + '%');
-            if (cptqlP !== null && cptqlP > 10) _wowIssues.push('CPTQL up ' + Math.abs(cptqlP).toFixed(0) + '%');
-            const _tqlP = pct(tw.tql, lw.tql);
-            if (_tqlP !== null && _tqlP < -15) _wowIssues.push('TQLs down ' + Math.abs(_tqlP).toFixed(0) + '%');
+          if (_incompleteWeek) {
+            wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">\u26A0 This week\u2019s data looks incomplete (\u20B9${(tw.spend/100000).toFixed(1)}L vs \u20B9${(lw.spend/100000).toFixed(1)}L last week). Pull fresh data from Meta API before comparing.</div>`;
+          } else {
+            const _wowIssues = [];
+            if (!lowData) {
+              if (cptdP !== null && cptdP > 10) _wowIssues.push('CPTD up ' + Math.abs(cptdP).toFixed(0) + '%');
+              if (cptqlP !== null && cptqlP > 10) _wowIssues.push('CPTQL up ' + Math.abs(cptqlP).toFixed(0) + '%');
+              const _tqlP = pct(tw.tql, lw.tql);
+              if (_tqlP !== null && _tqlP < -15) _wowIssues.push('TQLs down ' + Math.abs(_tqlP).toFixed(0) + '%');
+            }
+            if (_wowIssues.length > 0) wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-800 font-medium">\u26A0 Week-over-week: ${_wowIssues.join(', ')}</div>`;
+            else if (!lowData) wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-[11px] text-green-800 font-medium">\u2713 Week-over-week: stable or improving</div>`;
           }
-          if (_wowIssues.length > 0) wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-800 font-medium">\u26A0 Week-over-week: ${_wowIssues.join(', ')}</div>`;
-          else if (!lowData) wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-[11px] text-green-800 font-medium">\u2713 Week-over-week: stable or improving</div>`;
           // Week labels
           const _fmtShort = d => { const _m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const _d=new Date(d); return _m[_d.getMonth()]+' '+_d.getDate(); };
           wH += `<div class="flex items-center gap-4 mb-2">
@@ -6096,6 +6102,7 @@ function renderMetricTicker() {
   if (totalSpend > 0 || crm.td > 0) {
     // ── PRIOR PERIOD for trends ──
     let priorSpend = 0, priorCrm = { tql: 0, td: 0, paid: 0, ql: 0, revenue: 0 };
+    let priorLabel = '';
     if (from && to) {
       const dayMs = 86400000;
       const fromD = new Date(from), toD = new Date(to);
@@ -6103,6 +6110,8 @@ function renderMetricTicker() {
       const priorTo = new Date(fromD.getTime() - dayMs);
       const priorFrom = new Date(priorTo.getTime() - (spanDays - 1) * dayMs);
       const pf = priorFrom.toISOString().slice(0,10), pt = priorTo.toISOString().slice(0,10);
+      const _fmtD = d => { const _m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const _d=new Date(d); return _m[_d.getMonth()]+' '+_d.getDate(); };
+      priorLabel = `vs ${_fmtD(pf)} – ${_fmtD(pt)}`;
       priorSpend = getOracleMetrics(pf, pt, dashCountry).spend;
       // Pass prior-period dates directly — no DOM mutation needed
       priorCrm = getCRMPortfolioTotals(dashCountry, { from: pf, to: pt });
@@ -6193,7 +6202,7 @@ function renderMetricTicker() {
         </div>
         <p class="text-3xl font-black text-accent-${cptdColor}">${cptd > 0 ? formatCurrency(cptd) : '—'}</p>
         <div class="flex items-center gap-2 mt-1">
-          ${cptdTrend ? `<span class="text-[9px] text-text-muted">vs prior period</span>${cptdTrend}` : ''}
+          ${cptdTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${cptdTrend}` : ''}
           ${cptd > 0 ? `<span class="text-[9px] text-text-muted ml-auto">${crm.td} TDs from ${formatCurrency(totalSpend)} spend</span>` : ''}
         </div>
       </div>
@@ -6204,7 +6213,7 @@ function renderMetricTicker() {
         </div>
         <p class="text-3xl font-black text-accent-${roas && parseFloat(roas) >= 1 ? 'green' : roas && parseFloat(roas) >= 0.5 ? 'orange' : 'blue'}">${roas ? roas + 'x' : '—'}</p>
         <div class="flex items-center gap-2 mt-1">
-          ${roasTrend ? `<span class="text-[9px] text-text-muted">vs prior period</span>${roasTrend}` : ''}
+          ${roasTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${roasTrend}` : ''}
           ${crm.revenue > 0 ? `<span class="text-[9px] text-text-muted ml-auto">${formatCurrency(crm.revenue)} revenue</span>` : ''}
         </div>
       </div>
@@ -6212,9 +6221,9 @@ function renderMetricTicker() {
 
     // 3. Secondary KPI cards (smaller, with trends)
     const kpis = [
-      { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: dateLabel },
+      { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: `${dateLabel}${priorLabel ? ' · <span class="text-text-muted">' + priorLabel + '</span>' : ''}` },
       { label: 'TQLs', value: crm.tql > 0 ? crm.tql.toLocaleString() : '—', color: 'blue', trend: trend(crm.tql, priorCrm.tql, false), sub: `of ${crm.ql.toLocaleString()} QLs` },
-      { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: '' },
+      { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: priorLabel || '' },
       { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toLocaleString() : '—', color: crm.paid > 0 ? 'green' : 'blue', trend: trend(crm.paid, priorCrm.paid, false), sub: crm.paid > 0 ? `CAC ${formatCurrency(cac)}` : '' },
     ];
     html += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">`;
