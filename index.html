@@ -2784,7 +2784,7 @@ function navigateTo(view) {
   document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
   // Show/hide global filter bar (hidden on Settings and Forge)
   const filterBar = document.getElementById('globalFilterBar');
-  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'leads') ? 'none' : '';
+  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'leads' || view === 'tagger' || view === 'library') ? 'none' : '';
   const titles = { dashboard:'Dashboard', generate:'Create', tagger:'Tagger', intel:'Insights', library:'Library', leads:'Performance', influencer:'Creators', settings:'Settings' };
   const subs = { dashboard:'What to do right now', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', intel:'What\'s working & why', library:'Your creative assets', leads:'Funnel scoring & performance', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
