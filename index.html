@@ -7988,6 +7988,9 @@ function diagnoseTrend(data, geo) {
   // Split data into recent half vs prior half by date
   const dated = data.filter(c => c['_date']).sort((a, b) => (a['_date'] || '').localeCompare(b['_date'] || ''));
   if (dated.length < 10) return null;
+  // Require at least 7 days of date range for meaningful trend comparison
+  const _dateRange = new Date(dated[dated.length-1]['_date']) - new Date(dated[0]['_date']);
+  if (_dateRange < 7 * 86400000) return null;
   const mid = Math.floor(dated.length / 2);
   const prior = dated.slice(0, mid);
   const recent = dated.slice(mid);
@@ -9380,7 +9383,7 @@ function renderTaggerInsights() {
       tagPerf[tag].count++;
     });
 
-    const entries = Object.entries(tagPerf).filter(([,v]) => v.count >= 3);
+    const entries = Object.entries(tagPerf).filter(([,v]) => v.count >= 5);
     if (!entries.length) return;
     // Compute metrics: CPTD primary, CPQL fallback
     // Require minimum 3 TDs for CPTD to be reliable — otherwise fall back to CPTQL
@@ -9536,7 +9539,8 @@ function renderTaggerTable() {
     const mkt = extractMarket(c) || 'US';
     const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
     const verdict = td_val >= 3 ? scoreMetric(cptd_val, mktThresholds.cptd, false)
-      : ql >= 5 ? scoreMetric(spend/ql, mktThresholds.cpql, false) : 'gray';
+      : ql >= 5 ? scoreMetric(spend/ql, mktThresholds.cpql, false)
+      : (spend > 30000 && ql < 3 && td_val === 0) ? 'red' : 'gray'; // Budget leak: high spend, no conversions
     const verdictBorder = verdict === 'green' ? 'border-l-green-500' : verdict === 'amber' ? 'border-l-amber-400' : verdict === 'red' ? 'border-l-red-500' : 'border-l-gray-200';
 
     const thumb = c['image_url'] || c['thumbnail_url'] || '';
@@ -10792,7 +10796,7 @@ function renderPerfMatrix() {
 
 // ---- Winning Formulas ----
 function computeWinningFormula(market, icp) {
-  let filtered = [...(state.taggerData||[])];
+  let filtered = sanitizeTaggerData([...(state.taggerData||[])]);
   if (market && market !== 'all') filtered = filtered.filter(c => extractMarket(c) === market);
   if (icp && icp !== 'all') filtered = filtered.filter(c => c.tags?.icp_target === icp);
   if (filtered.length < 2) return {};
@@ -10827,8 +10831,8 @@ function renderWinningFormulas() {
     return;
   }
 
-  // Filter data for stats
-  let filtered = [...state.taggerData];
+  // Filter data for stats (sanitized to prevent ghost TDs)
+  let filtered = sanitizeTaggerData([...state.taggerData]);
   if (market !== 'all') filtered = filtered.filter(c => extractMarket(c) === market);
   if (icp !== 'all') filtered = filtered.filter(c => c.tags?.icp_target === icp);
   const totalSpend = filtered.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
@@ -12140,7 +12144,7 @@ function renderSentinelNarrative() {
   }
 
   // 4. Creative Fatigue — ads with high spend but degrading efficiency
-  const avgCPQL = rows.length > 0 ? rows.reduce((s, r) => s + (r.metrics?.cpql || 0), 0) / rows.filter(r => r.metrics?.cpql > 0).length : 0;
+  const avgCPQL = rows.length > 0 ? rows.reduce((s, r) => s + (r.metrics?.cpql || 0), 0) / Math.max(rows.filter(r => r.metrics?.cpql > 0).length, 1) : 0;
   const highSpendRows = rows.filter(r => r.metrics?.spend > 10000 && r.metrics?.cpql > 0);
   const fatigued = highSpendRows
     .filter(r => r.metrics.cpql > avgCPQL * 1.3) // CPQL 30%+ above average = fatigue signal
