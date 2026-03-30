@@ -1188,48 +1188,19 @@
           </div>
         </div>
 
-        <!-- Google Sheets -->
+        <!-- Data Source -->
         <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 mb-4">
-          <h3 class="text-sm font-bold mb-1">Google Sheets Integration</h3>
-          <p class="text-xs text-text-muted mb-4">Paste your Google Sheets URLs. Sheets must be shared as "Anyone with the link can view".</p>
-          <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Meta Ads Creative Performance (Google Sheet)</label>
-          <input id="settingsMetaSheet" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 mb-4" />
-          <div class="mb-4">
-            <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">CRM Leads Sheet URL</label>
-            <input id="settingsCrmSheet" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary" placeholder="Google Sheets URL for CRM Leads tab" />
+          <h3 class="text-sm font-bold mb-1">Data Source</h3>
+          <p class="text-xs text-text-muted mb-4">One Google Sheet with <code class="bg-gray-100 px-1 rounded text-[11px]">leads</code> and <code class="bg-gray-100 px-1 rounded text-[11px]">cost</code> tabs. Sheet must be shared as "Anyone with the link can view".</p>
+          <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Google Sheet URL</label>
+          <input id="settingsSheetUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 mb-3" />
+          <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Google API Key</label>
+          <input id="settingsGoogleApiKey" type="password" placeholder="AIza..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 mb-3 font-mono" />
+          <div class="flex gap-2 mb-3">
+            <button onclick="saveDataSource()" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold">Save & Connect</button>
+            <button onclick="testDataSource()" id="testDataSourceBtn" class="btn-secondary px-5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200">Test Connection</button>
           </div>
-          <div class="mb-4">
-            <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Creative Library Sheet URL</label>
-            <p class="text-[10px] text-text-muted mb-1.5">Columns: Creative Name, Format, Notion Link, Status cols, Hook Type, Frame, Language</p>
-            <input id="settingsLibrarySheet" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary" placeholder="Google Sheets URL for Creative Library" />
-          </div>
-          <!-- Collapsible advanced sheets -->
-          <details class="mb-4">
-            <summary class="text-[11px] font-bold text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-primary">Advanced Data Sources ▾</summary>
-            <div class="mt-3 space-y-3 pl-2 border-l-2 border-gray-100">
-              <div>
-                <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Costs Tracker Sheet URL</label>
-                <input id="settingsCostsSheet" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary" placeholder="Google Sheets URL for Costs Tracker" />
-              </div>
-              <div>
-                <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Regional Performance Sheet URL</label>
-                <input id="settingsRegionalSheet" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary" placeholder="Google Sheets URL for Regional Performance" />
-              </div>
-              <div>
-                <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Influencer Organic Performance Sheet URL</label>
-                <input id="settingsInfluencerSheet" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary" placeholder="Google Sheets URL for Influencer organic data" />
-              </div>
-              <div>
-                <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Creator Roster Sheet URL</label>
-                <p class="text-[10px] text-text-muted mb-1.5">Master list of influencer/creator names, handles, statuses</p>
-                <input id="settingsCreatorRosterSheet" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary" placeholder="Google Sheets URL for Creator Roster" />
-              </div>
-            </div>
-          </details>
-          <div class="flex gap-2">
-            <button onclick="saveSheetConfig()" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold">Save & Connect</button>
-            <button onclick="testSheetConnection()" class="btn-secondary px-5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200">Test Connection</button>
-          </div>
+          <div id="testDataSourcePreview" class="hidden"></div>
         </div>
 
         <!-- Meta Ads API -->
@@ -1966,6 +1937,8 @@ function renderDeploymentTracker() {
   html += '</div></div>';
   return html;
 }
+
+const API_KEY = localStorage.getItem('gf_claudeKey') || '';
 
 const DEFAULT_SHEETS = {
   metaUrl: 'https://docs.google.com/spreadsheets/d/11q8zU3mRa1RzD8WSjanRVAzXBXXoiFsZNXo_R4OwbKk/edit?gid=1805066969#gid=1805066969',
@@ -2801,9 +2774,6 @@ window.renderHealthPanel = renderHealthPanel;
 function init() {
   // Free localStorage space — evict recomputable keys on every boot
   EVICTABLE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
-  document.getElementById('settingsMetaSheet').value = state.sheetConfig.metaUrl || '';
-  document.getElementById('settingsCrmSheet').value = state.sheetConfig.crmLeadsUrl || '';
-  document.getElementById('settingsLibrarySheet').value = state.sheetConfig.libraryUrl || '';
   initMetaApiSettings();
   initApiKeySettings();
   document.querySelectorAll('.nav-item').forEach(btn => {
@@ -2828,18 +2798,45 @@ function init() {
       }
     }, 50);
   });
-  // Show loading state while sheets fetch (don't render stale tagger data numbers)
-  if (state.rawData.metaAds || state.taggerData.length) {
+  // ── Section 2 boot: load leads + cost data ──
+  const hasCached = loadCachedData();
+  if (hasCached) {
     document.getElementById('dashboardEmpty').classList.add('hidden');
     document.getElementById('dashboardContent').classList.remove('hidden');
-    document.getElementById('dataTimestamp').textContent = 'Loading fresh data from sheets...';
-    document.getElementById('metricTicker').innerHTML = '<div class="text-center py-8"><div class="w-6 h-6 border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mx-auto mb-2"></div><p class="text-xs text-text-muted">Fetching perf tracker + CRM data...</p></div>';
-  } else {
+    updateDataStatusLine();
+    console.log(`Boot: cache hit — ${leadsData.length} leads, ${costData.length} cost rows`);
+  }
+  // Fetch fresh data if credentials exist (async, non-blocking)
+  const _bootSheetUrl = localStorage.getItem('gf_sheetUrl');
+  const _bootApiKey = localStorage.getItem('gf_googleKey');
+  if (_bootSheetUrl && _bootApiKey) {
+    if (!hasCached) {
+      document.getElementById('dashboardEmpty').classList.add('hidden');
+      document.getElementById('dashboardContent').classList.remove('hidden');
+      document.getElementById('dataTimestamp').textContent = 'Loading data...';
+    }
+    fetchSheetData(_bootSheetUrl, _bootApiKey).then(counts => {
+      console.log(`Boot: fetched ${counts.leads} leads, ${counts.cost} cost rows`);
+      if (costData[0]) console.log('Cost columns:', Object.keys(costData[0]));
+      if (costData[0]) console.log('Cost row 0:', costData[0]);
+      if (leadsData[0]) console.log('Leads columns:', Object.keys(leadsData[0]).slice(0, 20));
+      // Spend diagnostic
+      const _allSpend = costData.reduce((s,r) => s + (parseFloat(r.spend || r.amount_spent) || 0), 0);
+      const _metaSpend = costData.filter(r => (r.medium||'').trim().toLowerCase() === 'meta').reduce((s,r) => s + (parseFloat(r.spend || r.amount_spent) || 0), 0);
+      const _mediums = {}; costData.forEach(r => { const m = (r.medium||'(empty)').trim(); _mediums[m] = (_mediums[m]||0)+1; });
+      console.log('Spend diagnostic — all:', ((_allSpend/10000000).toFixed(2))+'Cr, meta only:', ((_metaSpend/10000000).toFixed(2))+'Cr, mediums:', _mediums);
+      updateDataStatusLine();
+    }).catch(e => {
+      console.error('Boot fetch failed:', e);
+      if (hasCached) updateDataStatusLine(); // show cached status
+      else document.getElementById('dataTimestamp').textContent = 'Load failed — check Settings';
+    });
+  } else if (!hasCached) {
     document.getElementById('dashboardEmpty').classList.remove('hidden');
   }
-  // Always start on Dashboard — refreshData will populate it
+  // Always start on Dashboard
   navigateTo('dashboard');
-  // Fetch data from sheets + Supabase (auto-runs on every boot)
+  // Legacy: fetch tagger/Meta sheet data + Supabase (auto-runs on every boot)
   refreshData();
   if (state.preferences.refreshInterval > 0) {
     setInterval(refreshData, state.preferences.refreshInterval);
@@ -3479,51 +3476,85 @@ async function connectMetaApi() {
   }
 }
 
-// ==================== SHEET CONFIG ====================
-function saveSheetConfig() {
-  const metaUrl = document.getElementById('settingsMetaSheet').value.trim();
-  const crmLeadsUrl = document.getElementById('settingsCrmSheet').value.trim();
-  const libraryUrl = document.getElementById('settingsLibrarySheet').value.trim();
-  const costsTrackerUrl = (document.getElementById('settingsCostsSheet')?.value || '').trim();
-  const regionalUrl = (document.getElementById('settingsRegionalSheet')?.value || '').trim();
-  const influencerUrl = (document.getElementById('settingsInfluencerSheet')?.value || '').trim();
-  const creatorRosterUrl = (document.getElementById('settingsCreatorRosterSheet')?.value || '').trim();
-  state.sheetConfig = { ...state.sheetConfig, metaUrl, crmLeadsUrl, libraryUrl, costsTrackerUrl, regionalUrl, influencerUrl, creatorRosterUrl };
-  localStorage.setItem('gf_sheetConfig', JSON.stringify(state.sheetConfig));
-  showToast('Sheets saved! Connecting...');
-  refreshData();
+// ==================== SHEET CONFIG (Section 2) ====================
+function saveDataSource() {
+  const sheetUrl = document.getElementById('settingsSheetUrl').value.trim();
+  const apiKey = document.getElementById('settingsGoogleApiKey').value.trim();
+  if (!sheetUrl || !apiKey) { showToast('Both Sheet URL and API Key are required'); return; }
+  localStorage.setItem('gf_sheetUrl', sheetUrl);
+  if (!apiKey.includes('...')) localStorage.setItem('gf_googleKey', apiKey);
+  showToast('Saved! Loading data...');
+  fetchSheetData(sheetUrl, localStorage.getItem('gf_googleKey')).then(counts => {
+    showToast(`Loaded ${counts.leads} leads + ${counts.cost} cost rows`);
+    updateDataStatusLine();
+  }).catch(e => showToast('Load failed: ' + e.message));
 }
+
+async function testDataSource() {
+  const sheetUrl = document.getElementById('settingsSheetUrl').value.trim();
+  const apiKey = document.getElementById('settingsGoogleApiKey').value.trim();
+  if (!sheetUrl || !apiKey) { showToast('Enter Sheet URL and API Key first'); return; }
+  const btn = document.getElementById('testDataSourceBtn');
+  const preview = document.getElementById('testDataSourcePreview');
+  btn.disabled = true; btn.textContent = 'Testing...';
+  try {
+    const id = extractSheetId(sheetUrl);
+    if (!id) throw new Error('Invalid Sheet URL');
+    const base = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values`;
+    const [leadsRes, costRes] = await Promise.all([
+      fetch(`${base}/leads!A1:BG6?key=${apiKey}`),
+      fetch(`${base}/cost!A1:H6?key=${apiKey}`)
+    ]);
+    if (!leadsRes.ok) { const e = await leadsRes.json().catch(()=>({})); throw new Error(e.error?.message || `leads tab: ${leadsRes.status}`); }
+    if (!costRes.ok) { const e = await costRes.json().catch(()=>({})); throw new Error(e.error?.message || `cost tab: ${costRes.status}`); }
+    const leadsJson = await leadsRes.json();
+    const costJson = await costRes.json();
+    const leadsRows = leadsJson.values || [];
+    const costRows = costJson.values || [];
+    // Show preview table
+    let html = '<div class="border border-green-200 bg-green-50 rounded-xl p-3 text-xs">';
+    html += '<p class="font-semibold text-green-800 mb-2">Connected successfully</p>';
+    html += renderPreviewTable('leads', leadsRows);
+    html += renderPreviewTable('cost', costRows);
+    html += '</div>';
+    preview.innerHTML = html;
+    preview.classList.remove('hidden');
+    btn.textContent = 'Connected'; btn.disabled = false;
+    setTimeout(() => { btn.textContent = 'Test Connection'; }, 3000);
+  } catch(e) {
+    preview.innerHTML = `<div class="border border-red-200 bg-red-50 rounded-xl p-3 text-xs text-red-800">${e.message}</div>`;
+    preview.classList.remove('hidden');
+    btn.textContent = 'Failed'; btn.disabled = false;
+    setTimeout(() => { btn.textContent = 'Test Connection'; }, 3000);
+  }
+}
+
+function renderPreviewTable(tabName, rows) {
+  if (!rows.length) return `<p class="text-text-muted mt-1">${tabName}: no data</p>`;
+  const headers = rows[0];
+  const dataRows = rows.slice(1);
+  const cols = Math.min(headers.length, 8); // show max 8 columns
+  let html = `<p class="font-semibold mt-2 mb-1">${tabName} tab — ${headers.length} columns, showing first ${dataRows.length} rows</p>`;
+  html += '<div class="overflow-x-auto"><table class="w-full text-[10px] border-collapse">';
+  html += '<tr>' + headers.slice(0, cols).map(h => `<th class="border border-gray-200 bg-gray-100 px-1.5 py-1 text-left font-semibold">${h}</th>`).join('') + (headers.length > cols ? '<th class="border border-gray-200 bg-gray-100 px-1.5 py-1 text-text-muted">+' + (headers.length - cols) + ' more</th>' : '') + '</tr>';
+  dataRows.forEach(row => {
+    html += '<tr>' + row.slice(0, cols).map(v => `<td class="border border-gray-200 px-1.5 py-0.5">${(v||'').substring(0, 30)}</td>`).join('') + (headers.length > cols ? '<td class="border border-gray-200 px-1.5 py-0.5 text-text-muted">...</td>' : '') + '</tr>';
+  });
+  html += '</table></div>';
+  return html;
+}
+
 function loadSettingsFields() {
-  const c = state.sheetConfig || {};
   const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-  set('settingsMetaSheet', c.metaUrl);
-  set('settingsCrmSheet', c.crmLeadsUrl);
-  set('settingsLibrarySheet', c.libraryUrl);
-  set('settingsCostsSheet', c.costsTrackerUrl);
-  set('settingsRegionalSheet', c.regionalUrl);
-  set('settingsInfluencerSheet', c.influencerUrl);
-  set('settingsCreatorRosterSheet', c.creatorRosterUrl);
+  set('settingsSheetUrl', localStorage.getItem('gf_sheetUrl'));
+  const gk = localStorage.getItem('gf_googleKey');
+  if (gk) set('settingsGoogleApiKey', gk.substring(0, 10) + '...');
   // API keys
   set('settingsClaudeKey', API_KEY);
   set('settingsGeminiKey', GEMINI_KEY);
   set('settingsSupabaseUrl', SUPABASE_URL);
   set('settingsSupabaseKey', SUPABASE_KEY);
   set('settingsMetaToken', META_API_TOKEN);
-}
-async function testSheetConnection() {
-  const url = document.getElementById('settingsMetaSheet').value;
-  if (!url) { showToast('Enter a Google Sheets URL first'); return; }
-  const btn = document.querySelector('[onclick="testSheetConnection()"]');
-  if (btn) { btn.disabled = true; btn.textContent = 'Testing...'; }
-  try {
-    const text = await fetchSheetAsCsv(url);
-    const rows = parseCSV(text);
-    showToast(`Connected! Found ${rows.length} rows and ${Object.keys(rows[0]||{}).length} columns.`);
-    if (btn) { btn.textContent = 'Connected'; btn.classList.add('text-accent-green'); setTimeout(() => { btn.textContent = 'Test Connection'; btn.classList.remove('text-accent-green'); btn.disabled = false; }, 2000); }
-  } catch(e) {
-    showToast('Connection failed: ' + e.message);
-    if (btn) { btn.textContent = 'Failed'; btn.classList.add('text-accent-red'); setTimeout(() => { btn.textContent = 'Test Connection'; btn.classList.remove('text-accent-red'); btn.disabled = false; }, 2000); }
-  }
 }
 
 function parseSheetUrl(url) {
@@ -3581,9 +3612,9 @@ async function fetchSheetData(sheetUrl, apiKey) {
   leadsData = parseSheetValues(leadsJson.values);
   costData = parseSheetValues(costJson.values);
 
-  // Cache with timestamp
-  localStorage.setItem('gf_leadsData', JSON.stringify(leadsData));
-  localStorage.setItem('gf_costData', JSON.stringify(costData));
+  // Cache with timestamp — leads may exceed quota, that's OK (fetched fresh each session)
+  try { localStorage.setItem('gf_leadsData', JSON.stringify(leadsData)); } catch(e) { console.warn('leadsData too large to cache:', e.message); }
+  try { localStorage.setItem('gf_costData', JSON.stringify(costData)); } catch(e) { console.warn('costData too large to cache:', e.message); }
   localStorage.setItem('gf_dataTimestamp', Date.now().toString());
 
   return { leads: leadsData.length, cost: costData.length };
@@ -3605,6 +3636,18 @@ function getDataTimestamp() {
   const ts = parseInt(localStorage.getItem('gf_dataTimestamp') || '0');
   if (!ts) return null;
   return new Date(ts);
+}
+
+function updateDataStatusLine() {
+  const el = document.getElementById('dataTimestamp');
+  if (!el) return;
+  const ts = getDataTimestamp();
+  if (!ts && !leadsData.length) {
+    el.textContent = 'No data loaded';
+    return;
+  }
+  const time = ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  el.textContent = `${leadsData.length} leads · ${costData.length} cost rows · loaded ${time}`;
 }
 
 // ── Market filter helpers ──
