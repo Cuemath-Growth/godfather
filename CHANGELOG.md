@@ -4,6 +4,57 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Section 2: Data Layer Rebuild (2026-03-31)
+
+### Settings simplification
+- Replaced 7 Google Sheets URL inputs with single Sheet URL + Google API Key
+- Test Connection button fetches first 5 rows from leads + cost tabs, shows preview table
+- Stored in gf_sheetUrl + gf_googleKey in localStorage
+
+### Boot sequence + data loading
+- loadCachedData() runs first for instant render from slim cache
+- fetchSheetData() runs async in background, re-renders on completion
+- Slim cache: only 16 metric fields cached (~500KB vs ~10MB full leads)
+- Cache keys renamed to gf_v2_* to bust stale data; old keys purged on boot
+- Status line: "X leads · Y cost rows · loaded HH:MM"
+- Loading spinner guards KPI cards and Oracle cards while data loads
+
+### Metric functions (all read from leadsData + costData arrays)
+- getSpend(market, start, end, medium='meta') — filters cost tab to meta-only
+- getQL, getTQL, getTD_snapshot, getTD_cohort, getTS, getEnrolled, getRevenue, getInvalid, getNRI, getAsian
+- getTQL: per-market logic — NRI for US, IB/IGCSE for India/ME, all for APAC/UK. Handles "all geo" with per-row dispatch.
+- getMarketMetrics() — returns all metrics as one object with derived ratios
+- getCampaignBreakdown, getAdBreakdown — group by mx_utm_campaign / mx_utm_adcontent
+- Leads filtered to meta-only at load time (matches old CRM "select * where G='meta'")
+
+### Dashboard KPI cards rewired to Section 2
+- Hero row: CPTD + Trials Done (was CPTD + ROAS)
+- CPTD card subtitle: format CPTD from tagger data (e.g. "Video ₹38K · Static ₹45K")
+- Secondary row: Spend, CPTQL, QL→TD%, Enrolled (was Spend, TQLs, CPTQL, Enrolled)
+- Regional cards: per-geo metrics from getMarketMetrics()
+- Prior-period comparison: all from getMarketMetrics() (was getOracleMetrics + getCRMPortfolioTotals)
+- ROAS card removed
+- Funnel visualization uses Section 2 data
+
+### Oracle Pause Now + Make More
+- Pause Now: getAdBreakdown() where spend > ₹50K AND TD = 0, sorted by spend descending
+- Make More: getCampaignBreakdown() top 5 by CPTD where TD >= 3
+- Section-level dropdown menu (... button): Mark all done, Dismiss all, Snooze all 7d, Reset
+- Per-card: thumbnail from tagger data, campaign name (40 char), spend/QLs/TDs
+- Top offender gets red-50 background, rest neutral white
+- Action states persisted to Supabase oracle_actions table
+- Dismissed items hidden, snoozed hidden until date passes, done items greyed out
+
+### Bug fixes
+- Restored missing API_KEY declaration (dropped in Cloudflare migration)
+- Fixed getTQL returning all QLs for "all geo" (was falling through to rows.length)
+- Fixed ethnicity matching: case-insensitive includes('nri') instead of exact === 'NRI'
+- Fixed localStorage quota exceeded: slim cache with metric-only fields
+- Stale tagger numbers blocked: spinner shows until Section 2 data loads
+- Old v1 cache keys purged on every boot
+
+---
+
 ## Meta API Fix — GitHub Pages proxy routing (2026-03-30)
 
 ## Creative Review — New Landing View for Tagger (2026-03-30)
