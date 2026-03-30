@@ -2772,8 +2772,9 @@ window.renderHealthPanel = renderHealthPanel;
 
 // ==================== INIT ====================
 function init() {
-  // Free localStorage space — evict recomputable keys on every boot
+  // Free localStorage space — evict recomputable keys + stale v1 cache on every boot
   EVICTABLE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
+  ['gf_leadsData','gf_costData','gf_dataTimestamp'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
   initMetaApiSettings();
   initApiKeySettings();
   document.querySelectorAll('.nav-item').forEach(btn => {
