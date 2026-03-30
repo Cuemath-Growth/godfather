@@ -3534,7 +3534,328 @@ function parseSheetUrl(url) {
   return { id: match[1], gid: gidMatch ? gidMatch[1] : '0' };
 }
 
-// ==================== DATA FETCHING ====================
+// ==================== SECTION 2: NEW DATA LAYER ====================
+// Two source arrays — all metrics compute from these, never from derived sheets
+let leadsData = [];  // leads!A:BG — one row per lead
+let costData = [];   // cost!A:H — one row per day/market/campaign
+
+function extractSheetId(url) {
+  if (!url) return null;
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+
+function parseSheetValues(values) {
+  if (!values || values.length < 2) return [];
+  const headers = values[0];
+  return values.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
+    return obj;
+  });
+}
+
+async function fetchSheetData(sheetUrl, apiKey) {
+  const id = extractSheetId(sheetUrl);
+  if (!id) throw new Error('Invalid Google Sheet URL — could not extract spreadsheet ID');
+  if (!apiKey) throw new Error('Google API Key is required');
+
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values`;
+  const [leadsRes, costRes] = await Promise.all([
+    fetch(`${base}/leads!A:BG?key=${apiKey}`),
+    fetch(`${base}/cost!A:H?key=${apiKey}`)
+  ]);
+
+  if (!leadsRes.ok) {
+    const err = await leadsRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Leads tab failed: ${leadsRes.status}`);
+  }
+  if (!costRes.ok) {
+    const err = await costRes.json().catch(() => ({}));
+    throw new Error(err.error?.message || `Cost tab failed: ${costRes.status}`);
+  }
+
+  const leadsJson = await leadsRes.json();
+  const costJson = await costRes.json();
+
+  leadsData = parseSheetValues(leadsJson.values);
+  costData = parseSheetValues(costJson.values);
+
+  // Cache with timestamp
+  localStorage.setItem('gf_leadsData', JSON.stringify(leadsData));
+  localStorage.setItem('gf_costData', JSON.stringify(costData));
+  localStorage.setItem('gf_dataTimestamp', Date.now().toString());
+
+  return { leads: leadsData.length, cost: costData.length };
+}
+
+function loadCachedData() {
+  const ts = parseInt(localStorage.getItem('gf_dataTimestamp') || '0');
+  const age = Date.now() - ts;
+  const SIX_HOURS = 6 * 60 * 60 * 1000;
+  if (age > SIX_HOURS) return false;
+  try {
+    leadsData = JSON.parse(localStorage.getItem('gf_leadsData') || '[]');
+    costData = JSON.parse(localStorage.getItem('gf_costData') || '[]');
+    return leadsData.length > 0;
+  } catch { return false; }
+}
+
+function getDataTimestamp() {
+  const ts = parseInt(localStorage.getItem('gf_dataTimestamp') || '0');
+  if (!ts) return null;
+  return new Date(ts);
+}
+
+// ── Market filter helpers ──
+function filterLeadsByMarket(data, market) {
+  if (!market || market === 'all') return data;
+  return data.filter(r => (r.country_bucket || '').trim() === market);
+}
+
+function filterCostByMarket(data, market) {
+  if (!market || market === 'all') return data;
+  return data.filter(r => (r.country_segment || '').trim() === market);
+}
+
+// ── Metric primitives — each filters the in-memory arrays directly ──
+
+function getSpend(market, startDate, endDate) {
+  let rows = filterCostByMarket(costData, market);
+  rows = rows.filter(r => {
+    const day = r.day || '';
+    if (startDate && day < startDate) return false;
+    if (endDate && day > endDate) return false;
+    return true;
+  });
+  return rows.reduce((sum, r) => sum + (parseFloat(r.amount_spent) || 0), 0);
+}
+
+function getQL(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.qls) === '1';
+  }).length;
+}
+
+function getTQL(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  rows = rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.qls) === '1';
+  });
+  // Market-specific TQL definitions
+  if (market === 'US') return rows.filter(r => (r.ethnicity || '').trim() === 'NRI').length;
+  if (market === 'India') return rows.filter(r => ['IB', 'IGCSE'].includes((r['board (ME)'] || '').trim())).length;
+  if (market === 'ME') return rows.filter(r => ['IB', 'IGCSE'].includes((r['board (ME)'] || '').trim())).length;
+  // APAC, UK: TQL = QL
+  return rows.length;
+}
+
+function getTD_snapshot(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.trial_done_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.trials_done) === '1';
+  }).length;
+}
+
+function getTD_cohort(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.trials_done) === '1';
+  }).length;
+}
+
+function getTS(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.trial_sch_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.trials_sch) === '1';
+  }).length;
+}
+
+function getEnrolled(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.paid_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.paid) === '1';
+  }).length;
+}
+
+function getRevenue(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  rows = rows.filter(r => {
+    const d = r.paid_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.paid) === '1';
+  });
+  // Revenue in sheet is in lakhs — multiply by 100000
+  return rows.reduce((sum, r) => sum + ((parseFloat(r.revenue) || 0) * 100000), 0);
+}
+
+function getInvalid(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    return String(r.invalid) === '1';
+  }).length;
+}
+
+// ── Derived metrics — never divide by zero, return null ──
+
+function safeDivide(num, den) { return den > 0 ? num / den : null; }
+
+function getMarketMetrics(market, startDate, endDate) {
+  const spend = getSpend(market, startDate, endDate);
+  const ql = getQL(market, startDate, endDate);
+  const tql = getTQL(market, startDate, endDate);
+  const td_snap = getTD_snapshot(market, startDate, endDate);
+  const td_cohort = getTD_cohort(market, startDate, endDate);
+  const ts = getTS(market, startDate, endDate);
+  const enrolled = getEnrolled(market, startDate, endDate);
+  const revenue = getRevenue(market, startDate, endDate);
+  const invalid = getInvalid(market, startDate, endDate);
+
+  return {
+    spend, ql, tql, td: td_snap, td_cohort, ts, enrolled, revenue, invalid,
+    cpql: safeDivide(spend, ql),
+    cptql: safeDivide(spend, tql),
+    cptd: safeDivide(spend, td_snap),
+    ql_td_pct: safeDivide(td_cohort, ql),    // cohort, not snapshot
+    ts_td_pct: safeDivide(td_snap, ts),
+    t2p_pct: safeDivide(enrolled, td_snap),
+    cac: safeDivide(spend, enrolled),
+    roas: safeDivide(revenue, spend),
+    invalid_pct: safeDivide(invalid, ql),
+  };
+}
+
+// ── Campaign-level breakdown ──
+
+function getCampaignBreakdown(market, startDate, endDate) {
+  // Group leads by mx_utm_campaign
+  let leads = filterLeadsByMarket(leadsData, market);
+  const campaigns = {};
+  leads.forEach(r => {
+    const camp = r.mx_utm_campaign || '';
+    if (!camp) return;
+    if (!campaigns[camp]) campaigns[camp] = { name: camp, rows: [] };
+    campaigns[camp].rows.push(r);
+  });
+
+  return Object.values(campaigns).map(c => {
+    const inRange = r => {
+      const d = r.lead_created_date || '';
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate);
+    };
+    const inRangeRows = c.rows.filter(inRange);
+    const ql = inRangeRows.filter(r => String(r.qls) === '1').length;
+    const td_cohort = inRangeRows.filter(r => String(r.trials_done) === '1').length;
+    const td_snap = c.rows.filter(r => {
+      const d = r.trial_done_date || '';
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.trials_done) === '1';
+    }).length;
+    const enrolled = c.rows.filter(r => {
+      const d = r.paid_date || '';
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
+    }).length;
+
+    // Spend from costData where campaign_name matches
+    const spend = costData.filter(r => {
+      if (market && market !== 'all' && (r.country_segment || '').trim() !== market) return false;
+      const day = r.day || '';
+      if (startDate && day < startDate) return false;
+      if (endDate && day > endDate) return false;
+      return (r.campaign_name || '') === c.name;
+    }).reduce((sum, r) => sum + (parseFloat(r.amount_spent) || 0), 0);
+
+    return {
+      name: c.name, spend, ql, td: td_snap, td_cohort, enrolled,
+      cptd: safeDivide(spend, td_snap),
+      cpql: safeDivide(spend, ql),
+      ql_td_pct: safeDivide(td_cohort, ql),
+    };
+  });
+}
+
+function getAdBreakdown(market, startDate, endDate) {
+  let leads = filterLeadsByMarket(leadsData, market);
+  const ads = {};
+  leads.forEach(r => {
+    const ad = r.mx_utm_adcontent || '';
+    if (!ad) return;
+    if (!ads[ad]) ads[ad] = { name: ad, rows: [] };
+    ads[ad].rows.push(r);
+  });
+
+  return Object.values(ads).map(a => {
+    const inRange = r => {
+      const d = r.lead_created_date || '';
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate);
+    };
+    const inRangeRows = a.rows.filter(inRange);
+    const ql = inRangeRows.filter(r => String(r.qls) === '1').length;
+    const td_snap = a.rows.filter(r => {
+      const d = r.trial_done_date || '';
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.trials_done) === '1';
+    }).length;
+    const enrolled = a.rows.filter(r => {
+      const d = r.paid_date || '';
+      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
+    }).length;
+
+    // Spend: sum costData where campaign matches any campaign this ad appeared in
+    const campNames = new Set(a.rows.map(r => r.mx_utm_campaign).filter(Boolean));
+    const spend = costData.filter(r => {
+      if (market && market !== 'all' && (r.country_segment || '').trim() !== market) return false;
+      const day = r.day || '';
+      if (startDate && day < startDate) return false;
+      if (endDate && day > endDate) return false;
+      return campNames.has(r.campaign_name || '');
+    }).reduce((sum, r) => sum + (parseFloat(r.amount_spent) || 0), 0);
+
+    // Ad-level spend is proportional: this ad's QLs / campaign total QLs * campaign spend
+    // This avoids attributing full campaign spend to every ad
+    const totalCampQLs = leads.filter(r => campNames.has(r.mx_utm_campaign) && inRange(r) && String(r.qls) === '1').length;
+    const adSpend = totalCampQLs > 0 ? spend * (ql / totalCampQLs) : (ql > 0 ? spend / campNames.size : 0);
+
+    return {
+      name: a.name, spend: adSpend, ql, td: td_snap, enrolled,
+      cptd: safeDivide(adSpend, td_snap),
+      cpql: safeDivide(adSpend, ql),
+    };
+  });
+}
+
+// ── Format helpers for display ──
+function fmtMetric(val, prefix, suffix) {
+  if (val === null || val === undefined) return '—';
+  if (prefix === '₹') return formatCurrency(val);
+  if (suffix === '%') return (val * 100).toFixed(1) + '%';
+  if (suffix === 'x') return val.toFixed(2) + 'x';
+  return Math.round(val).toLocaleString();
+}
+
+// ==================== SECTION2_DEPRECATED: OLD DATA FETCHING ====================
+/* SECTION2_DEPRECATED — old CSV-based sheet fetching, replaced by Sheets API JSON
 async function fetchSheetAsCsv(url, tq) {
   const info = parseSheetUrl(url);
   if (!info) throw new Error('Invalid sheet URL');
@@ -3544,6 +3865,9 @@ async function fetchSheetAsCsv(url, tq) {
   if (!resp.ok) throw new Error(`Sheet fetch failed: ${resp.status}`);
   return await resp.text();
 }
+SECTION2_DEPRECATED */
+// Keep parseCSV for now — still used by refreshData until fully rewired
+
 
 function parseCSV(text) {
   const lines = [];
