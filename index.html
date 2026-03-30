@@ -800,10 +800,10 @@
           </div>
 
           <!-- Section Tabs -->
-          <!-- Global country filter (applies to all tabs) -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1 flex-wrap">
-              <button class="pill-btn active px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="table" onclick="switchTaggerTab('table')">Creatives</button>
+              <button class="pill-btn active px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="review" onclick="switchTaggerTab('review')">Creative Review</button>
+              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="table" onclick="switchTaggerTab('table')">Data Table</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="heatmap" onclick="switchTaggerTab('heatmap')">Heatmap</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="combos" onclick="switchTaggerTab('combos')">Combos</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="grid" onclick="switchTaggerTab('grid')">Grid</button>
@@ -813,8 +813,13 @@
             </select>
           </div>
 
+          <!-- Tab: Creative Review (Landing View) -->
+          <div id="taggerTab-review" class="tagger-tab">
+            <div id="creativeReviewContent"></div>
+          </div>
+
           <!-- Tab: Creatives Table -->
-          <div id="taggerTab-table" class="tagger-tab">
+          <div id="taggerTab-table" class="tagger-tab hidden">
             <!-- View Level Toggle + Filter Bar -->
             <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
               <!-- Row 1: View level + verdict summary -->
@@ -9742,8 +9747,9 @@ function switchTaggerTab(tab) {
   renderActiveTaggerTab(tab);
 }
 function renderActiveTaggerTab(tab) {
-  if (!tab) tab = document.querySelector('[data-tagger-tab].active')?.dataset.taggerTab || 'table';
-  if (tab === 'table') renderTaggerTable();
+  if (!tab) tab = document.querySelector('[data-tagger-tab].active')?.dataset.taggerTab || 'review';
+  if (tab === 'review') renderCreativeReview();
+  else if (tab === 'table') renderTaggerTable();
   else if (tab === 'heatmap') renderTaggerHeatmap();
   else if (tab === 'combos') renderTagCombos();
   else if (tab === 'grid') renderCreativeGrid();
@@ -9848,6 +9854,279 @@ function renderTaggerInsights() {
       <p class="text-[10px] text-text-muted mt-2">${ins.metricLabel}: "${tagLabel(ins.best)}" (${ins.bestCount} ads) costs ${savingsLabel} than "${tagLabel(ins.worst)}" (${ins.worstCount} ads)</p>
     </div>`;
   });
+}
+
+// ==================== CREATIVE REVIEW (Landing View) ====================
+// Designed for: graphic designers, video editors, copy writers, content heads, performance team, HOD
+// Answers: what went live, how is it doing, what's working as a pattern, what to make next
+
+function renderCreativeReview() {
+  const container = document.getElementById('creativeReviewContent');
+  if (!container) return;
+  const data = [...getFilteredTaggerData()]; // Uses global date + geo filters
+  if (!data.length) { container.innerHTML = '<div class="text-center py-12 text-text-muted">No creative data loaded. Pull from Meta API or connect Google Sheets in Settings.</div>'; return; }
+
+  const { from, to } = getGlobalDateRange();
+  const periodLabel = from && to ? `${from} to ${to}` : from ? `From ${from}` : to ? `Until ${to}` : 'All Time';
+
+  // ── Compute benchmarks per market ──
+  const benchmarks = {};
+  data.forEach(c => {
+    const mkt = extractMarket(c) || 'US';
+    if (!benchmarks[mkt]) benchmarks[mkt] = { spend: 0, clicks: 0, imp: 0, ql: 0, td: 0, count: 0 };
+    const b = benchmarks[mkt];
+    b.spend += parseNumber(c['Spent']||0); b.clicks += parseNumber(c['Clicks']||0);
+    b.imp += parseNumber(c['Impressions']||0); b.ql += parseNumber(c['QL']||0);
+    b.td += parseNumber(c['TD']||0); b.count++;
+  });
+  Object.values(benchmarks).forEach(b => {
+    b.avgCTR = b.imp > 0 ? (b.clicks/b.imp*100) : 0;
+    b.avgCPC = b.clicks > 0 ? b.spend/b.clicks : 0;
+    b.avgClickQL = b.clicks > 0 ? (b.ql/b.clicks*100) : 0;
+    b.avgCPTD = b.td > 0 ? b.spend/b.td : 0;
+  });
+
+  // ── Classify all creatives ──
+  const verdicts = data.map(c => ({ c, v: getCreativeVerdict(c) }));
+  const scale = verdicts.filter(x => x.v.key === 'scale').sort((a,b) => parseNumber(b.c['TD']||0) - parseNumber(a.c['TD']||0));
+  const working = verdicts.filter(x => x.v.key === 'working').sort((a,b) => parseNumber(b.c['TD']||0) - parseNumber(a.c['TD']||0));
+  const fatigued = verdicts.filter(x => x.v.key === 'fatigued').sort((a,b) => parseNumber(b.c['Spent']||0) - parseNumber(a.c['Spent']||0));
+  const pause = verdicts.filter(x => x.v.key === 'pause').sort((a,b) => parseNumber(b.c['Spent']||0) - parseNumber(a.c['Spent']||0));
+  const watch = verdicts.filter(x => x.v.key === 'watch');
+  const newAds = verdicts.filter(x => x.v.key === 'new');
+
+  // ── Tag performance aggregation ──
+  const tagPerf = {}; // { hook_type: { 'Parent testimonial': { spend, ql, td, clicks, imp, count } } }
+  const TAG_DIMS = ['hook_type', 'format', 'icp_target', 'segment', 'emotional_tone'];
+  const TAG_DIM_LABELS = { hook_type: 'Hook', format: 'Format', icp_target: 'Audience', segment: 'Segment', emotional_tone: 'Tone' };
+  data.forEach(c => {
+    const tags = c.tags || {};
+    TAG_DIMS.forEach(dim => {
+      const val = tags[dim];
+      if (!val || val === 'Unknown' || val === 'N/A' || val === 'null') return;
+      if (!tagPerf[dim]) tagPerf[dim] = {};
+      if (!tagPerf[dim][val]) tagPerf[dim][val] = { spend: 0, ql: 0, td: 0, clicks: 0, imp: 0, count: 0 };
+      const t = tagPerf[dim][val];
+      t.spend += parseNumber(c['Spent']||0); t.ql += parseNumber(c['QL']||0); t.td += parseNumber(c['TD']||0);
+      t.clicks += parseNumber(c['Clicks']||0); t.imp += parseNumber(c['Impressions']||0); t.count++;
+    });
+  });
+
+  // ── Helper: render a creative card ──
+  function creativeCard(c, v, showBenchmark) {
+    const name = c['Ad name'] || c['ad name'] || 'Unknown';
+    const spend = parseNumber(c['Spent']||0);
+    const ql = parseNumber(c['QL']||0);
+    const td = parseNumber(c['TD']||0);
+    const imp = parseNumber(c['Impressions']||0);
+    const clicks = parseNumber(c['Clicks']||0);
+    const ctr = imp > 0 ? (clicks/imp*100) : 0;
+    const cpc = clicks > 0 ? spend/clicks : 0;
+    const clickQL = clicks > 0 ? (ql/clicks*100) : 0;
+    const cptd = td >= 1 ? spend/td : 0;
+    const mkt = extractMarket(c) || 'US';
+    const b = benchmarks[mkt] || {};
+    const type = c['Creative type'] || 'Unknown';
+    const thumb = c['image_url'] || c['thumbnail_url'] || '';
+    const campaign = c['Campaign name'] || c['campaign name'] || '';
+    const tags = c.tags || {};
+    const hookTag = tags.hook_type && tags.hook_type !== 'Unknown' ? tags.hook_type : '';
+    const audTag = tags.icp_target && tags.icp_target !== 'Unknown' ? tags.icp_target : '';
+
+    const vColors = { green: 'border-green-300 bg-green-50', amber: 'border-amber-300 bg-amber-50', red: 'border-red-300 bg-red-50', gray: 'border-gray-200 bg-gray-50' };
+    const vBadge = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700', gray: 'bg-gray-100 text-gray-500' };
+
+    // Comparison arrows vs benchmark
+    const cmp = (val, bench, lower) => {
+      if (!bench || !val) return '';
+      const pct = ((val - bench) / bench * 100);
+      if (Math.abs(pct) < 5) return '<span class="text-gray-400 text-[9px]">≈ avg</span>';
+      if (lower) return pct < 0 ? `<span class="text-green-600 text-[9px]">▼${Math.abs(pct).toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]">▲${pct.toFixed(0)}%</span>`;
+      return pct > 0 ? `<span class="text-green-600 text-[9px]">▲${pct.toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]">▼${Math.abs(pct).toFixed(0)}%</span>`;
+    };
+
+    return `<div class="border rounded-xl p-3 ${vColors[v.color]} transition hover:shadow-md">
+      <div class="flex items-start gap-3">
+        ${thumb ? `<img src="${thumb}" class="w-14 h-14 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : `<div class="w-14 h-14 rounded-lg bg-white border border-dashed border-gray-300 flex items-center justify-center shrink-0"><span class="text-[10px] text-gray-400">${type === 'Video' ? '▶' : '□'}</span></div>`}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${vBadge[v.color]}">${v.label}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium ${type==='Video' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${type}</span>
+            <span class="text-[10px] text-text-muted">${mkt}</span>
+          </div>
+          <p class="text-[11px] font-semibold leading-tight mb-1 truncate" title="${name}">${shortAdName(name)}</p>
+          <p class="text-[10px] text-text-secondary leading-snug mb-2">${v.reason}</p>
+          ${hookTag || audTag ? `<div class="flex gap-1 mb-2">${hookTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-medium">${tagLabel(hookTag)}</span>` : ''}${audTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-medium">${tagLabel(audTag)}</span>` : ''}</div>` : ''}
+          <div class="grid grid-cols-4 gap-2 text-[10px]">
+            <div><span class="text-text-muted block">CTR</span><span class="font-bold ${ctr > 1.5 ? 'text-green-700' : ctr > 0 ? '' : 'text-text-muted'}">${ctr > 0 ? ctr.toFixed(2)+'%' : '—'}</span>${showBenchmark ? ` ${cmp(ctr, b.avgCTR, false)}` : ''}</div>
+            <div><span class="text-text-muted block">CPC</span><span class="font-bold">${cpc > 0 ? formatCurrency(cpc) : '—'}</span>${showBenchmark ? ` ${cmp(cpc, b.avgCPC, true)}` : ''}</div>
+            <div><span class="text-text-muted block">Click→QL</span><span class="font-bold ${clickQL > 3 ? 'text-green-700' : ''}">${clickQL > 0 ? clickQL.toFixed(1)+'%' : '—'}</span>${showBenchmark ? ` ${cmp(clickQL, b.avgClickQL, false)}` : ''}</div>
+            <div><span class="text-text-muted block">CPTD</span><span class="font-bold ${cptd > 0 ? (cptd < 40000 ? 'text-green-700' : cptd < 70000 ? 'text-amber-600' : 'text-red-600') : 'text-text-muted'}">${cptd > 0 ? formatCurrency(cptd) : '—'}</span>${showBenchmark && cptd > 0 ? ` ${cmp(cptd, b.avgCPTD, true)}` : ''}</div>
+          </div>
+          <div class="flex gap-3 mt-1.5 text-[9px] text-text-muted">
+            <span>Spend: ${formatCurrency(spend)}</span>
+            <span>${Math.round(ql)} QLs</span>
+            <span>${Math.round(td)} TDs</span>
+          </div>
+        </div>
+      </div>
+      ${campaign ? `<p class="text-[9px] text-text-muted mt-2 truncate" title="${campaign}">Campaign: ${campaign.length > 60 ? campaign.slice(0,57)+'...' : campaign}</p>` : ''}
+    </div>`;
+  }
+
+  // ── SECTION 1: Portfolio Snapshot ──
+  const totalSpend = data.reduce((s,c) => s + parseNumber(c['Spent']||0), 0);
+  const totalQL = data.reduce((s,c) => s + parseNumber(c['QL']||0), 0);
+  const totalTD = data.reduce((s,c) => s + parseNumber(c['TD']||0), 0);
+  const totalClicks = data.reduce((s,c) => s + parseNumber(c['Clicks']||0), 0);
+  const totalImp = data.reduce((s,c) => s + parseNumber(c['Impressions']||0), 0);
+  const portfolioCTR = totalImp > 0 ? (totalClicks/totalImp*100) : 0;
+  const portfolioCPTD = totalTD > 0 ? totalSpend/totalTD : 0;
+
+  let html = `
+    <div class="mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-bold">Creative Performance — ${periodLabel}</h3>
+        <span class="text-xs text-text-muted">${data.length} creatives</span>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mb-4">
+        <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+          <div class="text-[10px] text-text-muted mb-1">Total Spend</div>
+          <div class="text-sm font-bold">${formatCurrency(totalSpend)}</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+          <div class="text-[10px] text-text-muted mb-1">Portfolio CTR</div>
+          <div class="text-sm font-bold ${portfolioCTR > 1.5 ? 'text-green-700' : ''}">${portfolioCTR.toFixed(2)}%</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
+          <div class="text-[10px] text-text-muted mb-1">Avg CPTD</div>
+          <div class="text-sm font-bold ${portfolioCPTD < 40000 ? 'text-green-700' : portfolioCPTD < 70000 ? 'text-amber-600' : 'text-red-600'}">${formatCurrency(portfolioCPTD)}</div>
+        </div>
+        <div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center">
+          <div class="text-[10px] text-green-700 mb-1">Scale + Working</div>
+          <div class="text-sm font-bold text-green-700">${scale.length + working.length}</div>
+        </div>
+        <div class="bg-amber-50 rounded-xl border border-amber-200 p-3 text-center">
+          <div class="text-[10px] text-amber-700 mb-1">Watch + Fatigued</div>
+          <div class="text-sm font-bold text-amber-700">${watch.length + fatigued.length}</div>
+        </div>
+        <div class="bg-red-50 rounded-xl border border-red-200 p-3 text-center">
+          <div class="text-[10px] text-red-700 mb-1">Pause</div>
+          <div class="text-sm font-bold text-red-700">${pause.length}</div>
+        </div>
+      </div>
+    </div>`;
+
+  // ── SECTION 2: Scale These (Top Performers) ──
+  if (scale.length + working.length > 0) {
+    const winners = [...scale, ...working].slice(0, 6);
+    html += `<div class="mb-6">
+      <h3 class="text-base font-bold mb-1 text-green-800">✓ Scale These — Proven Winners</h3>
+      <p class="text-xs text-text-muted mb-3">These creatives are converting well. Make more like them or increase their budget.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        ${winners.map(x => creativeCard(x.c, x.v, true)).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── SECTION 3: Pause / Refresh These ──
+  if (pause.length + fatigued.length > 0) {
+    const losers = [...pause, ...fatigued].slice(0, 6);
+    html += `<div class="mb-6">
+      <h3 class="text-base font-bold mb-1 text-red-800">✗ Pause or Refresh — Underperforming</h3>
+      <p class="text-xs text-text-muted mb-3">These creatives are burning budget without converting. Pause or create new variants.</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        ${losers.map(x => creativeCard(x.c, x.v, true)).join('')}
+      </div>
+    </div>`;
+  }
+
+  // ── SECTION 4: What Tags Work — Cumulative Performance ──
+  html += `<div class="mb-6">
+    <h3 class="text-base font-bold mb-1">What's Working — Tag Performance</h3>
+    <p class="text-xs text-text-muted mb-3">Cumulative performance by creative tag. Green = below average CPTD (good). Red = above (bad). Use this to plan next week's assets.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
+
+  TAG_DIMS.forEach(dim => {
+    const dimData = tagPerf[dim];
+    if (!dimData) return;
+    const entries = Object.entries(dimData)
+      .map(([tag, t]) => ({ tag, ...t, cptd: t.td >= 2 ? t.spend/t.td : 0, ctr: t.imp > 0 ? t.clicks/t.imp*100 : 0, clickQL: t.clicks > 0 ? t.ql/t.clicks*100 : 0 }))
+      .filter(e => e.count >= 3)
+      .sort((a, b) => {
+        if (a.td >= 2 && b.td >= 2) return a.cptd - b.cptd;
+        if (a.td >= 2) return -1;
+        if (b.td >= 2) return 1;
+        return b.ql - a.ql;
+      });
+    if (!entries.length) return;
+
+    html += `<div class="bg-white rounded-xl border border-gray-200 p-3">
+      <h4 class="text-xs font-bold mb-2 text-text-muted uppercase tracking-wider">${TAG_DIM_LABELS[dim] || dim}</h4>
+      <div class="space-y-1.5">`;
+    entries.slice(0, 6).forEach((e, i) => {
+      const isGood = e.cptd > 0 && e.cptd < portfolioCPTD;
+      const barColor = e.td >= 2 ? (isGood ? 'bg-green-400' : 'bg-red-400') : 'bg-gray-300';
+      const maxSpend = Math.max(...entries.map(x => x.spend));
+      const barW = maxSpend > 0 ? Math.max(e.spend / maxSpend * 100, 8) : 8;
+      html += `<div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium w-28 truncate" title="${e.tag}">${tagLabel(e.tag)}</span>
+        <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden relative">
+          <div class="${barColor} h-full rounded-full" style="width:${barW}%"></div>
+          <span class="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700">${e.count} ads · ${e.td} TDs${e.cptd > 0 ? ' · CPTD ' + formatCurrency(e.cptd) : ''}</span>
+        </div>
+        <span class="text-[9px] w-12 text-right ${e.ctr > 1.5 ? 'text-green-700 font-bold' : 'text-text-muted'}">${e.ctr > 0 ? e.ctr.toFixed(1)+'%' : '—'}</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+  html += `</div></div>`;
+
+  // ── SECTION 5: Next Week Recommendations ──
+  html += `<div class="mb-6">
+    <h3 class="text-base font-bold mb-1">Recommended Next — What to Build</h3>
+    <p class="text-xs text-text-muted mb-3">Based on tag patterns from winners vs losers.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">`;
+
+  // Find winning tag patterns
+  const winnerTags = {};
+  const loserTags = {};
+  [...scale, ...working].forEach(x => {
+    const tags = x.c.tags || {};
+    TAG_DIMS.forEach(dim => { const v = tags[dim]; if (v && v !== 'Unknown' && v !== 'N/A') { winnerTags[v] = (winnerTags[v]||0) + 1; } });
+  });
+  [...pause, ...fatigued].forEach(x => {
+    const tags = x.c.tags || {};
+    TAG_DIMS.forEach(dim => { const v = tags[dim]; if (v && v !== 'Unknown' && v !== 'N/A') { loserTags[v] = (loserTags[v]||0) + 1; } });
+  });
+
+  // Tags that appear in winners but not losers = strong signals
+  const strongWins = Object.entries(winnerTags).filter(([t, c]) => c >= 2 && (!loserTags[t] || winnerTags[t] > loserTags[t] * 2)).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  const strongLosses = Object.entries(loserTags).filter(([t, c]) => c >= 2 && (!winnerTags[t] || loserTags[t] > winnerTags[t] * 2)).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+  if (strongWins.length) {
+    html += `<div class="bg-green-50 rounded-xl border border-green-200 p-4">
+      <h4 class="text-xs font-bold text-green-800 mb-2">✓ DO MORE OF</h4>
+      <ul class="space-y-1.5">
+        ${strongWins.map(([tag, count]) => `<li class="text-[11px]"><span class="font-bold text-green-800">${tagLabel(tag)}</span> <span class="text-green-600">— appears in ${count} winning creatives</span></li>`).join('')}
+      </ul>
+    </div>`;
+  }
+  if (strongLosses.length) {
+    html += `<div class="bg-red-50 rounded-xl border border-red-200 p-4">
+      <h4 class="text-xs font-bold text-red-800 mb-2">✗ AVOID / RETHINK</h4>
+      <ul class="space-y-1.5">
+        ${strongLosses.map(([tag, count]) => `<li class="text-[11px]"><span class="font-bold text-red-800">${tagLabel(tag)}</span> <span class="text-red-600">— appears in ${count} underperforming creatives</span></li>`).join('')}
+      </ul>
+    </div>`;
+  }
+  if (!strongWins.length && !strongLosses.length) {
+    html += `<div class="bg-gray-50 rounded-xl border border-gray-200 p-4 col-span-2 text-center text-xs text-text-muted">Not enough tagged data for pattern detection. Tag more creatives for recommendations.</div>`;
+  }
+
+  html += `</div></div>`;
+
+  container.innerHTML = html;
 }
 
 // ── Creative verdict: answers "is this working, should I pause/scale/refresh?" ──

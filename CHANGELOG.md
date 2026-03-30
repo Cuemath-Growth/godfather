@@ -6,6 +6,20 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ## Meta API Fix — GitHub Pages proxy routing (2026-03-30)
 
+## Creative Review — New Landing View for Tagger (2026-03-30)
+
+### New "Creative Review" tab — the default landing view for creative teams
+- **Portfolio Snapshot**: Total spend, CTR, CPTD, and verdict counts (Working/Watch/Pause) at a glance
+- **Scale These**: Top performers as cards with metrics vs market benchmarks (▲▼ vs avg), verdict reason, tags, and campaign
+- **Pause or Refresh**: Underperformers shown the same way — clear "why" for each
+- **What's Working — Tag Performance**: Cumulative bar charts per tag dimension (Hook, Format, Audience, Segment, Tone). Green = below avg CPTD, Red = above. Shows ad count, TD count, CTR per tag.
+- **Recommended Next — What to Build**: Auto-generated DO MORE / AVOID lists by comparing tag patterns in winners vs losers. "Parent testimonial appears in 8 winners" → make more.
+- **Data Table** (previous Creatives tab) is now a sub-tab for drill-down, not the landing view.
+- **WHO THIS SERVES:** Graphic designer (what format works), video editor (what hooks convert), copy writer (what messaging wins), content head (overall direction), performance team (what to scale/pause), HOD (are we building the right assets).
+- **RULE:** The landing view answers "what should I make next" in 10 seconds. Data tables are drill-down, not the front page.
+
+---
+
 ## Sprint 1: Creative Team UX Overhaul (2026-03-30)
 
 ### Tagger table redesigned for creative team workflow
