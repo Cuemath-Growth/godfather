@@ -77,6 +77,11 @@
     .copy-output li { margin-bottom: 0.3rem; color: #374151; }
     .copy-output blockquote { border-left: 3px solid #7C3AED; padding-left: 1rem; font-style: italic; color: #6B7280; background: #F8F9FC; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; }
 
+    .tagger-level-btn { color: #94A3B8; cursor: pointer; }
+    .tagger-level-btn.active { background: #fff; color: #7C3AED; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .tagger-level-btn:hover:not(.active) { color: #64748B; }
+    .tagger-group-row { cursor: pointer; }
+    .tagger-group-row:hover { background: #F8FAFC !important; }
     .status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; }
     .status-badge.connected { background: #D1FAE5; color: #065F46; }
     .status-badge.disconnected { background: #FEE2E2; color: #991B1B; }
@@ -810,62 +815,82 @@
 
           <!-- Tab: Creatives Table -->
           <div id="taggerTab-table" class="tagger-tab">
-            <!-- Filter Bar -->
-            <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4 flex items-center gap-3 flex-wrap">
-              <span class="text-xs font-bold text-text-muted">Filter:</span>
-              <select id="taggerFilterCategory" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
-                <option value="all">All Tags</option>
-                <option value="hook_type">Hook</option>
-                <option value="format">Format</option>
-                <option value="pain_benefit">Benefit Frame</option>
-                <option value="feature">Feature</option>
-                <option value="emotional_tone">Tone</option>
-                <option value="messaging_pillar">Pillar</option>
-                <option value="icp_target">Audience</option>
-                <option value="segment">Segment</option>
-                <option value="language">Language</option>
-                <option value="cta_type">CTA</option>
-                <option value="talent">Talent</option>
-              </select>
-              <select id="taggerSortBy" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
-                <option value="cptd_asc">Best CPTD</option>
-                <option value="cpql_asc">Best CPTQL</option>
-                <option value="cptd_desc">Worst CPTD</option>
-                <option value="cpql_desc">Worst CPTQL</option>
-                <option value="spend_desc">Highest Spend</option>
-                <option value="td_desc">Most TDs</option>
-                <option value="ql_desc">Most TQLs</option>
-              </select>
-              <div class="flex-1"></div>
-              <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-primary rounded-lg" title="Tags new/untagged creatives only — cached tags are preserved">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Tag New
-              </button>
-            </div>
-            <div class="flex flex-wrap gap-2 mb-3 text-[9px] text-text-muted">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-accent-purple-light border border-accent-purple/30"></span>Hook</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-accent-blue-light border border-accent-blue/30"></span>Format</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-accent-red-light border border-red-200"></span>Benefit</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-accent-pink-light border border-pink-200"></span>Tone</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-accent-orange-light border border-orange-200"></span>Audience</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-accent-green-light border border-green-200"></span>Segment</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-surface-tertiary border border-gray-200"></span>Confidence</span>
+            <!-- View Level Toggle + Filter Bar -->
+            <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
+              <!-- Row 1: View level + verdict summary -->
+              <div class="flex items-center gap-3 mb-3">
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">View:</span>
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5">
+                  <button class="tagger-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="campaign" onclick="setTaggerViewLevel('campaign')">Campaign</button>
+                  <button class="tagger-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="adset" onclick="setTaggerViewLevel('adset')">Ad Set</button>
+                  <button class="tagger-level-btn active px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-level="ad" onclick="setTaggerViewLevel('ad')">Ad</button>
+                </div>
+                <div class="flex-1"></div>
+                <div id="taggerVerdictSummary" class="flex items-center gap-2 text-[10px]"></div>
+                <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-primary rounded-lg" title="Tags new/untagged creatives only">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  Tag New
+                </button>
+              </div>
+              <!-- Row 2: Dropdown filters -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <select id="taggerCampaignType" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="all">All Campaigns</option>
+                  <option value="nri">NRI Targeting</option>
+                  <option value="influencer">Influencer</option>
+                  <option value="vernac">Vernacular</option>
+                  <option value="retargeting">Retargeting</option>
+                  <option value="broad">Broad / Advantage+</option>
+                </select>
+                <select id="taggerFormatFilter" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="all">All Formats</option>
+                  <option value="Video">Video</option>
+                  <option value="Static">Static</option>
+                </select>
+                <select id="taggerVerdictFilter" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="all">All Verdicts</option>
+                  <option value="scale">✓ Scale</option>
+                  <option value="working">Working</option>
+                  <option value="watch">Watch</option>
+                  <option value="fatigued">Fatigued</option>
+                  <option value="pause">✗ Pause</option>
+                </select>
+                <select id="taggerFilterCategory" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="all">All Tags</option>
+                  <option value="hook_type">Hook</option>
+                  <option value="format">Format</option>
+                  <option value="pain_benefit">Benefit</option>
+                  <option value="icp_target">Audience</option>
+                  <option value="segment">Segment</option>
+                </select>
+                <select id="taggerSortBy" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="cptd_asc">Best CPTD</option>
+                  <option value="ctr_desc">Best CTR</option>
+                  <option value="cpc_asc">Best CPC</option>
+                  <option value="click_ql_desc">Best Click→QL%</option>
+                  <option value="cpql_asc">Best CPQL</option>
+                  <option value="spend_desc">Highest Spend</option>
+                  <option value="td_desc">Most TDs</option>
+                  <option value="ql_desc">Most QLs</option>
+                  <option value="cptd_desc">Worst CPTD</option>
+                </select>
+              </div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
               <div class="overflow-x-auto">
                 <table class="w-full text-xs">
-                  <thead>
+                  <thead id="taggerTableHead">
                     <tr class="bg-surface-tertiary border-b border-gray-200">
-                      <th class="text-left px-3 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] sticky-col bg-surface-tertiary" style="min-width:180px;width:20%">Creative</th>
-                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%">Fmt</th>
-                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:70px;width:8%" title="Meta targeting audience from campaign name">Audience</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:65px;width:6%">Spend</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:35px;width:4%" title="Qualified Leads">QL</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:35px;width:4%" title="Trial Done">TD</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:60px;width:6%" title="Cost Per Trial Done — Spend ÷ TD">CPTD</th>
-                      <th class="text-center px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:45px;width:4%" title="QL to TD conversion rate">QL→TD</th>
-                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px;width:24%">Tags</th>
-                      <th class="text-center px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:35px;width:3%">Edit</th>
+                      <th class="text-left px-3 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] sticky-col bg-surface-tertiary" style="min-width:200px;width:22%">Creative</th>
+                      <th class="text-center px-1.5 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%" title="Performance verdict">Verdict</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:60px;width:6%">Spend</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:42px;width:4%" title="Click-Through Rate — Clicks ÷ Impressions">CTR</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:50px;width:5%" title="Cost Per Click">CPC</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:35px;width:3%" title="Qualified Leads">QL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:50px;width:5%" title="What % of clicks become qualified leads">Clk→QL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%" title="Trial Done">TD</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%" title="Cost Per Trial Done">CPTD</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:120px;width:18%">Tags</th>
                     </tr>
                   </thead>
                   <tbody id="taggerTableBody"></tbody>
@@ -9825,134 +9850,364 @@ function renderTaggerInsights() {
   });
 }
 
-function renderTaggerTable() {
-  const tbody = document.getElementById('taggerTableBody');
-  const catFilter = document.getElementById('taggerFilterCategory').value;
-  const sortBy = document.getElementById('taggerSortBy').value;
+// ── Creative verdict: answers "is this working, should I pause/scale/refresh?" ──
+let taggerViewLevel = 'ad'; // 'campaign' | 'adset' | 'ad'
 
+function setTaggerViewLevel(level) {
+  taggerViewLevel = level;
+  document.querySelectorAll('.tagger-level-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.level === level);
+    if (b.dataset.level === level) { b.classList.add('bg-white','shadow-sm','text-accent-purple'); }
+    else { b.classList.remove('bg-white','shadow-sm','text-accent-purple'); }
+  });
+  state._taggerTablePage = 1;
+  renderTaggerTable();
+}
+window.setTaggerViewLevel = setTaggerViewLevel;
+
+function getCreativeVerdict(c) {
+  const spend = parseNumber(c['Spent']||c['spent']||0);
+  const ql = parseNumber(c['QL']||c['ql']||0);
+  const td = parseNumber(c['TD']||c['td']||0);
+  const impressions = parseNumber(c['Impressions']||c['impressions']||0);
+  const clicks = parseNumber(c['Clicks']||c['clicks']||0);
+  const cptd = td >= 1 ? spend / td : 0;
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+  const cpc = clicks > 0 ? spend / clicks : 0;
+  const clickQL = clicks > 0 ? (ql / clicks) * 100 : 0;
+  const mkt = extractMarket(c) || 'US';
+  const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
+
+  // Not enough data
+  if (spend < 3000) return { label: 'New', key: 'new', color: 'gray', reason: 'Spend < ₹3K — not enough data yet' };
+
+  // SCALE: green CPTD with volume
+  if (td >= 3 && cptd <= th.cptd.green)
+    return { label: 'Scale', key: 'scale', color: 'green', reason: `CPTD ${formatCurrency(cptd)} is below ${formatCurrency(th.cptd.green)} target. ${td} TDs — proven performer.` };
+
+  // WORKING: decent CPTD or strong CTR with conversions
+  if (td >= 1 && cptd <= th.cptd.amber)
+    return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} within guardrails. ${td} TD${td>1?'s':''}.` };
+  if (ql >= 3 && ctr > 1.0)
+    return { label: 'Working', key: 'working', color: 'green', reason: `CTR ${ctr.toFixed(2)}% with ${ql} QLs — good engagement + conversion.` };
+
+  // FATIGUED: high spend, declining efficiency
+  if (spend > 20000 && ctr < 0.5 && ql <= 2)
+    return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `${formatCurrency(spend)} spent but CTR only ${ctr.toFixed(2)}% and ${ql} QLs. Audience may be exhausted.` };
+  if (td >= 1 && cptd > th.cptd.amber)
+    return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `CPTD ${formatCurrency(cptd)} above ${formatCurrency(th.cptd.amber)} limit. Was converting but getting expensive.` };
+
+  // PAUSE: clear budget leak
+  if (spend > 30000 && td === 0 && ql <= 2)
+    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials and ${ql} QLs — budget leak.` };
+  if (spend > 50000 && td === 0)
+    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials — stop immediately.` };
+
+  // WATCH: some signal but not conclusive
+  if (ql >= 1 || td >= 1)
+    return { label: 'Watch', key: 'watch', color: 'amber', reason: `${ql} QLs, ${td} TDs — early signal, needs more data.` };
+
+  return { label: 'Watch', key: 'watch', color: 'gray', reason: `${formatCurrency(spend)} spent, ${ql} QLs — no clear signal yet.` };
+}
+
+// ── Tagger data filtering with new dropdown filters ──
+function getFilteredTaggerDataWithDropdowns() {
   let data = [...getFilteredTaggerData()];
-  // Sort
-  data.sort((a,b) => {
-    const MIN_SPEND = 1000; // ₹1K minimum to be ranked in "best" sorts
-    const getS = c => parseNumber(c['Spent']||c['spent']||0);
-    const getQ = c => parseNumber(c['QL']||c['ql']||0);
-    const getT = c => parseNumber(c['TD']||c['td']||0);
-    if (sortBy === 'cptd_asc' || sortBy === 'cptd_desc') {
-      const aS = getS(a), bS = getS(b), aT = getT(a), bT = getT(b);
-      const aV = aT > 0 && aS >= MIN_SPEND ? aS/aT : 0;
-      const bV = bT > 0 && bS >= MIN_SPEND ? bS/bT : 0;
-      if (aV === 0 && bV === 0) return bS - aS; // both unranked — show higher spend first
-      if (aV === 0) return 1;
-      if (bV === 0) return -1;
-      return sortBy === 'cptd_asc' ? aV - bV : bV - aV;
-    }
-    if (sortBy === 'cpql_asc' || sortBy === 'cpql_desc') {
-      const aS = getS(a), bS = getS(b), aQ = getQ(a), bQ = getQ(b);
-      const aV = aQ > 0 && aS >= MIN_SPEND ? aS/aQ : 0;
-      const bV = bQ > 0 && bS >= MIN_SPEND ? bS/bQ : 0;
-      if (aV === 0 && bV === 0) return bS - aS;
-      if (aV === 0) return 1;
-      if (bV === 0) return -1;
-      return sortBy === 'cpql_asc' ? aV - bV : bV - aV;
-    }
+
+  // Campaign type filter
+  const campType = document.getElementById('taggerCampaignType')?.value || 'all';
+  if (campType !== 'all') {
+    data = data.filter(c => {
+      const camp = (c['Campaign name']||c['campaign name']||'').toLowerCase();
+      const adName = (c['Ad name']||c['ad name']||'').toLowerCase();
+      if (campType === 'nri') return camp.includes('nri') || camp.includes('desi');
+      if (campType === 'influencer') return camp.includes('influencer') || camp.includes('influ') || adName.includes('influencer') || adName.includes('postboost');
+      if (campType === 'vernac') return camp.includes('vernac') || camp.includes('telugu') || camp.includes('tamil') || camp.includes('gujarati') || camp.includes('hindi');
+      if (campType === 'retargeting') return camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt');
+      if (campType === 'broad') return camp.includes('broad') || camp.includes('advantage');
+      return true;
+    });
+  }
+
+  // Format filter
+  const fmtFilter = document.getElementById('taggerFormatFilter')?.value || 'all';
+  if (fmtFilter !== 'all') {
+    data = data.filter(c => {
+      const t = (c['Creative type']||c['creative type']||'').toLowerCase();
+      return t === fmtFilter.toLowerCase();
+    });
+  }
+
+  // Verdict filter
+  const verdictFilter = document.getElementById('taggerVerdictFilter')?.value || 'all';
+  if (verdictFilter !== 'all') {
+    data = data.filter(c => getCreativeVerdict(c).key === verdictFilter);
+  }
+
+  return data;
+}
+
+// ── Tagger sort helper ──
+function sortTaggerData(data, sortBy) {
+  const MIN_SPEND = 1000;
+  const getS = c => parseNumber(c['Spent']||c['spent']||0);
+  const getQ = c => parseNumber(c['QL']||c['ql']||0);
+  const getT = c => parseNumber(c['TD']||c['td']||0);
+  const getImp = c => parseNumber(c['Impressions']||c['impressions']||0);
+  const getClk = c => parseNumber(c['Clicks']||c['clicks']||0);
+  const getCTR = c => { const i = getImp(c); return i > 0 ? getClk(c)/i*100 : 0; };
+  const getCPC = c => { const cl = getClk(c); return cl > 0 ? getS(c)/cl : 999999; };
+  const getClkQL = c => { const cl = getClk(c); return cl > 0 ? getQ(c)/cl*100 : 0; };
+
+  const ranked = (valFn, asc) => (a, b) => {
+    const aS = getS(a), bS = getS(b);
+    const aV = aS >= MIN_SPEND ? valFn(a) : (asc ? 999999 : -1);
+    const bV = bS >= MIN_SPEND ? valFn(b) : (asc ? 999999 : -1);
+    if (aV === bV) return bS - aS;
+    return asc ? aV - bV : bV - aV;
+  };
+
+  data.sort((a, b) => {
+    if (sortBy === 'cptd_asc') return ranked(c => { const t = getT(c); return t > 0 ? getS(c)/t : 999999; }, true)(a, b);
+    if (sortBy === 'cptd_desc') return ranked(c => { const t = getT(c); return t > 0 ? getS(c)/t : 0; }, false)(a, b);
+    if (sortBy === 'cpql_asc') return ranked(c => { const q = getQ(c); return q > 0 ? getS(c)/q : 999999; }, true)(a, b);
+    if (sortBy === 'ctr_desc') return ranked(getCTR, false)(a, b);
+    if (sortBy === 'cpc_asc') return ranked(getCPC, true)(a, b);
+    if (sortBy === 'click_ql_desc') return ranked(getClkQL, false)(a, b);
     if (sortBy === 'td_desc') return getT(b) - getT(a);
     if (sortBy === 'ql_desc') return getQ(b) - getQ(a);
     if (sortBy === 'spend_desc') return getS(b) - getS(a);
     return 0;
   });
+  return data;
+}
 
-  const page = state._taggerTablePage || 1;
-  const paged = data.slice((page-1)*TAGGER_PAGE_SIZE, page*TAGGER_PAGE_SIZE);
-  renderPager('taggerTablePager', page, data.length, 'goTaggerTablePage');
-  tbody.innerHTML = paged.map(c => {
-    const name = c['Ad name'] || c['ad name'] || c['Creative name'] || c['creative name'] || c['Ad Name'] || 'Unknown';
-    let type = c['Creative type'] || c['creative type'] || c['Creative Type'] || '-';
-    // Fix Unknown types from ad name
-    if (type === 'Unknown' || type === '-') {
-      const adN = (c['Ad name']||c['ad name']||'').toLowerCase();
-      if (adN.includes('video') || adN.includes('reel') || adN.includes('_v_')) type = 'Video';
-      else if (adN.includes('static') || adN.includes('_s_') || adN.includes('image') || adN.includes('carousel')) type = 'Static';
-      else if (c['thumbnail_url'] && !c['image_url']) type = 'Video';
-      else if (c['image_url']) type = 'Static';
-    }
-    const spend = parseNumber(c['Spent']||c['spent']||0);
-    const ql = parseNumber(c['QL']||c['ql']||0);
-    const tql = parseNumber(c['TQL']||c['tql']||0);
-    const td_val = parseNumber(c['TD']||c['td']||0);
-    const cptql = tql > 0 ? spend / tql : 0;
-    const tags = c.tags || {};
+// ── Aggregate tagger rows for hierarchy view ──
+function aggregateTaggerRows(rows) {
+  let spend = 0, ql = 0, td = 0, imp = 0, clicks = 0, paid = 0;
+  rows.forEach(c => {
+    spend += parseNumber(c['Spent']||c['spent']||0);
+    ql += parseNumber(c['QL']||c['ql']||0);
+    td += parseNumber(c['TD']||c['td']||0);
+    imp += parseNumber(c['Impressions']||c['impressions']||0);
+    clicks += parseNumber(c['Clicks']||c['clicks']||0);
+    paid += parseNumber(c['Paid']||c['paid']||0);
+  });
+  const ctr = imp > 0 ? (clicks/imp)*100 : 0;
+  const cpc = clicks > 0 ? spend/clicks : 0;
+  const clickQL = clicks > 0 ? (ql/clicks)*100 : 0;
+  const cptd = td >= 3 ? spend/td : 0;
+  return { spend, ql, td, imp, clicks, paid, ctr, cpc, clickQL, cptd, count: rows.length };
+}
 
-    // Render tags — limit to most useful when showing all
-    let tagHtml = '';
-    const isAllFilter = catFilter === 'all';
-    const catsToShow = isAllFilter
-      ? ['hook_type','format','icp_target']  // Default: just 3 key tags for clarity
-      : [catFilter];
-    let tagCount = 0;
-    const MAX_VISIBLE = isAllFilter ? 3 : 20;
-    let hiddenCount = 0;
-    catsToShow.forEach(cat => {
-      const val = tags[cat];
-      if (!val || val === 'null' || val === 'N/A' || val === 'Unknown') return;
-      tagCount++;
-      if (tagCount > MAX_VISIBLE) { hiddenCount++; return; }
-      const baseCat = cat.replace('_secondary','');
-      const tc = TAG_COLORS[TAG_CATEGORIES[baseCat]?.color || 'purple'];
-      tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5">${tagLabel(val)}</span>`;
-    });
-    if (hiddenCount > 0) {
-      tagHtml += `<span class="inline-block text-[8px] px-1 py-0.5 rounded bg-surface-tertiary text-text-muted font-medium">+${hiddenCount}</span>`;
-    }
-    // Telugu flag
-    if (tags['telugu_flag']) {
-      tagHtml += `<span class="inline-block text-[8px] px-1 py-0.5 rounded bg-accent-orange-light text-amber-700 font-bold mr-0.5 mb-0.5">Telugu</span>`;
-    }
+// ── Toggle tagger group rows ──
+function toggleTaggerGroup(groupId) {
+  const children = document.querySelectorAll('.tagger-child[data-parent="' + groupId + '"]');
+  const isHidden = children.length > 0 && children[0].classList.contains('hidden');
+  children.forEach(el => el.classList.toggle('hidden', !isHidden));
+  const arrows = document.querySelectorAll('.tagger-arrow[data-group="' + groupId + '"]');
+  arrows.forEach(a => { a.innerHTML = isHidden ? '&#9660;' : '&#9654;'; });
+}
+window.toggleTaggerGroup = toggleTaggerGroup;
 
-    // Audience from campaign name
-    const audience = extractAudience(c);
-    const audColors = {'NRI':'purple','Expats':'blue','Indian Interests':'orange','Interests':'orange','Lookalike':'teal','Retargeting':'pink','Broad':'gray','Advantage+':'green','High NRI':'purple','Parents':'orange','School Targeting':'blue','Other':'gray'};
-    const audC = audColors[audience] || 'gray';
-    // CPTD + verdict — uses SENTINEL_THRESHOLDS for consistency across tabs
-    const cptd_val = td_val >= 1 ? spend / td_val : 0;
-    const qlTdPct = ql > 0 && td_val > 0 ? Math.min(td_val / ql * 100, 100) : 0;
-    const mkt = extractMarket(c) || 'US';
-    const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
-    const verdict = td_val >= 3 ? scoreMetric(cptd_val, mktThresholds.cptd, false)
-      : ql >= 5 ? scoreMetric(spend/ql, mktThresholds.cpql, false)
-      : (spend > 30000 && ql < 3 && td_val === 0) ? 'red' : 'gray'; // Budget leak: high spend, no conversions
-    const verdictBorder = verdict === 'green' ? 'border-l-green-500' : verdict === 'amber' ? 'border-l-amber-400' : verdict === 'red' ? 'border-l-red-500' : 'border-l-gray-200';
+// ── Render a single ad row for tagger table ──
+function renderTaggerAdRow(c, catFilter, indent) {
+  const name = c['Ad name'] || c['ad name'] || c['Creative name'] || 'Unknown';
+  let type = c['Creative type'] || c['creative type'] || '-';
+  if (type === 'Unknown' || type === '-') {
+    const adN = (c['Ad name']||c['ad name']||'').toLowerCase();
+    if (adN.includes('video') || adN.includes('reel') || adN.includes('_v_')) type = 'Video';
+    else if (adN.includes('static') || adN.includes('_s_') || adN.includes('image') || adN.includes('carousel')) type = 'Static';
+    else if (c['thumbnail_url'] && !c['image_url']) type = 'Video';
+    else if (c['image_url']) type = 'Static';
+  }
+  const spend = parseNumber(c['Spent']||c['spent']||0);
+  const ql = parseNumber(c['QL']||c['ql']||0);
+  const td_val = parseNumber(c['TD']||c['td']||0);
+  const impressions = parseNumber(c['Impressions']||c['impressions']||0);
+  const clicks = parseNumber(c['Clicks']||c['clicks']||0);
+  const ctr = impressions > 0 ? (clicks/impressions*100) : 0;
+  const cpc = clicks > 0 ? spend/clicks : 0;
+  const clickQL = clicks > 0 ? (ql/clicks*100) : 0;
+  const cptd_val = td_val >= 1 ? spend / td_val : 0;
+  const tags = c.tags || {};
+  const mkt = extractMarket(c) || 'US';
 
-    const thumb = c['image_url'] || c['thumbnail_url'] || '';
-    const market = extractMarket(c);
-    const adTitle = c['ad_title'] || '';
-    const adBody = c['ad_body'] || '';
-    const adCopy = adTitle || adBody ? `<span class="text-[9px] text-text-secondary block mt-0.5 leading-tight" title="${(adTitle + ' — ' + adBody).replace(/"/g, '&quot;')}">${adTitle ? '<b>' + adTitle.slice(0,40) + (adTitle.length>40?'…':'') + '</b>' : ''}${adTitle && adBody ? ' — ' : ''}${adBody ? adBody.slice(0,60) + (adBody.length>60?'…':'') : ''}</span>` : '';
-    return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ${verdictBorder}">
-      <td class="px-3 py-2.5">
-        <div class="flex items-center gap-2">
-          ${thumb ? `<img src="${thumb}" class="w-8 h-8 rounded object-cover shrink-0 cursor-pointer border border-gray-200" onclick="window.open('${thumb}','_blank')" onerror="this.outerHTML='<div class=\\'w-8 h-8 rounded bg-gray-100 flex items-center justify-center shrink-0\\'><svg class=\\'w-3 h-3 text-gray-400\\' fill=\\'none\\' stroke=\\'currentColor\\' viewBox=\\'0 0 24 24\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'2\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14\\'/></svg></div>'" />` : '<div class="w-8 h-8 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0"><span class="text-[8px] text-gray-400">?</span></div>'}
-          <div style="max-width:220px">
-            <span class="font-medium text-[11px] block" title="${name}">${shortAdName(name)}</span>
-            ${adCopy}
-            ${market !== 'Unknown' ? `<span class="text-[9px] text-text-muted">${market}</span>` : ''}
-          </div>
+  // Verdict
+  const v = getCreativeVerdict(c);
+  const vStyles = { green: 'bg-green-50 text-green-700 border-green-200', amber: 'bg-amber-50 text-amber-700 border-amber-200', red: 'bg-red-50 text-red-700 border-red-200', gray: 'bg-gray-50 text-gray-500 border-gray-200' };
+  const verdictBorder = v.color === 'green' ? 'border-l-green-500' : v.color === 'amber' ? 'border-l-amber-400' : v.color === 'red' ? 'border-l-red-500' : 'border-l-gray-200';
+
+  // Tags
+  let tagHtml = '';
+  const isAllFilter = (catFilter || 'all') === 'all';
+  const catsToShow = isAllFilter ? ['hook_type','format','icp_target'] : [catFilter];
+  let tagCount = 0;
+  catsToShow.forEach(cat => {
+    const val = tags[cat];
+    if (!val || val === 'null' || val === 'N/A' || val === 'Unknown') return;
+    tagCount++;
+    if (tagCount > 3) return;
+    const baseCat = cat.replace('_secondary','');
+    const tc = TAG_COLORS[TAG_CATEGORIES[baseCat]?.color || 'purple'];
+    tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5">${tagLabel(val)}</span>`;
+  });
+
+  const thumb = c['image_url'] || c['thumbnail_url'] || '';
+  const market = extractMarket(c);
+  const pl = indent ? `pl-${indent * 4 + 3}` : 'pl-3';
+  const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
+
+  return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ${verdictBorder}">
+    <td class="${pl} px-3 py-2">
+      <div class="flex items-center gap-2">
+        ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0"><span class="text-[8px] text-gray-400">?</span></div>'}
+        <div style="max-width:200px">
+          <span class="font-medium text-[11px] block leading-tight" title="${name}">${shortAdName(name)}</span>
+          <span class="text-[9px] text-text-muted">${market} · ${type}</span>
         </div>
-      </td>
-      <td class="px-2 py-2.5"><span class="text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${type==='Video' ? 'bg-accent-purple-light text-accent-purple' : 'bg-accent-blue-light text-accent-blue'}">${type}</span></td>
-      <td class="px-2 py-2.5"><span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-accent-${audC}-light text-accent-${audC}">${audience}</span></td>
-      <td class="px-2 py-2.5 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
-      <td class="px-2 py-2.5 text-right text-[11px]">${ql > 0 ? Math.round(ql) : '<span class="text-text-muted">0</span>'}</td>
-      <td class="px-2 py-2.5 text-right text-[11px] font-semibold">${td_val > 0 ? Math.round(td_val) : '<span class="text-text-muted">0</span>'}</td>
-      <td class="px-2 py-2.5 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val < 40000 ? 'text-accent-green' : cptd_val < 70000 ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>` : '<span class="text-[9px] text-text-muted">\u2014</span>'}</td>
-      <td class="px-2 py-2.5 text-center text-[11px]">${qlTdPct > 0 ? (ql < 3 ? `<span class="text-text-muted" title="Low volume (${Math.round(ql)} QL) \u2014 not reliable">${qlTdPct.toFixed(0)}%*</span>` : `<span class="${qlTdPct > 5 ? 'text-accent-green font-bold' : 'text-text-secondary'}">${qlTdPct.toFixed(1)}%</span>`) : '<span class="text-text-muted">\u2014</span>'}</td>
-      <td class="px-2 py-2.5"><div class="flex flex-wrap gap-0.5">${tagHtml || '<span class="text-text-muted text-[9px]">No tags</span>'}</div></td>
-      <td class="px-2 py-2.5 text-center">
-        <button onclick="editTags(${c.id})" class="p-1 rounded hover:bg-surface-tertiary transition" title="Edit tags">
-          <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-        </button>
-      </td>
-    </tr>`;
-  }).join('');
+      </div>
+    </td>
+    <td class="px-1.5 py-2 text-center"><span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${vStyles[v.color]}" title="${v.reason}">${v.label}</span></td>
+    <td class="px-2 py-2 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
+    <td class="px-2 py-2 text-right text-[11px] ${ctr > 1.5 ? 'text-accent-green font-bold' : ctr > 0.8 ? 'text-text-primary' : ctr > 0 ? 'text-accent-red' : 'text-text-muted'}">${ctr > 0 ? ctr.toFixed(2)+'%' : '\u2014'}</td>
+    <td class="px-2 py-2 text-right text-[11px]">${cpc > 0 ? formatCurrency(cpc) : '\u2014'}</td>
+    <td class="px-2 py-2 text-right text-[11px]">${ql > 0 ? Math.round(ql) : '<span class="text-text-muted">0</span>'}</td>
+    <td class="px-2 py-2 text-right text-[11px] ${clickQL > 3 ? 'text-accent-green font-bold' : clickQL > 1 ? 'text-text-primary' : 'text-text-muted'}">${clickQL > 0 ? clickQL.toFixed(1)+'%' : '\u2014'}</td>
+    <td class="px-2 py-2 text-right text-[11px] font-semibold">${td_val > 0 ? Math.round(td_val) : '<span class="text-text-muted">0</span>'}</td>
+    <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>` : '<span class="text-text-muted">\u2014</span>'}</td>
+    <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5">${tagHtml || '<span class="text-text-muted text-[9px]">—</span>'}</div></td>
+  </tr>`;
+}
+
+// ── Render a group (campaign/adset) aggregate row ──
+function renderTaggerGroupRow(label, totals, groupId, level, childCount) {
+  const shortLabel = label.length > 55 ? label.substring(0,52)+'...' : label;
+  const bgClass = level === 'campaign' ? 'bg-surface-tertiary/60' : 'bg-surface-secondary/40';
+  const pl = level === 'adset' ? 'pl-6' : 'pl-3';
+  const cptdColor = totals.cptd > 0 ? (totals.cptd < 40000 ? 'text-accent-green' : totals.cptd < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+  const ctrColor = totals.ctr > 1.5 ? 'text-accent-green font-bold' : totals.ctr > 0.8 ? '' : totals.ctr > 0 ? 'text-accent-red' : 'text-text-muted';
+
+  return `<tr class="${bgClass} tagger-group-row" onclick="toggleTaggerGroup('${groupId}')">
+    <td class="px-3 py-2.5 ${pl} font-bold" colspan="2">
+      <span class="text-[10px] text-text-muted mr-1 tagger-arrow" data-group="${groupId}">&#9654;</span>
+      <span title="${label}" class="text-[11px]">${shortLabel}</span>
+      <span class="text-[10px] text-text-muted ml-1.5 font-normal">${childCount} ad${childCount !== 1 ? 's' : ''}</span>
+    </td>
+    <td class="px-2 py-2.5 text-right font-bold text-[11px]">${formatCurrency(totals.spend)}</td>
+    <td class="px-2 py-2.5 text-right text-[11px] ${ctrColor}">${totals.ctr > 0 ? totals.ctr.toFixed(2)+'%' : '-'}</td>
+    <td class="px-2 py-2.5 text-right text-[11px]">${totals.cpc > 0 ? formatCurrency(totals.cpc) : '-'}</td>
+    <td class="px-2 py-2.5 text-right text-[11px]">${totals.ql}</td>
+    <td class="px-2 py-2.5 text-right text-[11px]">${totals.clickQL > 0 ? totals.clickQL.toFixed(1)+'%' : '-'}</td>
+    <td class="px-2 py-2.5 text-right font-bold text-[11px]">${totals.td}</td>
+    <td class="px-2 py-2.5 text-right font-bold text-[11px] ${cptdColor}">${totals.cptd > 0 ? formatCurrency(totals.cptd) : '-'}</td>
+    <td class="px-2 py-2.5 text-[10px] text-text-muted">${totals.td > 0 ? (totals.td >= 3 ? '✓ Converting' : 'Early signal') : totals.ql > 0 ? 'QLs only' : 'No conversions'}</td>
+  </tr>`;
+}
+
+function renderTaggerTable() {
+  const tbody = document.getElementById('taggerTableBody');
+  const catFilter = document.getElementById('taggerFilterCategory')?.value || 'all';
+  const sortBy = document.getElementById('taggerSortBy')?.value || 'cptd_asc';
+  const viewLevel = taggerViewLevel || 'ad';
+
+  let data = getFilteredTaggerDataWithDropdowns();
+  data = sortTaggerData(data, sortBy);
+
+  // Verdict summary
+  const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0 };
+  data.forEach(c => { const v = getCreativeVerdict(c); verdictCounts[v.key] = (verdictCounts[v.key]||0) + 1; });
+  const summaryEl = document.getElementById('taggerVerdictSummary');
+  if (summaryEl) {
+    summaryEl.innerHTML = `<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-bold border border-green-200">${verdictCounts.scale + verdictCounts.working} Working</span>` +
+      `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">${verdictCounts.watch + verdictCounts.fatigued} Watch</span>` +
+      `<span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold border border-red-200">${verdictCounts.pause} Pause</span>` +
+      `<span class="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 font-medium border border-gray-200">${verdictCounts.new} New</span>`;
+  }
+
+  // ── Ad-level flat view ──
+  if (viewLevel === 'ad') {
+    const page = state._taggerTablePage || 1;
+    const paged = data.slice((page-1)*TAGGER_PAGE_SIZE, page*TAGGER_PAGE_SIZE);
+    renderPager('taggerTablePager', page, data.length, 'goTaggerTablePage');
+    tbody.innerHTML = paged.map(c => renderTaggerAdRow(c, catFilter, 0)).join('');
+    return;
+  }
+
+  // ── Campaign / Ad Set hierarchy view ──
+  const hierarchy = {};
+  data.forEach(c => {
+    const campaign = c['Campaign name'] || c['campaign name'] || 'Unknown Campaign';
+    const adSet = c['Ad set name'] || c['ad set name'] || 'Unknown Ad Set';
+    if (!hierarchy[campaign]) hierarchy[campaign] = {};
+    if (!hierarchy[campaign][adSet]) hierarchy[campaign][adSet] = [];
+    hierarchy[campaign][adSet].push(c);
+  });
+
+  // Campaign totals
+  const campaignTotals = {};
+  Object.entries(hierarchy).forEach(([campaign, adSets]) => {
+    const allAds = [];
+    Object.values(adSets).forEach(ads => allAds.push(...ads));
+    campaignTotals[campaign] = aggregateTaggerRows(allAds);
+  });
+
+  // Sort campaigns
+  const sortedCampaigns = Object.keys(hierarchy).sort((a, b) => {
+    const at = campaignTotals[a], bt = campaignTotals[b];
+    if (sortBy === 'cptd_asc') return (at.cptd||999999) - (bt.cptd||999999);
+    if (sortBy === 'ctr_desc') return bt.ctr - at.ctr;
+    if (sortBy === 'td_desc') return bt.td - at.td;
+    return bt.spend - at.spend;
+  });
+
+  let html = '';
+  const pagerEl = document.getElementById('taggerTablePager');
+  if (pagerEl) pagerEl.innerHTML = `<span class="text-text-muted">${sortedCampaigns.length} campaigns · ${data.length} ads</span>`;
+
+  if (viewLevel === 'campaign') {
+    sortedCampaigns.slice(0, 40).forEach((campaign, ci) => {
+      const ct = campaignTotals[campaign];
+      const gid = 'tc_' + ci;
+      html += renderTaggerGroupRow(campaign, ct, gid, 'campaign', ct.count);
+      // Child ads (hidden by default)
+      Object.values(hierarchy[campaign]).forEach(ads => {
+        ads.forEach(c => {
+          html += `<tr class="hidden tagger-child border-b border-gray-50" data-parent="${gid}">` +
+            renderTaggerAdRow(c, catFilter, 2).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
+            `</tr>`;
+        });
+      });
+    });
+  } else if (viewLevel === 'adset') {
+    // Group by ad set across all campaigns
+    const adSetMap = {};
+    data.forEach(c => {
+      const adSet = c['Ad set name'] || c['ad set name'] || 'Unknown Ad Set';
+      if (!adSetMap[adSet]) adSetMap[adSet] = [];
+      adSetMap[adSet].push(c);
+    });
+    const adSetTotals = {};
+    Object.entries(adSetMap).forEach(([as, ads]) => { adSetTotals[as] = aggregateTaggerRows(ads); });
+    const sortedAdSets = Object.keys(adSetMap).sort((a, b) => {
+      const at = adSetTotals[a], bt = adSetTotals[b];
+      if (sortBy === 'cptd_asc') return (at.cptd||999999) - (bt.cptd||999999);
+      if (sortBy === 'ctr_desc') return bt.ctr - at.ctr;
+      return bt.spend - at.spend;
+    });
+    sortedAdSets.slice(0, 50).forEach((adSet, ai) => {
+      const at = adSetTotals[adSet];
+      const gid = 'tas_' + ai;
+      html += renderTaggerGroupRow(adSet, at, gid, 'adset', at.count);
+      adSetMap[adSet].forEach(c => {
+        html += `<tr class="hidden tagger-child border-b border-gray-50" data-parent="${gid}">` +
+          renderTaggerAdRow(c, catFilter, 2).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
+          `</tr>`;
+      });
+    });
+  }
+
+  tbody.innerHTML = html;
 }
 
 function renderTaggerHeatmap() {

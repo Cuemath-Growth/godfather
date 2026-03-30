@@ -6,6 +6,20 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ## Meta API Fix — GitHub Pages proxy routing (2026-03-30)
 
+## Sprint 1: Creative Team UX Overhaul (2026-03-30)
+
+### Tagger table redesigned for creative team workflow
+- **Campaign → Ad Set → Ad hierarchy**: Toggle between Campaign, Ad Set, and flat Ad views. Click any campaign/adset row to expand and see which of its ads are working. Answers "which of these 5 ads in this adset performed?"
+- **New columns**: CTR, CPC, Click→QL% replace QL→TD and Audience columns. These are the metrics creative teams actually use for optimization.
+- **Per-creative verdict**: Every ad gets a verdict badge — Scale (green), Working (green), Watch (amber), Fatigued (amber), Pause (red), New (gray) — with hover tooltip explaining WHY. Uses market-specific SENTINEL_THRESHOLDS.
+- **Verdict summary bar**: Shows counts at top — "12 Working, 5 Watch, 3 Pause" — so you know the portfolio health at a glance.
+- **Dropdown filters**: Campaign Type (NRI/Influencer/Vernacular/Retargeting/Broad), Format (Video/Static), Verdict, Tag category, Sort — all as compact dropdowns. Reduces clicks from 5 to 1.
+- **New sort options**: Best CTR, Best CPC, Best Click→QL% added alongside existing CPTD/CPQL sorts.
+- **RULE:** Creative team metrics are CTR, CPC, Click→QL%, CPTD. ROAS and CAC are finance metrics — keep them in Performance tab, not Tagger.
+- **RULE:** Every creative must answer "is this working?" in 3 seconds. Verdict badge + reason tooltip does this.
+
+---
+
 ### Fix: CRM QL never written to tagger — dead code in mergeCRMWithMeta()
 - **Root cause:** Line `if (ql > effectiveQL) c['QL'] = ql` was dead code. `effectiveQL = Math.max(metaQL, ql)` means `ql > max(metaQL, ql)` is always false. CRM QLs were computed but never written to direct-matched creatives. TDs were written (inside `hasSheetData` block), producing 208 ads with TD > 0 but QL = 0.
 - **Fix:** Changed to `if (ql > metaQL) c['QL'] = ql` — compares CRM ql against Meta's reported ql only. Since Meta reports 0 for most ads, CRM ql (which is correct) now always writes through.
