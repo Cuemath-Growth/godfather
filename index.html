@@ -2819,7 +2819,19 @@ function init() {
       console.log(`Boot: fetched ${counts.leads} leads, ${counts.cost} cost rows`);
       if (costData[0]) console.log('Cost columns:', Object.keys(costData[0]));
       if (costData[0]) console.log('Cost row 0:', costData[0]);
-      if (leadsData[0]) console.log('Leads columns:', Object.keys(leadsData[0]).slice(0, 20));
+      if (leadsData[0]) console.log('Leads columns:', Object.keys(leadsData[0]).slice(0, 30));
+      // Check utm_medium column name
+      const _utmCols = Object.keys(leadsData[0] || {}).filter(k => k.toLowerCase().includes('utm') || k.toLowerCase().includes('medium'));
+      console.log('UTM/medium columns in leads:', _utmCols);
+      console.log('Section 2 verification — QL:', getQL(), 'TD_snap:', getTD_snapshot(), 'TD_cohort:', getTD_cohort(), 'Spend:', (getSpend()/10000000).toFixed(2)+'Cr');
+      // Ethnicity diagnostic
+      const _eth = {}; leadsData.forEach(r => { const e = (r.ethnicity||'(empty)').trim(); _eth[e] = (_eth[e]||0)+1; });
+      console.log('Ethnicity values:', _eth);
+      // Revenue diagnostic
+      const _revCols = Object.keys(leadsData[0] || {}).filter(k => k.toLowerCase().includes('revenue') || k.toLowerCase().includes('booking') || k.toLowerCase().includes('net'));
+      console.log('Revenue columns:', _revCols);
+      const _paidRows = leadsData.filter(r => String(r.paid) === '1');
+      if (_paidRows.length) console.log('Sample paid row revenue fields:', { revenue: _paidRows[0].revenue, net_booking: _paidRows[0].net_booking, Revenue: _paidRows[0].Revenue, 'Net Booking': _paidRows[0]['Net Booking'] });
       // Spend diagnostic
       const _allSpend = costData.reduce((s,r) => s + (parseFloat(r.spend || r.amount_spent) || 0), 0);
       const _metaSpend = costData.filter(r => (r.medium||'').trim().toLowerCase() === 'meta').reduce((s,r) => s + (parseFloat(r.spend || r.amount_spent) || 0), 0);
@@ -3609,7 +3621,14 @@ async function fetchSheetData(sheetUrl, apiKey) {
   const leadsJson = await leadsRes.json();
   const costJson = await costRes.json();
 
-  leadsData = parseSheetValues(leadsJson.values);
+  const allLeads = parseSheetValues(leadsJson.values);
+  // Filter to Meta leads only — matches old CRM query "select * where G='meta'"
+  // Column name is utm_medium or mx_utm_medium — check both
+  leadsData = allLeads.filter(r => {
+    const med = (r.utm_medium || r.mx_utm_medium || '').trim().toLowerCase();
+    return med === 'meta';
+  });
+  console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
   costData = parseSheetValues(costJson.values);
 
   // Cache with timestamp — leads may exceed quota, that's OK (fetched fresh each session)
@@ -3663,9 +3682,10 @@ function filterCostByMarket(data, market) {
 
 // ── Metric primitives — each filters the in-memory arrays directly ──
 
-function getSpend(market, startDate, endDate) {
+function getSpend(market, startDate, endDate, medium = 'meta') {
   let rows = filterCostByMarket(costData, market);
   rows = rows.filter(r => {
+    if (medium && (r.medium || '').trim().toLowerCase() !== medium) return false;
     const day = r.day || '';
     if (startDate && day < startDate) return false;
     if (endDate && day > endDate) return false;
@@ -3693,11 +3713,20 @@ function getTQL(market, startDate, endDate) {
     return String(r.qls) === '1';
   });
   // Market-specific TQL definitions
-  if (market === 'US') return rows.filter(r => (r.ethnicity || '').trim() === 'NRI').length;
-  if (market === 'India') return rows.filter(r => ['IB', 'IGCSE'].includes((r['board (ME)'] || '').trim())).length;
-  if (market === 'ME') return rows.filter(r => ['IB', 'IGCSE'].includes((r['board (ME)'] || '').trim())).length;
-  // APAC, UK: TQL = QL
-  return rows.length;
+  const isNRI = r => { const e = (r.ethnicity || '').toLowerCase(); return e.includes('nri') && !e.startsWith('non'); };
+  const isTQLBoard = r => ['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim());
+  if (market === 'US') return rows.filter(isNRI).length;
+  if (market === 'India') return rows.filter(isTQLBoard).length;
+  if (market === 'ME' || market === 'MEA') return rows.filter(isTQLBoard).length;
+  if (market === 'AUS' || market === 'UK' || market === 'APAC') return rows.length;
+  // All geos — apply per-market logic to each row
+  return rows.filter(r => {
+    const cb = (r.country_bucket || '').trim();
+    if (cb === 'US' || cb === 'Canada') return isNRI(r);
+    if (cb === 'India' || cb === 'IN') return isTQLBoard(r);
+    if (cb === 'ME' || cb === 'MEA') return isTQLBoard(r);
+    return true; // APAC, UK — all QLs qualify
+  }).length;
 }
 
 function getTD_snapshot(market, startDate, endDate) {
@@ -3762,6 +3791,29 @@ function getInvalid(market, startDate, endDate) {
   }).length;
 }
 
+function getNRI(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    if (String(r.qls) !== '1') return false;
+    const e = (r.ethnicity || '').toLowerCase();
+    return e.includes('nri') && !e.startsWith('non');
+  }).length;
+}
+
+function getAsian(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(leadsData, market);
+  return rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    if (String(r.qls) !== '1') return false;
+    return (r.ethnicity || '').toLowerCase().startsWith('asian');
+  }).length;
+}
+
 // ── Derived metrics — never divide by zero, return null ──
 
 function safeDivide(num, den) { return den > 0 ? num / den : null; }
@@ -3776,9 +3828,11 @@ function getMarketMetrics(market, startDate, endDate) {
   const enrolled = getEnrolled(market, startDate, endDate);
   const revenue = getRevenue(market, startDate, endDate);
   const invalid = getInvalid(market, startDate, endDate);
+  const nri = getNRI(market, startDate, endDate);
+  const asian = getAsian(market, startDate, endDate);
 
   return {
-    spend, ql, tql, td: td_snap, td_cohort, ts, enrolled, revenue, invalid,
+    spend, ql, tql, nri, asian, td: td_snap, td_cohort, ts, enrolled, revenue, invalid,
     cpql: safeDivide(spend, ql),
     cptql: safeDivide(spend, tql),
     cptd: safeDivide(spend, td_snap),
@@ -4711,59 +4765,40 @@ function renderRegionalCards() {
   const container = document.getElementById('regionalCards');
   container.innerHTML = '';
   const countryFilter = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const { from, to } = getGlobalDateRange();
 
-  // Build regional summary from filtered tagger data (respects date + country filters)
-  const filteredData = getDashboardFilteredData();
-  if (filteredData.length) {
-    // Aggregate from filtered data to build geo stats
-    const geoStats = {};
-    filteredData.forEach(c => {
-      const geo = extractMarket(c);
-      if (geo === 'Unknown') return;
-      if (!geoStats[geo]) geoStats[geo] = { spend: 0, ql: 0, nri: 0, td: 0, paid: 0, count: 0 };
-      geoStats[geo].spend += parseNumber(c['Spent']||c['spent']||0);
-      geoStats[geo].ql += parseNumber(c['QL']||c['ql']||0);
-      geoStats[geo].nri += parseNumber(c['NRI']||c['nri']||0);
-      geoStats[geo].td += parseNumber(c['TD']||c['td']||0);
-      geoStats[geo].paid += parseNumber(c['Paid']||c['paid']||0);
-      geoStats[geo].count++;
-    });
+  // Section 2: regional cards from leadsData + costData
+  if (!leadsData.length) return;
 
-    let geos = Object.keys(geoStats).sort((a,b) => geoStats[b].spend - geoStats[a].spend);
-    if (countryFilter !== 'all') geos = geos.filter(g => g === countryFilter);
+  let geos = ['US', 'India', 'AUS', 'MEA', 'UK'];
+  if (countryFilter !== 'all') geos = geos.filter(g => g === countryFilter);
 
-    geos.forEach(geo => {
-      const s = geoStats[geo];
-      const card = document.createElement('div');
-      const colors = GEO_COLORS[geo] || { bg:'bg-surface-tertiary', border:'border-gray-200', text:'text-text-secondary', dot:'bg-gray-400' };
-      card.className = 'metric-card bg-white rounded-xl p-4 cursor-pointer';
-      card.onclick = () => { document.getElementById('briefMarket').value = geo; navigateTo('generate'); };
-      const cpql = s.ql > 0 ? s.spend / s.ql : 0;
-      const cpnri = s.nri > 0 ? s.spend / s.nri : 0;
-      const metrics = [
-        { label: 'Spend', value: formatCurrency(s.spend) },
-        { label: 'CPQL', value: cpql > 0 ? formatCurrency(cpql) : '-' },
-        { label: 'CPNRI', value: cpnri > 0 ? formatCurrency(cpnri) : '-' },
-        { label: 'Creatives', value: s.count },
-        { label: 'QLs', value: s.ql },
-      ].filter(m => m.value !== '-' && m.value !== 0);
-      card.innerHTML = `
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <div class="w-2.5 h-2.5 rounded-full ${colors.dot}"></div>
-            <span class="font-bold text-sm">${geo}</span>
-          </div>
-          <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${colors.bg} ${colors.text}">Live</span>
+  geos.forEach(geo => {
+    const gm = getMarketMetrics(geo, from || undefined, to || undefined);
+    if (gm.spend === 0 && gm.ql === 0) return; // skip empty markets
+    const colors = GEO_COLORS[geo] || { bg:'bg-surface-tertiary', border:'border-gray-200', text:'text-text-secondary', dot:'bg-gray-400' };
+    const card = document.createElement('div');
+    card.className = 'metric-card bg-white rounded-xl p-4 cursor-pointer';
+    card.onclick = () => { document.getElementById('briefMarket').value = geo; navigateTo('generate'); };
+    const metrics = [
+      { label: 'Spend', value: formatCurrency(gm.spend) },
+      { label: 'CPTD', value: gm.cptd ? formatCurrency(gm.cptd) : '—' },
+      { label: 'TQLs', value: gm.tql },
+      { label: 'TDs', value: gm.td },
+    ].filter(m => m.value !== '—' && m.value !== 0);
+    card.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-2.5 h-2.5 rounded-full ${colors.dot}"></div>
+          <span class="font-bold text-sm">${geo}</span>
         </div>
-        <div class="space-y-2">
-          ${metrics.slice(0,4).map(m => `<div class="flex justify-between text-xs"><span class="text-text-muted">${m.label}</span><span class="font-semibold">${m.value}</span></div>`).join('')}
-        </div>`;
-      container.appendChild(card);
-    });
-    return;
-  }
-
-  // No fallback — all data comes from tagger/Meta Ads
+        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${colors.bg} ${colors.text}">Live</span>
+      </div>
+      <div class="space-y-2">
+        ${metrics.map(m => `<div class="flex justify-between text-xs"><span class="text-text-muted">${m.label}</span><span class="font-semibold">${m.value}</span></div>`).join('')}
+      </div>`;
+    container.appendChild(card);
+  });
 }
 
 async function fullRefresh() {
@@ -6579,15 +6614,17 @@ function renderMetricTicker() {
   const { from, to } = getGlobalDateRange();
   const dateLabel = from && to ? `${from} to ${to}` : 'All time';
 
-  // Spend from Perf Tracker Daily (date-filtered), funnel from CRM (market-aware TQL)
-  const oracleSpend = getOracleMetrics(from, to, dashCountry).spend;
-  const crm = getCRMPortfolioTotals(dashCountry);
-  const totalSpend = oracleSpend;
-  const cptql = crm.tql > 0 && totalSpend > 0 ? totalSpend / crm.tql : 0;
-  const cptd = crm.td > 0 && totalSpend > 0 ? totalSpend / crm.td : 0;
-  const cac = crm.paid > 0 && totalSpend > 0 ? totalSpend / crm.paid : 0;
-  const tqlTdPct = crm.ql > 0 ? Math.min(crm.td / crm.ql * 100, 100) : 0; // QL→TD% uses ALL QLs
-  const roas = crm.revenue > 0 && totalSpend > 0 ? (crm.revenue / totalSpend).toFixed(2) : null;
+  // Section 2: all metrics from leadsData + costData
+  const market = dashCountry === 'all' ? null : dashCountry;
+  const m = getMarketMetrics(market, from || undefined, to || undefined);
+  const totalSpend = m.spend;
+  const cptql = m.cptql || 0;
+  const cptd = m.cptd || 0;
+  const cac = m.cac || 0;
+  const tqlTdPct = m.ql_td_pct ? m.ql_td_pct * 100 : 0;
+  const roas = m.roas ? m.roas.toFixed(2) : null;
+  // Compat shim so the rest of renderMetricTicker keeps working
+  const crm = { ql: m.ql, tql: m.tql, td: m.td, paid: m.enrolled, revenue: m.revenue, invalid: m.invalid, ts: m.ts, nri: m.nri, asian: m.asian };
 
   if (totalSpend > 0 || crm.td > 0) {
     // ── PRIOR PERIOD for trends ──
@@ -6602,13 +6639,12 @@ function renderMetricTicker() {
       const pf = priorFrom.toISOString().slice(0,10), pt = priorTo.toISOString().slice(0,10);
       const _fmtD = d => { const _m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const _d=new Date(d); return _m[_d.getMonth()]+' '+_d.getDate(); };
       priorLabel = `vs ${_fmtD(pf)} – ${_fmtD(pt)}`;
-      priorSpend = getOracleMetrics(pf, pt, dashCountry).spend;
-      // Pass prior-period dates directly — no DOM mutation needed
-      priorCrm = getCRMPortfolioTotals(dashCountry, { from: pf, to: pt });
+      const pm = getMarketMetrics(market, pf, pt);
+      priorSpend = pm.spend;
+      priorCrm = { tql: pm.tql, td: pm.td, paid: pm.enrolled, ql: pm.ql, revenue: pm.revenue };
     }
     const priorCptd = priorCrm.td > 0 && priorSpend > 0 ? priorSpend / priorCrm.td : 0;
     const priorCptql = priorCrm.tql > 0 && priorSpend > 0 ? priorSpend / priorCrm.tql : 0;
-    const priorRoas = priorCrm.revenue > 0 && priorSpend > 0 ? priorCrm.revenue / priorSpend : 0;
 
     // Trend helper: returns arrow + pct badge
     const trend = (curr, prior, inverted) => {
@@ -6632,10 +6668,9 @@ function renderMetricTicker() {
     let bestGeo = '', worstGeo = '', bestCptd = Infinity, worstCptd = 0;
     if (dashCountry === 'all') {
       ['US','India','AUS','MEA','UK'].forEach(g => {
-        const gSpend = getOracleMetrics(from, to, g).spend;
-        const gCrm = getCRMPortfolioTotals(g); // No DOM mutation — reads dates from DOM directly
-        if (gCrm.td > 2 && gSpend > 0) {
-          const gc = gSpend / gCrm.td;
+        const gm = getMarketMetrics(g, from || undefined, to || undefined);
+        if (gm.td > 2 && gm.spend > 0) {
+          const gc = gm.spend / gm.td;
           if (gc < bestCptd) { bestCptd = gc; bestGeo = g; }
           if (gc > worstCptd) { worstCptd = gc; worstGeo = g; }
         }
@@ -6669,8 +6704,8 @@ function renderMetricTicker() {
     }
     if (leakCount > 0) {
       tldrParts.push(`<span class="text-accent-red font-semibold">Action: ${leakCount} budget leaks (${formatCurrency(leakSpend)} recoverable) — pause now.</span>`);
-    } else if (crm.paid > 0 && roas && parseFloat(roas) >= 1) {
-      tldrParts.push(`<span class="text-accent-green font-semibold">ROAS ${roas}x — profitably acquiring at ${formatCurrency(cac)} CAC.</span>`);
+    } else if (crm.paid > 0 && cac > 0) {
+      tldrParts.push(`<span class="text-accent-green font-semibold">${crm.paid} enrolled at ${formatCurrency(cac)} CAC.</span>`);
     }
 
     // ── RENDER: TL;DR → Hero CPTD → KPI row → Visual Funnel ──
@@ -6682,9 +6717,28 @@ function renderMetricTicker() {
       <p class="text-[9px] text-text-muted mt-1">${dateLabel} · ${geoLabel} · Auto-generated from Perf Tracker + CRM</p>
     </div>`;
 
-    // 2. Hero CPTD + ROAS (large, side by side)
+    // 2. Hero: CPTD + TD (large, side by side)
     const cptdTrend = trend(cptd, priorCptd, true);
-    const roasTrend = trend(roas ? parseFloat(roas) : 0, priorRoas, false);
+    const tdTrend = trend(crm.td, priorCrm.td, false);
+    // Format CPTD from tagger data
+    let formatCptdLine = '';
+    if (state.taggerData?.length) {
+      const fmtStats = {};
+      const dashData = getDashboardFilteredData();
+      dashData.forEach(c => {
+        const fmt = c['Creative type'] || 'Unknown';
+        if (fmt === 'Unknown') return;
+        if (!fmtStats[fmt]) fmtStats[fmt] = { spend: 0, td: 0 };
+        fmtStats[fmt].spend += parseNumber(c['Spent']||c['spent']||0);
+        fmtStats[fmt].td += parseNumber(c['TD']||c['td']||0);
+      });
+      const fmtCptd = Object.entries(fmtStats)
+        .filter(([,s]) => s.td >= 3)
+        .map(([fmt, s]) => ({ fmt, cptd: s.spend / s.td }))
+        .sort((a, b) => a.cptd - b.cptd)
+        .slice(0, 3);
+      if (fmtCptd.length) formatCptdLine = fmtCptd.map(f => `${f.fmt} ${formatCurrency(f.cptd)}`).join(' · ');
+    }
     html += `<div class="grid grid-cols-2 gap-3 mb-3">
       <div class="metric-card bg-white rounded-xl p-5 border-l-4 border-accent-${cptdColor}">
         <div class="flex items-center gap-2 mb-1">
@@ -6694,27 +6748,29 @@ function renderMetricTicker() {
         <p class="text-3xl font-black text-accent-${cptdColor}">${cptd > 0 ? formatCurrency(cptd) : '—'}</p>
         <div class="flex items-center gap-2 mt-1">
           ${cptdTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${cptdTrend}` : ''}
-          ${cptd > 0 ? `<span class="text-[9px] text-text-muted ml-auto">${crm.td} TDs from ${formatCurrency(totalSpend)} spend</span>` : ''}
+          ${cptd > 0 ? `<span class="text-[9px] text-text-muted ml-auto">${formatCurrency(totalSpend)} spend</span>` : ''}
         </div>
+        ${formatCptdLine ? `<p class="text-[9px] text-text-muted mt-1.5">${formatCptdLine}</p>` : ''}
       </div>
-      <div class="metric-card bg-white rounded-xl p-5 border-l-4 border-accent-${roas && parseFloat(roas) >= 1 ? 'green' : roas && parseFloat(roas) >= 0.5 ? 'orange' : 'blue'}">
+      <div class="metric-card bg-white rounded-xl p-5 border-l-4 border-accent-teal">
         <div class="flex items-center gap-2 mb-1">
-          <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider">ROAS</p>
-          <p class="text-[9px] text-text-muted">Return on Ad Spend</p>
+          <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Trials Done</p>
+          <p class="text-[9px] text-text-muted">${dateLabel}</p>
         </div>
-        <p class="text-3xl font-black text-accent-${roas && parseFloat(roas) >= 1 ? 'green' : roas && parseFloat(roas) >= 0.5 ? 'orange' : 'blue'}">${roas ? roas + 'x' : '—'}</p>
+        <p class="text-3xl font-black text-accent-teal">${crm.td > 0 ? crm.td.toLocaleString() : '—'}</p>
         <div class="flex items-center gap-2 mt-1">
-          ${roasTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${roasTrend}` : ''}
-          ${crm.revenue > 0 ? `<span class="text-[9px] text-text-muted ml-auto">${formatCurrency(crm.revenue)} revenue</span>` : ''}
+          ${tdTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${tdTrend}` : ''}
+          ${crm.td > 0 ? `<span class="text-[9px] text-text-muted ml-auto">from ${crm.ql.toLocaleString()} QLs</span>` : ''}
         </div>
       </div>
     </div>`;
 
     // 3. Secondary KPI cards (smaller, with trends)
+    const priorQlTdPct = priorCrm.ql > 0 ? (priorCrm.td / priorCrm.ql * 100) : 0;
     const kpis = [
-      { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: `${dateLabel}${priorLabel ? ' · <span class="text-text-muted">' + priorLabel + '</span>' : ''}` },
-      { label: 'TQLs', value: crm.tql > 0 ? crm.tql.toLocaleString() : '—', color: 'blue', trend: trend(crm.tql, priorCrm.tql, false), sub: `of ${crm.ql.toLocaleString()} QLs` },
-      { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: priorLabel || '' },
+      { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: dateLabel },
+      { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: `${crm.tql.toLocaleString()} TQLs` },
+      { label: 'QL→TD%', value: tqlTdPct > 0 ? tqlTdPct.toFixed(1) + '%' : '—', color: tqlTdPct >= 25 ? 'green' : tqlTdPct >= 15 ? 'orange' : 'red', trend: trend(tqlTdPct, priorQlTdPct, false), sub: 'Cohort conversion' },
       { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toLocaleString() : '—', color: crm.paid > 0 ? 'green' : 'blue', trend: trend(crm.paid, priorCrm.paid, false), sub: crm.paid > 0 ? `CAC ${formatCurrency(cac)}` : '' },
     ];
     html += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">`;
