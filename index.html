@@ -3747,7 +3747,7 @@ function mergeCRMWithMeta() {
         c['net_booking'] = revenue;
       }
       // Always backfill QL from CRM if CRM has more leads than Meta reported
-      if (ql > effectiveQL) c['QL'] = ql;
+      if (ql > metaQL) c['QL'] = ql;
       c._crmMatchType = 'ad_content';
       c._crmMatchScore = bestAdScore;
       c._crmLeadCount = leads.length;

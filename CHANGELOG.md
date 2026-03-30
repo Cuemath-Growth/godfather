@@ -6,6 +6,11 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ## Meta API Fix — GitHub Pages proxy routing (2026-03-30)
 
+### Fix: CRM QL never written to tagger — dead code in mergeCRMWithMeta()
+- **Root cause:** Line `if (ql > effectiveQL) c['QL'] = ql` was dead code. `effectiveQL = Math.max(metaQL, ql)` means `ql > max(metaQL, ql)` is always false. CRM QLs were computed but never written to direct-matched creatives. TDs were written (inside `hasSheetData` block), producing 208 ads with TD > 0 but QL = 0.
+- **Fix:** Changed to `if (ql > metaQL) c['QL'] = ql` — compares CRM ql against Meta's reported ql only. Since Meta reports 0 for most ads, CRM ql (which is correct) now always writes through.
+- **RULE:** Never compare a computed value against a max that includes itself. `x > max(a, x)` is always false.
+
 ### Fix: Meta API calls failing on GitHub Pages (404 on /api/proxy-meta)
 - **Root cause:** `_IS_DEPLOYED` checked `hostname.includes('cuemath')` — true for `cuemath-growth.github.io`. When true, ALL Meta API calls routed through `/api/proxy-meta`, a Netlify serverless function that doesn't exist on GitHub Pages → 404.
 - **Fix:** Split into `_IS_NETLIFY` (proxy available) and `_IS_DEPLOYED` (any hosted env). All proxy routing (`callMetaAPI`, `callClaudeAPI`, `connectMetaApi`, UI badges) now gates on `_IS_NETLIFY`. On GitHub Pages, Meta API calls go direct with user's token from localStorage.
