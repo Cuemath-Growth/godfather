@@ -1,2 +1,6 @@
-# Local Netlify folder
-.netlify
+# Cloudflare
+.wrangler
+node_modules
+
+# OS
+.DS_Store
