@@ -4,6 +4,16 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Meta API Fix — GitHub Pages proxy routing (2026-03-30)
+
+### Fix: Meta API calls failing on GitHub Pages (404 on /api/proxy-meta)
+- **Root cause:** `_IS_DEPLOYED` checked `hostname.includes('cuemath')` — true for `cuemath-growth.github.io`. When true, ALL Meta API calls routed through `/api/proxy-meta`, a Netlify serverless function that doesn't exist on GitHub Pages → 404.
+- **Fix:** Split into `_IS_NETLIFY` (proxy available) and `_IS_DEPLOYED` (any hosted env). All proxy routing (`callMetaAPI`, `callClaudeAPI`, `connectMetaApi`, UI badges) now gates on `_IS_NETLIFY`. On GitHub Pages, Meta API calls go direct with user's token from localStorage.
+- **Also fixed:** Toast messages no longer say "deploy to Netlify" — they say "enter token in Settings."
+- **RULE:** Proxy-dependent code must check `_IS_NETLIFY`, not `_IS_DEPLOYED`. GitHub Pages is a static host — no server-side functions.
+
+---
+
 ## Spend Inflation Fix — Supabase Clear (2026-03-30, ~2:30am)
 
 ### Fix: QL→TD 100% across all ads — removed QL=TD floor

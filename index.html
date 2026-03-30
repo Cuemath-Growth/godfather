@@ -1564,12 +1564,13 @@
 // On Netlify: calls go through /api/proxy-ai and /api/proxy-meta (keys stored in Netlify env vars)
 const API_KEY = localStorage.getItem('gf_claudeKey') || '';
 const GEMINI_KEY = localStorage.getItem('gf_geminiKey') || '';
-const _IS_DEPLOYED = location.hostname.includes('netlify.app') || location.hostname.includes('cuemath');
+const _IS_NETLIFY = location.hostname.includes('netlify.app');
+const _IS_DEPLOYED = _IS_NETLIFY || location.hostname.includes('github.io');
 const _PROXY_BASE = _IS_DEPLOYED ? '' : ''; // Same origin when deployed
 
 // Proxy helpers — route through Netlify Functions when deployed, direct when local
 async function callClaudeAPI(model, system, messages, maxTokens) {
-  if (_IS_DEPLOYED) {
+  if (_IS_NETLIFY) {
     const res = await fetch('/api/proxy-ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1587,7 +1588,8 @@ async function callClaudeAPI(model, system, messages, maxTokens) {
 }
 
 async function callMetaAPI(endpoint, params) {
-  if (_IS_DEPLOYED) {
+  if (_IS_NETLIFY) {
+    // Netlify: route through server-side proxy (token in env var)
     const res = await fetch('/api/proxy-meta', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1595,7 +1597,7 @@ async function callMetaAPI(endpoint, params) {
     });
     return await res.json();
   }
-  // Local dev — direct call
+  // GitHub Pages / local dev — direct call with user's token
   const token = state?.metaApi?.token || localStorage.getItem('gf_metaToken') || '';
   const url = new URL(`https://graph.facebook.com/v21.0/${endpoint}`);
   if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
@@ -3012,8 +3014,8 @@ function initMetaApiSettings() {
   // Show proxy note when deployed
   const proxyNote = document.getElementById('metaProxyNote');
   const tokenHint = document.getElementById('metaTokenHint');
-  if (_IS_DEPLOYED && proxyNote) { proxyNote.classList.remove('hidden'); }
-  if (_IS_DEPLOYED && tokenHint) { tokenHint.textContent = '(server-side via Netlify — shared by all team members)'; }
+  if (_IS_NETLIFY && proxyNote) { proxyNote.classList.remove('hidden'); }
+  if (_IS_NETLIFY && tokenHint) { tokenHint.textContent = '(server-side via Netlify — shared by all team members)'; }
   if (state.metaApi.datePreset) { const el = document.getElementById('settingsMetaDatePreset'); if (el) el.value = state.metaApi.datePreset; }
   if (state.metaApi.level) { const el = document.getElementById('settingsMetaLevel'); if (el) el.value = state.metaApi.level; }
   updateMetaApiBadge();
@@ -3035,8 +3037,8 @@ function initMetaApiSettings() {
 function updateMetaApiBadge() {
   const badge = document.getElementById('metaApiBadge');
   if (!badge) return;
-  if (_IS_DEPLOYED) {
-    // When deployed, Meta API goes through Netlify proxy — no local token needed
+  if (_IS_NETLIFY) {
+    // Netlify: Meta API goes through server-side proxy — no local token needed
     badge.className = 'status-badge connected text-[10px]';
     badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-current"></span>${META_AD_ACCOUNTS.length} accounts (via proxy)`;
   } else if (META_API_TOKEN && META_AD_ACCOUNTS.length) {
@@ -3082,7 +3084,7 @@ async function testMetaApi() {
   const token = state.metaApi.token || META_API_TOKEN;
   const accounts = state.metaApi.accounts || META_AD_ACCOUNTS;
   const statusEl = document.getElementById('metaApiStatus');
-  if (!_IS_DEPLOYED && !token) { showToast('No token — enter one above or deploy to Netlify'); return; }
+  if (!_IS_NETLIFY && !token) { showToast('No token — enter your Meta API token in Settings'); return; }
 
   statusEl.textContent = 'Testing all accounts...';
   let results = [];
@@ -3275,7 +3277,7 @@ async function connectMetaApi() {
   const datePreset = document.getElementById('settingsMetaDatePreset')?.value || state.metaApi.datePreset || 'last_30d';
   const level = document.getElementById('settingsMetaLevel')?.value || state.metaApi.level || 'ad';
 
-  if (!_IS_DEPLOYED && !token) { showToast('No API token configured — enter it above or deploy to Netlify'); return; }
+  if (!_IS_NETLIFY && !token) { showToast('No API token configured — enter it in Settings above'); return; }
 
   const btn = document.getElementById('metaApiConnectBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Pulling data...'; }
@@ -3291,8 +3293,8 @@ async function connectMetaApi() {
     try {
       const fields = 'campaign_name,adset_name,ad_name,spend,impressions,clicks,actions,cost_per_action_type,frequency,reach,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions';
       let url;
-      if (_IS_DEPLOYED) {
-        // Use proxy — token is server-side, not in browser
+      if (_IS_NETLIFY) {
+        // Netlify: use server-side proxy — token in env var
         const proxyParams = { level, fields, date_preset: datePreset, limit: '500' };
         const proxyRes = await callMetaAPI(`${account.id}/insights`, proxyParams);
         // Wrap in pagination-compatible format
