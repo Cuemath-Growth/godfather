@@ -6625,6 +6625,15 @@ function renderMetricTicker() {
   const { from, to } = getGlobalDateRange();
   const dateLabel = from && to ? `${from} to ${to}` : 'All time';
 
+  // Guard: don't render stale tagger numbers — wait for Section 2 data
+  if (!leadsData.length) {
+    const hasCredentials = localStorage.getItem('gf_sheetUrl') && localStorage.getItem('gf_googleKey');
+    if (hasCredentials) {
+      container.innerHTML = '<div class="text-center py-8"><div class="w-6 h-6 border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mx-auto mb-2"></div><p class="text-xs text-text-muted">Loading portfolio data...</p></div>';
+      return;
+    }
+  }
+
   // Section 2: all metrics from leadsData + costData
   const market = dashCountry === 'all' ? null : dashCountry;
   const m = getMarketMetrics(market, from || undefined, to || undefined);
