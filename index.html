@@ -2838,6 +2838,8 @@ function init() {
       const _mediums = {}; costData.forEach(r => { const m = (r.medium||'(empty)').trim(); _mediums[m] = (_mediums[m]||0)+1; });
       console.log('Spend diagnostic — all:', ((_allSpend/10000000).toFixed(2))+'Cr, meta only:', ((_metaSpend/10000000).toFixed(2))+'Cr, mediums:', _mediums);
       updateDataStatusLine();
+      // Re-render dashboard with fresh data
+      if (state.currentView === 'dashboard') try { onDashboardFilterChange(); } catch(e) {}
     }).catch(e => {
       console.error('Boot fetch failed:', e);
       if (hasCached) updateDataStatusLine(); // show cached status
@@ -3631,28 +3633,36 @@ async function fetchSheetData(sheetUrl, apiKey) {
   console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
   costData = parseSheetValues(costJson.values);
 
-  // Cache with timestamp — leads may exceed quota, that's OK (fetched fresh each session)
-  try { localStorage.setItem('gf_leadsData', JSON.stringify(leadsData)); } catch(e) { console.warn('leadsData too large to cache:', e.message); }
-  try { localStorage.setItem('gf_costData', JSON.stringify(costData)); } catch(e) { console.warn('costData too large to cache:', e.message); }
-  localStorage.setItem('gf_dataTimestamp', Date.now().toString());
+  // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
+  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','revenue','board (ME)','board','mx_utm_campaign','mx_utm_adcontent'];
+  const slimLeads = leadsData.map(r => {
+    const s = {};
+    LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
+    return s;
+  });
+  try { localStorage.setItem('gf_v2_leadsData', JSON.stringify(slimLeads)); } catch(e) { console.warn('leadsData cache failed:', e.message); }
+  try { localStorage.setItem('gf_v2_costData', JSON.stringify(costData)); } catch(e) { console.warn('costData cache failed:', e.message); }
+  localStorage.setItem('gf_v2_timestamp', Date.now().toString());
+  // Clean up old keys
+  ['gf_leadsData','gf_costData','gf_dataTimestamp'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
 
   return { leads: leadsData.length, cost: costData.length };
 }
 
 function loadCachedData() {
-  const ts = parseInt(localStorage.getItem('gf_dataTimestamp') || '0');
+  const ts = parseInt(localStorage.getItem('gf_v2_timestamp') || '0');
   const age = Date.now() - ts;
   const SIX_HOURS = 6 * 60 * 60 * 1000;
   if (age > SIX_HOURS) return false;
   try {
-    leadsData = JSON.parse(localStorage.getItem('gf_leadsData') || '[]');
-    costData = JSON.parse(localStorage.getItem('gf_costData') || '[]');
+    leadsData = JSON.parse(localStorage.getItem('gf_v2_leadsData') || '[]');
+    costData = JSON.parse(localStorage.getItem('gf_v2_costData') || '[]');
     return leadsData.length > 0;
   } catch { return false; }
 }
 
 function getDataTimestamp() {
-  const ts = parseInt(localStorage.getItem('gf_dataTimestamp') || '0');
+  const ts = parseInt(localStorage.getItem('gf_v2_timestamp') || '0');
   if (!ts) return null;
   return new Date(ts);
 }
