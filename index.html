@@ -294,10 +294,19 @@
           <!-- Section 1: PAUSE NOW -->
           <div class="mb-6" id="oraclePause">
             <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-accent-red flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+              <div class="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center"><svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
               <h3 class="text-sm font-bold">Pause Now</h3>
-              <span class="text-[9px] text-red-600 font-bold px-1.5 py-0.5 rounded bg-accent-red-light">ACTION REQUIRED</span>
               <span class="text-[10px] text-text-muted">— high spend, zero trials</span>
+              <div class="ml-auto relative">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg></button>
+                <div class="hidden absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-20 min-w-[160px]" onclick="this.classList.add('hidden')">
+                  <button onclick="oracleBulkAction('pause','done')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Mark all done</button>
+                  <button onclick="oracleBulkAction('pause','dismissed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Dismiss all</button>
+                  <button onclick="oracleBulkAction('pause','snoozed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Snooze all 7d</button>
+                  <hr class="my-1 border-gray-100"/>
+                  <button onclick="oracleClearActions('pause')" class="w-full text-left px-3 py-1.5 text-[11px] text-text-muted hover:bg-surface-tertiary">Reset actions</button>
+                </div>
+              </div>
             </div>
             <div id="oraclePauseList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary flex items-center gap-2"><svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Connect data to unlock</p></div>
           </div>
@@ -318,8 +327,17 @@
             <div class="flex items-center gap-2 mb-3">
               <div class="w-6 h-6 rounded-lg bg-accent-green flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg></div>
               <h3 class="text-sm font-bold">Make More Of This</h3>
-              <span class="text-[9px] text-green-700 font-bold px-1.5 py-0.5 rounded bg-accent-green-light">OPPORTUNITY</span>
-              <span class="text-[10px] text-text-muted">— best performing combos to scale</span>
+              <span class="text-[10px] text-text-muted">— best performing campaigns to scale</span>
+              <div class="ml-auto relative">
+                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg></button>
+                <div class="hidden absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-20 min-w-[160px]" onclick="this.classList.add('hidden')">
+                  <button onclick="oracleBulkAction('make_more','done')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Mark all done</button>
+                  <button onclick="oracleBulkAction('make_more','dismissed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Dismiss all</button>
+                  <button onclick="oracleBulkAction('make_more','snoozed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Snooze all 7d</button>
+                  <hr class="my-1 border-gray-100"/>
+                  <button onclick="oracleClearActions('make_more')" class="w-full text-left px-3 py-1.5 text-[11px] text-text-muted hover:bg-surface-tertiary">Reset actions</button>
+                </div>
+              </div>
             </div>
             <div id="oracleMakeMoreList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary flex items-center gap-2"><svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Connect data to unlock</p></div>
           </div>
@@ -2849,6 +2867,10 @@ function init() {
   } else if (!hasCached) {
     document.getElementById('dashboardEmpty').classList.remove('hidden');
   }
+  // Load oracle actions from Supabase (non-blocking)
+  loadOracleActions().then(() => {
+    if (state.currentView === 'dashboard' && leadsData.length) try { renderOracleCardsV2(); } catch(e) {}
+  });
   // Always start on Dashboard
   navigateTo('dashboard');
   // Legacy: fetch tagger/Meta sheet data + Supabase (auto-runs on every boot)
@@ -5977,8 +5999,90 @@ function renderOracleActions() {
 }
 
 // ── Section 2: Oracle Pause Now + Make More from CRM data ──
+let _oracleActions = []; // loaded from Supabase on boot
+
+async function loadOracleActions() {
+  const rows = await supabaseGet('oracle_actions', 'select=*');
+  if (rows) _oracleActions = rows;
+}
+
+function getOracleAction(itemId) {
+  return _oracleActions.find(a => a.item_id === itemId);
+}
+
+function isItemVisible(itemId) {
+  const action = getOracleAction(itemId);
+  if (!action) return true;
+  if (action.status === 'dismissed') return false;
+  if (action.status === 'snoozed' && action.snooze_until) {
+    return new Date() >= new Date(action.snooze_until);
+  }
+  return true; // 'done' items are visible but greyed out
+}
+
+async function oracleAction(itemId, cardType, status, name, silent) {
+  const row = {
+    item_id: itemId,
+    card_type: cardType,
+    status: status,
+    note: '',
+    item_name: name,
+    actioned_by: 'naina',
+    actioned_at: new Date().toISOString(),
+    snooze_until: status === 'snoozed' ? new Date(Date.now() + 7 * 86400000).toISOString() : null
+  };
+  _oracleActions = _oracleActions.filter(a => a.item_id !== itemId);
+  _oracleActions.push(row);
+  supabaseUpsert('oracle_actions', [row]);
+  if (!silent) {
+    renderOracleCardsV2();
+    showToast(status === 'done' ? 'Marked done' : status === 'dismissed' ? 'Dismissed' : 'Snoozed 7 days');
+  }
+}
+
+function _oracleThumbnail(adName) {
+  if (!state.taggerData?.length) return '';
+  const nameLower = (adName || '').toLowerCase();
+  const match = state.taggerData.find(c => {
+    const n = (c['Ad name'] || '').toLowerCase();
+    return n && (n.includes(nameLower) || nameLower.includes(n));
+  });
+  const url = match?.['thumbnail_url'] || match?.['image_url'] || '';
+  if (url) return `<img src="${url}" class="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-lg bg-surface-tertiary shrink-0\\'></div>'" />`;
+  return '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
+}
+
+function oracleBulkAction(cardType, status) {
+  const prefix = cardType === 'pause' ? 'pause:' : 'make:';
+  const items = _oracleActions.filter(a => a.item_id.startsWith(prefix));
+  // Get all currently visible items from the DOM
+  const list = cardType === 'pause' ? document.getElementById('oraclePauseList') : document.getElementById('oracleMakeMoreList');
+  const cards = list?.querySelectorAll('[data-item-id]') || [];
+  cards.forEach(card => {
+    const itemId = card.dataset.itemId;
+    if (itemId) oracleAction(itemId, cardType, status, card.dataset.itemName || '', true);
+  });
+  renderOracleCardsV2();
+  showToast(status === 'done' ? 'All marked done' : status === 'dismissed' ? 'All dismissed' : 'All snoozed 7d');
+}
+
+function oracleClearActions(cardType) {
+  const prefix = cardType === 'pause' ? 'pause:' : 'make:';
+  _oracleActions = _oracleActions.filter(a => !a.item_id.startsWith(prefix));
+  renderOracleCardsV2();
+  showToast('Actions reset');
+}
+
 function renderOracleCardsV2() {
-  if (!leadsData.length) return; // Section 2 not loaded yet
+  if (!leadsData.length) {
+    const hasCredentials = localStorage.getItem('gf_sheetUrl') && localStorage.getItem('gf_googleKey');
+    if (hasCredentials) {
+      const spinner = '<div class="text-center py-4"><div class="w-5 h-5 border-2 border-amber-300/30 border-t-amber-400 rounded-full animate-spin mx-auto mb-1.5"></div><p class="text-[10px] text-text-muted">Loading...</p></div>';
+      document.getElementById('oraclePauseList').innerHTML = spinner;
+      document.getElementById('oracleMakeMoreList').innerHTML = spinner;
+    }
+    return;
+  }
   const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
   const market = dashCountry === 'all' ? null : dashCountry;
   const { from, to } = getGlobalDateRange();
@@ -5991,26 +6095,35 @@ function renderOracleCardsV2() {
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 8);
 
-  if (pauseAds.length) {
+  const visiblePause = pauseAds.filter(a => isItemVisible('pause:' + a.name));
+  if (visiblePause.length) {
     let html = '<div class="space-y-2">';
-    pauseAds.forEach(a => {
-      html += `<div class="flex items-center gap-3 p-3 bg-accent-red-light/50 border border-red-200 rounded-xl">
-        <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
-          <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    visiblePause.forEach((a, idx) => {
+      const itemId = 'pause:' + a.name;
+      const action = getOracleAction(itemId);
+      const isDone = action?.status === 'done';
+      const opacity = isDone ? 'opacity-50' : '';
+      const isTopOffender = idx === 0 && !isDone;
+      const cardBg = isTopOffender ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200';
+      const metricColor = isTopOffender ? 'text-red-700' : 'text-text-muted';
+      const shortName = a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name;
+      html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
+        <div class="flex items-center gap-3">
+          ${_oracleThumbnail(a.name)}
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-semibold truncate" title="${a.name}">${shortName}</p>
+            <p class="text-[10px] ${metricColor}">${formatCurrency(a.spend)} spent · ${a.ql} QLs · 0 TDs</p>
+            ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
+          </div>
         </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs font-semibold truncate" title="${a.name}">${a.name.length > 50 ? a.name.slice(0, 50) + '...' : a.name}</p>
-          <p class="text-[10px] text-red-700">${formatCurrency(a.spend)} spent · ${a.ql} QLs · 0 TDs</p>
-        </div>
-        <button onclick="copyToClipboard('${a.name.replace(/'/g, "\\'")}')" class="text-[10px] px-3 py-1 rounded-full bg-red-600 text-white font-bold hover:bg-red-700 shrink-0">Copy & Pause</button>
       </div>`;
     });
-    const totalWaste = pauseAds.reduce((s, a) => s + a.spend, 0);
-    html += `<p class="text-[10px] text-red-700 font-semibold mt-2">${pauseAds.length} ads · ${formatCurrency(totalWaste)} recoverable spend</p>`;
+    const totalWaste = visiblePause.filter(a => !getOracleAction('pause:' + a.name)?.status).reduce((s, a) => s + a.spend, 0);
+    if (totalWaste > 0) html += `<p class="text-[10px] text-amber-700 font-semibold mt-2">${visiblePause.length} ads · ${formatCurrency(totalWaste)} recoverable</p>`;
     html += '</div>';
     pauseList.innerHTML = html;
   } else {
-    pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (spend > ₹50K with 0 TDs).</p>';
+    pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected.</p>';
   }
 
   // ── MAKE MORE: top campaigns by CPTD where TD >= 3 ──
@@ -6021,28 +6134,37 @@ function renderOracleCardsV2() {
     .sort((a, b) => a.cptd - b.cptd)
     .slice(0, 5);
 
-  if (topCampaigns.length) {
+  const visibleMake = topCampaigns.filter(c => isItemVisible('make:' + c.name));
+  if (visibleMake.length) {
     let html = '<div class="space-y-2">';
-    topCampaigns.forEach((c, i) => {
+    visibleMake.forEach((c, i) => {
+      const itemId = 'make:' + c.name;
+      const action = getOracleAction(itemId);
+      const isDone = action?.status === 'done';
+      const opacity = isDone ? 'opacity-50' : '';
       const cptdColor = c.cptd < 40000 ? 'green' : c.cptd < 70000 ? 'orange' : 'red';
-      html += `<div class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl">
-        <div class="w-8 h-8 rounded-lg bg-accent-green-light flex items-center justify-center shrink-0">
-          <span class="text-xs font-bold text-green-700">#${i + 1}</span>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-xs font-semibold truncate" title="${c.name}">${c.name.length > 60 ? c.name.slice(0, 60) + '...' : c.name}</p>
-          <p class="text-[10px] text-text-muted">${c.td} TDs · ${c.ql} QLs · ${formatCurrency(c.spend)} spent</p>
-        </div>
-        <div class="text-right shrink-0">
-          <p class="text-sm font-bold text-accent-${cptdColor}">${formatCurrency(c.cptd)}</p>
-          <p class="text-[9px] text-text-muted">CPTD</p>
+      const shortName = c.name.length > 40 ? c.name.slice(0, 40) + '...' : c.name;
+      html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-accent-green-light flex items-center justify-center shrink-0">
+            <span class="text-xs font-bold text-green-700">#${i + 1}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs font-semibold truncate" title="${c.name}">${shortName}</p>
+            <p class="text-[10px] text-text-muted">${c.td} TDs · ${c.ql} QLs · ${formatCurrency(c.spend)} spent</p>
+            ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
+          </div>
+          <div class="text-right shrink-0">
+            <p class="text-sm font-bold text-accent-${cptdColor}">${formatCurrency(c.cptd)}</p>
+            <p class="text-[9px] text-text-muted">CPTD</p>
+          </div>
         </div>
       </div>`;
     });
     html += '</div>';
     makeMoreList.innerHTML = html;
   } else {
-    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 3+ TDs found in current filters.</p>';
+    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 3+ TDs found.</p>';
   }
 }
 
