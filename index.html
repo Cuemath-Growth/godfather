@@ -5778,7 +5778,7 @@ function onDashboardFilterChange() {
         parts.push('CRM: ' + fmtMo(cMin) + '\u2013' + fmtMo(cMax));
       }
     }
-    if (m) parts.push(Math.round(m.tql) + ' TQLs \u00b7 ' + Math.round(m.td) + ' TDs \u00b7 ' + Math.round(m.paid) + ' enrolled');
+    if (m) parts.push(Math.round(m.tql) + ' TQLs \u00b7 ' + Math.round(m.td) + ' TDs \u00b7 ' + Math.round(m.enrolled||0) + ' enrolled');
     el.textContent = parts.join(' \u00b7 ');
   }
 }
@@ -10732,9 +10732,9 @@ function renderLensAggregateMetrics() {
     metricCard('Meta Spend', m.spend > 0 ? formatCurrency(m.spend) : '\u2014', ''),
     metricCard('TQLs', (m.tql||0) > 0 ? Math.round(m.tql).toString() : '\u2014', m.nri > 0 ? `${Math.round(m.nri)} NRI` : ''),
     metricCard('CPTQL', ((m.tql||0) === 0 && (m.td||0) > 0) ? '\u2014' : ((m.cptql||0) > 0 ? formatCurrency(m.cptql) : '\u2014'), ''),
-    metricCard('TDs', m.td > 0 ? Math.round(m.td).toString() : '\u2014', (m.tqlTd||0) > 0 ? `TQL\u2192TD ${m.tqlTd.toFixed(1)}%` : ''),
+    metricCard('TDs', m.td > 0 ? Math.round(m.td).toString() : '\u2014', (m.ql_td_pct||0) > 0 ? `QL→TD ${(m.ql_td_pct*100).toFixed(1)}%` : ''),
     metricCard('CPTD', (m.cptd||0) > 0 ? formatCurrency(m.cptd) : '\u2014', ''),
-    metricCard('Enrolled', (m.enrolled||m.paid||0) > 0 ? Math.round(m.enrolled||m.paid).toString() : '\u2014', (m.cac||0) > 0 ? `CAC ${formatCurrency(m.cac)}` : '')
+    metricCard('Enrolled', (m.enrolled||0) > 0 ? Math.round(m.enrolled).toString() : '\u2014', (m.cac||0) > 0 ? `CAC ${formatCurrency(m.cac)}` : '')
   ].join('');
 
   // Portfolio metrics are now on Dashboard only — don't show on Tagger/Insights
@@ -14252,7 +14252,7 @@ function renderSentinelKPIs() {
     { label: 'CPTQL', value: (tql === 0 && td > 0) ? '\u2014' : (cptql > 0 ? formatCurrency(cptql) : '-'), score: cptqlScore, sub: `${Math.round(tql).toLocaleString()} TQLs` },
     { label: 'CPTD', value: td < 10 ? 'Low data' : (cptd > 0 ? formatCurrency(cptd) : '-'), score: cptdScore, sub: `${Math.round(td)} trials done` },
     { label: 'QL→TD%', value: (qlTdPct||0).toFixed(1) + '%', score: qlTdScore, sub: 'Funnel conversion' },
-    { label: 'ROAS', value: roas >= 0.01 ? roas.toFixed(2) + 'x' : '-', score: roasScore, sub: roas >= 0.01 ? `${formatCurrency(crm.revenue || 0)} revenue` : '' },
+    { label: 'ROAS', value: roas >= 0.01 ? roas.toFixed(2) + 'x' : '-', score: roasScore, sub: roas >= 0.01 ? `${formatCurrency(_m2?.revenue || 0)} revenue` : '' },
     { label: 'CAC', value: cac > 0 ? formatCurrency(cac) : '-', score: 'gray', sub: `${Math.round(enrolled)} enrolled` },
   ];
 
