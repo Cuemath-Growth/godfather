@@ -4377,7 +4377,7 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     const campKey = normalizeAdName(r.mx_utm_campaign);
     if (!adKey || !campKey) return;
     const key = adKey + '||' + campKey;
-    if (!qlMap[key]) qlMap[key] = { adName: r.mx_utm_adcontent, campaignName: r.mx_utm_campaign, ql: 0 };
+    if (!qlMap[key]) qlMap[key] = { adName: r.mx_utm_adcontent, campaignName: r.mx_utm_campaign, ql: 0, _market: r.country_bucket || '' };
     qlMap[key].ql++;
   });
 
@@ -4403,11 +4403,14 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     const hasSpend = metaSpend !== undefined && metaSpend > 0;
     if (hasSpend) metaMatched++; else metaMissed++;
 
+    // Derive market: CRM country_bucket first, then extract from campaign name
+    const mkt = data._market || matchMarketFromText(' ' + (data.campaignName || '').toUpperCase() + ' ');
     return {
       adName: data.adName,
       campaignName: data.campaignName,
       displayName: stripCampaignPrefix(data.adName),
       campaignContext: stripCampaignPrefix(data.campaignName),
+      market: mkt === 'Unknown' ? '' : mkt,
       ql: data.ql,
       spend: hasSpend ? metaSpend : null,
       cptql: hasSpend && data.ql > 0 ? metaSpend / data.ql : null,
@@ -4422,10 +4425,12 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     const origRow = metaAdData.find(r => normalizeAdName(r.ad_name) === adKey && normalizeAdName(r.campaign_name) === campKey);
     const adName = origRow?.ad_name || adKey;
     const campName = origRow?.campaign_name || campKey;
+    const mkt = matchMarketFromText(' ' + campName.toUpperCase() + ' ');
     results.push({
       adName, campaignName: campName,
       displayName: stripCampaignPrefix(adName),
       campaignContext: stripCampaignPrefix(campName),
+      market: mkt === 'Unknown' ? '' : mkt,
       ql: 0, spend, cptql: null, _spendSource: 'meta_insights',
     });
   });
@@ -6507,9 +6512,11 @@ function renderOracleCardsV2() {
   const { from, to } = getGlobalDateRange();
 
   // ── PAUSE NOW: CPTQL > 2x market avg — flag inefficient ads ──
-  // Skip already-paused ads (check metaCreatives effective_status)
+  // Use wider lookback (min 90 days) so short date ranges still show results
+  const pauseLookback = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const pauseFrom = from < pauseLookback ? from : pauseLookback;
   const pauseList = document.getElementById('oraclePauseList');
-  const adCampData = getAdCampaignBreakdown(market, from, to);
+  const adCampData = getAdCampaignBreakdown(market, pauseFrom, to);
   const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
 
   const isPaused = (adName) => {
@@ -6524,6 +6531,7 @@ function renderOracleCardsV2() {
     .slice(0, 8)
     .map(a => ({
       name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
+      campaignName: a.campaignName, market: a.market || '',
       spend: a.spend, ql: a.ql, cptql: a.cptql,
       _type: 'spend', _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.ql} QLs · ${formatCurrency(a.spend)}`,
     }));
@@ -6564,12 +6572,13 @@ function renderOracleCardsV2() {
       const metricColor = isTopOffender || isUrgent ? 'text-red-700' : 'text-text-muted';
       const displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
       const campCtx = a.campaignContext || '';
+      const geoTag = a.market ? `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
       const thumbHtml = _oracleThumbnail(a.name);
       html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
         <div class="flex items-center gap-3">
           ${thumbHtml}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${a.name}">${displayName}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
+            <p class="text-xs font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
             ${campCtx ? `<p class="text-[9px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
             <p class="text-[10px] ${metricColor}">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
@@ -6583,7 +6592,7 @@ function renderOracleCardsV2() {
     html += '</div>';
     pauseList.innerHTML = html;
   } else {
-    pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 30 days).</p>';
+    pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 90 days).</p>';
   }
 
   // ── MAKE MORE: ad+campaign level, ranked by CPTQL ──
@@ -6606,11 +6615,12 @@ function renderOracleCardsV2() {
       const opacity = isDone ? 'opacity-50' : '';
       const cpqlColor = c.cptql < 5000 ? 'green' : c.cptql < 10000 ? 'orange' : 'red';
       const esc = s => s.replace(/'/g, "\\'");
+      const geoTag = c.market ? `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${c.market}</span>` : '';
       html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${c.displayName}">
         <div class="flex items-center gap-3">
           ${_oracleThumbnail(c.adName)}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${c.adName}">${c.displayName}</p>
+            <p class="text-xs font-semibold truncate" title="${c.adName}">${c.displayName} ${geoTag}</p>
             <p class="text-[9px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
             <p class="text-[10px] text-text-muted">${c.ql} QLs · ${formatCurrency(c.spend)} spent${c._spendSource === 'campaign_prorated' ? ' (est.)' : ''}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
