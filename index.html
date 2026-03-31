@@ -3744,9 +3744,15 @@ function loadCachedCreatives() {
   } catch { return false; }
 }
 
-async function fetchMetaCreatives() {
+async function fetchMetaCreatives(force = false) {
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
   if (!accounts?.length) return;
+  // Skip if data is fresh (< 24 hours) unless forced
+  const lastFetch = parseInt(localStorage.getItem('gf_v2_creativesTs') || '0');
+  if (!force && metaCreatives.length > 0 && (Date.now() - lastFetch < 24 * 60 * 60 * 1000)) {
+    console.log('Meta creatives: skipping — data is < 24h old. Use Settings > Refresh to force.');
+    return;
+  }
   const all = [];
   for (const account of accounts) {
     try {
@@ -3822,9 +3828,15 @@ async function loadCachedAdData() {
   } catch { return false; }
 }
 
-async function fetchMetaAdInsights() {
+async function fetchMetaAdInsights(force = false) {
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
   if (!accounts?.length) return;
+  // Skip if data is fresh (< 24 hours) unless forced
+  const lastFetch = parseInt(localStorage.getItem('gf_v2_adDataTs') || '0');
+  if (!force && metaAdData.length > 0 && (Date.now() - lastFetch < 24 * 60 * 60 * 1000)) {
+    console.log('Meta ad insights: skipping — data is < 24h old. Use Settings > Refresh to force.');
+    return;
+  }
   // Last 90 days
   const end = new Date().toISOString().slice(0, 10);
   const start = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
@@ -5363,7 +5375,10 @@ async function fullRefresh() {
       // Also store raw data for new ads that aren't tagged yet
       state.rawData.metaAds = allAds;
     }
-    // Step 3: Refresh sheets (CRM, regional, etc.)
+    // Step 3: Refresh ad insights + creatives (force, bypasses 24h gate)
+    btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin"></div> Ad insights...';
+    await Promise.all([fetchMetaCreatives(true), fetchMetaAdInsights(true)]);
+    // Step 4: Refresh sheets (CRM, regional, etc.)
     btn.innerHTML = '<div class="w-3.5 h-3.5 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin"></div> Sheets...';
     await refreshData();
     // Step 4: Recompute derived metrics and save
