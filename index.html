@@ -6120,12 +6120,19 @@ async function oracleAction(itemId, cardType, status, name, silent) {
   }
 }
 
-function _oracleThumbnail(adName) {
-  // Try metaCreatives first (Section 3), then tagger data fallback
-  const url = getCreativeThumbnail(adName)
-    || (() => { const m = (state.taggerData || []).find(c => { const n = (c['Ad name']||'').toLowerCase(), q = (adName||'').toLowerCase(); return n && q && (n.includes(q) || q.includes(n)); }); return m?.thumbnail_url || m?.image_url || ''; })();
+function _oracleThumbnail(name) {
+  // Try exact ad match, then campaign substring match, then tagger fallback
+  const url = getCreativeThumbnail(name) || getCampaignThumbnail(name)
+    || (() => { const m = (state.taggerData || []).find(c => { const n = (c['Ad name']||'').toLowerCase(), q = (name||'').toLowerCase(); return n && q && (n.includes(q) || q.includes(n)); }); return m?.thumbnail_url || m?.image_url || ''; })();
   if (url) return `<img src="${url}" class="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-lg bg-surface-tertiary shrink-0\\'></div>'" />`;
   return '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
+}
+
+function getCampaignThumbnail(campaignName) {
+  if (!metaCreatives.length || !campaignName) return null;
+  const q = campaignName.toLowerCase();
+  const match = metaCreatives.find(c => c.name.toLowerCase().includes(q));
+  return match ? (match.thumbnail_url || match.image_url || null) : null;
 }
 
 function oracleBulkAction(cardType, status) {
@@ -6236,9 +6243,32 @@ function renderOracleCardsV2() {
     .sort((a, b) => a.cptd - b.cptd)
     .slice(0, 5);
 
-  // Log suspicious campaigns for debugging
+  // ── DEBUG: trace CPTD + thumbnail inputs ──
+  const _debugAll = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0).sort((a,b) => a.cptd - b.cptd);
+  console.log('=== MAKE MORE DEBUG ===');
+  _debugAll.slice(0, 5).forEach(c => {
+    // Campaign name comparison: leads vs cost
+    const costMatches = costData.filter(r => (r.campaign_name || '') === c.name);
+    const costMatchesMeta = costMatches.filter(r => (r.medium||'').trim().toLowerCase() === 'meta');
+    const costCampNames = [...new Set(costData.map(r => r.campaign_name))].filter(n => n.toLowerCase().includes(c.name.slice(0, 20).toLowerCase()));
+    console.log('Campaign:', c.name);
+    console.log('  TDs:', c.td, '| spend:', Math.round(c.spend), '| CPTD:', Math.round(c.cptd));
+    console.log('  costData exact matches:', costMatches.length, '(meta:', costMatchesMeta.length, ')');
+    console.log('  costData partial matches:', costCampNames.slice(0, 3));
+    console.log('  leads mx_utm_campaign sample:', leadsData.filter(r => r.mx_utm_campaign === c.name).slice(0, 1).map(r => r.mx_utm_campaign)[0]);
+    // Thumbnail debug
+    const thumbResult = getCreativeThumbnail(c.name);
+    const campThumbResult = getCampaignThumbnail(c.name);
+    console.log('  thumbnail — getCreativeThumbnail:', thumbResult ? 'HIT' : 'MISS', '| getCampaignThumbnail:', campThumbResult ? 'HIT' : 'MISS');
+    if (!campThumbResult && metaCreatives.length) {
+      const q = c.name.toLowerCase().slice(0, 30);
+      const partial = metaCreatives.filter(mc => mc.name.toLowerCase().includes(q)).length;
+      console.log('  metaCreatives partial name match (first 30 chars):', partial, '| search:', q);
+    }
+  });
+  console.log('=== END DEBUG ===');
   const suspicious = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0 && c.cptd < 5000);
-  if (suspicious.length) console.warn('Make More: filtered out', suspicious.length, 'campaigns with CPTD < ₹5K:', suspicious.map(c => ({ name: c.name.slice(0, 40), cptd: Math.round(c.cptd), spend: c.spend, td: c.td })));
+  if (suspicious.length) console.warn('Make More: filtered', suspicious.length, 'with CPTD < ₹5K');
 
   const visibleMake = topCampaigns.filter(c => isItemVisible('make:' + c.name));
   const makeBadge = document.getElementById('makeMoreBadge');
