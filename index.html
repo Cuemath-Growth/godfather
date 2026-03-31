@@ -6449,35 +6449,27 @@ function renderOracleCardsV2() {
   const market = dashCountry === 'all' ? null : dashCountry;
   const { from, to } = getGlobalDateRange();
 
-  // ── PAUSE NOW: high spend + 0 QLs, OR high CPTQL (>2x portfolio avg) ──
+  // ── PAUSE NOW: CPTQL > 2x market avg — flag inefficient ads ──
+  // Skip already-paused ads (check metaCreatives effective_status)
   const pauseList = document.getElementById('oraclePauseList');
   const adCampData = getAdCampaignBreakdown(market, from, to);
   const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
-  const avgCPTQL_2x = avgCPTQL * 2;
 
-  // Type 1: high spend, zero QLs
-  const zeroQL = adCampData
-    .filter(a => a.spend !== null && a.spend > 30000 && a.ql === 0)
-    .sort((a, b) => b.spend - a.spend)
-    .slice(0, 4)
-    .map(a => ({
-      name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
-      spend: a.spend, ql: 0, cptql: null,
-      _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · 0 QLs`,
-    }));
+  const isPaused = (adName) => {
+    const key = (adName || '').toLowerCase().trim();
+    const creative = metaCreatives.find(c => c.name.toLowerCase().trim() === key);
+    return creative && (creative.status === 'PAUSED' || creative.status === 'paused');
+  };
 
-  // Type 2: has QLs but CPTQL > 2x portfolio avg (inefficient)
-  const highCPTQL = adCampData
-    .filter(a => a.spend !== null && a.spend > 20000 && a.ql >= 2 && a.cptql > avgCPTQL_2x)
+  const spendLeaks = adCampData
+    .filter(a => a.spend !== null && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
     .sort((a, b) => b.cptql - a.cptql)
-    .slice(0, 4)
+    .slice(0, 8)
     .map(a => ({
       name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
       spend: a.spend, ql: a.ql, cptql: a.cptql,
-      _type: 'spend', _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql/avgCPTQL)}x avg) · ${a.ql} QLs · ${formatCurrency(a.spend)}`,
+      _type: 'spend', _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.ql} QLs · ${formatCurrency(a.spend)}`,
     }));
-
-  const spendLeaks = [...zeroQL, ...highCPTQL];
 
   // Merge fatigue ads (Stage 2+3 only)
   const fatigueAds = detectFatigue()
