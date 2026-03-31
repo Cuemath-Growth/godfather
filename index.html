@@ -2104,8 +2104,7 @@ function deduplicateByAdName(data) {
   data.forEach(c => {
     const name = (c['Ad name'] || c['ad name'] || '').trim();
     if (!name) return;
-    // Normalize: strip trailing placement suffixes that Meta adds
-    const key = name.replace(/_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds)_(ig|fb|an)$/i, '');
+    const key = normalizeAdName(name);
     if (!byName[key]) {
       byName[key] = { ...c, _dedupCount: 1 };
     } else {
@@ -4154,7 +4153,7 @@ function buildLookupMaps() {
   costData.forEach(r => {
     const med = (r.medium || '').trim().toLowerCase();
     if (med !== 'meta') return;
-    const key = (r.campaign_name || '').toLowerCase().trim();
+    const key = normalizeAdName(r.campaign_name);
     if (!key) return;
     if (!_campaignMap[key]) _campaignMap[key] = { spend: 0, medium: 'meta', market: (r.country_segment || '').trim(), rows: 0 };
     _campaignMap[key].spend += parseFloat(r.amount_spent) || 0;
@@ -4176,7 +4175,7 @@ function buildLookupMaps() {
 
   // Match rate logging
   const leadsWithCamp = leadsData.filter(r => (r.mx_utm_campaign || '').trim()).length;
-  const leadsMatchedCamp = leadsData.filter(r => _campaignMap[(r.mx_utm_campaign || '').toLowerCase().trim()]).length;
+  const leadsMatchedCamp = leadsData.filter(r => _campaignMap[normalizeAdName(r.mx_utm_campaign)]).length;
   const leadsWithAd = leadsData.filter(r => (r.mx_utm_adcontent || '').trim()).length;
   const leadsMatchedAd = leadsData.filter(r => _adMap[normalizeAdName(r.mx_utm_adcontent)]).length;
   console.log(`Campaign map: ${Object.keys(_campaignMap).length} meta campaigns, matched ${leadsMatchedCamp}/${leadsWithCamp} leads (${leadsWithCamp > 0 ? Math.round(leadsMatchedCamp / leadsWithCamp * 100) : 0}%)`);
@@ -4187,7 +4186,7 @@ function buildLookupMaps() {
 function getCampaignSpend(campaignName, market, startDate, endDate) {
   // Fast path: use pre-built map for all-time, all-market
   if (!startDate && !endDate && !market) {
-    const entry = _campaignMap?.[(campaignName || '').toLowerCase().trim()];
+    const entry = _campaignMap?.[normalizeAdName(campaignName)];
     return entry ? entry.spend : null;
   }
   // Slow path: filter costData for specific date/market range
@@ -4196,11 +4195,11 @@ function getCampaignSpend(campaignName, market, startDate, endDate) {
 
 // ── Campaign join helper: case-insensitive trimmed match, medium-first ──
 function _metaCostForCampaign(campaignName, market, startDate, endDate) {
-  const key = (campaignName || '').toLowerCase().trim();
+  const key = normalizeAdName(campaignName);
   if (!key) return null; // null = unmatched, distinct from 0 = matched but zero spend
   const rows = filterCostByMarket(costData, market).filter(r => {
     if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
-    if ((r.campaign_name || '').toLowerCase().trim() !== key) return false;
+    if (normalizeAdName(r.campaign_name) !== key) return false;
     const day = r.day || '';
     if (startDate && day < startDate) return false;
     if (endDate && day > endDate) return false;
@@ -4216,7 +4215,7 @@ function getCampaignBreakdown(market, startDate, endDate) {
   leads.forEach(r => {
     const camp = (r.mx_utm_campaign || '').trim();
     if (!camp) return;
-    const key = camp.toLowerCase();
+    const key = normalizeAdName(camp);
     if (!campaigns[key]) campaigns[key] = { name: camp, rows: [] };
     campaigns[key].rows.push(r);
   });
@@ -4263,7 +4262,7 @@ function getAdBreakdown(market, startDate, endDate) {
   leads.forEach(r => {
     const ad = (r.mx_utm_adcontent || '').trim();
     if (!ad) return;
-    const key = ad.toLowerCase();
+    const key = normalizeAdName(ad);
     if (!ads[key]) ads[key] = { name: ad, rows: [] };
     ads[key].rows.push(r);
   });
@@ -6488,7 +6487,7 @@ function renderOracleCardsV2() {
   // Merge fatigue ads (Stage 2+3 only)
   const fatigueAds = detectFatigue()
     .filter(f => f.stage >= 2)
-    .filter(f => !spendLeaks.some(s => s.name === f.ad_name))
+    .filter(f => !spendLeaks.some(s => normalizeAdName(s.name) === normalizeAdName(f.ad_name)))
     .slice(0, 5)
     .map(f => ({
       name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0,
