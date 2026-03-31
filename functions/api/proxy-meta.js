@@ -32,18 +32,15 @@ export async function onRequest(context) {
       return Response.json({ error: true, message: 'endpoint required' }, { status: 400 });
     }
 
-    // Build Meta Graph API URL
-    // Use manual query string construction to avoid double-encoding JSON params like time_range
-    let queryParts = [];
+    // Build Meta Graph API URL using URL constructor for the base
+    // Use v22.0 — Meta deprecates older versions regularly
+    const url = new URL(`https://graph.facebook.com/v22.0/${endpoint}`);
     if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        queryParts.push(`${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
-      });
+      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
     }
-    queryParts.push(`access_token=${encodeURIComponent(META_TOKEN)}`);
-    const metaUrl = `https://graph.facebook.com/v21.0/${endpoint}?${queryParts.join('&')}`;
+    url.searchParams.set('access_token', META_TOKEN);
 
-    const res = await fetch(metaUrl);
+    const res = await fetch(url.toString());
     const responseText = await res.text();
 
     // Try to parse as JSON, fall back to raw text error
@@ -55,14 +52,6 @@ export async function onRequest(context) {
         { error: true, message: `Meta returned non-JSON (${res.status}): ${responseText.slice(0, 200)}` },
         { status: res.status, headers: { 'Access-Control-Allow-Origin': '*' } }
       );
-    }
-
-    // Forward Meta's error with details
-    if (!res.ok && data.error) {
-      return Response.json(data, {
-        status: res.status,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-      });
     }
 
     return Response.json(data, {

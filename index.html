@@ -3306,7 +3306,7 @@ async function backfillThumbnails() {
         if (!nextUrl) break;
         page++;
         await sleep(300);
-        const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace('/v21.0/', ''); const _params = {};
+        const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, ''); const _params = {};
         _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
         data = await callMetaAPI(_ep, _params);
       }
@@ -3337,7 +3337,7 @@ async function backfillThumbnails() {
           if (!nextUrl) break;
           page++;
           await sleep(300);
-          const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace('/v21.0/', ''); const _params = {};
+          const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, ''); const _params = {};
           _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
           data = await callMetaAPI(_ep, _params);
         }
@@ -3435,7 +3435,7 @@ async function connectMetaApi() {
         if (statusEl) statusEl.textContent = `${account.name}: page ${page}...`;
         await new Promise(r => setTimeout(r, 2000));
         const _nu = new URL(nextUrl);
-        const _ep = _nu.pathname.replace('/v21.0/', '');
+        const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, '');
         const _params = {};
         _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
         const _nextRes = await callMetaAPI(_ep, _params);
@@ -3477,7 +3477,7 @@ async function connectMetaApi() {
         thumbPage++;
         await sleep(META_DELAY_BETWEEN_REQUESTS);
         const _nu = new URL(nextUrl);
-        const _ep = _nu.pathname.replace('/v21.0/', '');
+        const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, '');
         const _params = {};
         _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
         thumbData = await callMetaAPI(_ep, _params);
@@ -5204,7 +5204,7 @@ async function fullRefresh() {
             if (!nextUrl) break;
             page++;
             await sleep(META_DELAY_BETWEEN_REQUESTS);
-            const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace('/v21.0/', ''); const _params = {};
+            const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, ''); const _params = {};
             _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
             data = await callMetaAPI(_ep, _params);
           }
