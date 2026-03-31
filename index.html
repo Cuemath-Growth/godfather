@@ -5447,7 +5447,12 @@ function setDatePreset(preset) {
   const now = new Date();
   const fmt = d => d.toISOString().split('T')[0];
   if (preset === 'allTime') { from.value = ''; to.value = ''; }
-  else if (preset === 'thisMonth') { from.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`; to.value = fmt(now); }
+  else if (preset === 'thisMonth') {
+    // If first 5 days of month, show previous month (too little data for current month)
+    const useMonth = now.getDate() <= 5 ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : now;
+    from.value = `${useMonth.getFullYear()}-${String(useMonth.getMonth()+1).padStart(2,'0')}-01`;
+    to.value = fmt(now);
+  }
   else if (preset === 'last30') { const d = new Date(now); d.setDate(d.getDate()-30); from.value = fmt(d); to.value = fmt(now); }
   else if (preset === 'last90') { const d = new Date(now); d.setDate(d.getDate()-90); from.value = fmt(d); to.value = fmt(now); }
   // Highlight active preset button
