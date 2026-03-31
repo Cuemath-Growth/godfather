@@ -4138,18 +4138,35 @@ function getMarketMetrics(market, startDate, endDate) {
 
 // ── Campaign-level breakdown ──
 
+// ── Campaign join helper: case-insensitive trimmed match, medium-first ──
+function _metaCostForCampaign(campaignName, market, startDate, endDate) {
+  const key = (campaignName || '').toLowerCase().trim();
+  if (!key) return null; // null = unmatched, distinct from 0 = matched but zero spend
+  const rows = filterCostByMarket(costData, market).filter(r => {
+    if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
+    if ((r.campaign_name || '').toLowerCase().trim() !== key) return false;
+    const day = r.day || '';
+    if (startDate && day < startDate) return false;
+    if (endDate && day > endDate) return false;
+    return true;
+  });
+  if (rows.length === 0) return null; // no cost rows found = unmatched
+  return rows.reduce((sum, r) => sum + (parseFloat(r.amount_spent) || 0), 0);
+}
+
 function getCampaignBreakdown(market, startDate, endDate) {
-  // Group leads by mx_utm_campaign
   let leads = filterLeadsByMarket(leadsData, market);
   const campaigns = {};
   leads.forEach(r => {
-    const camp = r.mx_utm_campaign || '';
+    const camp = (r.mx_utm_campaign || '').trim();
     if (!camp) return;
-    if (!campaigns[camp]) campaigns[camp] = { name: camp, rows: [] };
-    campaigns[camp].rows.push(r);
+    const key = camp.toLowerCase();
+    if (!campaigns[key]) campaigns[key] = { name: camp, rows: [] };
+    campaigns[key].rows.push(r);
   });
 
-  return Object.values(campaigns).map(c => {
+  let matched = 0, unmatched = 0;
+  const results = Object.values(campaigns).map(c => {
     const inRange = r => {
       const d = r.lead_created_date || '';
       return (!startDate || d >= startDate) && (!endDate || d <= endDate);
@@ -4166,22 +4183,19 @@ function getCampaignBreakdown(market, startDate, endDate) {
       return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
     }).length;
 
-    // Spend from costData where campaign_name matches (meta only, market-filtered)
-    const spend = filterCostByMarket(costData, market).filter(r => {
-      if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
-      const day = r.day || '';
-      if (startDate && day < startDate) return false;
-      if (endDate && day > endDate) return false;
-      return (r.campaign_name || '') === c.name;
-    }).reduce((sum, r) => sum + (parseFloat(r.amount_spent) || 0), 0);
+    const spend = _metaCostForCampaign(c.name, market, startDate, endDate);
+    if (spend !== null) matched++; else unmatched++;
 
     return {
       name: c.name, spend, ql, td: td_snap, td_cohort, enrolled,
-      cptd: safeDivide(spend, td_snap),
-      cpql: safeDivide(spend, ql),
+      cptd: spend !== null ? safeDivide(spend, td_snap) : null,
+      cpql: spend !== null ? safeDivide(spend, ql) : null,
       ql_td_pct: safeDivide(td_cohort, ql),
+      _spendMatched: spend !== null,
     };
   });
+  console.log(`Campaign join: ${matched} matched, ${unmatched} unmatched of ${matched + unmatched}`);
+  return results;
 }
 
 // CPTQL is primary at ad level — TD UTM attribution
@@ -4191,10 +4205,11 @@ function getAdBreakdown(market, startDate, endDate) {
   let leads = filterLeadsByMarket(leadsData, market);
   const ads = {};
   leads.forEach(r => {
-    const ad = r.mx_utm_adcontent || '';
+    const ad = (r.mx_utm_adcontent || '').trim();
     if (!ad) return;
-    if (!ads[ad]) ads[ad] = { name: ad, rows: [] };
-    ads[ad].rows.push(r);
+    const key = ad.toLowerCase();
+    if (!ads[key]) ads[key] = { name: ad, rows: [] };
+    ads[key].rows.push(r);
   });
 
   return Object.values(ads).map(a => {
@@ -4213,25 +4228,29 @@ function getAdBreakdown(market, startDate, endDate) {
       return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
     }).length;
 
-    // Spend: sum costData where campaign matches (meta only, market-filtered)
-    const campNames = new Set(a.rows.map(r => r.mx_utm_campaign).filter(Boolean));
-    const spend = filterCostByMarket(costData, market).filter(r => {
-      if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
-      const day = r.day || '';
-      if (startDate && day < startDate) return false;
-      if (endDate && day > endDate) return false;
-      return campNames.has(r.campaign_name || '');
-    }).reduce((sum, r) => sum + (parseFloat(r.amount_spent) || 0), 0);
+    // Spend: campaign-level from meta cost, then proportional to this ad's QLs
+    const campNames = new Set(a.rows.map(r => (r.mx_utm_campaign || '').trim()).filter(Boolean));
+    let totalCampSpend = 0;
+    let anyMatch = false;
+    campNames.forEach(cn => {
+      const s = _metaCostForCampaign(cn, market, startDate, endDate);
+      if (s !== null) { totalCampSpend += s; anyMatch = true; }
+    });
 
-    // Ad-level spend is proportional: this ad's QLs / campaign total QLs * campaign spend
-    // This avoids attributing full campaign spend to every ad
-    const totalCampQLs = leads.filter(r => campNames.has(r.mx_utm_campaign) && inRange(r) && String(r.qls) === '1').length;
-    const adSpend = totalCampQLs > 0 ? spend * (ql / totalCampQLs) : (ql > 0 ? spend / campNames.size : 0);
+    const totalCampQLs = leads.filter(r => {
+      const cn = (r.mx_utm_campaign || '').trim();
+      return campNames.has(cn) && inRange(r) && String(r.qls) === '1';
+    }).length;
+    const adSpend = anyMatch ? (totalCampQLs > 0 ? totalCampSpend * (ql / totalCampQLs) : (ql > 0 ? totalCampSpend / campNames.size : 0)) : null;
 
     return {
-      name: a.name, spend: adSpend, campaignSpend: spend, ql, td: td_snap, enrolled,
-      cptd: safeDivide(adSpend, td_snap),
-      cpql: safeDivide(adSpend, ql),
+      name: a.name,
+      spend: adSpend,
+      campaignSpend: anyMatch ? totalCampSpend : null,
+      ql, td: td_snap, enrolled,
+      cptd: adSpend !== null ? safeDivide(adSpend, td_snap) : null,
+      cpql: adSpend !== null ? safeDivide(adSpend, ql) : null,
+      _spendMatched: anyMatch,
     };
   });
 }
@@ -6300,12 +6319,12 @@ function renderOracleCardsV2() {
   const pauseList = document.getElementById('oraclePauseList');
   const adBreakdown = getAdBreakdown(market, pauseFrom, pauseTo);
   const spendLeaks = adBreakdown
-    .filter(a => (a.campaignSpend || a.spend) > 50000 && a.td === 0)
-    .sort((a, b) => (b.campaignSpend || b.spend) - (a.campaignSpend || a.spend))
+    .filter(a => a._spendMatched && (a.campaignSpend || 0) > 50000 && a.td === 0)
+    .sort((a, b) => (b.campaignSpend || 0) - (a.campaignSpend || 0))
     .slice(0, 8)
     .map(a => {
-      const displaySpend = a.campaignSpend || a.spend;
-      const cptqlStr = a.ql > 0 ? `CPTQL ${formatCurrency(displaySpend / a.ql)}` : 'No QLs';
+      const displaySpend = a.campaignSpend || a.spend || 0;
+      const cptqlStr = a.ql > 0 && displaySpend > 0 ? `CPTQL ${formatCurrency(displaySpend / a.ql)}` : 'No QLs';
       return { ...a, spend: displaySpend, _type: 'spend', _signal: `${formatCurrency(displaySpend)} spent · ${a.ql} QLs · ${cptqlStr}` };
     });
 
@@ -6350,7 +6369,7 @@ function renderOracleCardsV2() {
           ${thumbHtml}
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold truncate" title="${a.name}">${shortName}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
-            <p class="text-[10px] ${metricColor}">${a._signal || (formatCurrency(a.spend) + ' spent · ' + a.ql + ' QLs · ' + a.td + ' TDs')}</p>
+            <p class="text-[10px] ${metricColor}">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs · ' + a.td + ' TDs')}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
         </div>
@@ -6368,7 +6387,7 @@ function renderOracleCardsV2() {
   // ── MAKE MORE: top campaigns by CPTQL, TD >= 5, spend >= ₹10K ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
   const campBreakdown = getCampaignBreakdown(market, from || undefined, to || undefined);
-  const allQualified = campBreakdown.filter(c => c.td >= 5 && c.cpql > 0);
+  const allQualified = campBreakdown.filter(c => c.td >= 5 && c._spendMatched && c.cpql > 0);
   const hiddenLowSpend = allQualified.filter(c => c.spend < 10000);
   const topCampaigns = allQualified
     .filter(c => c.spend >= 10000)
@@ -6395,7 +6414,7 @@ function renderOracleCardsV2() {
           ${_oracleThumbnail(c.name)}
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold truncate" title="${c.name}">${shortName}</p>
-            <p class="text-[10px] text-text-muted">${c.td} TDs · ${c.ql} QLs · ${formatCurrency(c.spend)} spent</p>
+            <p class="text-[10px] text-text-muted">${c.td} TDs · ${c.ql} QLs · ${c.spend !== null ? formatCurrency(c.spend) + ' spent' : 'spend —'}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
           <div class="text-right shrink-0">
