@@ -1637,10 +1637,12 @@ async function callClaudeAPI(model, system, messages, maxTokens) {
 }
 
 async function callMetaAPI(endpoint, params) {
+  // Sanitize endpoint — strip whitespace from account IDs
+  const cleanEndpoint = endpoint.replace(/\s/g, '');
   const res = await fetch('/api/proxy-meta', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ endpoint, params }),
+    body: JSON.stringify({ endpoint: cleanEndpoint, params }),
   });
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
@@ -3093,7 +3095,8 @@ const META_AD_ACCOUNTS_DEFAULT = [
   { id: 'act_5215842511824318', name: 'Cuemath - US & Canada', market: 'US' },
   { id: 'act_888586384639855', name: 'Cuemath-Demand-India', market: 'India' }
 ];
-const META_AD_ACCOUNTS = JSON.parse(localStorage.getItem('gf_metaAccounts') || 'null') || META_AD_ACCOUNTS_DEFAULT;
+const META_AD_ACCOUNTS = (JSON.parse(localStorage.getItem('gf_metaAccounts') || 'null') || META_AD_ACCOUNTS_DEFAULT)
+  .map(a => ({ ...a, id: a.id.replace(/\s/g, '') }));
 state.metaApi = JSON.parse(localStorage.getItem('gf_metaApi') || JSON.stringify({token:META_API_TOKEN,accounts:META_AD_ACCOUNTS,datePreset:'last_30d',level:'ad'}));
 // Use localStorage token if available
 if (META_API_TOKEN) { state.metaApi.token = META_API_TOKEN; state.metaApi.accounts = META_AD_ACCOUNTS; }
