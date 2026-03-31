@@ -282,8 +282,8 @@
             <div id="funnelTable" class="mt-4"></div>
           </div>
 
-          <!-- Week-over-Week Changes -->
-          <div class="mb-6" id="wowSection"></div>
+          <!-- Week-over-Week removed — not requested -->
+          <div class="mb-6 hidden" id="wowSection"></div>
 
           <!-- CMO Decisions: CPTD Diagnosis + Budget Reallocation -->
           <div class="mb-6" id="oracleCMODecisions">
@@ -3800,14 +3800,16 @@ async function fetchMetaAdInsights() {
   const all = [];
   for (const account of accounts) {
     try {
-      let page = await callMetaAPI(`${account.id}/insights`, {
+      const insightParams = {
         fields: 'date_start,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions',
         time_increment: '1',
         level: 'ad',
         time_range: JSON.stringify({ since: start, until: end }),
         limit: '500'
-      });
-      if (page.error) { console.error(`Ad insights ${account.name}:`, page.error.message); continue; }
+      };
+      console.log(`Fetching insights for ${account.name}...`, `${account.id}/insights`, insightParams);
+      let page = await callMetaAPI(`${account.id}/insights`, insightParams);
+      if (page.error) { console.error(`Ad insights ${account.name}:`, page.error); continue; }
       let pageNum = 1;
       while (page && pageNum <= 40) {
         if (page.data) {
@@ -4177,6 +4179,9 @@ function getCampaignBreakdown(market, startDate, endDate) {
   });
 }
 
+// CPTQL is primary at ad level — TD UTM attribution
+// unreliable below campaign aggregate.
+// CPTD shown as reference only where TD > 0.
 function getAdBreakdown(market, startDate, endDate) {
   let leads = filterLeadsByMarket(leadsData, market);
   const ads = {};
@@ -5753,164 +5758,7 @@ function renderOracleActions() {
   };
   const td = c => hasDateFilter ? crmMetricsForDate(c, fromDate, toDate).td : parseNumber(c['TD']||c['td']||0);
 
-  // ── WEEK-OVER-WEEK TRENDS ──
-  const wowEl = document.getElementById('wowSection');
-  if (wowEl) {
-    // Use daily perf tracker + CRM data (Nov 2025 – Mar 2026) when available
-    const hasPerfWoW = state._perfTrackerDaily?.length > 0;
-    const hasCRMWoW = state._crmLeads?.length > 0;
-    const dashCountryWoW = document.getElementById('dashboardCountryFilter')?.value || 'all';
-
-    if (hasPerfWoW || hasCRMWoW) {
-      // WoW end date: latest actual data date, capped by picker "to" if set
-      const pickerTo = document.getElementById('dashboardDateTo')?.value || '';
-      let maxDate = '';
-      if (!maxDate && hasPerfWoW) {
-        state._perfTrackerDaily.forEach(r => { if (r.medium?.toLowerCase() === 'meta' && (r.day||'') > maxDate) maxDate = r.day; });
-      }
-      if (!maxDate && hasCRMWoW) {
-        state._crmLeads.forEach(r => { if ((r.lead_created_date||'') > maxDate) maxDate = r.lead_created_date; });
-      }
-      // Cap with picker "to" date — if user selected Feb, WoW should end in Feb
-      if (pickerTo && maxDate && pickerTo < maxDate) maxDate = pickerTo;
-      if (maxDate) {
-        const endDate = new Date(maxDate);
-        const twStart = new Date(endDate); twStart.setDate(endDate.getDate() - 6); // most recent 7 days
-        const lwStart = new Date(twStart); lwStart.setDate(twStart.getDate() - 7); // 7 days before that
-        const twStartStr = twStart.toISOString().slice(0,10);
-        const lwStartStr = lwStart.toISOString().slice(0,10);
-        const twEndStr = maxDate;
-        const lwEndStr = new Date(twStart); lwEndStr.setDate(twStart.getDate() - 1);
-        const lwEndStr2 = lwEndStr.toISOString().slice(0,10);
-
-        // WoW from CRM data (has real dates: lead_created_date, trial_done_date)
-        // Tagger _date is creation date from ad name — unreliable for WoW
-        const wowCrmFilter = (rows, from, to, dateField) => rows.filter(r => {
-          const d = r[dateField] || '';
-          return d && d >= from && d <= to;
-        });
-        const crmRows = (state._crmLeads || []).filter(r => crmGeoMatchRow(r, dashCountryWoW));
-        const wowMetrics = (from, to) => {
-          const qlRows = wowCrmFilter(crmRows, from, to, 'lead_created_date');
-          const tdRows = wowCrmFilter(crmRows, from, to, 'trial_done_date');
-          const ql = qlRows.reduce((s,r) => s + parseNumber(r['qls']||0), 0);
-          const nri = qlRows.filter(r => (r['ethnicity']||'').toLowerCase().includes('nri') && !(r['ethnicity']||'').toLowerCase().startsWith('non')).length;
-          const td = tdRows.reduce((s,r) => s + parseNumber(r['trials_done']||0), 0);
-          // Market-aware TQL: US=NRI, India/MEA=board filter, others=all QLs
-          let tql;
-          if (dashCountryWoW === 'US' || dashCountryWoW === 'Canada') { tql = nri; }
-          else if (dashCountryWoW === 'India') { tql = qlRows.filter(r => INDIA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
-          else if (dashCountryWoW === 'MEA' || dashCountryWoW === 'ME') { tql = qlRows.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
-          else { tql = ql; }
-          // Spend from perf tracker if available, otherwise estimate from tagger
-          let spend = 0;
-          if (hasPerfWoW) {
-            state._perfTrackerDaily.forEach(r => {
-              const d = r.day || r.Day || r.date || '';
-              if (d >= from && d <= to) spend += parseNumber(r['spend']||r['Spend']||r['amount_spent']||0);
-            });
-          }
-          if (!spend) {
-            // Fallback: estimate from tagger data that has dates in range
-            const taggerInRange = sanitizeTaggerData(state.taggerData).filter(c => {
-              const d = c['_date']||''; return d && d >= from && d <= to;
-            });
-            if (dashCountryWoW !== 'all') {
-              spend = taggerInRange.filter(c => extractMarket(c) === dashCountryWoW).reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
-            } else {
-              spend = taggerInRange.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
-            }
-          }
-          return { spend, tql, cptql: tql > 0 ? spend/tql : 0, td, cptd: td > 0 ? spend/td : 0, tqlTd: tql > 0 ? Math.min(td/tql*100,100) : 0 };
-        };
-        const tw = wowMetrics(twStartStr, twEndStr);
-        const lw = wowMetrics(lwStartStr, lwEndStr2);
-
-        const pct = (c,p) => c&&p ? ((c-p)/p*100) : null;
-        const cptqlP=pct(tw.cptql,lw.cptql), cptdP=pct(tw.cptd,lw.cptd), tqlTdP=pct(tw.tqlTd,lw.tqlTd), spendP=pct(tw.spend,lw.spend);
-        const badge = (p,inv) => { if(p===null) return ''; const good=inv?(p>5):(p<-5); const bad=inv?(p<-5):(p>5); const cl=good?'bg-accent-green-light text-green-700':bad?'bg-accent-red-light text-red-700':'bg-surface-tertiary text-text-muted'; const a=p>1?'\u2191':p<-1?'\u2193':'\u2192'; return `<span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${cl}">${a} ${Math.abs(p)>999?(Math.abs(p/100).toFixed(0)+'x'):(Math.abs(p).toFixed(0)+'%')}</span>`; };
-
-        // Low data guard: don't show misleading % changes when data is sparse
-        const lowData = (tw.tql < 5 && lw.tql < 5) || (tw.spend < 10000 && lw.spend < 10000);
-        const safeBadge = (p,inv) => lowData ? '' : badge(p,inv);
-
-        if (tw.spend > 0 || lw.spend > 0) {
-          let wH = lowData ? '<p class="text-[10px] text-amber-600 mb-2">\u26A0 Low data for this geo/period \u2014 percentages may be unreliable</p>' : '';
-          const _wGeo = dashCountryWoW === 'all' ? 'all' : dashCountryWoW;
-          // Incomplete data detection: if this week's spend is <10% of last week, data is likely partial
-          const _incompleteWeek = lw.spend > 0 && tw.spend > 0 && tw.spend < lw.spend * 0.1;
-          // WoW verdict banner
-          if (_incompleteWeek) {
-            wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-medium">\u26A0 This week\u2019s data looks incomplete (\u20B9${(tw.spend/100000).toFixed(1)}L vs \u20B9${(lw.spend/100000).toFixed(1)}L last week). Pull fresh data from Meta API before comparing.</div>`;
-          } else {
-            const _wowIssues = [];
-            if (!lowData) {
-              if (cptdP !== null && cptdP > 10) _wowIssues.push('CPTD up ' + Math.abs(cptdP).toFixed(0) + '%');
-              if (cptqlP !== null && cptqlP > 10) _wowIssues.push('CPTQL up ' + Math.abs(cptqlP).toFixed(0) + '%');
-              const _tqlP = pct(tw.tql, lw.tql);
-              if (_tqlP !== null && _tqlP < -15) _wowIssues.push('TQLs down ' + Math.abs(_tqlP).toFixed(0) + '%');
-            }
-            if (_wowIssues.length > 0) wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-[11px] text-red-800 font-medium">\u26A0 Week-over-week: ${_wowIssues.join(', ')}</div>`;
-            else if (!lowData) wH += `<div class="mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-[11px] text-green-800 font-medium">\u2713 Week-over-week: stable or improving</div>`;
-          }
-          // Week labels
-          const _fmtShort = d => { const _m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const _d=new Date(d); return _m[_d.getMonth()]+' '+_d.getDate(); };
-          wH += `<div class="flex items-center gap-4 mb-2">
-            <span class="text-[10px] font-bold text-accent-purple uppercase tracking-wider px-2 py-0.5 rounded bg-accent-purple-light">This Week: ${_fmtShort(twStartStr)} \u2013 ${_fmtShort(twEndStr)}</span>
-            <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">vs Last Week: ${_fmtShort(lwStartStr)} \u2013 ${_fmtShort(lwEndStr2)}</span>
-            <span class="text-[9px] text-text-muted ml-auto">${dashCountryWoW === 'all' ? 'All markets' : dashCountryWoW}</span>
-          </div>`;
-          // WoW cards with clear THIS / LAST separation
-          const _wowCard = (label, twVal, lwVal, chgBadge, spark, ttip) => `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3">
-            <p class="text-[9px] text-text-muted uppercase font-bold mb-1"${ttip||''}>${label}</p>
-            <div class="flex items-center gap-1.5"><p class="text-lg font-black">${twVal}</p>${chgBadge}</div>
-            <div class="mt-1">${spark}</div>
-            <div class="flex items-center justify-between mt-1.5 pt-1.5 border-t border-gray-100">
-              <span class="text-[9px] text-text-muted">Last week</span>
-              <span class="text-[10px] font-semibold text-text-secondary">${lwVal}</span>
-            </div></div>`;
-          wH += `<div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-2">
-            ${_wowCard('Spend',formatCurrency(tw.spend),formatCurrency(lw.spend),safeBadge(spendP,false),renderSparkline('spend',_wGeo,{width:100,height:24}))}
-            ${_wowCard('TQLs',Math.round(tw.tql),Math.round(lw.tql),safeBadge(pct(tw.tql,lw.tql),true),renderSparkline('ql',_wGeo,{width:100,height:24,lowerBetter:false}))}
-            ${_wowCard('CPTQL',tw.cptql?formatCurrency(tw.cptql):'\u2014',lw.cptql?formatCurrency(lw.cptql):'\u2014',safeBadge(cptqlP,false),renderSparkline('cptql',_wGeo,{width:100,height:24}),tooltipAttr('CPTQL'))}
-            ${_wowCard('CPTD',tw.cptd?formatCurrency(tw.cptd):'\u2014',lw.cptd?formatCurrency(lw.cptd):'\u2014',safeBadge(cptdP,false),renderSparkline('cptd',_wGeo,{width:100,height:24}),tooltipAttr('CPTD'))}
-            ${_wowCard('TQL\u2192TD%',tw.tqlTd?tw.tqlTd.toFixed(1)+'%':'\u2014',lw.tqlTd?lw.tqlTd.toFixed(1)+'%':'\u2014',safeBadge(tqlTdP,true),renderSparkline('ql_td_pct',_wGeo,{width:100,height:24,lowerBetter:false}))}
-          </div>`;
-          wH += `<p class="text-[9px] text-text-muted">Source: Perf tracker${hasCRMWoW ? ' + CRM' : ''}</p>`;
-          wowEl.innerHTML = wH;
-        } else {
-          wowEl.innerHTML = '<p class="text-xs text-text-muted py-2">No spend data in the last 2 weeks of perf tracker data.</p>';
-        }
-      } else {
-        wowEl.innerHTML = '<p class="text-xs text-text-muted py-2">No dates found in perf tracker data.</p>';
-      }
-    } else {
-      // Fallback to tagger data
-      const now = new Date();
-      const twStart = new Date(now); twStart.setDate(now.getDate() - 7);
-      const lwStart = new Date(now); lwStart.setDate(now.getDate() - 14);
-      const thisW = data.filter(c => { const d = new Date(c['_date']||''); return !isNaN(d) && d >= twStart; });
-      const lastW = data.filter(c => { const d = new Date(c['_date']||''); return !isNaN(d) && d >= lwStart && d < twStart; });
-
-      if (thisW.length >= 3 && lastW.length >= 3) {
-        const calc = arr => { const s=arr.reduce((t,c)=>t+spend(c),0),q=arr.reduce((t,c)=>t+ql(c),0),t2=arr.reduce((t,c)=>t+td(c),0); return{spend:s,ql:q,td:t2,cpql:q>0?s/q:null,cptd:t2>0?s/t2:null,qlTd:q>0&&t2>0?Math.min(t2/q*100,100):null}; };
-        const tw = calc(thisW), lw = calc(lastW);
-        const pct = (c,p) => c&&p ? ((c-p)/p*100) : null;
-        const cpqlP=pct(tw.cpql,lw.cpql), cptdP=pct(tw.cptd,lw.cptd), qlTdP=pct(tw.qlTd,lw.qlTd);
-        const badge = (p,inv) => { if(p===null) return ''; const good=inv?(p>5):(p<-5); const bad=inv?(p<-5):(p>5); const cl=good?'bg-accent-green-light text-green-700':bad?'bg-accent-red-light text-red-700':'bg-surface-tertiary text-text-muted'; const a=p>1?'\u2191':p<-1?'\u2193':'\u2192'; return `<span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${cl}">${a} ${Math.abs(p)>999?(Math.abs(p/100).toFixed(0)+'x'):(Math.abs(p).toFixed(0)+'%')}</span>`; };
-
-        let wH = `<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-          <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 text-center"><p class="text-[9px] text-text-muted uppercase font-bold"${tooltipAttr('CPQL')}>CPQL</p><p class="text-lg font-black">${tw.cpql?formatCurrency(tw.cpql):'\u2014'}</p>${badge(cpqlP,false)}</div>
-          <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 text-center"><p class="text-[9px] text-text-muted uppercase font-bold"${tooltipAttr('CPTD')}>CPTD</p><p class="text-lg font-black">${tw.cptd?formatCurrency(tw.cptd):'\u2014'}</p>${badge(cptdP,false)}</div>
-          <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 text-center"><p class="text-[9px] text-text-muted uppercase font-bold">QL\u2192TD%</p><p class="text-lg font-black">${tw.qlTd?tw.qlTd.toFixed(1)+'%':'\u2014'}</p>${badge(qlTdP,true)}</div>
-          <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 text-center"><p class="text-[9px] text-text-muted uppercase font-bold">Spend</p><p class="text-lg font-black">${formatCurrency(tw.spend)}</p><p class="text-[9px] text-text-muted">vs ${formatCurrency(lw.spend)} last wk</p></div>
-        </div>`;
-        wowEl.innerHTML = wH;
-      } else {
-        wowEl.innerHTML = `<p class="text-xs text-text-muted py-2">Need 2+ weeks of data. This week: ${thisW.length} ads, last week: ${lastW.length} ads.</p>`;
-      }
-    }
-  }
+  // Week-over-week removed — not requested. Add back only if explicitly asked.
 
   // ── SECTION 1: PAUSE NOW ──
   const pauseList = document.getElementById('oraclePauseList');
@@ -6450,7 +6298,11 @@ function renderOracleCardsV2() {
     .filter(a => a.spend > 50000 && a.td === 0)
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 8)
-    .map(a => ({ ...a, _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · 0 TDs` }));
+    .map(a => {
+      const cptqlStr = a.ql > 0 ? `CPTQL ${formatCurrency(a.spend / a.ql)}` : 'No QLs';
+      const cptdStr = a.td > 0 ? ` · CPTD ${formatCurrency(a.spend / a.td)}` : '';
+      return { ...a, _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · ${a.ql} QLs · ${cptqlStr}${cptdStr}` };
+    });
 
   // Merge fatigue ads (Stage 2+3 only)
   const fatigueAds = detectFatigue()
@@ -6508,14 +6360,14 @@ function renderOracleCardsV2() {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 30 days).</p>';
   }
 
-  // ── MAKE MORE: top campaigns by CPTD where TD >= 3 and spend >= ₹10K ──
+  // ── MAKE MORE: top campaigns by CPTQL, TD >= 5, spend >= ₹10K ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
   const campBreakdown = getCampaignBreakdown(market, from || undefined, to || undefined);
-  const allQualified = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0);
+  const allQualified = campBreakdown.filter(c => c.td >= 5 && c.cpql > 0);
   const hiddenLowSpend = allQualified.filter(c => c.spend < 10000);
   const topCampaigns = allQualified
     .filter(c => c.spend >= 10000)
-    .sort((a, b) => a.cptd - b.cptd)
+    .sort((a, b) => a.cpql - b.cpql)
     .slice(0, 5);
 
   const visibleMake = topCampaigns.filter(c => isItemVisible('make:' + c.name));
@@ -6529,9 +6381,10 @@ function renderOracleCardsV2() {
       const action = getOracleAction(itemId);
       const isDone = action?.status === 'done';
       const opacity = isDone ? 'opacity-50' : '';
-      const cptdColor = c.cptd < 40000 ? 'green' : c.cptd < 70000 ? 'orange' : 'red';
+      const cpqlColor = c.cpql < 5000 ? 'green' : c.cpql < 10000 ? 'orange' : 'red';
       const shortName = c.name.length > 40 ? c.name.slice(0, 40) + '...' : c.name;
       const esc = s => s.replace(/'/g, "\\'");
+      const cptdRef = c.cptd && c.td > 0 ? `<span class="text-[9px] text-text-muted">CPTD ${formatCurrency(c.cptd)}</span>` : '';
       html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
         <div class="flex items-center gap-3">
           ${_oracleThumbnail(c.name)}
@@ -6541,8 +6394,9 @@ function renderOracleCardsV2() {
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
           <div class="text-right shrink-0">
-            <p class="text-sm font-bold text-accent-${cptdColor}">${formatCurrency(c.cptd)}</p>
-            <p class="text-[9px] text-text-muted">CPTD</p>
+            <p class="text-sm font-bold text-accent-${cpqlColor}">${formatCurrency(c.cpql)}</p>
+            <p class="text-[9px] text-text-muted">CPTQL</p>
+            ${cptdRef}
           </div>
         </div>
         ${!isDone ? `<div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
@@ -6556,7 +6410,7 @@ function renderOracleCardsV2() {
     html += '</div>';
     makeMoreList.innerHTML = html;
   } else {
-    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 3+ TDs and sufficient spend data found.</p>';
+    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 5+ TDs and sufficient spend data found.</p>';
   }
 }
 
@@ -10118,124 +9972,59 @@ function buildTaggerPrompt(batch) {
     return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}${titleLine}${bodyLine}${descLine}${ctaLine}${freqLine}`;
   }).join('\n');
 
-  return `You are Lens, Cuemath's creative audit AI. Tag these ad creatives using Cuemath's EXACT coded taxonomy.
+  return `You are Lens, Cuemath's creative audit AI. Tag these ad creatives.
+
+IMPORTANT: image/video thumbnail arrives first, then ad copy, then headline, then ad name LAST. Do not anchor on ad name — tag what you see and read.
 
 CREATIVES:
 ${creatives}
 
-## TAGGING TAXONOMY (use ONLY these codes)
+## TAGGING TAXONOMY
 
-### Hook Type (first 3 seconds of video / headline of static):
-- H-MATH: Math-anchored ("Boost your child's math confidence")
-- H-FEAR: Fear/urgency ("Summer learning loss starts in 6 weeks")
-- H-PROBLEM: Problem-specific ("Does your child freeze at Algebra?")
-- H-PAINPOINT: Parent pain point ("Tutoring quality abroad is inconsistent — Kumon feels too rote, local tutors don't understand Indian emphasis on conceptual clarity")
-- H-TEST: Testimonial ("My son went from C to A in 4 months")
-- H-STAT: Statistic ("83% of parents say their child struggles")
-- H-QUES: Question ("Is your child really understanding math?")
-- H-LIFE: Lifestyle/emotional ("Watch their confidence grow") — NOTE: H-LIFE hooks consistently underperform on QL→TD%
-- H-EVENT: Event/seasonal ("NAPLAN prep starts now", "Back to school")
-- H-COMP: Competitive/comparison ("See how Cuemath vs Kumon compares")
-- H-OFFER: Offer/price-led ("50% off first month", "Free trial class")
-- H-GRADE: Grade badge ("From C to A in 3 months", grade-specific targeting)
+### FORMAT (pick exactly 1):
+Static image | Video | Influencer UGC | Testimonial video | Vernacular testimonial | Product video | Brand video
 
-### Format:
-- F-STATIC: Static image ad
-- F-VIDEO: Video ad (any length)
-- F-INFLU: Influencer/UGC video
-- F-TESTI: Testimonial video
-- F-ANIM: Animated/motion graphic
-- F-CAROUSEL: Carousel (multi-card swipeable)
-- F-VERN-TESTI: Vernacular testimonial (non-English testimonial)
-- F-PRODUCT: Product video (platform walkthrough / feature demo)
-- F-PLATFORM-DEMO: Platform demo (screen recording of Cuemath app/platform)
-- F-FOUNDER: Founder video (featuring Manan Khurma or leadership)
-- F-BRAND: Brand film (cinematic / brand story)
-- F-APP-PREVIEW: App preview (app store style preview)
-- F-CONTENT-UGC: Content creator UGC (non-influencer user-generated content)
+### HOOK TYPE (pick exactly 1):
+- Math anchor: opens with math problem or skill gap
+- Problem: present-tense learning struggle
+- Fear / urgency: future risk or falling behind
+- Parent testimonial: parent leads the hook
+- Statistic: opens with data point
+- Question: direct question to parent
+- Lifestyle / emotional: aspiration, warmth, family
+- Competitive: references another brand or tutor
+- Offer / price: discount or free trial as hook
+- Grade badge: specific grade or board call-out
+- Seasonal: season, holiday, exam period
 
-### Pain/Benefit Frame:
-- PB-GRADE: Grade improvement / school performance
-- PB-CONF: Confidence / anxiety reduction
-- PB-FOUND: Foundation building / not just memorisation
-- PB-FUTURE: Future readiness / college prep / AP
-- PB-TUTOR: Quality of tutor / 1:1 attention
-- PB-INDIAN: Indian curriculum roots / NRI identity
-- PB-COMP: Competition prep (Olympiad, AMC, MATHCOUNTS, Math Kangaroo)
+### PAIN POINT (array, 1-2 values):
+Grades & school | Confidence & anxiety | Strong foundations | Future readiness | Tutor quality | Indian roots | Competition prep
 
-### ICP Target:
-- NRI: "NRI" in name, or Indian diaspora targeting
-- Non-NRI: Explicitly non-NRI targeting
-- Asian: Chinese/Korean/Vietnamese/Japanese targeting
-- Expat: Expat parents (non-Indian diaspora abroad)
-- Telugu Speaking: Telugu-speaking audience
-- Tamil Speaking: Tamil-speaking audience
-- Hindi Speaking: Hindi-speaking audience
-- Gujarati Speaking: Gujarati-speaking audience
-- Arabic Speaking: Arabic-speaking audience
-- High School Parents: Parents of high school students
-- Universal: Broad or unspecified
+### TONE (pick exactly 1):
+Testimonial | Aspirational | Confident | Urgency | Comparison | Offer / promo | Seasonal
 
-### Emotional Tone:
-- Aspirational: Forward-looking, dream-oriented
-- Testimonial: Social proof, real parent/child stories
-- Offer/Promo: Discount, free trial, limited-time deal
-- Urgency: Time-sensitive, fear of missing out
-- Comparison: Cuemath vs competitors or alternatives
-- Seasonal: Tied to events, holidays, back-to-school
-- Confident: Assured, authoritative tone
-- Empathetic: Understanding parent struggles
-- Warm: Friendly, approachable, gentle
+### AUDIENCE (pick exactly 1):
+NRI parents | Expat parents | Local parents | Gujarati speaking | Telugu speaking | Tamil speaking | High school parents
 
-### Feature (explicit USP/product mention in the creative):
-- 1:1 tutoring, Top 1% tutors, Smart whiteboard, Gamification, Curriculum aligned
-- Adaptive platform, Talk-o-Meter, Cue dont tell, FUAR framework, MathFit identity
-- Math playground, Progress tracking, Personalized worksheets, Parent dashboard
-- Multi-device, Flexible scheduling, Money-back guarantee, Sibling discount
-NOTE: Only tag a feature if it is EXPLICITLY mentioned in the ad name or copy. Do not infer features.
+### OFFER PRESENT: true/false
+true only if specific promotion beyond standard free trial.
 
-### Segment:
-- Foundation Rebuilder: Rebuilding basics, closing gaps
-- Personalization Seeker: Wants tailored 1:1 attention
-- Confidence Builder: Child is hesitant, anxiety-focused
-- Accelerator: Competition prep, advanced math
-- Universal: Brand/general
+### TALENT NAME: detect from ad name or copy:
+Keerthi, Priyanshul, Shweta Negi, Mital, Swetha, Payal, Gunjan, Jharna, Damla, Kaira, Sarita, Rituja, Deepthi, Jia, Neha, Surveen, Jasleen, Chetan Patel, Kinjal Gandhi, Haiyan, Jasmine, Sameer, Nancy
+If detected: set talent_name, set format to Influencer UGC if format would otherwise be Video or Unknown.
 
-## AUTO-TAGGING RULES FROM AD NAMES:
-- "Keerthi", "Priyanshul", "Shweta", "Jharna" etc. in name = F-INFLU, talent: Influencer
-- "Testimonial" or "Testi" in name = F-TESTI
-- "Telugu" or "Tel" suffix = language: Telugu
-- "Malayalam" = language: Malayalam
-- "IndianTutors" or "Indian_Tutors" = PB-TUTOR + PB-INDIAN
-- "MathKangaroo" or "Olympiad" or "AMC" = PB-COMP, H-EVENT
-- "NRI" in name = icp_target: NRI (US/ROW/MEA only — NEVER for India market)
-- "Expat" or "Expart" = icp_target: NRI (US/ROW/MEA only)
-- India market ads: icp_target should be language-based (Tamil Speaking, Hindi Speaking, etc.) or Universal — NEVER NRI/Non-NRI
-- "Advantage" or "LAL" = broad targeting
-- Question mark in first line of ad copy = H-QUES
+### SETTING (pick 1 or null):
+Home | Studio | Outdoor | Screen recording | Animation
 
-## CONFIDENCE LEVELS (mandatory for every tag):
-- "verified": confirmed from actual creative file
-- "inferred": derived from ad name + campaign name patterns (THIS IS MOST COMMON — use this as default)
-- "hypothesis": educated guess from limited signals
+### PRODUCTION STYLE (pick 1):
+UGC | Studio shoot | Motion graphic | Screen record
 
-## CRITICAL RULES:
-1. A creative can have MULTIPLE hook types and pain/benefit frames (e.g., H-MATH + H-EVENT, PB-TUTOR + PB-INDIAN). Tag ALL that apply.
-2. For VISUAL tags only (visual_style, video_attrs, color_dominant, talent) — use "Unknown" if you cannot determine from the name. But for CTA, Feature, and Messaging Pillar — ALWAYS make your best inference. NEVER leave these as "Unknown":
-   - cta_type: Default to "Free trial" for Cuemath ads (this is the standard CTA). Only use others if the name explicitly mentions "demo", "whatsapp", "download", "enroll", "learn more".
-   - feature: Infer from ad name — "Indian Tutors" = "Top 1% tutors", "Math" = "1:1 tutoring", "Platform" = "Adaptive platform", "Whiteboard" = "Smart whiteboard". If no feature is identifiable, use "1:1 tutoring" as default (core product).
-   - messaging_pillar: Map from hook/benefit — H-MATH/PB-FOUND = "Deep learning", PB-TUTOR/PB-INDIAN = "Top tutors", PB-CONF = "360 skills", H-TEST = "Parent experience", H-COMP = "Personalization". NEVER leave as Unknown.
-3. ALWAYS split influencer creatives by their hook type — "Influencer" alone is NEVER sufficient. Keerthi with math content ≠ Jharna with lifestyle content.
-4. Flag any Telugu testimonial creatives — these are consistently underrepresented but high-performing.
+### CONFIDENCE: 0.0-1.0
+Below 0.7 = flag for human review.
 
-Return ONLY a JSON array. Each object must include ALL these fields:
-[{"hook_type":"H-MATH","hook_type_secondary":"H-EVENT or null","format":"F-STATIC","pain_benefit":"PB-TUTOR","pain_benefit_secondary":"PB-INDIAN or null","feature":"1:1 tutoring","cta_type":"Free trial","emotional_tone":"Confident","visual_style":"Unknown","video_attrs":"N/A","color_dominant":"Unknown","talent":"No talent/Graphic","talent_face":"Unknown","messaging_pillar":"Top tutors","icp_target":"NRI","segment":"Foundation Rebuilder","language":"English","confidence":"inferred","telugu_flag":false}]
-
-IMPORTANT — talent_face field:
-- For influencer/UGC ads (F-INFLU, F-CONTENT-UGC, or any ad with a person's name in the ad name): describe the likely creator as precisely as possible from the ad name. Extract the creator name and provide it as-is. Examples: "Priyanshul", "Keerthi", "Jharna-Gupta", "Telugu_Swetha", "Ona", "Damla"
-- For static/brand/generic ads: use "None"
-- For testimonial ads: use the parent name if visible in the ad name, otherwise "Unknown parent"
-- This field is used to group ads by the same creator across different campaigns and ad sets`;
+Return ONLY a JSON array. Each object:
+[{"format":"","hook_type":"","pain_point":["",""],"tone":"","audience":"","offer_present":false,"offer_detail":null,"talent_name":null,"setting":null,"production_style":"","confidence":0.0,"flag_for_review":false,"flag_reason":null}]
+`;
 }
 
 function retagCreatives(force) {
