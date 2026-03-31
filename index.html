@@ -2864,6 +2864,8 @@ function init() {
     updateDataStatusLine();
     console.log(`Boot: cache hit — ${leadsData.length} leads, ${costData.length} cost rows`);
     buildLookupMaps();
+    // Trigger CRM merge with cached leadsData (fixes 0 TDs when state._crmLeads is empty)
+    if (state.taggerData.length && leadsData.length) { mergeCRMWithMeta(); }
   }
   // Fetch fresh data if credentials exist (async, non-blocking)
   const _bootSheetUrl = localStorage.getItem('gf_sheetUrl');
@@ -2878,6 +2880,8 @@ function init() {
       console.log(`Boot: ${counts.leads} leads, ${counts.cost} cost rows`);
       buildLookupMaps();
       updateDataStatusLine();
+      // Re-trigger CRM merge now that leadsData is available (fixes 0 TDs when state._crmLeads is empty)
+      if (state.taggerData.length && leadsData.length) { mergeCRMWithMeta(); }
       if (state.currentView === 'dashboard') try { onDashboardFilterChange(); } catch(e) {}
     }).catch(e => {
       console.error('Boot fetch failed:', e);
@@ -4517,14 +4521,16 @@ function parseNumber(val) {
 }
 
 function mergeCRMWithMeta() {
-  console.log('CRM merge:', state._crmLeads?.length, 'leads,', state.taggerData.length, 'creatives');
+  // Use state._crmLeads if available, otherwise fall back to leadsData (same sheet, already loaded)
+  let rows = state._crmLeads?.length ? state._crmLeads : (typeof leadsData !== 'undefined' && leadsData.length ? leadsData : null);
+  const source = state._crmLeads?.length ? 'CRM sheet' : (rows ? 'leadsData fallback' : 'none');
+  console.log(`CRM merge: ${rows?.length || 0} leads (${source}), ${state.taggerData.length} creatives`);
   // Diagnostic: tagger market distribution + thumbnails
   const mktDist = {};
   let thumbCount = 0;
   state.taggerData.forEach(c => { const m = extractMarket(c); mktDist[m] = (mktDist[m]||0)+1; if (c['thumbnail_url'] || c['image_url']) thumbCount++; });
   console.log('Tagger market distribution:', mktDist);
   console.log('Tagger thumbnails:', thumbCount, 'of', state.taggerData.length, 'have image URLs');
-  let rows = state._crmLeads;
   if (!rows?.length) return;
   // Deduplicate CRM leads by prospectid to prevent double-counting
   const seenProspects = new Set();
