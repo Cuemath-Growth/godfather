@@ -4193,6 +4193,7 @@ let _campaignMap = null; // { key: { spend, medium, market, rows } }
 let _adMap = null;       // { key: { thumbnail_url, image_url, campaign_name } }
 
 function buildLookupMaps() {
+  invalidateAdPerfCache(); // clear cached getAdPerformance results
   // CAMPAIGN MAP: aggregate meta spend per campaign from costData
   _campaignMap = {};
   costData.forEach(r => {
@@ -4226,7 +4227,189 @@ function buildLookupMaps() {
   console.log(`Campaign map: ${Object.keys(_campaignMap).length} meta campaigns, matched ${leadsMatchedCamp}/${leadsWithCamp} leads (${leadsWithCamp > 0 ? Math.round(leadsMatchedCamp / leadsWithCamp * 100) : 0}%)`);
   console.log(`Ad map: ${Object.keys(_adMap).length} ads, matched ${leadsMatchedAd}/${leadsWithAd} leads (${leadsWithAd > 0 ? Math.round(leadsMatchedAd / leadsWithAd * 100) : 0}%)`);
   console.log(`Unmatched campaigns: ${leadsWithCamp - leadsMatchedCamp} leads — older campaigns before mid-2024 not in cost tab`);
+
+  // TAG MAP: lookup tags + creative type + thumbnails by normalized ad name from taggerData
+  _tagMap = {};
+  (state.taggerData || []).forEach(c => {
+    const key = normalizeAdName(c['Ad name'] || c['ad name']);
+    if (!key) return;
+    if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return; // keep first with tags
+    _tagMap[key] = {
+      tags: c.tags || {},
+      type: c['Creative type'] || c['creative type'] || '',
+      thumb: c.thumbnail_url || c.image_url || '',
+      campaign: c['Campaign name'] || c['campaign name'] || '',
+      adset: c['Ad set name'] || c['ad set name'] || '',
+    };
+  });
+  console.log(`Tag map: ${Object.keys(_tagMap).length} creatives with tags`);
 }
+
+let _tagMap = {}; // { normalizedAdName: { tags, type, thumb, campaign, adset } }
+let _adPerfCache = { key: '', data: [] }; // cache for getAdPerformance
+
+// ── CLEAN DATA LAYER: getAdPerformance() ──
+// Single source of truth for ALL views. Joins leadsData (date-aware QLs/TDs) + metaAdData (date-aware spend).
+// Enriches with tags from _tagMap (built from taggerData). Returns backward-compatible field names.
+function getAdPerformance(market, startDate, endDate) {
+  const start = startDate || COST_DATA_START || '';
+  const end = endDate || new Date().toISOString().slice(0, 10);
+
+  // Cache: return previous result if same params
+  const cacheKey = `${market||'all'}|${start}|${end}`;
+  if (_adPerfCache.key === cacheKey && _adPerfCache.data.length) return _adPerfCache.data;
+
+  // Step 1: Lead metrics per ad (from leadsData, date-aware, cohort counting)
+  const leadMap = {}; // key: normalizedAdName → metrics
+  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
+  filteredLeads.forEach(r => {
+    const d = r.lead_created_date || '';
+    if (start && d < start) return;
+    if (end && d > end) return;
+    const key = normalizeAdName(r.mx_utm_adcontent);
+    if (!key) return;
+    if (!leadMap[key]) leadMap[key] = { adName: r.mx_utm_adcontent, campaign: r.mx_utm_campaign || '', ql: 0, td: 0, enrolled: 0, nri: 0, invalid: 0, totalLeads: 0, _market: r.country_bucket || '' };
+    const e = leadMap[key];
+    e.totalLeads++;
+    if (String(r.qls) === '1') e.ql++;
+    if (String(r.trials_done) === '1') e.td++;
+    if (String(r.paid) === '1') e.enrolled++;
+    if (String(r.invalid) === '1') e.invalid++;
+    if ((r.ethnicity || '').toLowerCase().includes('nri')) e.nri++;
+  });
+  // Clamp: TD ≤ QL, Enrolled ≤ TD
+  Object.values(leadMap).forEach(e => { e.td = Math.min(e.td, e.ql); e.enrolled = Math.min(e.enrolled, e.td); });
+
+  // Step 2: Spend metrics per ad (from metaAdData, date-aware)
+  const spendMap = {}; // key: normalizedAdName → { spend, impressions, clicks, adName, campaign, adset }
+  metaAdData.forEach(r => {
+    const rStart = r.date_min || r.date || '';
+    const rEnd = r.date_max || r.date || '';
+    if (start && rEnd < start) return;
+    if (end && rStart > end) return;
+    const key = normalizeAdName(r.ad_name);
+    if (!key) return;
+    if (!spendMap[key]) spendMap[key] = { spend: 0, impressions: 0, clicks: 0, adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '', account: r._account || '' };
+    const s = spendMap[key];
+    s.spend += r.spend || 0;
+    s.impressions += parseInt(r.impressions) || 0;
+    s.clicks += parseInt(r.clicks) || 0;
+  });
+
+  // Step 3: Fallback spend from costData (campaign-level, when metaAdData empty)
+  const useMetaSpend = Object.keys(spendMap).length > 0;
+  const campSpendMap = {};
+  if (!useMetaSpend) {
+    costData.forEach(r => {
+      if ((r.medium || '').trim().toLowerCase() !== 'meta') return;
+      const key = normalizeAdName(r.campaign_name);
+      if (!key) return;
+      const day = r.day || '';
+      if (start && day < start) return;
+      if (end && day > end) return;
+      if (!campSpendMap[key]) campSpendMap[key] = 0;
+      campSpendMap[key] += parseFloat(r.amount_spent) || 0;
+    });
+  }
+
+  // Step 4: Union join — all ad names from both sides
+  const allKeys = new Set([...Object.keys(leadMap), ...Object.keys(spendMap)]);
+  const results = [];
+
+  allKeys.forEach(key => {
+    const lead = leadMap[key] || { adName: '', campaign: '', ql: 0, td: 0, enrolled: 0, nri: 0, invalid: 0, totalLeads: 0, _market: '' };
+    const spend = spendMap[key] || null;
+    const tag = _tagMap[key] || {};
+
+    // Skip budget burns below threshold if no QLs
+    if (lead.ql === 0 && (!spend || spend.spend < 5000)) return;
+
+    // Ad name: prefer original case from leads, then spend, then tag
+    const adName = lead.adName || spend?.adName || key;
+    const campaign = lead.campaign || spend?.campaign || tag.campaign || '';
+    const adset = spend?.adset || tag.adset || '';
+
+    // Market
+    const mkt = lead._market || matchMarketFromText(' ' + campaign.toUpperCase() + ' ');
+    const adMarket = mkt === 'Unknown' ? '' : mkt;
+    // Skip if market filter and doesn't match
+    if (market && market !== 'all' && adMarket && adMarket !== market) return;
+
+    // Spend: metaAdData > costData campaign pro-rate
+    let adSpend = spend ? spend.spend : null;
+    let spendSource = spend ? 'meta_insights' : null;
+    if (adSpend === null && !useMetaSpend && lead.ql > 0) {
+      const campKey = normalizeAdName(campaign);
+      const campTotal = campSpendMap[campKey] || 0;
+      if (campTotal > 0) {
+        // Pro-rate: this ad's QL share of campaign spend
+        const campQLs = Object.values(leadMap).filter(l => normalizeAdName(l.campaign) === campKey).reduce((s, l) => s + l.ql, 0);
+        adSpend = campQLs > 0 ? campTotal * (lead.ql / campQLs) : null;
+        spendSource = adSpend !== null ? 'campaign_prorated' : null;
+      }
+    }
+
+    // Impressions/clicks from metaAdData
+    const impressions = spend?.impressions || 0;
+    const clicks = spend?.clicks || 0;
+
+    // TQL (market-aware)
+    const isUS = adMarket === 'US' || adMarket === 'Canada';
+    const tql = isUS ? lead.nri : lead.ql;
+
+    // Derived metrics
+    const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+    const cpc = clicks > 0 ? (adSpend || 0) / clicks : 0;
+    const cpql = adSpend !== null && lead.ql > 0 ? adSpend / lead.ql : null;
+    const cptql = adSpend !== null && tql > 0 ? adSpend / tql : null;
+    const cptd = adSpend !== null && lead.td > 0 ? adSpend / lead.td : null;
+    const clickToQl = clicks > 0 ? (lead.ql / clicks) * 100 : 0;
+    const qlTdPct = lead.ql > 0 ? (lead.td / lead.ql) * 100 : 0;
+    const nriPct = lead.ql > 0 ? lead.nri / lead.ql : 0;
+
+    results.push({
+      // Backward-compatible field names (renderers read these)
+      'Ad name': adName, 'ad name': adName,
+      'Campaign name': campaign, 'campaign name': campaign,
+      'Ad set name': adset, 'ad set name': adset,
+      'Creative type': tag.type || '', 'creative type': tag.type || '',
+      'Spent': adSpend, 'spent': adSpend,
+      'Impressions': impressions, 'impressions': impressions,
+      'Clicks': clicks, 'clicks': clicks,
+      'QL': lead.ql, 'ql': lead.ql,
+      'TD': lead.td, 'td': lead.td,
+      'NRI': lead.nri, 'nri': lead.nri,
+      'TQL': tql, 'tql': tql,
+      'Paid': lead.enrolled, 'paid': lead.enrolled,
+      'TS': 0, 'ts': 0,
+      'CPTD': cptd, 'cptd': cptd,
+      'CPQL': cpql, 'cpql': cpql,
+      'CPTQL': cptql, 'cptql': cptql,
+      'CPNRI': isUS && adSpend !== null && lead.nri > 0 ? adSpend / lead.nri : null,
+      'CTR': ctr, 'CPC': cpc,
+      'QL-TD%': qlTdPct, 'QL→TD%': qlTdPct, 'Click→QL%': clickToQl,
+      'NRI%': nriPct * 100,
+      'Invalid%': lead.totalLeads > 0 ? (lead.invalid / lead.totalLeads) * 100 : 0,
+      thumbnail_url: tag.thumb || _adMap?.[key]?.thumbnail_url || '',
+      image_url: _adMap?.[key]?.image_url || tag.thumb || '',
+      tags: tag.tags || {},
+      _market: adMarket,
+      _spendSource: spendSource,
+      _date: '', // no single date for aggregated result
+    });
+  });
+
+  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads (${Object.keys(leadMap).length} from leads, ${Object.keys(spendMap).length} from meta, ${Object.keys(_tagMap).length} tagged)`);
+
+  // Sort by spend descending (budget allocation view)
+  results.sort((a, b) => (b['Spent'] || 0) - (a['Spent'] || 0));
+
+  _adPerfCache = { key: cacheKey, data: results };
+  return results;
+}
+
+// Invalidate cache when data sources change
+function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; }
 
 function getCampaignSpend(campaignName, market, startDate, endDate) {
   // Fast path: use pre-built map for all-time, all-market
@@ -5466,6 +5649,7 @@ function setDatePreset(preset) {
 }
 
 function onGlobalFilterChange() {
+  invalidateAdPerfCache(); // filters changed, clear cached data
   syncGeoFilter('dashboardCountryFilter');
   syncDateLabels();
   // Re-render the currently active view with new filters
@@ -5533,32 +5717,8 @@ function getDashboardFilteredData() {
   const countryFilter = document.getElementById('dashboardCountryFilter')?.value || 'all';
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
-
-  let data = sanitizeTaggerData([...state.taggerData]);
-
-  // Country filter
-  if (countryFilter !== 'all') {
-    const before = data.length;
-    data = data.filter(c => {
-      const m = extractMarket(c);
-      if (countryFilter === 'ROW') return m === 'ROW' || m === 'APAC' || m === 'Unknown';
-      return m === countryFilter;
-    });
-    console.log(`Country filter "${countryFilter}": ${data.length}/${before} creatives match`);
-  }
-
-  // Date filter (calendar From/To)
-  if (fromDate || toDate) {
-    data = data.filter(c => {
-      const d = c['_date'] || c['date'] || c['Date'] || '';
-      if (!d) return true;
-      if (fromDate && d < fromDate) return false;
-      if (toDate && d > toDate) return false;
-      return true;
-    });
-  }
-
-  return data;
+  const market = countryFilter === 'all' ? null : countryFilter;
+  return getAdPerformance(market, fromDate || null, toDate || null);
 }
 
 function createGeoCard(geo, row) {
@@ -10605,8 +10765,9 @@ function runGroundTruthQA() {
 // Portfolio layer — unfiltered except date + geo. Used by Oracle KPIs and Sentinel.
 function getGlobalFilteredTaggerData(geoElId, formatFilter) {
   const country = document.getElementById(geoElId || 'dashboardCountryFilter')?.value || 'all';
-  let data = sanitizeTaggerData(filterByGlobalDate([...state.taggerData]));
-  // Apply format filter if provided
+  const { from, to } = getGlobalDateRange();
+  const market = country === 'all' ? null : country;
+  let data = getAdPerformance(market, from || null, to || null);
   if (formatFilter && formatFilter !== 'all') {
     data = data.filter(c => {
       const t = (c['Creative type']||c['creative type']||'').toLowerCase();
@@ -10615,9 +10776,7 @@ function getGlobalFilteredTaggerData(geoElId, formatFilter) {
       return true;
     });
   }
-  if (country === 'all') return data;
-  if (country === 'ROW') return data.filter(c => { const m = extractMarket(c); return m === 'ROW' || m === 'APAC' || m === 'Unknown'; });
-  return data.filter(c => extractMarket(c) === country);
+  return data;
 }
 
 // CRM portfolio totals — direct count from CRM leads, filtered by date + geo. 100% of leads, no matching gaps.
@@ -10771,26 +10930,8 @@ function syncDateLabels() {
 function getFilteredTaggerData(filterElId) {
   const country = document.getElementById(filterElId || 'taggerFilterCountry')?.value || 'all';
   const { from, to } = getGlobalDateRange();
-  let data = state.taggerData.filter(c => {
-    const spend = parseNumber(c['Spent']||c['spent']||0);
-    if (spend < LENS_MIN_SPEND) return false;
-    return true;
-  });
-  // Apply global date range from Oracle date picker
-  if (from || to) {
-    data = data.filter(c => {
-      const d = c['_date'] || c['date'] || c['Date'] || '';
-      if (!d) return true; // Include undated rows — Meta Ads sheet has no dates, excluding kills 95% of data
-      if (from && d < from) return false;
-      if (to && d > to) return false;
-      return true;
-    });
-  }
-  // Sanitize CRM false matches via shared function
-  data = sanitizeTaggerData(data);
-  if (country === 'all') return data;
-  if (country === 'ROW') return data.filter(c => { const m = extractMarket(c); return m === 'ROW' || m === 'APAC' || m === 'Unknown'; });
-  return data.filter(c => extractMarket(c) === country);
+  const market = country === 'all' ? null : country;
+  return getAdPerformance(market, from || null, to || null).filter(c => parseNumber(c['Spent']||c['spent']||0) >= LENS_MIN_SPEND);
 }
 
 function onTaggerCountryChange() {
