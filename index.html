@@ -889,15 +889,13 @@
                   <option value="segment">Segment</option>
                 </select>
                 <select id="taggerSortBy" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="cpql_asc">Best CPTQL</option>
                   <option value="cptd_asc">Best CPTD</option>
                   <option value="ctr_desc">Best CTR</option>
                   <option value="cpc_asc">Best CPC</option>
-                  <option value="click_ql_desc">Best Click→QL%</option>
-                  <option value="cpql_asc">Best CPQL</option>
                   <option value="spend_desc">Highest Spend</option>
-                  <option value="td_desc">Most TDs</option>
                   <option value="ql_desc">Most QLs</option>
-                  <option value="cptd_desc">Worst CPTD</option>
+                  <option value="cpql_desc">Worst CPTQL</option>
                 </select>
               </div>
             </div>
@@ -930,10 +928,10 @@
             <div class="flex items-center justify-between mb-3">
               <h3 class="text-sm font-bold">Tag x Performance Heatmap</h3>
               <select id="heatmapSortBy" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="state._heatmapPage=1;renderTaggerHeatmap()">
+                <option value="cpql_asc">Best CPTQL</option>
+                <option value="cpql_desc">Worst CPTQL</option>
                 <option value="cptd_asc">Best CPTD</option>
-                <option value="cptd_desc">Worst CPTD</option>
                 <option value="spend_desc">Highest Spend</option>
-                <option value="td_desc">Most TDs</option>
                 <option value="count_desc">Most Ads</option>
               </select>
             </div>
@@ -2055,7 +2053,8 @@ function saveState(key, value) {
   }
 }
 
-const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','TQL','CPQL','CPTD','CPNRI','CPTQL','CTR','CPC','QL_TD_PCT','Click_QL_PCT','Impressions','Clicks','tags','id','_market','_account','_date','_source','thumbnail_url','image_url','ad_body','ad_title','ad_description','ad_cta','Frequency','Reach','Video_P25','Video_P50','Video_P75','Video_P100','net_booking','board','ethnicity'];
+// Slim fields for localStorage — derived metrics recomputed by ensureDerivedMetrics on load
+const TAGGER_KEEP_FIELDS = ['Ad name','Campaign name','Ad set name','Creative type','Spent','QL','NRI','TD','TS','Paid','Impressions','Clicks','tags','id','_market','_account','_date','thumbnail_url','image_url','Frequency'];
 function compressTaggerData(data) {
   return data.map(c => {
     const slim = {};
@@ -11281,7 +11280,7 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount) {
 function renderTaggerTable() {
   const tbody = document.getElementById('taggerTableBody');
   const catFilter = document.getElementById('taggerFilterCategory')?.value || 'all';
-  const sortBy = document.getElementById('taggerSortBy')?.value || 'cptd_asc';
+  const sortBy = document.getElementById('taggerSortBy')?.value || 'cpql_asc';
   const viewLevel = taggerViewLevel || 'ad';
 
   let data = getFilteredTaggerDataWithDropdowns();
@@ -11417,7 +11416,7 @@ function renderTaggerHeatmap() {
     return pts;
   };
 
-  let html = '<p class="text-xs text-text-secondary mb-3">Each row is a tag value. Sorted by CPTD (lowest = best). <span class="text-green-600 font-medium">Green bars = cheaper than average</span>, <span class="text-red-500 font-medium">red bars = more expensive</span>.</p><div class="overflow-x-auto"><table class="w-full text-[11px] table-fixed"><thead><tr><th class="text-left px-2 py-2 font-bold text-text-muted" style="width:20%">Tag</th><th class="text-right px-2 py-2 font-bold text-text-muted">Ads</th><th class="text-right px-2 py-2 font-bold text-text-muted">Avg CPTD</th><th class="text-right px-2 py-2 font-bold text-text-muted">Avg CPTQL</th><th class="text-right px-2 py-2 font-bold text-text-muted">Spend</th><th class="text-right px-2 py-2 font-bold text-text-muted">TDs</th><th class="px-2 py-2 font-bold text-text-muted" style="width:10%">Trend</th><th class="px-2 py-2 font-bold text-text-muted" style="width:25%">Relative Cost</th></tr></thead><tbody>';
+  let html = '<p class="text-xs text-text-secondary mb-3">Each row is a tag value. CPTQL = primary metric. <span class="text-green-600 font-medium">Green = cheaper than average</span>, <span class="text-red-500 font-medium">red = more expensive</span>. Min 3 creatives per tag.</p><div class="overflow-x-auto"><table class="w-full text-[11px] table-fixed"><thead><tr><th class="text-left px-2 py-2 font-bold text-text-muted" style="width:20%">Tag</th><th class="text-right px-2 py-2 font-bold text-text-muted">Ads</th><th class="text-right px-2 py-2 font-bold text-text-muted">Avg CPTQL</th><th class="text-right px-2 py-2 font-bold text-text-muted">Avg CPTD</th><th class="text-right px-2 py-2 font-bold text-text-muted">Spend</th><th class="text-right px-2 py-2 font-bold text-text-muted">TDs</th><th class="px-2 py-2 font-bold text-text-muted" style="width:10%">Trend</th><th class="px-2 py-2 font-bold text-text-muted" style="width:25%">Relative Cost</th></tr></thead><tbody>';
 
   const allTagPerf = [];
   cats.forEach(cat => {
@@ -11446,39 +11445,32 @@ function renderTaggerHeatmap() {
   });
 
   // Sort based on dropdown
-  const hmSort = document.getElementById('heatmapSortBy')?.value || 'cptd_asc';
+  const hmSort = document.getElementById('heatmapSortBy')?.value || 'cpql_asc';
   allTagPerf.sort((a,b) => {
-    if (hmSort === 'cptd_asc') {
-      const aV = a.avgCPTD !== null ? a.avgCPTD : Infinity;
-      const bV = b.avgCPTD !== null ? b.avgCPTD : Infinity;
-      return aV - bV;
-    }
-    if (hmSort === 'cptd_desc') {
-      const aV = a.avgCPTD !== null ? a.avgCPTD : 0;
-      const bV = b.avgCPTD !== null ? b.avgCPTD : 0;
-      return bV - aV;
-    }
+    if (hmSort === 'cpql_asc') return (a.avgCPQL || Infinity) - (b.avgCPQL || Infinity);
+    if (hmSort === 'cpql_desc') return (b.avgCPQL || 0) - (a.avgCPQL || 0);
+    if (hmSort === 'cptd_asc') return (a.avgCPTD || Infinity) - (b.avgCPTD || Infinity);
     if (hmSort === 'spend_desc') return b.totalSpend - a.totalSpend;
-    if (hmSort === 'td_desc') return b.totalTD - a.totalTD;
     if (hmSort === 'count_desc') return b.count - a.count;
     return 0;
   });
-  const cptdValues = allTagPerf.filter(t => t.avgCPTD !== null).map(t => t.avgCPTD);
-  const maxCPTD = cptdValues.length ? Math.max(...cptdValues) : 1;
+  const cpqlValues = allTagPerf.filter(t => t.avgCPQL !== null).map(t => t.avgCPQL);
+  const maxCPQL = cpqlValues.length ? Math.max(...cpqlValues) : 1;
   const hPage = state._heatmapPage || 1;
   const hPaged = allTagPerf.slice((hPage-1)*TAGGER_PAGE_SIZE, hPage*TAGGER_PAGE_SIZE);
   renderPager('taggerHeatmapPager', hPage, allTagPerf.length, 'goHeatmapPage');
 
   hPaged.forEach(tp => {
     const hasCPTD = tp.avgCPTD !== null;
-    const pct = hasCPTD ? Math.min(100, (tp.avgCPTD / maxCPTD) * 100) : 100;
-    const barColor = hasCPTD ? (pct < 33 ? '#10B981' : pct < 66 ? '#F59E0B' : '#EF4444') : '#9CA3AF';
+    const hasCPQL = tp.avgCPQL !== null;
+    const pct = hasCPQL ? Math.min(100, (tp.avgCPQL / maxCPQL) * 100) : 100;
+    const barColor = hasCPQL ? (pct < 33 ? '#10B981' : pct < 66 ? '#F59E0B' : '#EF4444') : '#9CA3AF';
     const tc = TAG_COLORS[tp.color];
     html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/30">
       <td class="px-2 py-2"><span class="inline-flex items-center gap-1"><span class="${tc.bg} ${tc.text} text-[9px] px-1.5 py-0.5 rounded font-medium">${tp.catLabel}</span><span class="font-medium">${tagLabel(tp.tag)}</span></span></td>
       <td class="px-2 py-2 text-right text-text-muted">${tp.count}</td>
-      <td class="px-2 py-2 text-right font-bold" style="color:${barColor}">${hasCPTD ? formatCurrency(tp.avgCPTD) : '\u2014'}</td>
-      <td class="px-2 py-2 text-right text-text-muted">${tp.avgCPQL !== null ? formatCurrency(tp.avgCPQL) : '\u2014'}</td>
+      <td class="px-2 py-2 text-right font-bold" style="color:${tp.avgCPQL !== null ? barColor : '#9CA3AF'}">${tp.avgCPQL !== null ? formatCurrency(tp.avgCPQL) : '\u2014'}</td>
+      <td class="px-2 py-2 text-right text-text-muted">${hasCPTD ? formatCurrency(tp.avgCPTD) : '\u2014'}</td>
       <td class="px-2 py-2 text-right text-text-muted">${formatCurrency(tp.totalSpend)}</td>
       <td class="px-2 py-2 text-right text-text-muted">${Math.round(tp.totalTD)}</td>
       <td class="px-2 py-2">${generateSparklineSVG(_hmBuildSparkData(tp.tag, tp.cat), {width:60,height:16,lowerBetter:true,id:'hm_'+tp.tag.replace(/\W/g,'')})}</td>
