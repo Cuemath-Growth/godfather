@@ -4296,21 +4296,18 @@ function getAdPerformance(market, startDate, endDate) {
     s.clicks += parseInt(r.clicks) || 0;
   });
 
-  // Step 3: Fallback spend from costData (campaign-level, when metaAdData empty)
-  const useMetaSpend = Object.keys(spendMap).length > 0;
+  // Step 3: Campaign-level spend from costData — used as fallback per-ad when metaAdData has no match
   const campSpendMap = {};
-  if (!useMetaSpend) {
-    costData.forEach(r => {
-      if ((r.medium || '').trim().toLowerCase() !== 'meta') return;
-      const key = normalizeAdName(r.campaign_name);
-      if (!key) return;
-      const day = r.day || '';
-      if (start && day < start) return;
-      if (end && day > end) return;
-      if (!campSpendMap[key]) campSpendMap[key] = 0;
-      campSpendMap[key] += parseFloat(r.amount_spent) || 0;
-    });
-  }
+  costData.forEach(r => {
+    if ((r.medium || '').trim().toLowerCase() !== 'meta') return;
+    const key = normalizeAdName(r.campaign_name);
+    if (!key) return;
+    const day = r.day || '';
+    if (start && day < start) return;
+    if (end && day > end) return;
+    if (!campSpendMap[key]) campSpendMap[key] = 0;
+    campSpendMap[key] += parseFloat(r.amount_spent) || 0;
+  });
 
   // Step 4: Union join — all ad names from both sides
   const allKeys = new Set([...Object.keys(leadMap), ...Object.keys(spendMap)]);
@@ -4335,10 +4332,10 @@ function getAdPerformance(market, startDate, endDate) {
     // Skip if market filter and doesn't match
     if (market && market !== 'all' && adMarket && adMarket !== market) return;
 
-    // Spend: metaAdData > costData campaign pro-rate
+    // Spend: metaAdData first, then costData campaign pro-rate as fallback
     let adSpend = spend ? spend.spend : null;
     let spendSource = spend ? 'meta_insights' : null;
-    if (adSpend === null && !useMetaSpend && lead.ql > 0) {
+    if (adSpend === null && lead.ql > 0) {
       const campKey = normalizeAdName(campaign);
       const campTotal = campSpendMap[campKey] || 0;
       if (campTotal > 0) {
