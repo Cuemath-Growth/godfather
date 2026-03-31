@@ -3750,8 +3750,8 @@ async function fetchMetaCreatives() {
   for (const account of accounts) {
     try {
       let page = await callMetaAPI(`${account.id}/ads`, {
-        fields: 'id,name,creative{thumbnail_url,image_url,body,title,call_to_action_type},status,effective_status',
-        limit: '500'
+        fields: 'id,name,creative{thumbnail_url,image_url},status,effective_status',
+        limit: '100'
       });
       let pageNum = 1;
       while (page && pageNum <= 20) {
@@ -6079,7 +6079,8 @@ function renderOracleActions() {
   // ── SECTION 3: DEPLOY THESE ──
   const deployList = document.getElementById('oracleDeployList');
   const library = state._librarySheet ? state._librarySheet.map(normalizeLibraryRow).filter(c => c.name) : CREATIVE_ASSETS;
-  if (library.length && audRows.length) {
+  const _audRows = typeof audRows !== 'undefined' ? audRows : [];
+  if (library.length && _audRows.length) {
     // Match library assets to winning audience patterns
     const deployRecs = [];
     library.slice(0, 50).forEach(asset => {
@@ -6091,7 +6092,7 @@ function renderOracleActions() {
       });
       if (deployed) return;
       // Match to best audience
-      const bestAud = audRows[0]; // best performing audience
+      const bestAud = _audRows[0]; // best performing audience
       if (bestAud) {
         deployRecs.push({
           asset: asset.name || 'Untitled',
@@ -6518,10 +6519,10 @@ function renderOracleCardsV2() {
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
         </div>
-        ${!isDone ? _pauseCardActions(itemId, shortName) : ''}
+        ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
       </div>`;
     });
-    const totalWaste = visiblePause.filter(a => !getOracleAction('pause:' + a.name)?.status).reduce((s, a) => s + a.spend, 0);
+    const totalWaste = visiblePause.filter(a => !getOracleAction('pause:' + a.name)?.status && a.spend).reduce((s, a) => s + (a.spend || 0), 0);
     if (totalWaste > 0) html += `<p class="text-[10px] text-amber-700 font-semibold mt-2">${formatCurrency(totalWaste)} recoverable · last 30 days</p>`;
     html += '</div>';
     pauseList.innerHTML = html;
