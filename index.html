@@ -4173,10 +4173,9 @@ function buildLookupMaps() {
   const leadsMatchedCamp = leadsData.filter(r => _campaignMap[(r.mx_utm_campaign || '').toLowerCase().trim()]).length;
   const leadsWithAd = leadsData.filter(r => (r.mx_utm_adcontent || '').trim()).length;
   const leadsMatchedAd = leadsData.filter(r => _adMap[(r.mx_utm_adcontent || '').toLowerCase().trim()]).length;
-  console.log(`Campaign map: ${Object.keys(_campaignMap).length} campaigns`);
-  console.log(`Ad map: ${Object.keys(_adMap).length} ads`);
-  console.log(`Lead campaign match rate: ${leadsWithCamp > 0 ? Math.round(leadsMatchedCamp / leadsWithCamp * 100) : 0}% (${leadsMatchedCamp}/${leadsWithCamp})`);
-  console.log(`Lead ad match rate: ${leadsWithAd > 0 ? Math.round(leadsMatchedAd / leadsWithAd * 100) : 0}% (${leadsMatchedAd}/${leadsWithAd})`);
+  console.log(`Campaign map: ${Object.keys(_campaignMap).length} meta campaigns, matched ${leadsMatchedCamp}/${leadsWithCamp} leads (${leadsWithCamp > 0 ? Math.round(leadsMatchedCamp / leadsWithCamp * 100) : 0}%)`);
+  console.log(`Ad map: ${Object.keys(_adMap).length} ads, matched ${leadsMatchedAd}/${leadsWithAd} leads (${leadsWithAd > 0 ? Math.round(leadsMatchedAd / leadsWithAd * 100) : 0}%)`);
+  console.log(`Unmatched campaigns: ${leadsWithCamp - leadsMatchedCamp} leads — older campaigns before mid-2024 not in cost tab`);
 }
 
 function getCampaignSpend(campaignName, market, startDate, endDate) {
