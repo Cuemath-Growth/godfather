@@ -1262,11 +1262,18 @@
               </select>
             </div>
           </div>
-          <div class="flex gap-2">
+          <div class="flex gap-2 flex-wrap">
             <button onclick="connectMetaApi()" id="metaApiConnectBtn" class="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold">Connect & Pull Data</button>
             <button onclick="testMetaApi()" class="btn-secondary px-5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200">Test Connection</button>
           </div>
           <p class="text-[10px] text-text-muted mt-3" id="metaApiStatus"></p>
+          <!-- Backfill: one-time fetch of full history from COST_DATA_START -->
+          <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <p class="text-[11px] font-bold text-amber-800 mb-1">Full History Backfill (run once)</p>
+            <p class="text-[10px] text-amber-700 mb-2">Fetches ad spend from Nov 2025 → today in monthly chunks. Required for accurate CPTQL on historical campaigns. Takes ~2 min. Only needed once — daily sync handles updates after.</p>
+            <button onclick="backfillMetaAdInsights()" id="backfillInsightsBtn" class="px-4 py-2 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700">Backfill Full History (Nov 2025–today)</button>
+            <p class="text-[10px] text-amber-700 mt-1.5" id="backfillInsightsStatus"></p>
+          </div>
         </div>
 
         <!-- API Keys -->
@@ -3832,30 +3839,22 @@ async function loadCachedAdData() {
   } catch { return false; }
 }
 
-async function fetchMetaAdInsights(force = false) {
+// ── Core fetch for a single date range across all accounts ──
+// Returns array of daily ad rows. Upserts to Supabase, does NOT replace metaAdData.
+async function _fetchMetaInsightsRange(since, until, onProgress) {
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
-  if (!accounts?.length) return;
-  // Skip if data is fresh (< 24 hours) unless forced
-  const lastFetch = parseInt(localStorage.getItem('gf_v2_adDataTs') || '0');
-  if (!force && metaAdData.length > 0 && (Date.now() - lastFetch < 24 * 60 * 60 * 1000)) {
-    console.log('Meta ad insights: skipping — data is < 24h old. Use Settings > Refresh to force.');
-    return;
-  }
-  // Last 90 days
-  const end = new Date().toISOString().slice(0, 10);
-  const start = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  if (!accounts?.length) return [];
   const all = [];
   for (const account of accounts) {
     try {
-      // Safe top-level fields only — link_clicks is inside actions array, not a top-level field
       const insightParams = {
         fields: 'date_start,ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency',
         time_increment: '1',
         level: 'ad',
-        time_range: JSON.stringify({ since: start, until: end }),
+        time_range: JSON.stringify({ since, until }),
         limit: '500'
       };
-      console.log(`Fetching insights for ${account.name}...`);
+      if (onProgress) onProgress(`${account.name} (${since}→${until})…`);
       let page = await callMetaAPI(`${account.id}/insights`, insightParams);
       if (page.error) { console.error(`Ad insights ${account.name}:`, page.error); continue; }
       let pageNum = 1;
@@ -3866,14 +3865,10 @@ async function fetchMetaAdInsights(force = false) {
               date: r.date_start,
               ad_id: r.ad_id || '', ad_name: r.ad_name || '',
               adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
-              spend: parseFloat(r.spend || 0),
-              impressions: parseInt(r.impressions || 0),
-              reach: parseInt(r.reach || 0),
-              clicks: parseInt(r.clicks || 0),
-              ctr: parseFloat(r.ctr || 0),
-              cpc: parseFloat(r.cpc || 0),
-              cpm: parseFloat(r.cpm || 0),
-              frequency: parseFloat(r.frequency || 0),
+              spend: parseFloat(r.spend || 0), impressions: parseInt(r.impressions || 0),
+              reach: parseInt(r.reach || 0), clicks: parseInt(r.clicks || 0),
+              ctr: parseFloat(r.ctr || 0), cpc: parseFloat(r.cpc || 0),
+              cpm: parseFloat(r.cpm || 0), frequency: parseFloat(r.frequency || 0),
               _account: account.market
             });
           });
@@ -3887,31 +3882,94 @@ async function fetchMetaAdInsights(force = false) {
         const p = {}; u.searchParams.forEach((v, k) => { if (k !== 'access_token') p[k] = v; });
         page = await callMetaAPI(ep, p);
       }
-    } catch(e) { console.error(`Ad insights ${account.name}:`, e.message); }
-    console.log(`  ${account.name}: ${all.length} rows so far`);
+    } catch(e) { console.error(`Ad insights ${account.name} (${since}→${until}):`, e.message); }
   }
-  metaAdData = all;
-  console.log(`Meta ad insights: ${all.length} daily rows from ${accounts.length} accounts`);
-  // Save to Supabase (full daily data, no trimming — 500MB limit vs 5MB localStorage)
-  const BATCH = 500;
-  const sbRows = all.map(r => ({
-    date: r.date, ad_id: r.ad_id || '', ad_name: r.ad_name || '',
-    adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
-    spend: r.spend || 0, impressions: r.impressions || 0,
-    reach: r.reach || 0, clicks: r.clicks || 0,
-    ctr: r.ctr || 0, cpc: r.cpc || 0, cpm: r.cpm || 0,
-    frequency: r.frequency || 0, account: r._account || '',
-    updated_at: new Date().toISOString()
-  }));
-  let sbOk = 0, sbFail = 0;
-  for (let i = 0; i < sbRows.length; i += BATCH) {
-    const ok = await supabaseUpsert('meta_ad_data', sbRows.slice(i, i + BATCH));
-    if (ok) sbOk += Math.min(BATCH, sbRows.length - i); else sbFail += Math.min(BATCH, sbRows.length - i);
+  // Upsert to Supabase — additive, never replaces existing rows
+  if (all.length) {
+    const BATCH = 500;
+    const sbRows = all.map(r => ({
+      date: r.date, ad_id: r.ad_id || '', ad_name: r.ad_name || '',
+      adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
+      spend: r.spend || 0, impressions: r.impressions || 0,
+      reach: r.reach || 0, clicks: r.clicks || 0,
+      ctr: r.ctr || 0, cpc: r.cpc || 0, cpm: r.cpm || 0,
+      frequency: r.frequency || 0, account: r._account || '',
+      updated_at: new Date().toISOString()
+    }));
+    for (let i = 0; i < sbRows.length; i += BATCH) {
+      await supabaseUpsert('meta_ad_data', sbRows.slice(i, i + BATCH));
+    }
+    console.log(`_fetchMetaInsightsRange(${since}→${until}): ${all.length} rows upserted`);
   }
-  console.log(`Supabase meta_ad_data: saved ${sbOk} rows${sbFail ? `, ${sbFail} failed` : ''}`);
-  // Keep lightweight localStorage fallback (aggregated) for offline boot
+  return all;
+}
+
+// ── Backfill: fetch every month from COST_DATA_START to today in chunks ──
+async function backfillMetaAdInsights() {
+  const btn = document.getElementById('backfillInsightsBtn');
+  const status = document.getElementById('backfillInsightsStatus');
+  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+
+  const onProgress = (msg) => {
+    console.log('Backfill:', msg);
+    if (status) status.textContent = msg;
+  };
+
+  const startDate = new Date(COST_DATA_START);
+  const today = new Date();
+  // Build monthly chunks
+  const months = [];
+  let cur = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  while (cur <= today) {
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const since = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const until = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    months.push({ since, until: until > today.toISOString().slice(0, 10) ? today.toISOString().slice(0, 10) : until });
+    cur = new Date(y, m + 1, 1);
+  }
+
+  let totalRows = 0;
+  for (const chunk of months) {
+    onProgress(`Fetching ${chunk.since} → ${chunk.until}…`);
+    const rows = await _fetchMetaInsightsRange(chunk.since, chunk.until, onProgress);
+    totalRows += rows.length;
+    await sleep(1000); // Pause between months to avoid rate limiting
+  }
+
+  // Reload from Supabase so metaAdData reflects full history
+  await loadCachedAdData();
+  invalidateAdPerfCache();
+  buildLookupMaps();
+
+  const msg = `Backfill done — ${totalRows} rows fetched, ${metaAdData.length} total in memory`;
+  console.log(msg);
+  if (status) status.textContent = msg;
+  if (btn) { btn.disabled = false; btn.textContent = 'Backfill Full History'; }
+  showToast(msg);
+  localStorage.setItem('gf_v2_adDataTs', Date.now().toString());
+}
+window.backfillMetaAdInsights = backfillMetaAdInsights;
+
+async function fetchMetaAdInsights(force = false) {
+  const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
+  if (!accounts?.length) return;
+  // Skip if data is fresh (< 24 hours) unless forced
+  const lastFetch = parseInt(localStorage.getItem('gf_v2_adDataTs') || '0');
+  if (!force && metaAdData.length > 0 && (Date.now() - lastFetch < 24 * 60 * 60 * 1000)) {
+    console.log('Meta ad insights: skipping — data is < 24h old. Use Settings > Refresh to force.');
+    return;
+  }
+  // Incremental: only last 7 days — full history lives in Supabase from backfill
+  const end = new Date().toISOString().slice(0, 10);
+  const start = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const newRows = await _fetchMetaInsightsRange(start, end);
+  // Reload from Supabase to get merged full history
+  await loadCachedAdData();
+  console.log(`Meta ad insights: incremental sync done (${newRows.length} new rows), ${metaAdData.length} total in memory`);
+  // Build lightweight localStorage fallback (aggregated) from full in-memory data
   const aggMap = {};
-  all.forEach(r => {
+  metaAdData.forEach(r => {
     const key = normalizeAdName(r.ad_name) + '||' + normalizeAdName(r.campaign_name) + '||' + (r._account || '');
     if (!aggMap[key]) aggMap[key] = { ad_name: r.ad_name, ad_id: r.ad_id, campaign_name: r.campaign_name, spend: 0, _account: r._account, date_min: r.date, date_max: r.date };
     aggMap[key].spend += r.spend || 0;
@@ -3921,6 +3979,8 @@ async function fetchMetaAdInsights(force = false) {
   const aggData = Object.values(aggMap).map(r => ({ ...r, date: r.date_min }));
   _safeCacheSet('gf_v2_metaAdData', JSON.stringify(aggData));
   _safeCacheSet('gf_v2_adDataTs', Date.now().toString());
+  invalidateAdPerfCache();
+  buildLookupMaps();
   // Re-render if on Performance tab
   if (state.currentView === 'leads') try { renderDayByDay(); } catch(e) {}
 }
@@ -6025,11 +6085,11 @@ function renderOracleActions() {
 
     if (dashCountry === 'all' && geos.length > 1) {
       const geoPerf = geos.map(g => {
-        const gSpend = getOracleMetrics(fromDate, toDate, g).spend;
-        const gCrm = getCRMPortfolioTotals(g); // No DOM mutation — uses current DOM dates directly
-        const gCptd = gCrm.td > 0 && gSpend > 0 ? gSpend / gCrm.td : 0;
+        const _gm = getMarketMetrics(g, fromDate, toDate);
+        const gSpend = _gm.spend;
+        const gCptd = _gm.cptd || 0;
         const gColor = getThresholdColor('cptd', gCptd, g);
-        return { geo: g, spend: gSpend, td: gCrm.td, cptd: gCptd, color: gColor };
+        return { geo: g, spend: gSpend, td: _gm.td, cptd: gCptd, color: gColor };
       }).filter(g => g.spend > 0);
 
       const greenGeos = geoPerf.filter(g => g.color === 'green' && g.td >= 3);
@@ -6421,7 +6481,7 @@ function renderOracleActions() {
   let mhAny = false;
 
   mhGeos.forEach(geo => {
-    const m = (state._perfTrackerDaily?.length || state._crmLeads?.length) ? getOracleMetrics(mhFrom, mhTo, geo) : null;
+    const m = leadsData.length ? getMarketMetrics(geo, mhFrom, mhTo) : null;
     if (!m || m.spend === 0) return;
     mhAny = true;
     const gc = GEO_COLORS[geo] || GEO_COLORS.US;
@@ -6444,7 +6504,7 @@ function renderOracleActions() {
         <div><p class="text-[9px] text-text-muted">QL\u2192TD%</p><p class="text-xs font-bold">${qlTdPct}</p></div>
       </div>
       <div class="my-1.5 flex justify-center">${renderSparkline('cptd', geo, {width:100,height:20,days:14})}</div>
-      <p class="text-[10px] text-text-muted">${formatCurrency(m.spend)} spend · ${Math.round(m.ql)} QLs · ${Math.round(m.td)} TDs · ${Math.round(m.paid||0)} enrolled</p>
+      <p class="text-[10px] text-text-muted">${formatCurrency(m.spend)} spend · ${Math.round(m.ql)} QLs · ${Math.round(m.td)} TDs · ${Math.round(m.enrolled||0)} enrolled</p>
       <p class="text-[10px] mt-1.5 font-medium ${status === 'Healthy' ? 'text-green-700' : status === 'Watch' ? 'text-amber-700' : status === 'Alert' ? 'text-red-700' : 'text-text-muted'}">${status === 'Healthy' ? 'Scale — increase budget or test new audiences' : status === 'Watch' ? 'Optimize — refresh creatives, test new hooks' : status === 'Alert' ? 'Investigate — pause worst performers, check funnel' : 'Need more data'}</p>
       ${(status === 'Alert' || status === 'Watch') ? `<details class="mt-1" data-diag-geo="${geo}"><summary class="text-[9px] font-bold text-accent-purple cursor-pointer hover:underline">Why?</summary><div class="diag-container"></div></details>` : ''}
       ${upcoming.length ? `<p class="text-[10px] text-text-muted mt-1">\ud83d\udcc5 ${upcoming[0].event} (${upcoming[0].start})</p>` : ''}
@@ -9374,32 +9434,24 @@ function computeSparklineData(metric, geo, days) {
   const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  // Daily spend from Perf Tracker
+  // Daily spend from costData (Section 2)
   const dailySpend = {};
-  (state._perfTrackerDaily || []).forEach(r => {
+  filterCostByMarket(costData, geo === 'all' ? null : geo).forEach(r => {
     if ((r.medium || '').toLowerCase() !== 'meta') return;
-    const d = r.day || r.date || '';
+    const d = r.day || '';
     if (!d || d < cutoffStr) return;
-    const rGeo = (r.country_segment || r.region || '').toLowerCase();
-    if (geo && geo !== 'all') {
-      const geoMap = { 'us': 'US', 'usa': 'US', 'india': 'India', 'in': 'India', 'aus': 'AUS', 'australia': 'AUS', 'mea': 'MEA', 'uk': 'UK', 'apac': 'APAC' };
-      const mapped = geoMap[rGeo] || rGeo;
-      if (mapped.toLowerCase() !== geo.toLowerCase()) return;
-    }
     if (!dailySpend[d]) dailySpend[d] = 0;
-    dailySpend[d] += parseFloat(r.amount_spent || r.spend || 0) || 0;
+    dailySpend[d] += parseFloat(r.amount_spent || 0) || 0;
   });
 
-  // Daily funnel from CRM
+  // Daily funnel from leadsData (Section 2) — uses crmGeoMatchRow for correct AUS/MEA handling
   const dailyQL = {}, dailyTD = {}, dailyPaid = {};
-  (state._crmLeads || []).forEach(r => {
-    const rGeo = r.country_bucket || r.region || '';
-    if (geo && geo !== 'all' && rGeo.toLowerCase() !== geo.toLowerCase()) return;
+  filterLeadsByMarket(leadsData, geo === 'all' ? null : geo).forEach(r => {
     const qd = (r.lead_created_date || '').slice(0, 10);
-    const td = (r.trial_done_date || '').slice(0, 10);
+    const td_d = (r.trial_done_date || '').slice(0, 10);
     const pd = (r.paid_date || '').slice(0, 10);
-    if (qd >= cutoffStr && parseFloat(r.qls || 0)) { dailyQL[qd] = (dailyQL[qd] || 0) + parseFloat(r.qls || 0); }
-    if (td >= cutoffStr && parseFloat(r.trials_done || 0)) { dailyTD[td] = (dailyTD[td] || 0) + parseFloat(r.trials_done || 0); }
+    if (qd >= cutoffStr && parseFloat(r.qls || r.ql_count || 0)) { dailyQL[qd] = (dailyQL[qd] || 0) + parseFloat(r.qls || r.ql_count || 0); }
+    if (td_d >= cutoffStr && parseFloat(r.trials_done || 0)) { dailyTD[td_d] = (dailyTD[td_d] || 0) + parseFloat(r.trials_done || 0); }
     if (pd >= cutoffStr && parseFloat(r.paid || 0)) { dailyPaid[pd] = (dailyPaid[pd] || 0) + parseFloat(r.paid || 0); }
   });
 
@@ -10606,12 +10658,12 @@ function renderLensAggregateMetrics() {
   const geoFilter = (state.currentView === 'intel') ? intelGeo : taggerGeo;
   const resolvedGeo = geoFilter;
 
-  // Date-filtered from perf tracker (spend) + CRM (funnel)
-  if (!state._perfTrackerDaily?.length && !state._crmLeads?.length) return;
+  // Section 2: costData + leadsData — same source as Dashboard KPI cards
+  if (!leadsData.length) return;
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
-  const m = getOracleMetrics(fromDate, toDate, resolvedGeo);
-  if (!m) return;
+  const m = getMarketMetrics(resolvedGeo === 'all' ? null : resolvedGeo, fromDate, toDate);
+  if (!m || m.spend === 0) return;
   const srcLabel = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All time';
 
   // Count direct vs proportional matches in current tagger data for transparency
@@ -14048,12 +14100,11 @@ function _runSentinelViewInner() {
     const _diagGeo = (document.getElementById('sentinelGeo')?.value || 'all') === 'all' ? 'US' : document.getElementById('sentinelGeo').value;
     const _diagData = getGlobalFilteredTaggerData('sentinelGeo');
     if (_diagData.length >= 5) {
-      // Use oracle spend (Perf Tracker Daily — matches KPI cards) not inflated tagger spend
+      // Use Section 2 spend (costData) + funnel (leadsData) — matches Dashboard KPI cards
       const _sentGeo = document.getElementById('sentinelGeo').value;
       const { from: _dFrom, to: _dTo } = getGlobalDateRange();
-      const _diagOracle = getOracleMetrics(_dFrom, _dTo, _sentGeo);
-      const _diagCRM = getCRMPortfolioTotals(_sentGeo);
-      const _diagCPTD = _diagCRM.td > 0 && _diagOracle.spend > 0 ? _diagOracle.spend / _diagCRM.td : 0;
+      const _diagM2 = leadsData.length ? getMarketMetrics(_sentGeo === 'all' ? null : _sentGeo, _dFrom, _dTo) : null;
+      const _diagCPTD = _diagM2?.cptd || 0;
       const _diag = diagnoseCPTD(_diagData, _diagGeo, { overrideCPTD: _diagCPTD });
       if (_diag.factors.length) {
         const _diagEl = document.getElementById('sentinelKPIs');
@@ -14090,21 +14141,21 @@ function renderSentinelKPIs() {
   const isFormatFiltered = formatFilter !== 'all';
   const taggerData = getGlobalFilteredTaggerData('sentinelGeo', formatFilter);
   const { from: _kpiFrom, to: _kpiTo } = getGlobalDateRange();
-  const oracle = getOracleMetrics(_kpiFrom, _kpiTo, geoFilter);
-  // Spend: Perf Tracker when available, tagger fallback when format-filtered (relative only)
-  const spend = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0) : (oracle.spend || 0);
-  // CRM data CANNOT be format-filtered — when format active, CRM metrics are invalid
-  const crm = isFormatFiltered ? { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, revenue: 0, ts: 0 } : getCRMPortfolioTotals(geoFilter);
-  // When format-filtered, derive funnel from tagger data (approximate but honest)
-  const tql = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['TQL']||0), 0) : (crm.tql || 0);
-  const qlTotal = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['QL']||c['ql']||0), 0) : (crm.ql || 0);
-  const td = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['TD']||c['td']||0), 0) : (crm.td || 0);
+  // Section 2: costData (spend) + leadsData (funnel) — single source of truth
+  const _s2market = geoFilter === 'all' ? null : geoFilter;
+  const _m2 = leadsData.length ? getMarketMetrics(_s2market, _kpiFrom, _kpiTo) : null;
+  // Spend: Section 2 when available, tagger fallback when format-filtered (relative only)
+  const spend = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0) : (_m2?.spend || 0);
+  // Funnel data CANNOT be format-filtered — when format active, derive from tagger (approximate)
+  const tql = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['TQL']||0), 0) : (_m2?.tql || 0);
+  const qlTotal = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['QL']||c['ql']||0), 0) : (_m2?.ql || 0);
+  const td = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['TD']||c['td']||0), 0) : (_m2?.td || 0);
   const cptql = tql > 0 && spend > 0 ? spend / tql : 0;
   const cptd = td > 0 && spend > 0 ? spend / td : 0;
   const qlTdPct = qlTotal > 0 ? Math.min(td / qlTotal * 100, 100) : 0;
-  const enrolled = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['Paid']||c['paid']||0), 0) : (crm.paid || 0);
+  const enrolled = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['Paid']||c['paid']||0), 0) : (_m2?.enrolled || 0);
   const cac = enrolled > 0 && spend > 0 ? spend / enrolled : 0;
-  const roas = isFormatFiltered ? 0 : (crm.revenue > 0 && spend > 0 ? crm.revenue / spend : 0);
+  const roas = isFormatFiltered ? 0 : (_m2?.roas || 0);
 
   // Traffic metrics from tagger (only source with impressions/clicks)
   const ctr = s.avg_ctr;
@@ -14215,15 +14266,14 @@ function renderSentinelNarrative() {
   const geoFilter = document.getElementById('sentinelGeo')?.value || 'all';
   const formatFilter = document.getElementById('sentinelFormatFilterHeader')?.value || 'all';
   const isFormatFiltered = formatFilter !== 'all';
-  // Use oracle spend (Perf Tracker Daily — matches KPI cards) not inflated tagger spend
+  // Section 2: costData (spend) + leadsData (funnel) — consistent with KPI cards
   const { from: _nFrom, to: _nTo } = getGlobalDateRange();
-  const _narrativeOracle = getOracleMetrics(_nFrom, _nTo, geoFilter);
+  const _narrativeM2 = leadsData.length ? getMarketMetrics(geoFilter === 'all' ? null : geoFilter, _nFrom, _nTo) : null;
   const totalSpend = isFormatFiltered
     ? getGlobalFilteredTaggerData('sentinelGeo', formatFilter).reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0)
-    : (_narrativeOracle.spend || 0);
-  // Use CRM TDs for CPTD (consistent with KPI cards) — tagger TDs only when format-filtered
-  const _narrativeCRM = isFormatFiltered ? null : getCRMPortfolioTotals(geoFilter);
-  const td = isFormatFiltered ? rows.reduce((t, r) => t + (r.metrics?.td || 0), 0) : (_narrativeCRM?.td || 0);
+    : (_narrativeM2?.spend || 0);
+  // Use Section 2 TDs for CPTD (consistent with KPI cards) — tagger TDs only when format-filtered
+  const td = isFormatFiltered ? rows.reduce((t, r) => t + (r.metrics?.td || 0), 0) : (_narrativeM2?.td || 0);
   const currentCPTD = td > 0 && totalSpend > 0 ? totalSpend / td : 0;
 
   // All-time average CPTD from ALL tagger data (unfiltered) — true baseline comparison
