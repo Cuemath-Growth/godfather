@@ -1225,6 +1225,7 @@
             <button onclick="testDataSource()" id="testDataSourceBtn" class="btn-secondary px-5 py-2.5 rounded-xl text-sm font-semibold border border-gray-200">Test Connection</button>
           </div>
           <div id="testDataSourcePreview" class="hidden"></div>
+          <p class="text-[10px] text-amber-700 mt-3 px-1">Cost data available from November 2025. Metrics before this date will show spend as —</p>
         </div>
 
         <!-- Meta Ads API -->
@@ -1989,6 +1990,9 @@ function renderDeploymentTracker() {
 }
 
 const API_KEY = localStorage.getItem('gf_claudeKey') || '';
+
+// Cost tab only has data from this date. All spend metrics before this are unreliable.
+const COST_DATA_START = '2025-11-01';
 
 const DEFAULT_SHEETS = {
   metaUrl: 'https://docs.google.com/spreadsheets/d/11q8zU3mRa1RzD8WSjanRVAzXBXXoiFsZNXo_R4OwbKk/edit?gid=1805066969#gid=1805066969',
@@ -6363,15 +6367,9 @@ function renderOracleCardsV2() {
   const market = dashCountry === 'all' ? null : dashCountry;
   const { from, to } = getGlobalDateRange();
 
-  // ── PAUSE NOW: default to last 30 days if no date selected ──
-  let pauseFrom = from, pauseTo = to;
-  if (!pauseFrom && !pauseTo) {
-    const now = new Date();
-    pauseTo = now.toISOString().slice(0, 10);
-    pauseFrom = new Date(now - 30 * 86400000).toISOString().slice(0, 10);
-  }
+  // ── PAUSE NOW: uses global date range (defaults to COST_DATA_START → today) ──
   const pauseList = document.getElementById('oraclePauseList');
-  const adBreakdown = getAdBreakdown(market, pauseFrom, pauseTo);
+  const adBreakdown = getAdBreakdown(market, from, to);
   const spendLeaks = adBreakdown
     .filter(a => a._spendMatched && (a.campaignSpend || 0) > 50000 && a.td === 0)
     .sort((a, b) => (b.campaignSpend || 0) - (a.campaignSpend || 0))
@@ -10482,9 +10480,9 @@ function getGlobalDateRange() {
     if (fromEl) fromEl.value = from;
     if (toEl) toEl.value = to;
   }
-  // Empty dates = All Time (no filter). Do NOT auto-fill from tagger data.
-  // The "All Time" button explicitly clears dates. Respect that.
-  if (!from && !to) return { from: '', to: '' };
+  // Default to COST_DATA_START → today when no dates set.
+  // Cost tab only covers Nov 2025+. "All time" would surface false signals from pre-Nov data gaps.
+  if (!from && !to) return { from: COST_DATA_START, to: new Date().toISOString().slice(0, 10) };
   // If only one date set, don't auto-fill the other — just use what's there
   if (false && !from && !to && state.taggerData?.length) {
     // DISABLED: This side effect was auto-filling dates from tagger data,
