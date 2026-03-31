@@ -2835,29 +2835,8 @@ function init() {
       document.getElementById('dataTimestamp').textContent = 'Loading data...';
     }
     fetchSheetData(_bootSheetUrl, _bootApiKey).then(counts => {
-      console.log(`Boot: fetched ${counts.leads} leads, ${counts.cost} cost rows`);
-      if (costData[0]) console.log('Cost columns:', Object.keys(costData[0]));
-      if (costData[0]) console.log('Cost row 0:', costData[0]);
-      if (leadsData[0]) console.log('Leads columns:', Object.keys(leadsData[0]).slice(0, 30));
-      // Check utm_medium column name
-      const _utmCols = Object.keys(leadsData[0] || {}).filter(k => k.toLowerCase().includes('utm') || k.toLowerCase().includes('medium'));
-      console.log('UTM/medium columns in leads:', _utmCols);
-      console.log('Section 2 verification — QL:', getQL(), 'TD_snap:', getTD_snapshot(), 'TD_cohort:', getTD_cohort(), 'Spend:', (getSpend()/10000000).toFixed(2)+'Cr');
-      // Ethnicity diagnostic
-      const _eth = {}; leadsData.forEach(r => { const e = (r.ethnicity||'(empty)').trim(); _eth[e] = (_eth[e]||0)+1; });
-      console.log('Ethnicity values:', _eth);
-      // Revenue diagnostic
-      const _revCols = Object.keys(leadsData[0] || {}).filter(k => k.toLowerCase().includes('revenue') || k.toLowerCase().includes('booking') || k.toLowerCase().includes('net'));
-      console.log('Revenue columns:', _revCols);
-      const _paidRows = leadsData.filter(r => String(r.paid) === '1');
-      if (_paidRows.length) console.log('Sample paid row revenue fields:', { revenue: _paidRows[0].revenue, net_booking: _paidRows[0].net_booking, Revenue: _paidRows[0].Revenue, 'Net Booking': _paidRows[0]['Net Booking'] });
-      // Spend diagnostic
-      const _allSpend = costData.reduce((s,r) => s + (parseFloat(r.spend || r.amount_spent) || 0), 0);
-      const _metaSpend = costData.filter(r => (r.medium||'').trim().toLowerCase() === 'meta').reduce((s,r) => s + (parseFloat(r.spend || r.amount_spent) || 0), 0);
-      const _mediums = {}; costData.forEach(r => { const m = (r.medium||'(empty)').trim(); _mediums[m] = (_mediums[m]||0)+1; });
-      console.log('Spend diagnostic — all:', ((_allSpend/10000000).toFixed(2))+'Cr, meta only:', ((_metaSpend/10000000).toFixed(2))+'Cr, mediums:', _mediums);
+      console.log(`Boot: ${counts.leads} leads, ${counts.cost} cost rows`);
       updateDataStatusLine();
-      // Re-render dashboard with fresh data
       if (state.currentView === 'dashboard') try { onDashboardFilterChange(); } catch(e) {}
     }).catch(e => {
       console.error('Boot fetch failed:', e);
@@ -3657,7 +3636,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
   costData = parseSheetValues(costJson.values);
 
   // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
-  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','revenue','board (ME)','board','mx_utm_campaign','mx_utm_adcontent'];
+  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','revenue','Revenue','board (ME)','board','mx_utm_campaign','mx_utm_adcontent'];
   const slimLeads = leadsData.map(r => {
     const s = {};
     LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
@@ -3810,8 +3789,8 @@ function getRevenue(market, startDate, endDate) {
     if (endDate && d > endDate) return false;
     return String(r.paid) === '1';
   });
-  // Revenue in sheet is in lakhs — multiply by 100000
-  return rows.reduce((sum, r) => sum + ((parseFloat(r.revenue) || 0) * 100000), 0);
+  // Revenue column is "Revenue" (capital R), value in lakhs — multiply by 100000
+  return rows.reduce((sum, r) => sum + ((parseFloat(r.Revenue || r.revenue) || 0) * 100000), 0);
 }
 
 function getInvalid(market, startDate, endDate) {
@@ -3996,6 +3975,8 @@ async function fetchSheetAsCsv(url, tq) {
   return await resp.text();
 }
 SECTION2_DEPRECATED */
+// Stub so old refreshData() doesn't crash — returns empty CSV
+function fetchSheetAsCsv() { return Promise.resolve(''); }
 // Keep parseCSV for now — still used by refreshData until fully rewired
 
 
