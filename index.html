@@ -4367,18 +4367,23 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
   const start = startDate || COST_DATA_START;
   const end = endDate || new Date().toISOString().slice(0, 10);
 
-  // Step 1: QLs per ad+campaign from leadsData
+  // Step 1: Full funnel metrics per ad+campaign from leadsData
   const qlMap = {};
   filterLeadsByMarket(leadsData, market).forEach(r => {
     const d = r.lead_created_date || '';
     if (d < start || d > end) return;
-    if (String(r.qls) !== '1') return;
     const adKey = normalizeAdName(r.mx_utm_adcontent);
     const campKey = normalizeAdName(r.mx_utm_campaign);
     if (!adKey || !campKey) return;
     const key = adKey + '||' + campKey;
-    if (!qlMap[key]) qlMap[key] = { adName: r.mx_utm_adcontent, campaignName: r.mx_utm_campaign, ql: 0, _market: r.country_bucket || '' };
-    qlMap[key].ql++;
+    if (!qlMap[key]) qlMap[key] = { adName: r.mx_utm_adcontent, campaignName: r.mx_utm_campaign, ql: 0, td: 0, enrolled: 0, nri: 0, invalid: 0, totalLeads: 0, _market: r.country_bucket || '' };
+    const entry = qlMap[key];
+    entry.totalLeads++;
+    if (String(r.qls) === '1') entry.ql++;
+    if (String(r.trials_done) === '1') entry.td++;
+    if (String(r.paid) === '1') entry.enrolled++;
+    if (String(r.invalid) === '1') entry.invalid++;
+    if ((r.ethnicity || '').toLowerCase().includes('nri')) entry.nri++;
   });
 
   // Step 2: Spend per ad+campaign from metaAdData (ad-level, exact)
@@ -4405,15 +4410,21 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
 
     // Derive market: CRM country_bucket first, then extract from campaign name
     const mkt = data._market || matchMarketFromText(' ' + (data.campaignName || '').toUpperCase() + ' ');
+    const isUS = mkt === 'US';
+    const tql = isUS ? data.nri : data.ql; // TQL = NRI in US, all QLs elsewhere
     return {
       adName: data.adName,
       campaignName: data.campaignName,
       displayName: stripCampaignPrefix(data.adName),
       campaignContext: stripCampaignPrefix(data.campaignName),
       market: mkt === 'Unknown' ? '' : mkt,
-      ql: data.ql,
+      ql: data.ql, tql, td: data.td, enrolled: data.enrolled,
+      nri: data.nri, invalid: data.invalid, totalLeads: data.totalLeads,
+      nriPct: data.ql > 0 ? data.nri / data.ql : 0,
+      qlToTdPct: data.ql > 0 ? data.td / data.ql : 0,
+      invalidPct: data.totalLeads > 0 ? data.invalid / data.totalLeads : 0,
       spend: hasSpend ? metaSpend : null,
-      cptql: hasSpend && data.ql > 0 ? metaSpend / data.ql : null,
+      cptql: hasSpend && tql > 0 ? metaSpend / tql : null,
       _spendSource: hasSpend ? 'meta_insights' : 'unavailable',
     };
   });
@@ -6525,34 +6536,61 @@ function renderOracleCardsV2() {
     return creative && (creative.status === 'PAUSED' || creative.status === 'paused');
   };
 
-  const spendLeaks = adCampData
-    .filter(a => a.spend !== null && a.ql >= 5 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
-    .sort((a, b) => b.cptql - a.cptql)
-    .slice(0, 8)
-    .map(a => ({
-      name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
-      campaignName: a.campaignName, market: a.market || '',
-      spend: a.spend, ql: a.ql, cptql: a.cptql,
-      _type: 'spend', _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.ql} QLs · ${formatCurrency(a.spend)}`,
-    }));
+  // ── SIGNAL 1: Budget burns — spending ₹15K+ with zero QLs ──
+  const budgetBurns = adCampData
+    .filter(a => a.spend >= 15000 && a.ql === 0 && !isPaused(a.adName))
+    .sort((a, b) => b.spend - a.spend)
+    .slice(0, 4)
+    .map(a => ({ ...a, name: a.adName, _type: 'burn', _priority: 1,
+      _signal: `${formatCurrency(a.spend)} spent · 0 QLs — pure waste` }));
 
-  // Merge fatigue ads (Stage 2+3 only)
-  const fatigueAds = detectFatigue()
-    .filter(f => f.stage >= 2)
-    .filter(f => !spendLeaks.some(s => normalizeAdName(s.name) === normalizeAdName(f.ad_name)))
+  // ── SIGNAL 2: CPTQL too high — 2x+ market average ──
+  const cptqlLeaks = adCampData
+    .filter(a => a.spend !== null && a.tql >= 3 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
+    .sort((a, b) => b.spend - a.spend) // sort by spend (biggest waste first, not worst CPTQL)
     .slice(0, 5)
+    .map(a => ({ ...a, name: a.adName, _type: 'cptql', _priority: 2,
+      _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.tql} TQLs · ${formatCurrency(a.spend)}` }));
+
+  // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
+  const wrongAudience = adCampData
+    .filter(a => a.market === 'US' && a.spend >= 20000 && a.ql >= 5 && a.nriPct < 0.30 && !isPaused(a.adName))
+    .sort((a, b) => a.nriPct - b.nriPct)
+    .slice(0, 3)
+    .map(a => ({ ...a, name: a.adName, _type: 'audience', _priority: 2,
+      _signal: `Only ${Math.round(a.nriPct * 100)}% NRI (${a.nri}/${a.ql}) · ${formatCurrency(a.spend)} — attracting wrong audience` }));
+
+  // ── SIGNAL 4: Dead funnel — QLs but zero TDs (QL >= 8, spend > ₹20K) ──
+  const deadFunnel = adCampData
+    .filter(a => a.spend >= 20000 && a.ql >= 8 && a.td === 0 && !isPaused(a.adName))
+    .sort((a, b) => b.ql - a.ql)
+    .slice(0, 3)
+    .map(a => ({ ...a, name: a.adName, _type: 'funnel', _priority: 2,
+      _signal: `${a.ql} QLs → 0 TDs · ${formatCurrency(a.spend)} — leads aren't converting` }));
+
+  // ── SIGNAL 5: Spam magnet — high invalid rate (> 25%, QL >= 5) ──
+  const spamAds = adCampData
+    .filter(a => a.spend >= 10000 && a.totalLeads >= 10 && a.invalidPct > 0.25 && !isPaused(a.adName))
+    .sort((a, b) => b.invalidPct - a.invalidPct)
+    .slice(0, 3)
+    .map(a => ({ ...a, name: a.adName, _type: 'spam', _priority: 2,
+      _signal: `${Math.round(a.invalidPct * 100)}% invalid leads (${a.invalid}/${a.totalLeads}) · ${formatCurrency(a.spend)}` }));
+
+  // ── SIGNAL 6: Fatigue (existing) ──
+  const seenNames = new Set([...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds].map(a => normalizeAdName(a.name)));
+  const fatigueAds = detectFatigue()
+    .filter(f => f.stage >= 2 && !seenNames.has(normalizeAdName(f.ad_name)))
+    .slice(0, 4)
     .map(f => ({
-      name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0,
-      _type: 'fatigue', _stage: f.stage,
+      name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0, market: '',
+      _type: 'fatigue', _priority: f.stage === 3 ? 0 : 1,
       _signal: f.signals.join(' · ') + (f.stage === 3 ? ' · URGENT' : '')
     }));
 
-  // Stage 3 first, then Stage 2, then spend leaks
-  const pauseAds = [
-    ...fatigueAds.filter(f => f._stage === 3),
-    ...fatigueAds.filter(f => f._stage === 2),
-    ...spendLeaks
-  ];
+  // Combine + sort: priority 0 (urgent fatigue) → 1 (burns, early fatigue) → 2 (leaks/audience/funnel)
+  const pauseAds = [...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds, ...fatigueAds]
+    .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0))
+    .slice(0, 10);
 
   const visiblePause = pauseAds.filter(a => isItemVisible('pause:' + a.name));
   const badge = document.getElementById('pauseNowBadge');
@@ -6567,9 +6605,12 @@ function renderOracleCardsV2() {
       const opacity = isDone ? 'opacity-50' : '';
       const isTopOffender = idx === 0 && !isDone;
       const isFatigue = a._type === 'fatigue';
-      const isUrgent = isFatigue && a._stage === 3;
-      const cardBg = isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200';
-      const metricColor = isTopOffender || isUrgent ? 'text-red-700' : 'text-text-muted';
+      const isBurn = a._type === 'burn';
+      const isUrgent = (isFatigue && a._priority === 0) || isBurn;
+      const isWarn = a._type === 'audience' || a._type === 'funnel' || a._type === 'spam';
+      const cardBg = isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200';
+      const metricColor = isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted';
+      const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED' }[a._type] || '';
       const displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
       const campCtx = a.campaignContext || '';
       const geoTag = a.market ? `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
@@ -6578,7 +6619,7 @@ function renderOracleCardsV2() {
         <div class="flex items-center gap-3">
           ${thumbHtml}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
+            <p class="text-xs font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[8px] px-1.5 py-0.5 rounded ${isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
             ${campCtx ? `<p class="text-[9px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
             <p class="text-[10px] ${metricColor}">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
@@ -6587,20 +6628,49 @@ function renderOracleCardsV2() {
         ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
       </div>`;
     });
-    const totalWaste = visiblePause.filter(a => !getOracleAction('pause:' + a.name)?.status && a.spend).reduce((s, a) => s + (a.spend || 0), 0);
-    if (totalWaste > 0) html += `<p class="text-[10px] text-amber-700 font-semibold mt-2">${formatCurrency(totalWaste)} recoverable · last 30 days</p>`;
+    const actionable = visiblePause.filter(a => !getOracleAction('pause:' + a.name)?.status && a.spend);
+    const totalWaste = actionable.reduce((s, a) => s + (a.spend || 0), 0);
+    const signalCounts = {};
+    actionable.forEach(a => { signalCounts[a._type] = (signalCounts[a._type] || 0) + 1; });
+    const signalSummary = Object.entries(signalCounts).map(([t, n]) => `${n} ${({burn:'burns',cptql:'costly',audience:'wrong audience',funnel:'dead funnel',spam:'spam',fatigue:'fatigued'})[t] || t}`).join(', ');
+    if (totalWaste > 0) html += `<p class="text-[10px] text-amber-700 font-semibold mt-2">${formatCurrency(totalWaste)} at risk · ${signalSummary}</p>`;
     html += '</div>';
     pauseList.innerHTML = html;
   } else {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 90 days).</p>';
   }
 
-  // ── MAKE MORE: ad+campaign level, ranked by CPTQL ──
+  // ── MAKE MORE: multi-signal — efficient + right audience + converting ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
   const portfolioCPTQL = getQL() > 0 ? getSpend() / getQL() : Infinity;
+  const avgNriPct = (() => { const us = adCampData.filter(a => a.market === 'US' && a.ql >= 3); return us.length ? us.reduce((s, a) => s + a.nriPct, 0) / us.length : 0.5; })();
+  const avgQlToTd = (() => { const withTd = adCampData.filter(a => a.ql >= 5); return withTd.length ? withTd.reduce((s, a) => s + a.qlToTdPct, 0) / withTd.length : 0.1; })();
+
+  // Score each ad: lower CPTQL = better, higher NRI% = better (US), higher QL→TD% = better
   const makeAds = adCampData
-    .filter(a => a.spend !== null && a.spend >= 10000 && a.ql >= 5 && a.cptql !== null && a.cptql < portfolioCPTQL)
-    .slice(0, 5);
+    .filter(a => a.spend !== null && a.spend >= 10000 && a.tql >= 3 && a.cptql !== null && a.cptql < portfolioCPTQL * 1.2)
+    .map(a => {
+      const signals = [];
+      const cptqlScore = portfolioCPTQL > 0 ? Math.max(0, 1 - a.cptql / portfolioCPTQL) : 0; // 0-1, higher = better
+      if (a.cptql < portfolioCPTQL * 0.5) signals.push(`CPTQL ${formatCurrency(a.cptql)} — ${Math.round((1 - a.cptql / portfolioCPTQL) * 100)}% below avg`);
+      else if (a.cptql < portfolioCPTQL) signals.push(`CPTQL ${formatCurrency(a.cptql)}`);
+
+      let audienceScore = 0;
+      if (a.market === 'US' && a.nriPct > avgNriPct) {
+        audienceScore = 0.3;
+        signals.push(`${Math.round(a.nriPct * 100)}% NRI — right audience`);
+      }
+      let funnelScore = 0;
+      if (a.td > 0 && a.qlToTdPct > avgQlToTd) {
+        funnelScore = 0.3;
+        signals.push(`${a.td} TDs (${Math.round(a.qlToTdPct * 100)}% QL→TD)`);
+      }
+      if (a.enrolled > 0) { funnelScore += 0.2; signals.push(`${a.enrolled} enrolled`); }
+
+      return { ...a, _score: cptqlScore + audienceScore + funnelScore, _makeSignals: signals };
+    })
+    .sort((a, b) => b._score - a._score)
+    .slice(0, 8);
 
   const visibleMake = makeAds.filter(c => isItemVisible('make:' + c.adName));
   const makeBadge = document.getElementById('makeMoreBadge');
@@ -6622,7 +6692,7 @@ function renderOracleCardsV2() {
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold truncate" title="${c.adName}">${c.displayName} ${geoTag}</p>
             <p class="text-[9px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
-            <p class="text-[10px] text-text-muted">${c.ql} QLs · ${formatCurrency(c.spend)} spent${c._spendSource === 'campaign_prorated' ? ' (est.)' : ''}</p>
+            <p class="text-[10px] text-text-muted">${c._makeSignals?.length ? c._makeSignals.join(' · ') : `${c.tql} TQLs · ${formatCurrency(c.spend)} spent`}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
           <div class="text-right shrink-0">
@@ -6640,7 +6710,7 @@ function renderOracleCardsV2() {
     html += '</div>';
     makeMoreList.innerHTML = html;
   } else {
-    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No ads with 5+ QLs below portfolio avg CPTQL found.</p>';
+    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No standout ads found (need 3+ TQLs, ₹10K+ spend, CPTQL below avg).</p>';
   }
 }
 
