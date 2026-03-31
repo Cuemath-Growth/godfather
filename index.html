@@ -6463,7 +6463,7 @@ function renderOracleCardsV2() {
   };
 
   const spendLeaks = adCampData
-    .filter(a => a.spend !== null && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
+    .filter(a => a.spend !== null && a.ql >= 5 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
     .sort((a, b) => b.cptql - a.cptql)
     .slice(0, 8)
     .map(a => ({
