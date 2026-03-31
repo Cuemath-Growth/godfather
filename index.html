@@ -4312,6 +4312,85 @@ function getAdBreakdown(market, startDate, endDate) {
   });
 }
 
+// ── Ad+Campaign breakdown — unit of analysis is ad within a campaign ──
+// Same creative across 4 campaigns = 4 separate records
+function getAdCampaignBreakdown(market, startDate, endDate) {
+  const start = startDate || COST_DATA_START;
+  const end = endDate || new Date().toISOString().slice(0, 10);
+
+  // Step 1: QLs per ad+campaign from leadsData
+  const qlMap = {};
+  filterLeadsByMarket(leadsData, market).forEach(r => {
+    const d = r.lead_created_date || '';
+    if (d < start || d > end) return;
+    if (String(r.qls) !== '1') return;
+    const adKey = (r.mx_utm_adcontent || '').toLowerCase().trim();
+    const campKey = (r.mx_utm_campaign || '').toLowerCase().trim();
+    if (!adKey || !campKey) return;
+    const key = adKey + '||' + campKey;
+    if (!qlMap[key]) qlMap[key] = { adName: r.mx_utm_adcontent, campaignName: r.mx_utm_campaign, ql: 0 };
+    qlMap[key].ql++;
+  });
+
+  // Step 2: Spend per ad+campaign from metaAdData (ad-level, exact)
+  const spendMap = {};
+  metaAdData.forEach(r => {
+    if (r.date < start || r.date > end) return;
+    const adKey = (r.ad_name || '').toLowerCase().trim();
+    const campKey = (r.campaign_name || '').toLowerCase().trim();
+    if (!adKey || !campKey) return;
+    const key = adKey + '||' + campKey;
+    if (!spendMap[key]) spendMap[key] = 0;
+    spendMap[key] += r.spend || 0;
+  });
+
+  // Step 3: Fallback spend from campaignMap (pro-rated) when metaAdData unavailable
+  // costData = campaign level spend only. Never use for ad/creative level metrics.
+  // This fallback is only used when metaAdData has no rows for this ad.
+
+  // Step 4: Merge
+  const results = Object.entries(qlMap).map(([key, data]) => {
+    const metaSpend = spendMap[key];
+    const hasMetaSpend = metaSpend !== undefined && metaSpend > 0;
+
+    // If no metaAdData spend, try campaign-level pro-rate as fallback
+    let spend = hasMetaSpend ? metaSpend : null;
+    let spendSource = hasMetaSpend ? 'meta_insights' : 'unavailable';
+    if (!hasMetaSpend) {
+      const campSpend = getCampaignSpend(data.campaignName, market, startDate, endDate);
+      if (campSpend !== null) {
+        // Pro-rate: this ad's QLs / total campaign QLs * campaign spend
+        const campKey = (data.campaignName || '').toLowerCase().trim();
+        const totalCampQLs = Object.values(qlMap).filter(v => (v.campaignName || '').toLowerCase().trim() === campKey).reduce((s, v) => s + v.ql, 0);
+        spend = totalCampQLs > 0 ? campSpend * (data.ql / totalCampQLs) : null;
+        spendSource = 'campaign_prorated';
+      }
+    }
+
+    return {
+      adName: data.adName,
+      campaignName: data.campaignName,
+      displayName: stripCampaignPrefix(data.adName),
+      campaignContext: stripCampaignPrefix(data.campaignName),
+      ql: data.ql,
+      spend,
+      cptql: spend !== null && data.ql > 0 ? spend / data.ql : null,
+      _spendSource: spendSource,
+    };
+  });
+
+  return results.sort((a, b) => (a.cptql || Infinity) - (b.cptql || Infinity));
+}
+
+function stripCampaignPrefix(name) {
+  if (!name) return '';
+  return name
+    .replace(/^(USA|Ind|MEA|ANZ|UK|SNG|CAN|Mea|Aus)_/i, '')
+    .replace(/^(PFX|AKT|FB)_/i, '')
+    .replace(/^(FB_)?Leads[_-]Conv[_-]/i, '')
+    .replace(/_\d{6}$/, ''); // strip trailing date suffix _DDMMYY
+}
+
 // ── Format helpers for display ──
 function fmtMetric(val, prefix, suffix) {
   if (val === null || val === undefined) return '—';
@@ -6366,18 +6445,18 @@ function renderOracleCardsV2() {
   const market = dashCountry === 'all' ? null : dashCountry;
   const { from, to } = getGlobalDateRange();
 
-  // ── PAUSE NOW: uses global date range (defaults to COST_DATA_START → today) ──
+  // ── PAUSE NOW: ad+campaign level, uses global date range ──
   const pauseList = document.getElementById('oraclePauseList');
-  const adBreakdown = getAdBreakdown(market, from, to);
-  const spendLeaks = adBreakdown
-    .filter(a => a._spendMatched && (a.campaignSpend || 0) > 50000 && a.td === 0)
-    .sort((a, b) => (b.campaignSpend || 0) - (a.campaignSpend || 0))
+  const adCampData = getAdCampaignBreakdown(market, from, to);
+  const spendLeaks = adCampData
+    .filter(a => a.spend !== null && a.spend > 50000 && a.ql === 0)
+    .sort((a, b) => b.spend - a.spend)
     .slice(0, 8)
-    .map(a => {
-      const displaySpend = a.campaignSpend || a.spend || 0;
-      const cptqlStr = a.ql > 0 && displaySpend > 0 ? `CPTQL ${formatCurrency(displaySpend / a.ql)}` : 'No QLs';
-      return { ...a, spend: displaySpend, _type: 'spend', _signal: `${formatCurrency(displaySpend)} spent · ${a.ql} QLs · ${cptqlStr}` };
-    });
+    .map(a => ({
+      name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
+      spend: a.spend, ql: a.ql, td: 0, cptql: null,
+      _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · 0 QLs`,
+    }));
 
   // Merge fatigue ads (Stage 2+3 only)
   const fatigueAds = detectFatigue()
@@ -6413,14 +6492,16 @@ function renderOracleCardsV2() {
       const isUrgent = isFatigue && a._stage === 3;
       const cardBg = isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200';
       const metricColor = isTopOffender || isUrgent ? 'text-red-700' : 'text-text-muted';
-      const shortName = a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name;
+      const displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
+      const campCtx = a.campaignContext || '';
       const thumbHtml = _oracleThumbnail(a.name);
-      html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
+      html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
         <div class="flex items-center gap-3">
           ${thumbHtml}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${a.name}">${shortName}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
-            <p class="text-[10px] ${metricColor}">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs · ' + a.td + ' TDs')}</p>
+            <p class="text-xs font-semibold truncate" title="${a.name}">${displayName}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
+            ${campCtx ? `<p class="text-[9px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
+            <p class="text-[10px] ${metricColor}">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
         </div>
@@ -6435,57 +6516,51 @@ function renderOracleCardsV2() {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 30 days).</p>';
   }
 
-  // ── MAKE MORE: top campaigns by CPTQL, TD >= 5, spend >= ₹10K ──
+  // ── MAKE MORE: ad+campaign level, ranked by CPTQL ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
-  const campBreakdown = getCampaignBreakdown(market, from || undefined, to || undefined);
-  const allQualified = campBreakdown.filter(c => c.td >= 5 && c._spendMatched && c.cpql > 0);
-  const hiddenLowSpend = allQualified.filter(c => c.spend < 10000);
-  const topCampaigns = allQualified
-    .filter(c => c.spend >= 10000)
-    .sort((a, b) => a.cpql - b.cpql)
+  const portfolioCPTQL = getQL() > 0 ? getSpend() / getQL() : Infinity;
+  const makeAds = adCampData
+    .filter(a => a.spend !== null && a.spend >= 10000 && a.ql >= 5 && a.cptql !== null && a.cptql < portfolioCPTQL)
     .slice(0, 5);
 
-  const visibleMake = topCampaigns.filter(c => isItemVisible('make:' + c.name));
+  const visibleMake = makeAds.filter(c => isItemVisible('make:' + c.adName));
   const makeBadge = document.getElementById('makeMoreBadge');
-  if (makeBadge) makeBadge.textContent = visibleMake.length > 0 ? `${visibleMake.length} campaigns` : '';
+  if (makeBadge) makeBadge.textContent = visibleMake.length > 0 ? `${visibleMake.length} ads` : '';
 
   if (visibleMake.length) {
     let html = '<div class="space-y-2">';
     visibleMake.forEach((c, i) => {
-      const itemId = 'make:' + c.name;
+      const itemId = 'make:' + c.adName;
       const action = getOracleAction(itemId);
       const isDone = action?.status === 'done';
       const opacity = isDone ? 'opacity-50' : '';
-      const cpqlColor = c.cpql < 5000 ? 'green' : c.cpql < 10000 ? 'orange' : 'red';
-      const shortName = c.name.length > 40 ? c.name.slice(0, 40) + '...' : c.name;
+      const cpqlColor = c.cptql < 5000 ? 'green' : c.cptql < 10000 ? 'orange' : 'red';
       const esc = s => s.replace(/'/g, "\\'");
-      const cptdRef = c.cptd && c.td > 0 ? `<span class="text-[9px] text-text-muted">CPTD ${formatCurrency(c.cptd)}</span>` : '';
-      html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
+      html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${c.displayName}">
         <div class="flex items-center gap-3">
-          ${_oracleThumbnail(c.name)}
+          ${_oracleThumbnail(c.adName)}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${c.name}">${shortName}</p>
-            <p class="text-[10px] text-text-muted">${c.td} TDs · ${c.ql} QLs · ${c.spend !== null ? formatCurrency(c.spend) + ' spent' : 'spend —'}</p>
+            <p class="text-xs font-semibold truncate" title="${c.adName}">${c.displayName}</p>
+            <p class="text-[9px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
+            <p class="text-[10px] text-text-muted">${c.ql} QLs · ${formatCurrency(c.spend)} spent${c._spendSource === 'campaign_prorated' ? ' (est.)' : ''}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
           <div class="text-right shrink-0">
-            <p class="text-sm font-bold text-accent-${cpqlColor}">${formatCurrency(c.cpql)}</p>
+            <p class="text-sm font-bold text-accent-${cpqlColor}">${formatCurrency(c.cptql)}</p>
             <p class="text-[9px] text-text-muted">CPTQL</p>
-            ${cptdRef}
           </div>
         </div>
         ${!isDone ? `<div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
-          <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
-          <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
-          <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(c.displayName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(c.displayName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(c.displayName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
         </div>` : ''}
       </div>`;
     });
-    if (hiddenLowSpend.length) html += `<p class="text-[10px] text-text-muted mt-2">${hiddenLowSpend.length} campaign${hiddenLowSpend.length > 1 ? 's' : ''} hidden — insufficient spend data (&lt;₹10K). Check Meta Ads Manager directly.</p>`;
     html += '</div>';
     makeMoreList.innerHTML = html;
   } else {
-    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 5+ TDs and sufficient spend data found.</p>';
+    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No ads with 5+ QLs below portfolio avg CPTQL found.</p>';
   }
 }
 
