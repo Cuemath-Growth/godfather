@@ -3939,14 +3939,14 @@ function detectFatigue() {
 
 function getCreativeThumbnail(adName) {
   if (!metaCreatives.length) return null;
-  const nameLower = (adName || '').toLowerCase();
-  if (!nameLower) return null;
+  const norm = normalizeAdName(adName);
+  if (!norm) return null;
   // Exact match first, then fuzzy
-  const exact = metaCreatives.find(c => c.name.toLowerCase() === nameLower);
+  const exact = metaCreatives.find(c => normalizeAdName(c.name) === norm);
   if (exact) return exact.thumbnail_url || exact.image_url || null;
   const fuzzy = metaCreatives.find(c => {
-    const n = c.name.toLowerCase();
-    return n.includes(nameLower) || nameLower.includes(n);
+    const n = normalizeAdName(c.name);
+    return n.includes(norm) || norm.includes(n);
   });
   return fuzzy ? (fuzzy.thumbnail_url || fuzzy.image_url || null) : null;
 }
@@ -6324,16 +6324,16 @@ function _oracleThumbnail(name) {
   const adEntry = _adMap?.[key];
   const url = (adEntry?.thumbnail_url || adEntry?.image_url)
     || getCreativeThumbnail(name) || getCampaignThumbnail(name)
-    || (() => { const m = (state.taggerData || []).find(c => { const n = (c['Ad name']||'').toLowerCase(), q = key; return n && q && (n.includes(q) || q.includes(n)); }); return m?.thumbnail_url || m?.image_url || ''; })();
+    || (() => { const m = (state.taggerData || []).find(c => { const n = normalizeAdName(c['Ad name']), q = key; return n && q && (n.includes(q) || q.includes(n)); }); return m?.thumbnail_url || m?.image_url || ''; })();
   if (url) return `<img src="${url}" class="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-lg bg-surface-tertiary shrink-0\\'></div>'" />`;
   return '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
 }
 
 function getCampaignThumbnail(campaignName) {
   if (!campaignName) return null;
-  const q = (campaignName || '').toLowerCase();
+  const q = normalizeAdName(campaignName);
   // Look up tagger data by Campaign name field → get first ad's thumbnail
-  const taggerMatch = (state.taggerData || []).find(c => (c['Campaign name'] || '').toLowerCase() === q);
+  const taggerMatch = (state.taggerData || []).find(c => normalizeAdName(c['Campaign name']) === q);
   if (taggerMatch) {
     const url = taggerMatch.thumbnail_url || taggerMatch.image_url;
     if (url) return url;
@@ -6341,7 +6341,7 @@ function getCampaignThumbnail(campaignName) {
   // Fallback: any metaCreative whose ad name shares a prefix with campaign name (first 25 chars)
   if (metaCreatives.length) {
     const prefix = q.slice(0, 25);
-    const match = metaCreatives.find(c => c.name.toLowerCase().startsWith(prefix));
+    const match = metaCreatives.find(c => normalizeAdName(c.name).startsWith(prefix));
     if (match) return match.thumbnail_url || match.image_url || null;
   }
   return null;
@@ -9603,7 +9603,7 @@ function runSentinelAnalysis(data, geo) {
     const seen = new Set();
     return arr.filter(r => {
       const name = (r['Ad name'] || r['ad name'] || '');
-      const key = name.slice(-20).toLowerCase();
+      const key = normalizeAdName(name).slice(-20);
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -9612,11 +9612,11 @@ function runSentinelAnalysis(data, geo) {
   const top5 = dedup5([...topStatics, ...topVideos]).slice(0, 5);
 
   // G-02: no ad name in both top and bottom
-  const topIds = new Set(top5.map(r => r['Ad name'] || r['ad name']));
+  const topIds = new Set(top5.map(r => normalizeAdName(r['Ad name'] || r['ad name'])));
 
   // Bottom: 3 statics + 2 videos from tail, excluding top5
-  const botStatPool = rankableStatics.filter(r => !topIds.has(r['Ad name'] || r['ad name']));
-  const botVidPool = rankableVideos.filter(r => !topIds.has(r['Ad name'] || r['ad name']));
+  const botStatPool = rankableStatics.filter(r => !topIds.has(normalizeAdName(r['Ad name'] || r['ad name'])));
+  const botVidPool = rankableVideos.filter(r => !topIds.has(normalizeAdName(r['Ad name'] || r['ad name'])));
   let botStatics = botStatPool.slice(-5).reverse();
   let botVideos = botVidPool.slice(-4).reverse();
   if (botStatics.length < 5) botVideos = botVidPool.slice(-(4 + (5 - botStatics.length))).reverse();
@@ -11569,8 +11569,8 @@ function renderTagCombos() {
   }
 
   // Get top5/bottom5 ad names from sentinel output for signal detection
-  const sentTop5Names = new Set((state.sentinelOutput?.top5 || []).map(r => (r['Ad name']||r['ad name']||'').toLowerCase()));
-  const sentBottom5Names = new Set((state.sentinelOutput?.bottom5 || []).map(r => (r['Ad name']||r['ad name']||'').toLowerCase()));
+  const sentTop5Names = new Set((state.sentinelOutput?.top5 || []).map(r => normalizeAdName(r['Ad name']||r['ad name'])));
+  const sentBottom5Names = new Set((state.sentinelOutput?.bottom5 || []).map(r => normalizeAdName(r['Ad name']||r['ad name'])));
   const hasSignalData = sentTop5Names.size >= 3 && sentBottom5Names.size >= 3;
 
   // Build tag-to-creative mapping for signal detection
@@ -11584,7 +11584,7 @@ function renderTagCombos() {
         const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown') return;
         if (!tagCreatives[tag]) tagCreatives[tag] = { inTop: 0, inBottom: 0, total: 0 };
         tagCreatives[tag].total++;
-        const adName = (c['Ad name']||c['ad name']||'').toLowerCase();
+        const adName = normalizeAdName(c['Ad name']||c['ad name']);
         if (sentTop5Names.has(adName)) tagCreatives[tag].inTop++;
         if (sentBottom5Names.has(adName)) tagCreatives[tag].inBottom++;
       });
@@ -11636,7 +11636,7 @@ function renderTagCombos() {
           if (hasSignalData) {
             filteredData.forEach(c => {
               if (c.tags?.[v.catA] === v.tagA && c.tags?.[v.catB] === v.tagB) {
-                const adName = (c['Ad name']||c['ad name']||'').toLowerCase();
+                const adName = normalizeAdName(c['Ad name']||c['ad name']);
                 if (sentTop5Names.has(adName)) comboInTop++;
                 if (sentBottom5Names.has(adName)) comboInBottom++;
               }
@@ -11669,7 +11669,7 @@ function renderTagCombos() {
     function findExampleAd(tag, cat, isTop) {
       const nameSet = isTop ? sentTop5Names : sentBottom5Names;
       const match = filteredData.find(c => {
-        const adName = (c['Ad name']||c['ad name']||'').toLowerCase();
+        const adName = normalizeAdName(c['Ad name']||c['ad name']);
         return nameSet.has(adName) && c.tags?.[cat] === tag;
       });
       return match ? shortAdName(match['Ad name']||match['ad name']||'') : '';
@@ -14783,8 +14783,10 @@ function _isInfluencerCampaign(campName) {
 //   ..._Engaged_Priyanshul_131025 → Priyanshul
 function _extractCreatorFromAdName(adName) {
   if (!adName) return 'Unknown';
+  // Strip placement suffix FIRST (e.g. _Instagram_Stories_ig) before parsing
+  let cleaned = adName.replace(_PLACEMENT_SUFFIX_RE, '');
   // Strip date suffix (6 digits at end, optionally preceded by _ or -)
-  let cleaned = adName.replace(/[-_]\d{6}$/, '');
+  cleaned = cleaned.replace(/[-_]\d{6}$/, '');
 
   // Strategy: find the LAST occurrence of _Video_ or similar structural token, take everything after it
   // Then strip any remaining structural prefixes
