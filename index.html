@@ -1511,6 +1511,28 @@
                 </div>
               </div>
             </div>
+
+            <!-- Day-by-Day Ad Health (Section 4) -->
+            <div class="mt-6">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-bold">Day-by-Day Ad Health</h3>
+                  <span class="text-[10px] text-text-muted">— daily spend, frequency, fatigue signals</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="text" id="dayByDaySearch" placeholder="Search ad name..." class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary w-48" oninput="renderDayByDay()" />
+                  <select id="dayByDaySort" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary" onchange="renderDayByDay()">
+                    <option value="spend">Sort: Spend</option>
+                    <option value="frequency">Sort: Frequency</option>
+                    <option value="ctr">Sort: CTR</option>
+                    <option value="date">Sort: Date</option>
+                  </select>
+                </div>
+              </div>
+              <div id="dayByDayTable" class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+                <p class="text-xs text-text-muted p-4">Pull Meta API data to see daily ad health. Available on deployed site only.</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -2856,9 +2878,10 @@ function init() {
   loadOracleActions().then(() => {
     if (state.currentView === 'dashboard' && leadsData.length) try { renderOracleCardsV2(); } catch(e) {}
   });
-  // Section 3: Meta creatives (thumbnails) — cache first, then background fetch
+  // Section 3+4: Meta creatives + daily insights — cache first, then parallel background fetch
   loadCachedCreatives();
-  if (_IS_DEPLOYED) fetchMetaCreatives();
+  loadCachedAdData();
+  if (_IS_DEPLOYED) { fetchMetaCreatives(); fetchMetaAdInsights(); }
   // Always start on Dashboard
   navigateTo('dashboard');
   // Legacy: fetch tagger/Meta sheet data + Supabase (auto-runs on every boot)
@@ -2920,7 +2943,10 @@ function navigateTo(view) {
   // Render intel when switching to it
   if (view === 'dashboard') { try { onDashboardFilterChange(); } catch(e) { console.error('onDashboardFilterChange crashed:', e); } }
   if (view === 'intel' && state.taggerData.length) { try { renderCreativeIntel(); } catch(e) { console.error('renderCreativeIntel crashed:', e); } }
-  if (view === 'leads' && state.taggerData.length) { try { runSentinelView(); } catch(e) { console.error('runSentinelView crashed:', e); } }
+  if (view === 'leads') {
+    if (state.taggerData.length) { try { runSentinelView(); } catch(e) { console.error('runSentinelView crashed:', e); } }
+    if (metaAdData.length) { try { renderDayByDay(); } catch(e) { console.error('renderDayByDay crashed:', e); } }
+  }
   if (view === 'influencer') renderInfluencerView();
   if (view === 'settings') { loadSettingsFields(); setTimeout(renderHealthPanel, 100); }
   if (view === 'library') {
@@ -3748,6 +3774,148 @@ async function fetchMetaCreatives() {
   _safeCacheSet('gf_v2_creativesTs', Date.now().toString());
   // Re-render oracle cards with thumbnails
   if (state.currentView === 'dashboard') try { renderOracleCardsV2(); } catch(e) {}
+}
+
+// ── Section 4: Daily Ad Insights + Fatigue Detection ──
+let metaAdData = []; // { date, ad_id, ad_name, adset_name, campaign_name, spend, impressions, reach, clicks, link_clicks, ctr, cpc, cpm, frequency, _account }
+
+function loadCachedAdData() {
+  const ts = parseInt(localStorage.getItem('gf_v2_adDataTs') || '0');
+  if (Date.now() - ts > 6 * 60 * 60 * 1000) return false;
+  try {
+    metaAdData = JSON.parse(localStorage.getItem('gf_v2_metaAdData') || '[]');
+    return metaAdData.length > 0;
+  } catch { return false; }
+}
+
+async function fetchMetaAdInsights() {
+  const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
+  if (!accounts?.length) return;
+  // Last 90 days
+  const end = new Date().toISOString().slice(0, 10);
+  const start = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const all = [];
+  for (const account of accounts) {
+    try {
+      let page = await callMetaAPI(`${account.id}/insights`, {
+        fields: 'date_start,ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,link_clicks,ctr,cpc,cpm,frequency',
+        time_increment: '1',
+        level: 'ad',
+        time_range: JSON.stringify({ since: start, until: end }),
+        limit: '500'
+      });
+      let pageNum = 1;
+      while (page && pageNum <= 40) {
+        if (page.data) {
+          page.data.forEach(r => {
+            all.push({
+              date: r.date_start,
+              ad_id: r.ad_id, ad_name: r.ad_name || '',
+              adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
+              spend: parseFloat(r.spend || 0),
+              impressions: parseInt(r.impressions || 0),
+              reach: parseInt(r.reach || 0),
+              clicks: parseInt(r.clicks || 0),
+              link_clicks: parseInt(r.link_clicks || 0),
+              ctr: parseFloat(r.ctr || 0),
+              cpc: parseFloat(r.cpc || 0),
+              cpm: parseFloat(r.cpm || 0),
+              frequency: parseFloat(r.frequency || 0),
+              _account: account.market
+            });
+          });
+        }
+        const next = page?.paging?.next;
+        if (!next) break;
+        pageNum++;
+        await sleep(META_DELAY_BETWEEN_REQUESTS || 500);
+        const u = new URL(next);
+        const ep = u.pathname.replace(/\/v\d+\.\d+\//, '');
+        const p = {}; u.searchParams.forEach((v, k) => { if (k !== 'access_token') p[k] = v; });
+        page = await callMetaAPI(ep, p);
+      }
+    } catch(e) { console.error(`Ad insights ${account.name}:`, e.message); }
+  }
+  metaAdData = all;
+  console.log(`Meta ad insights: ${all.length} daily rows from ${accounts.length} accounts`);
+  // Cache — trim to last 30 days if > 1.5MB
+  let cacheData = all;
+  const raw = JSON.stringify(all);
+  if (raw.length > 1500000) {
+    const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    cacheData = all.filter(r => r.date >= cutoff);
+    console.log(`Ad data trimmed for cache: ${all.length} → ${cacheData.length} rows (last 30d)`);
+  }
+  _safeCacheSet('gf_v2_metaAdData', JSON.stringify(cacheData));
+  _safeCacheSet('gf_v2_adDataTs', Date.now().toString());
+  // Check total localStorage size
+  let totalBytes = 0;
+  for (let i = 0; i < localStorage.length; i++) totalBytes += (localStorage.getItem(localStorage.key(i)) || '').length;
+  console.log(`localStorage: ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
+  if (totalBytes > 3 * 1024 * 1024) {
+    console.warn('localStorage over 3MB — trimming ad data to 14 days');
+    const cutoff14 = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+    _safeCacheSet('gf_v2_metaAdData', JSON.stringify(all.filter(r => r.date >= cutoff14)));
+  }
+  // Re-render if on Performance tab
+  if (state.currentView === 'leads') try { renderDayByDay(); } catch(e) {}
+}
+
+// Fatigue detection — compare last 3 days vs prior 3 days per ad
+function detectFatigue() {
+  if (metaAdData.length < 6) return [];
+  const byAd = {};
+  metaAdData.forEach(r => {
+    if (!byAd[r.ad_id]) byAd[r.ad_id] = [];
+    byAd[r.ad_id].push(r);
+  });
+  const results = [];
+  Object.entries(byAd).forEach(([adId, rows]) => {
+    rows.sort((a, b) => b.date.localeCompare(a.date)); // newest first
+    if (rows.length < 6) return;
+    const recent = rows.slice(0, 3);
+    const prior = rows.slice(3, 6);
+    const avg = (arr, field) => arr.reduce((s, r) => s + (r[field] || 0), 0) / arr.length;
+    const recentFreq = avg(recent, 'frequency');
+    const recentCtr = avg(recent, 'ctr');
+    const priorCtr = avg(prior, 'ctr');
+    const recentCpm = avg(recent, 'cpm');
+    const priorCpm = avg(prior, 'cpm');
+    const recentClicks = recent.reduce((s, r) => s + r.link_clicks, 0);
+    const priorClicks = prior.reduce((s, r) => s + r.link_clicks, 0);
+    const recentSpend = avg(recent, 'spend');
+    const ctrDrop = priorCtr > 0 ? (recentCtr - priorCtr) / priorCtr : 0;
+    const cpmRise = priorCpm > 0 ? (recentCpm - priorCpm) / priorCpm : 0;
+    const clickDrop = priorClicks > 0 ? (recentClicks - priorClicks) / priorClicks : 0;
+
+    let stage = 0, signals = [];
+    if (recentFreq >= 1.5 && recentFreq < 2.0) { stage = 1; signals.push(`Freq ${recentFreq.toFixed(1)}`); }
+    if (recentFreq >= 2.0) { stage = 2; signals.push(`Freq ${recentFreq.toFixed(1)}`); }
+    if (recentFreq >= 2.0 && (ctrDrop < -0.2 || cpmRise > 0.2 || clickDrop < -0.2)) {
+      stage = 3;
+      if (ctrDrop < -0.2) signals.push(`CTR ${Math.round(ctrDrop * 100)}%`);
+      if (cpmRise > 0.2) signals.push(`CPM +${Math.round(cpmRise * 100)}%`);
+      if (clickDrop < -0.2) signals.push(`Clicks ${Math.round(clickDrop * 100)}%`);
+    }
+    // Performance-only fallback if no frequency
+    if (recentFreq === 0 && (ctrDrop < -0.3 || cpmRise > 0.3)) {
+      stage = 2; signals = ['No freq data'];
+      if (ctrDrop < -0.3) signals.push(`CTR ${Math.round(ctrDrop * 100)}%`);
+      if (cpmRise > 0.3) signals.push(`CPM +${Math.round(cpmRise * 100)}%`);
+    }
+    if (stage > 0) {
+      results.push({
+        ad_id: adId,
+        ad_name: recent[0].ad_name,
+        campaign_name: recent[0].campaign_name,
+        stage, signals,
+        frequency: recentFreq,
+        daily_spend: recentSpend,
+        _account: recent[0]._account
+      });
+    }
+  });
+  return results.sort((a, b) => b.stage - a.stage || b.daily_spend - a.daily_spend);
 }
 
 function getCreativeThumbnail(adName) {
@@ -6176,6 +6344,80 @@ function _pauseCardActions(itemId, shortName) {
   </div>`;
 }
 
+// ── Section 4: Day-by-Day table rendering ──
+function renderDayByDay() {
+  const container = document.getElementById('dayByDayTable');
+  if (!container || !metaAdData.length) return;
+  const search = (document.getElementById('dayByDaySearch')?.value || '').toLowerCase();
+  const sortBy = document.getElementById('dayByDaySort')?.value || 'spend';
+
+  let rows = metaAdData;
+  if (search) rows = rows.filter(r => r.ad_name.toLowerCase().includes(search) || r.campaign_name.toLowerCase().includes(search));
+
+  // Sort
+  if (sortBy === 'spend') rows.sort((a, b) => b.spend - a.spend);
+  else if (sortBy === 'frequency') rows.sort((a, b) => b.frequency - a.frequency);
+  else if (sortBy === 'ctr') rows.sort((a, b) => b.ctr - a.ctr);
+  else if (sortBy === 'date') rows.sort((a, b) => b.date.localeCompare(a.date));
+
+  // Limit to 200 rows for performance
+  const display = rows.slice(0, 200);
+
+  // QL lookup: count leads per ad per day
+  const qlLookup = {};
+  leadsData.forEach(r => {
+    const ad = r.mx_utm_adcontent || '';
+    const day = r.lead_created_date || '';
+    if (ad && day && String(r.qls) === '1') {
+      const key = ad + '|' + day;
+      qlLookup[key] = (qlLookup[key] || 0) + 1;
+    }
+  });
+
+  const thClass = 'px-2 py-2 text-[10px] font-bold text-text-muted uppercase tracking-wider text-left cursor-pointer hover:text-text-primary';
+  let html = `<div class="overflow-x-auto"><table class="w-full text-xs">
+    <thead class="bg-surface-secondary border-b border-gray-200">
+      <tr>
+        <th class="${thClass}">Date</th>
+        <th class="${thClass}">Ad Name</th>
+        <th class="${thClass} text-right">Spend</th>
+        <th class="${thClass} text-right">Impr</th>
+        <th class="${thClass} text-right">CPM</th>
+        <th class="${thClass} text-right">Clicks</th>
+        <th class="${thClass} text-right">CTR</th>
+        <th class="${thClass} text-right">CPC</th>
+        <th class="${thClass} text-right">Freq</th>
+        <th class="${thClass} text-right">QL</th>
+        <th class="${thClass} text-right">Click:QL</th>
+      </tr>
+    </thead><tbody>`;
+
+  display.forEach(r => {
+    const freq = r.frequency || 0;
+    const rowBg = freq > 2.0 ? 'bg-red-50' : freq >= 1.5 ? 'bg-amber-50' : '';
+    const ql = qlLookup[(r.ad_name + '|' + r.date)] || 0;
+    const clickQL = ql > 0 ? (r.link_clicks / ql).toFixed(1) : '—';
+    const shortName = r.ad_name.length > 40 ? r.ad_name.slice(0, 40) + '...' : r.ad_name;
+    html += `<tr class="${rowBg} border-b border-gray-100 hover:bg-surface-secondary">
+      <td class="px-2 py-1.5 text-text-muted whitespace-nowrap">${r.date}</td>
+      <td class="px-2 py-1.5 font-medium truncate max-w-[200px]" title="${r.ad_name}">${shortName}</td>
+      <td class="px-2 py-1.5 text-right font-semibold">${r.spend > 0 ? '₹' + Math.round(r.spend).toLocaleString() : '—'}</td>
+      <td class="px-2 py-1.5 text-right text-text-muted">${r.impressions.toLocaleString()}</td>
+      <td class="px-2 py-1.5 text-right text-text-muted">${r.cpm > 0 ? '₹' + Math.round(r.cpm) : '—'}</td>
+      <td class="px-2 py-1.5 text-right">${r.link_clicks}</td>
+      <td class="px-2 py-1.5 text-right ${r.ctr > 1.5 ? 'text-accent-green' : r.ctr < 0.5 ? 'text-accent-red' : ''}">${r.ctr.toFixed(2)}%</td>
+      <td class="px-2 py-1.5 text-right text-text-muted">${r.cpc > 0 ? '₹' + Math.round(r.cpc) : '—'}</td>
+      <td class="px-2 py-1.5 text-right font-semibold ${freq > 2.0 ? 'text-accent-red' : freq >= 1.5 ? 'text-amber-600' : ''}">${freq > 0 ? freq.toFixed(1) : '—'}</td>
+      <td class="px-2 py-1.5 text-right ${ql > 0 ? 'font-semibold' : 'text-text-muted'}">${ql || '—'}</td>
+      <td class="px-2 py-1.5 text-right text-text-muted">${clickQL}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  if (rows.length > 200) html += `<p class="text-[10px] text-text-muted p-2">Showing 200 of ${rows.length} rows. Use search to filter.</p>`;
+  container.innerHTML = html;
+}
+
 function renderOracleCardsV2() {
   if (!leadsData.length) {
     const hasCredentials = localStorage.getItem('gf_sheetUrl') && localStorage.getItem('gf_googleKey');
@@ -6199,10 +6441,29 @@ function renderOracleCardsV2() {
   }
   const pauseList = document.getElementById('oraclePauseList');
   const adBreakdown = getAdBreakdown(market, pauseFrom, pauseTo);
-  const pauseAds = adBreakdown
+  const spendLeaks = adBreakdown
     .filter(a => a.spend > 50000 && a.td === 0)
     .sort((a, b) => b.spend - a.spend)
-    .slice(0, 8);
+    .slice(0, 8)
+    .map(a => ({ ...a, _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · 0 TDs` }));
+
+  // Merge fatigue ads (Stage 2+3 only)
+  const fatigueAds = detectFatigue()
+    .filter(f => f.stage >= 2)
+    .filter(f => !spendLeaks.some(s => s.name === f.ad_name))
+    .slice(0, 5)
+    .map(f => ({
+      name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0,
+      _type: 'fatigue', _stage: f.stage,
+      _signal: f.signals.join(' · ') + (f.stage === 3 ? ' · URGENT' : '')
+    }));
+
+  // Stage 3 first, then Stage 2, then spend leaks
+  const pauseAds = [
+    ...fatigueAds.filter(f => f._stage === 3),
+    ...fatigueAds.filter(f => f._stage === 2),
+    ...spendLeaks
+  ];
 
   const visiblePause = pauseAds.filter(a => isItemVisible('pause:' + a.name));
   const badge = document.getElementById('pauseNowBadge');
@@ -6216,16 +6477,18 @@ function renderOracleCardsV2() {
       const isDone = action?.status === 'done';
       const opacity = isDone ? 'opacity-50' : '';
       const isTopOffender = idx === 0 && !isDone;
-      const cardBg = isTopOffender ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200';
-      const metricColor = isTopOffender ? 'text-red-700' : 'text-text-muted';
+      const isFatigue = a._type === 'fatigue';
+      const isUrgent = isFatigue && a._stage === 3;
+      const cardBg = isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200';
+      const metricColor = isTopOffender || isUrgent ? 'text-red-700' : 'text-text-muted';
       const shortName = a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name;
       const thumbHtml = _oracleThumbnail(a.name);
       html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
         <div class="flex items-center gap-3">
           ${thumbHtml}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${a.name}">${shortName}</p>
-            <p class="text-[10px] ${metricColor}">${formatCurrency(a.spend)} spent · ${a.ql} QLs · 0 TDs</p>
+            <p class="text-xs font-semibold truncate" title="${a.name}">${shortName}${isUrgent ? ' <span class="text-[9px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold">URGENT</span>' : ''}</p>
+            <p class="text-[10px] ${metricColor}">${a._signal || (formatCurrency(a.spend) + ' spent · ' + a.ql + ' QLs · ' + a.td + ' TDs')}</p>
             ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
         </div>
