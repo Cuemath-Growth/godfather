@@ -4269,24 +4269,18 @@ function getCampaignBreakdown(market, startDate, endDate) {
     };
     const inRangeRows = c.rows.filter(inRange);
     const ql = inRangeRows.filter(r => String(r.qls) === '1').length;
-    const td_cohort = inRangeRows.filter(r => String(r.trials_done) === '1').length;
-    const td_snap = c.rows.filter(r => {
-      const d = r.trial_done_date || '';
-      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.trials_done) === '1';
-    }).length;
-    const enrolled = c.rows.filter(r => {
-      const d = r.paid_date || '';
-      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
-    }).length;
+    // COHORT: TD and Enrolled from same leads as QL (by lead_created_date)
+    const td = Math.min(inRangeRows.filter(r => String(r.trials_done) === '1').length, ql);
+    const enrolled = Math.min(inRangeRows.filter(r => String(r.paid) === '1').length, td);
 
     const spend = getCampaignSpend(c.name, market, startDate, endDate);
     if (spend !== null) matched++; else unmatched++;
 
     return {
-      name: c.name, spend, ql, td: td_snap, td_cohort, enrolled,
-      cptd: spend !== null ? safeDivide(spend, td_snap) : null,
+      name: c.name, spend, ql, td, enrolled,
+      cptd: spend !== null ? safeDivide(spend, td) : null,
       cpql: spend !== null ? safeDivide(spend, ql) : null,
-      ql_td_pct: safeDivide(td_cohort, ql),
+      ql_td_pct: safeDivide(td, ql),
       _spendMatched: spend !== null,
     };
   });
@@ -4315,17 +4309,11 @@ function getAdBreakdown(market, startDate, endDate) {
     };
     const inRangeRows = a.rows.filter(inRange);
     const ql = inRangeRows.filter(r => String(r.qls) === '1').length;
-    const td_snap = a.rows.filter(r => {
-      const d = r.trial_done_date || '';
-      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.trials_done) === '1';
-    }).length;
-    const enrolled = a.rows.filter(r => {
-      const d = r.paid_date || '';
-      return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
-    }).length;
+    // COHORT: TD and Enrolled from same leads as QL (by lead_created_date)
+    const td = Math.min(inRangeRows.filter(r => String(r.trials_done) === '1').length, ql);
+    const enrolled = Math.min(inRangeRows.filter(r => String(r.paid) === '1').length, td);
 
     // Spend: campaign-level from meta cost via lookup map, then pro-rate by QL share
-    // NOTE: ad-level spend is estimated. Exact requires Meta Insights API (blocked until proxy fixed).
     const campNames = new Set(a.rows.map(r => (r.mx_utm_campaign || '').trim()).filter(Boolean));
     let totalCampSpend = 0;
     let anyMatch = false;
@@ -4344,8 +4332,8 @@ function getAdBreakdown(market, startDate, endDate) {
       name: a.name,
       spend: adSpend,
       campaignSpend: anyMatch ? totalCampSpend : null,
-      ql, td: td_snap, enrolled,
-      cptd: adSpend !== null ? safeDivide(adSpend, td_snap) : null,
+      ql, td, enrolled,
+      cptd: adSpend !== null ? safeDivide(adSpend, td) : null,
       cpql: adSpend !== null ? safeDivide(adSpend, ql) : null,
       _spendMatched: anyMatch,
     };
@@ -4638,7 +4626,7 @@ function mergeCRMWithMeta() {
       const effectiveQL = Math.max(metaQL, ql); // CRM ql or Meta QL (whichever is higher)
       const metaSpend = parseNumber(c['Spent']||c['spent']||0);
       if (
-        (effectiveQL > 0 && td > effectiveQL * 5) ||  // TDs vastly exceed total QLs (Meta + CRM)
+        (effectiveQL > 0 && td > effectiveQL * 1.5) ||  // TDs exceed QLs — impossible in real funnel
         (metaSpend > 0 && td > 0 && metaSpend / td < 1500) // CPTD < ₹1.5K is unrealistic — false match
       ) {
         c._crmMatchType = 'unmatched';
@@ -4811,6 +4799,16 @@ function mergeCRMWithMeta() {
 
   const totalMatched = directMatched + campaignMatched;
   if (totalMatched > 0) {
+    // SAFETY CLAMP: TD can never exceed QL in a real funnel
+    let clamped = 0;
+    state.taggerData.forEach(c => {
+      const ql = parseNumber(c['QL']||c['ql']||0);
+      const td = parseNumber(c['TD']||c['td']||0);
+      const paid = parseNumber(c['Paid']||c['paid']||0);
+      if (td > ql && ql > 0) { c['TD'] = ql; c['td'] = ql; clamped++; }
+      if (paid > Math.min(td, ql)) { const cap = Math.min(td, ql); c['Paid'] = cap; c['paid'] = cap; }
+    });
+    if (clamped) console.warn(`CRM merge: clamped ${clamped} creatives where TD > QL`);
     // Recompute derived metrics (CPTD, CPNRI) now that CRM added TD/NRI/Paid values
     state.taggerData = ensureDerivedMetrics(state.taggerData);
     saveTaggerData();
@@ -5745,26 +5743,14 @@ function crmMetricsForDate(c, fromDate, toDate) {
   let td = 0, paid = 0, ql = 0;
   leads.forEach(r => {
     const leadDate = r['lead_created_date'] || '';
-    const tdDate = r['trial_done_date'] || '';
-    const paidDate = r['paid_date'] || '';
+    // COHORT COUNTING: ALL metrics filtered by lead_created_date
+    // This ensures TD ≤ QL always (a TD must have been a QL first)
+    const inRange = leadDate && (!fromDate || leadDate >= fromDate) && (!toDate || leadDate <= toDate);
     if (fromDate || toDate) {
-      // Count QL if lead_created_date is in range
-      if (leadDate) {
-        if ((!fromDate || leadDate >= fromDate) && (!toDate || leadDate <= toDate)) ql++;
-      } else { ql++; }
-      // Count TD only if trial_done_date is in range
-      const tdVal = parseNumber(r['trials_done'] || 0);
-      if (tdVal > 0 && tdDate) {
-        if ((!fromDate || tdDate >= fromDate) && (!toDate || tdDate <= toDate)) td += tdVal;
-      } else if (tdVal > 0 && !tdDate) {
-        td += tdVal;
-      }
-      // Count Paid only if paid_date is in range
-      const pVal = parseNumber(r['paid'] || 0);
-      if (pVal > 0 && paidDate) {
-        if ((!fromDate || paidDate >= fromDate) && (!toDate || paidDate <= toDate)) paid += pVal;
-      } else if (pVal > 0 && !paidDate) {
-        paid += pVal;
+      if (inRange || !leadDate) {
+        ql++;
+        if (parseNumber(r['trials_done'] || 0) > 0) td++;
+        if (parseNumber(r['paid'] || 0) > 0) paid++;
       }
     } else {
       ql++;
@@ -5773,6 +5759,9 @@ function crmMetricsForDate(c, fromDate, toDate) {
     }
   });
   if (!isDirect) { td *= share; paid *= share; ql *= share; }
+  // Safety: TD can never exceed QL in a cohort
+  td = Math.min(td, ql);
+  paid = Math.min(paid, td);
   return { td, paid, ql };
 }
 
