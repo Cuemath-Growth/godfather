@@ -3857,25 +3857,26 @@ async function fetchMetaAdInsights() {
   }
   metaAdData = all;
   console.log(`Meta ad insights: ${all.length} daily rows from ${accounts.length} accounts`);
-  // Cache — trim to last 30 days if > 1.5MB
-  let cacheData = all;
-  const raw = JSON.stringify(all);
-  if (raw.length > 1500000) {
-    const cutoff = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-    cacheData = all.filter(r => r.date >= cutoff);
-    console.log(`Ad data trimmed for cache: ${all.length} → ${cacheData.length} rows (last 30d)`);
-  }
-  _safeCacheSet('gf_v2_metaAdData', JSON.stringify(cacheData));
+  // Cache — aggregate to ad+campaign level (not daily) to fit in localStorage
+  // Daily granularity only needed for fatigue detection which re-fetches from API anyway
+  const aggMap = {};
+  all.forEach(r => {
+    const key = normalizeAdName(r.ad_name) + '||' + normalizeAdName(r.campaign_name) + '||' + (r._account || '');
+    if (!aggMap[key]) aggMap[key] = { ad_name: r.ad_name, ad_id: r.ad_id, adset_name: r.adset_name, campaign_name: r.campaign_name, spend: 0, impressions: 0, reach: 0, clicks: 0, _account: r._account, date_min: r.date, date_max: r.date };
+    aggMap[key].spend += r.spend || 0;
+    aggMap[key].impressions += parseInt(r.impressions) || 0;
+    aggMap[key].reach += parseInt(r.reach) || 0;
+    aggMap[key].clicks += parseInt(r.clicks) || 0;
+    if (r.date < aggMap[key].date_min) aggMap[key].date_min = r.date;
+    if (r.date > aggMap[key].date_max) aggMap[key].date_max = r.date;
+  });
+  const aggData = Object.values(aggMap).map(r => ({ ...r, date: r.date_min }));
+  console.log(`Ad data aggregated for cache: ${all.length} daily → ${aggData.length} ad-level rows`);
+  _safeCacheSet('gf_v2_metaAdData', JSON.stringify(aggData));
   _safeCacheSet('gf_v2_adDataTs', Date.now().toString());
-  // Check total localStorage size
   let totalBytes = 0;
   for (let i = 0; i < localStorage.length; i++) totalBytes += (localStorage.getItem(localStorage.key(i)) || '').length;
   console.log(`localStorage: ${(totalBytes / 1024 / 1024).toFixed(2)}MB`);
-  if (totalBytes > 3 * 1024 * 1024) {
-    console.warn('localStorage over 3MB — trimming ad data to 14 days');
-    const cutoff14 = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
-    _safeCacheSet('gf_v2_metaAdData', JSON.stringify(all.filter(r => r.date >= cutoff14)));
-  }
   // Re-render if on Performance tab
   if (state.currentView === 'leads') try { renderDayByDay(); } catch(e) {}
 }
@@ -4341,9 +4342,12 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
   });
 
   // Step 2: Spend per ad+campaign from metaAdData (ad-level, exact)
+  // Rows may be daily (live fetch) or aggregated (cached) with date_min/date_max
   const spendMap = {};
   metaAdData.forEach(r => {
-    if (r.date < start || r.date > end) return;
+    const rStart = r.date_min || r.date;
+    const rEnd = r.date_max || r.date;
+    if (rEnd < start || rStart > end) return; // range overlap check
     const adKey = normalizeAdName(r.ad_name);
     const campKey = normalizeAdName(r.campaign_name);
     if (!adKey || !campKey) return;
@@ -6393,10 +6397,10 @@ function renderDayByDay() {
   // Limit to 200 rows for performance
   const display = rows.slice(0, 200);
 
-  // QL lookup: count leads per ad per day
+  // QL lookup: count leads per ad per day (normalized for CRM↔Meta name format differences)
   const qlLookup = {};
   leadsData.forEach(r => {
-    const ad = r.mx_utm_adcontent || '';
+    const ad = normalizeAdName(r.mx_utm_adcontent);
     const day = r.lead_created_date || '';
     if (ad && day && String(r.qls) === '1') {
       const key = ad + '|' + day;
@@ -6424,7 +6428,7 @@ function renderDayByDay() {
   display.forEach(r => {
     const freq = r.frequency || 0;
     const rowBg = freq > 2.0 ? 'bg-red-50' : freq >= 1.5 ? 'bg-amber-50' : '';
-    const ql = qlLookup[(r.ad_name + '|' + r.date)] || 0;
+    const ql = qlLookup[(normalizeAdName(r.ad_name) + '|' + r.date)] || 0;
     const shortName = r.ad_name.length > 40 ? r.ad_name.slice(0, 40) + '...' : r.ad_name;
     html += `<tr class="${rowBg} border-b border-gray-100 hover:bg-surface-secondary">
       <td class="px-2 py-1.5 text-text-muted whitespace-nowrap">${r.date}</td>
@@ -6466,8 +6470,8 @@ function renderOracleCardsV2() {
   const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
 
   const isPaused = (adName) => {
-    const key = (adName || '').toLowerCase().trim();
-    const creative = metaCreatives.find(c => c.name.toLowerCase().trim() === key);
+    const key = normalizeAdName(adName);
+    const creative = metaCreatives.find(c => normalizeAdName(c.name) === key);
     return creative && (creative.status === 'PAUSED' || creative.status === 'paused');
   };
 
@@ -12044,11 +12048,14 @@ function extractMarket(c) {
 }
 
 function matchMarketFromText(text) {
+  // ANZ sub-geos must match BEFORE generic ANZ (which = Australia)
+  if (/ANZ[-_]UK/i.test(text) || /\bUK\b/.test(text) || text.includes('UNITED KINGDOM')) return 'UK';
+  if (/ANZ[-_]NZ/i.test(text) || text.includes('NEW ZEALAND')) return 'APAC';
+  if (/ANZ[-_]SG/i.test(text) || text.includes('SINGAPORE')) return 'APAC';
   if (text.includes('ANZ') || /\bAUS\b/.test(text) || text.includes('AUSTRALIA') || text.includes('NAPLAN') || text.includes('SELECTIVE')) return 'AUS';
   if (text.includes('INDIA') || /\bIND[_\s-]/.test(text) || text.includes('DEMAND-IND') || text.includes('CBSE') || text.includes('ICSE')) return 'India';
   if (text.includes('MEA') || /\bME[_\s-]/.test(text) || text.includes('MIDDLE EAST') || text.includes('DUBAI') || text.includes('UAE') || text.includes('SAUDI') || text.includes('QATAR') || text.includes('KUWAIT') || text.includes('BAHRAIN') || text.includes('OMAN')) return 'MEA';
   if (/\bUSA\b/.test(text) || /USA[_\s-]/.test(text) || /\bUS[_\s-]/.test(text) || text.includes('UNITED STATES') || text.includes('CANADA') || text.includes('STAAR') || text.includes('AMC')) return 'US';
-  if (/\bUK\b/.test(text) || text.includes('UNITED KINGDOM')) return 'UK';
   if (text.includes('APAC') || text.includes('ROW')) return 'APAC';
   if (text.includes('CANADA')) return 'US';
   return 'Unknown';
