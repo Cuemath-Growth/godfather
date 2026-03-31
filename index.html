@@ -2850,6 +2850,9 @@ function init() {
   loadOracleActions().then(() => {
     if (state.currentView === 'dashboard' && leadsData.length) try { renderOracleCardsV2(); } catch(e) {}
   });
+  // Section 3: Meta creatives (thumbnails) — cache first, then background fetch
+  loadCachedCreatives();
+  if (_IS_DEPLOYED) fetchMetaCreatives();
   // Always start on Dashboard
   navigateTo('dashboard');
   // Legacy: fetch tagger/Meta sheet data + Supabase (auto-runs on every boot)
@@ -3667,6 +3670,78 @@ function getDataTimestamp() {
   const ts = parseInt(localStorage.getItem('gf_v2_timestamp') || '0');
   if (!ts) return null;
   return new Date(ts);
+}
+
+// ── Section 3: Meta Creatives (thumbnails, body, title, CTA) ──
+let metaCreatives = []; // { id, name, thumbnail_url, image_url, body, title, cta, status, effective_status }
+
+function loadCachedCreatives() {
+  const ts = parseInt(localStorage.getItem('gf_v2_creativesTs') || '0');
+  if (Date.now() - ts > 6 * 60 * 60 * 1000) return false;
+  try {
+    metaCreatives = JSON.parse(localStorage.getItem('gf_v2_metaCreatives') || '[]');
+    return metaCreatives.length > 0;
+  } catch { return false; }
+}
+
+async function fetchMetaCreatives() {
+  const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
+  if (!accounts?.length) return;
+  const all = [];
+  for (const account of accounts) {
+    try {
+      let page = await callMetaAPI(`${account.id}/ads`, {
+        fields: 'id,name,creative{thumbnail_url,image_url,body,title,call_to_action_type},status,effective_status',
+        limit: '500'
+      });
+      let pageNum = 1;
+      while (page && pageNum <= 20) {
+        if (page.data) {
+          page.data.forEach(ad => {
+            all.push({
+              id: ad.id,
+              name: ad.name || '',
+              thumbnail_url: ad.creative?.thumbnail_url || '',
+              image_url: ad.creative?.image_url || '',
+              body: ad.creative?.body || '',
+              title: ad.creative?.title || '',
+              cta: ad.creative?.call_to_action_type || '',
+              status: ad.effective_status || ad.status || '',
+              _account: account.market
+            });
+          });
+        }
+        const next = page?.paging?.next;
+        if (!next) break;
+        pageNum++;
+        await sleep(META_DELAY_BETWEEN_REQUESTS || 500);
+        const u = new URL(next);
+        const ep = u.pathname.replace(/\/v\d+\.\d+\//, '');
+        const p = {}; u.searchParams.forEach((v, k) => { if (k !== 'access_token') p[k] = v; });
+        page = await callMetaAPI(ep, p);
+      }
+    } catch(e) { console.error(`Creatives ${account.name}:`, e.message); }
+  }
+  metaCreatives = all;
+  console.log(`Meta creatives: ${all.length} ads from ${accounts.length} accounts`);
+  try { localStorage.setItem('gf_v2_metaCreatives', JSON.stringify(all)); } catch(e) { console.warn('metaCreatives cache failed:', e.message); }
+  localStorage.setItem('gf_v2_creativesTs', Date.now().toString());
+  // Re-render oracle cards with thumbnails
+  if (state.currentView === 'dashboard') try { renderOracleCardsV2(); } catch(e) {}
+}
+
+function getCreativeThumbnail(adName) {
+  if (!metaCreatives.length) return null;
+  const nameLower = (adName || '').toLowerCase();
+  if (!nameLower) return null;
+  // Exact match first, then fuzzy
+  const exact = metaCreatives.find(c => c.name.toLowerCase() === nameLower);
+  if (exact) return exact.thumbnail_url || exact.image_url || null;
+  const fuzzy = metaCreatives.find(c => {
+    const n = c.name.toLowerCase();
+    return n.includes(nameLower) || nameLower.includes(n);
+  });
+  return fuzzy ? (fuzzy.thumbnail_url || fuzzy.image_url || null) : null;
 }
 
 function updateDataStatusLine() {
@@ -6022,13 +6097,9 @@ async function oracleAction(itemId, cardType, status, name, silent) {
 }
 
 function _oracleThumbnail(adName) {
-  if (!state.taggerData?.length) return '';
-  const nameLower = (adName || '').toLowerCase();
-  const match = state.taggerData.find(c => {
-    const n = (c['Ad name'] || '').toLowerCase();
-    return n && (n.includes(nameLower) || nameLower.includes(n));
-  });
-  const url = match?.['thumbnail_url'] || match?.['image_url'] || '';
+  // Try metaCreatives first (Section 3), then tagger data fallback
+  const url = getCreativeThumbnail(adName)
+    || (() => { const m = (state.taggerData || []).find(c => { const n = (c['Ad name']||'').toLowerCase(), q = (adName||'').toLowerCase(); return n && q && (n.includes(q) || q.includes(n)); }); return m?.thumbnail_url || m?.image_url || ''; })();
   if (url) return `<img src="${url}" class="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-lg bg-surface-tertiary shrink-0\\'></div>'" />`;
   return '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
 }
