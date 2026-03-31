@@ -4163,13 +4163,13 @@ function buildLookupMaps() {
   // AD MAP: from metaCreatives (has thumbnail + campaign mapping)
   _adMap = {};
   metaCreatives.forEach(c => {
-    const key = (c.name || '').toLowerCase().trim();
+    const key = normalizeAdName(c.name);
     if (!key) return;
     _adMap[key] = { thumbnail_url: c.thumbnail_url || '', image_url: c.image_url || '', campaign_name: '' };
   });
   // Enrich with campaign_name from tagger data if available
   (state.taggerData || []).forEach(c => {
-    const key = (c['Ad name'] || '').toLowerCase().trim();
+    const key = normalizeAdName(c['Ad name']);
     if (key && _adMap[key]) _adMap[key].campaign_name = c['Campaign name'] || '';
   });
 
@@ -4177,7 +4177,7 @@ function buildLookupMaps() {
   const leadsWithCamp = leadsData.filter(r => (r.mx_utm_campaign || '').trim()).length;
   const leadsMatchedCamp = leadsData.filter(r => _campaignMap[(r.mx_utm_campaign || '').toLowerCase().trim()]).length;
   const leadsWithAd = leadsData.filter(r => (r.mx_utm_adcontent || '').trim()).length;
-  const leadsMatchedAd = leadsData.filter(r => _adMap[(r.mx_utm_adcontent || '').toLowerCase().trim()]).length;
+  const leadsMatchedAd = leadsData.filter(r => _adMap[normalizeAdName(r.mx_utm_adcontent)]).length;
   console.log(`Campaign map: ${Object.keys(_campaignMap).length} meta campaigns, matched ${leadsMatchedCamp}/${leadsWithCamp} leads (${leadsWithCamp > 0 ? Math.round(leadsMatchedCamp / leadsWithCamp * 100) : 0}%)`);
   console.log(`Ad map: ${Object.keys(_adMap).length} ads, matched ${leadsMatchedAd}/${leadsWithAd} leads (${leadsWithAd > 0 ? Math.round(leadsMatchedAd / leadsWithAd * 100) : 0}%)`);
   console.log(`Unmatched campaigns: ${leadsWithCamp - leadsMatchedCamp} leads — older campaigns before mid-2024 not in cost tab`);
@@ -4311,6 +4311,15 @@ function getAdBreakdown(market, startDate, endDate) {
   });
 }
 
+// ── Ad name normalization — CRM mx_utm_adcontent has placement suffixes + underscores,
+// Meta ad_name uses hyphens. Normalize both for matching. ──
+const _PLACEMENT_SUFFIX_RE = /_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds|mobile_feed|mobile_reels)_(ig|fb|an)$/i;
+function normalizeAdName(s) {
+  return (s || '').toLowerCase().trim()
+    .replace(_PLACEMENT_SUFFIX_RE, '')
+    .replace(/-/g, '_');
+}
+
 // ── Ad+Campaign breakdown — unit of analysis is ad within a campaign ──
 // Same creative across 4 campaigns = 4 separate records
 function getAdCampaignBreakdown(market, startDate, endDate) {
@@ -4323,8 +4332,8 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     const d = r.lead_created_date || '';
     if (d < start || d > end) return;
     if (String(r.qls) !== '1') return;
-    const adKey = (r.mx_utm_adcontent || '').toLowerCase().trim();
-    const campKey = (r.mx_utm_campaign || '').toLowerCase().trim();
+    const adKey = normalizeAdName(r.mx_utm_adcontent);
+    const campKey = normalizeAdName(r.mx_utm_campaign);
     if (!adKey || !campKey) return;
     const key = adKey + '||' + campKey;
     if (!qlMap[key]) qlMap[key] = { adName: r.mx_utm_adcontent, campaignName: r.mx_utm_campaign, ql: 0 };
@@ -4335,8 +4344,8 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
   const spendMap = {};
   metaAdData.forEach(r => {
     if (r.date < start || r.date > end) return;
-    const adKey = (r.ad_name || '').toLowerCase().trim();
-    const campKey = (r.campaign_name || '').toLowerCase().trim();
+    const adKey = normalizeAdName(r.ad_name);
+    const campKey = normalizeAdName(r.campaign_name);
     if (!adKey || !campKey) return;
     const key = adKey + '||' + campKey;
     if (!spendMap[key]) spendMap[key] = 0;
@@ -4344,7 +4353,6 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
   });
 
   // Step 3: Merge — metaAdData spend ONLY. No campaign pro-rate fallback.
-  // costData = campaign level spend only. NEVER use for ad/creative level metrics.
   let metaMatched = 0, metaMissed = 0;
   const results = Object.entries(qlMap).map(([key, data]) => {
     const metaSpend = spendMap[key];
@@ -4363,13 +4371,11 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     };
   });
   // Step 4: Add ads from metaAdData that have spend but NO QLs in leadsData
-  // These are true budget burns — Meta recorded spend but zero leads came through
   Object.entries(spendMap).forEach(([key, spend]) => {
-    if (qlMap[key]) return; // already in results
-    if (spend < 5000) return; // ignore tiny spend
+    if (qlMap[key]) return;
+    if (spend < 5000) return;
     const [adKey, campKey] = key.split('||');
-    // Find the original ad name (not lowercased)
-    const origRow = metaAdData.find(r => (r.ad_name || '').toLowerCase().trim() === adKey && (r.campaign_name || '').toLowerCase().trim() === campKey);
+    const origRow = metaAdData.find(r => normalizeAdName(r.ad_name) === adKey && normalizeAdName(r.campaign_name) === campKey);
     const adName = origRow?.ad_name || adKey;
     const campName = origRow?.campaign_name || campKey;
     results.push({
@@ -4379,7 +4385,7 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
       ql: 0, spend, cptql: null, _spendSource: 'meta_insights',
     });
   });
-  console.log(`Ad-level join: ${metaMatched} matched, ${metaMissed} unmatched. ${results.filter(r => r.ql === 0 && r.spend > 0).length} ads with spend but 0 QLs.`);
+  console.log(`Ad-level join: ${metaMatched} matched, ${metaMissed} unmatched (${metaMatched + metaMissed > 0 ? Math.round(metaMatched / (metaMatched + metaMissed) * 100) : 0}%). ${results.filter(r => r.ql === 0 && r.spend > 0).length} ads with spend but 0 QLs.`);
 
   return results.sort((a, b) => (a.cptql || Infinity) - (b.cptql || Infinity));
 }
@@ -6311,7 +6317,7 @@ async function oracleAction(itemId, cardType, status, name, silent) {
 
 function _oracleThumbnail(name) {
   // Try: ad map → metaCreatives → campaign tagger match → tagger fuzzy → grey placeholder
-  const key = (name || '').toLowerCase().trim();
+  const key = normalizeAdName(name);
   const adEntry = _adMap?.[key];
   const url = (adEntry?.thumbnail_url || adEntry?.image_url)
     || getCreativeThumbnail(name) || getCampaignThumbnail(name)
