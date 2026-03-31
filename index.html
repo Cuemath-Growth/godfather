@@ -3813,11 +3813,21 @@ async function fetchMetaCreatives(force = false) {
 let metaAdData = []; // { date, ad_id, ad_name, adset_name, campaign_name, spend, impressions, reach, clicks, ctr, cpc, cpm, frequency, _account }
 
 async function loadCachedAdData() {
-  // Try Supabase first (full history, no trim), fall back to localStorage
+  // Try Supabase first (full history, paginated — default limit is 1000), fall back to localStorage
   try {
-    const rows = await supabaseGet('meta_ad_data', 'select=*&order=date.desc&limit=50000');
-    if (rows && rows.length > 0) {
-      metaAdData = rows.map(r => ({
+    let allRows = [];
+    let from = 0;
+    const pageSize = 1000;
+    while (true) {
+      const url = `select=*&order=date.desc&offset=${from}&limit=${pageSize}`;
+      const page = await supabaseGet('meta_ad_data', url);
+      if (!page || page.length === 0) break;
+      allRows = allRows.concat(page);
+      if (page.length < pageSize) break;
+      from += pageSize;
+    }
+    if (allRows.length > 0) {
+      metaAdData = allRows.map(r => ({
         date: r.date, ad_id: r.ad_id || '', ad_name: r.ad_name || '',
         adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
         spend: parseFloat(r.spend || 0), impressions: parseInt(r.impressions || 0),
@@ -3826,7 +3836,9 @@ async function loadCachedAdData() {
         cpm: parseFloat(r.cpm || 0), frequency: parseFloat(r.frequency || 0),
         _account: r.account || ''
       }));
-      console.log(`Supabase meta_ad_data: ${metaAdData.length} rows loaded`);
+      console.log(`Supabase meta_ad_data: ${metaAdData.length} rows loaded (${Math.ceil(allRows.length / pageSize)} pages)`);
+      const dates = metaAdData.map(r => r.date).filter(Boolean).sort();
+      if (dates.length) console.log(`Date range: ${dates[0]} → ${dates[dates.length - 1]}`);
       return true;
     }
   } catch(e) { console.warn('Supabase ad data load failed, trying localStorage:', e.message); }
@@ -3844,6 +3856,8 @@ async function loadCachedAdData() {
 async function _fetchMetaInsightsRange(since, until, onProgress) {
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
   if (!accounts?.length) return [];
+  // Guard: since must be <= until (prevents 400 errors on edge-case month chunks)
+  if (since > until) { console.warn(`_fetchMetaInsightsRange: skipping — since ${since} > until ${until}`); return []; }
   const all = [];
   for (const account of accounts) {
     try {
@@ -9240,34 +9254,43 @@ function shortAdName(name) {
 }
 
 const TAG_CATEGORIES = {
-  hook_type: { label:'Hook', color:'purple', values:['H-MATH','H-FEAR','H-PROBLEM','H-PAINPOINT','H-TEST','H-STAT','H-QUES','H-LIFE','H-EVENT','H-COMP','H-OFFER','H-GRADE'] },
-  format: { label:'Format', color:'blue', values:['F-STATIC','F-VIDEO','F-INFLU','F-TESTI','F-ANIM','F-CAROUSEL','F-VERN-TESTI','F-PRODUCT','F-PLATFORM-DEMO','F-FOUNDER','F-BRAND','F-APP-PREVIEW','F-CONTENT-UGC'] },
-  pain_benefit: { label:'Benefit Frame', color:'red', values:['PB-GRADE','PB-CONF','PB-FOUND','PB-FUTURE','PB-TUTOR','PB-INDIAN','PB-COMP'] },
-  feature: { label:'Feature', color:'blue', values:['1:1 tutoring','Top 1% tutors','Smart whiteboard','Gamification','Curriculum aligned','Adaptive platform','Talk-o-Meter','Cue dont tell','FUAR framework','MathFit identity','Math playground','Progress tracking','Personalized worksheets','Parent dashboard','Multi-device','Flexible scheduling','Money-back guarantee','Sibling discount'] },
-  cta_type: { label:'CTA', color:'orange', values:['Free trial','Book demo','Learn more','Limited offer','Download app','WhatsApp chat','Call now','Enroll today'] },
-  emotional_tone: { label:'Tone', color:'pink', values:['Aspirational','Testimonial','Offer/Promo','Urgency','Comparison','Seasonal','Confident','Empathetic','Warm'] },
-  visual_style: { label:'Visual (Static)', color:'teal', values:['Heavy text overlay','Light text overlay','No text','Face present','Child focus','Parent focus','Badge/Offer visible'] },
-  video_attrs: { label:'Visual (Video)', color:'teal', values:['Face-to-camera','Screen recording','Text card','B-roll','Math moment on screen','<15s','15-30s','30-60s','>60s'] },
-  color_dominant: { label:'Color', color:'purple', values:['Brand yellow','Warm tones','Cool tones','Neutral/White','Bold/Vibrant','Dark/Premium','Pastel','Mixed'] },
-  talent: { label:'Talent', color:'pink', values:['Child only','Parent only','Parent+child','Tutor+child','Family','No talent/Graphic','Influencer','Multiple kids'] },
-  talent_face: { label:'Creator ID', color:'pink', values:[] },
-  messaging_pillar: { label:'Pillar', color:'teal', values:['Top tutors','Personalization','Deep learning','Platform/Tech','360 skills','Parent experience','MathFit identity','AI vs Thinking'] },
-  icp_target: { label:'Audience', color:'orange', values:['NRI','Non-NRI','Asian','Expat','Telugu Speaking','Tamil Speaking','Hindi Speaking','Gujarati Speaking','Arabic Speaking','High School Parents','Universal'] },
-  segment: { label:'Segment', color:'green', values:['Foundation Rebuilder','Personalization Seeker','Confidence Builder','Accelerator','Universal'] },
-  language: { label:'Language', color:'blue', values:['English','Hindi','Telugu','Tamil','Malayalam','Gujarati','Other'] },
-  confidence: { label:'Confidence', color:'purple', values:['verified','inferred','hypothesis'] }
+  hook_type: { label:'Hook', color:'purple', values:['Math anchor','Problem','Fear / urgency','Parent testimonial','Statistic','Question','Lifestyle / emotional','Competitive','Offer / price','Grade badge','Seasonal'] },
+  format: { label:'Format', color:'blue', values:['Static image','Video','Influencer UGC','Testimonial video','Vernacular testimonial','Product video','Brand video'] },
+  pain_benefit: { label:'Pain Point', color:'red', isArray:true, values:['Grades & school','Confidence & anxiety','Strong foundations','Future readiness','Tutor quality','Indian roots','Competition prep'] },
+  emotional_tone: { label:'Tone', color:'pink', values:['Testimonial','Aspirational','Confident','Urgency','Comparison','Offer / promo','Seasonal'] },
+  icp_target: { label:'Audience', color:'orange', values:['NRI parents','Expat parents','Local parents','Gujarati speaking','Telugu speaking','Tamil speaking','High school parents'] },
+  setting: { label:'Setting', color:'teal', values:['Home','Studio','Outdoor','Screen recording','Animation'] },
+  production_style: { label:'Production', color:'blue', values:['UGC','Studio shoot','Motion graphic','Screen record'] },
+  // Legacy categories kept for backward compat with existing tags — not shown in new tagging
+  feature: { label:'Feature', color:'blue', values:['1:1 tutoring','Top 1% tutors','Smart whiteboard','Gamification','Curriculum aligned','Adaptive platform','Talk-o-Meter','Cue dont tell','FUAR framework','MathFit identity','Math playground','Progress tracking','Personalized worksheets','Parent dashboard','Multi-device','Flexible scheduling','Money-back guarantee','Sibling discount'], _legacy:true },
+  messaging_pillar: { label:'Pillar', color:'teal', values:['Top tutors','Personalization','Deep learning','Platform/Tech','360 skills','Parent experience','MathFit identity','AI vs Thinking'], _legacy:true },
+  segment: { label:'Segment', color:'green', values:['Foundation Rebuilder','Personalization Seeker','Confidence Builder','Accelerator','Universal'], _legacy:true },
+  language: { label:'Language', color:'blue', values:['English','Hindi','Telugu','Tamil','Malayalam','Gujarati','Other'], _legacy:true },
 };
 
 function validateTags(tags) {
   const validated = {...tags};
+  // Map new field names → internal field names (Claude prompt returns new names)
+  if (validated.pain_point && !validated.pain_benefit) { validated.pain_benefit = validated.pain_point; delete validated.pain_point; }
+  if (validated.tone && !validated.emotional_tone) { validated.emotional_tone = validated.tone; delete validated.tone; }
+  if (validated.audience && !validated.icp_target) { validated.icp_target = validated.audience; delete validated.audience; }
   Object.entries(validated).forEach(([key, val]) => {
-    if (!val || key === 'confidence' || key === '_migrated' || key === 'telugu_flag') return;
+    if (!val || key === 'confidence' || key === '_migrated' || key === 'telugu_flag' || key === 'offer_present' || key === 'offer_detail' || key === 'flag_for_review' || key === 'flag_reason' || key === 'talent_name') return;
     const cat = TAG_CATEGORIES[key.replace('_secondary','')];
     if (cat && cat.values && cat.values.length > 0) {
-      if (!cat.values.includes(val)) {
-        const match = cat.values.find(v => v.toLowerCase() === val.toLowerCase());
-        if (match) validated[key] = match;
-        else validated[key] = 'Unknown';
+      if (cat.isArray && Array.isArray(val)) {
+        // Validate each element in array
+        validated[key] = val.map(v => {
+          if (cat.values.includes(v)) return v;
+          const match = cat.values.find(cv => cv.toLowerCase() === (v||'').toLowerCase());
+          return match || 'Unknown';
+        }).filter(v => v !== 'Unknown');
+      } else if (!Array.isArray(val)) {
+        if (!cat.values.includes(val)) {
+          const match = cat.values.find(v => v.toLowerCase() === val.toLowerCase());
+          if (match) validated[key] = match;
+          else validated[key] = 'Unknown';
+        }
       }
     }
   });
@@ -10095,15 +10118,35 @@ function runSentinelAnalysis(data, geo) {
 
 // Old taxonomy → new taxonomy migration map (used by migrateTags, called during rehydration)
 const TAG_MIGRATION = {
-  'Question': 'H-QUES', 'Statistic': 'H-STAT', 'Testimonial': 'H-TEST',
-  'Fear/Urgency': 'H-FEAR', 'Aspirational': 'H-LIFE', 'Problem-Solution': 'H-PROBLEM',
-  'Curiosity Gap': 'H-QUES', 'Social Proof': 'H-TEST', 'Direct Benefit': 'H-MATH',
-  'Math anxiety': 'PB-CONF', 'Rote learning': 'PB-FOUND', 'One-size-fits-all': 'PB-TUTOR',
-  'Lack of confidence': 'PB-CONF', 'School struggle': 'PB-GRADE', 'Boring tutoring': 'PB-TUTOR',
-  'No conceptual understanding': 'PB-FOUND', 'Exam pressure': 'PB-COMP',
-  'Conceptual understanding': 'PB-FOUND', 'Confidence': 'PB-CONF',
-  'Personalized learning': 'PB-TUTOR', 'Future-ready': 'PB-FUTURE',
-  'Better grades': 'PB-GRADE', 'Problem-solving skills': 'PB-FOUND',
+  // Old shorthand hooks → new human-readable
+  'H-MATH': 'Math anchor', 'H-FEAR': 'Fear / urgency', 'H-PROBLEM': 'Problem', 'H-PAINPOINT': 'Problem',
+  'H-TEST': 'Parent testimonial', 'H-STAT': 'Statistic', 'H-QUES': 'Question',
+  'H-LIFE': 'Lifestyle / emotional', 'H-EVENT': 'Seasonal', 'H-COMP': 'Competitive',
+  'H-OFFER': 'Offer / price', 'H-GRADE': 'Grade badge',
+  // Old shorthand formats → new
+  'F-STATIC': 'Static image', 'F-VIDEO': 'Video', 'F-INFLU': 'Influencer UGC', 'F-CONTENT-UGC': 'Influencer UGC',
+  'F-TESTI': 'Testimonial video', 'F-VERN-TESTI': 'Vernacular testimonial',
+  'F-PRODUCT': 'Product video', 'F-PLATFORM-DEMO': 'Product video', 'F-APP-PREVIEW': 'Product video',
+  'F-BRAND': 'Brand video', 'F-FOUNDER': 'Brand video', 'F-ANIM': 'Video', 'F-CAROUSEL': 'Static image',
+  // Old shorthand pain/benefit → new
+  'PB-GRADE': 'Grades & school', 'PB-CONF': 'Confidence & anxiety', 'PB-FOUND': 'Strong foundations',
+  'PB-FUTURE': 'Future readiness', 'PB-TUTOR': 'Tutor quality', 'PB-INDIAN': 'Indian roots', 'PB-COMP': 'Competition prep',
+  // Old audience → new
+  'NRI': 'NRI parents', 'Non-NRI': 'Expat parents', 'Asian': 'NRI parents', 'Expat': 'Expat parents',
+  'Telugu Speaking': 'Telugu speaking', 'Tamil Speaking': 'Tamil speaking', 'Gujarati Speaking': 'Gujarati speaking',
+  'Hindi Speaking': 'Local parents', 'Arabic Speaking': 'Local parents', 'High School Parents': 'High school parents', 'Universal': 'NRI parents',
+  // Old tone → new
+  'Offer/Promo': 'Offer / promo', 'Empathetic': 'Aspirational', 'Warm': 'Aspirational',
+  // Very old taxonomy (pre-shorthand)
+  'Question': 'Question', 'Statistic': 'Statistic', 'Testimonial': 'Parent testimonial',
+  'Fear/Urgency': 'Fear / urgency', 'Aspirational': 'Aspirational', 'Problem-Solution': 'Problem',
+  'Curiosity Gap': 'Question', 'Social Proof': 'Parent testimonial', 'Direct Benefit': 'Math anchor',
+  'Math anxiety': 'Confidence & anxiety', 'Rote learning': 'Strong foundations', 'One-size-fits-all': 'Tutor quality',
+  'Lack of confidence': 'Confidence & anxiety', 'School struggle': 'Grades & school', 'Boring tutoring': 'Tutor quality',
+  'No conceptual understanding': 'Strong foundations', 'Exam pressure': 'Competition prep',
+  'Conceptual understanding': 'Strong foundations', 'Confidence': 'Confidence & anxiety',
+  'Personalized learning': 'Tutor quality', 'Future-ready': 'Future readiness',
+  'Better grades': 'Grades & school', 'Problem-solving skills': 'Strong foundations',
 };
 
 // Tag cache: keyed by ad name, stores tags so we never re-tag the same creative
@@ -10315,15 +10358,33 @@ function useDashboardData() {
 
 function migrateTags(tags) {
   if (!tags || !tags.hook_type) return tags;
-  // Already new taxonomy
-  if (tags.hook_type.startsWith('H-')) return tags;
-  // Migrate
   const migrated = { ...tags };
+  // Check if already new taxonomy (human-readable, not shorthand codes)
+  const isNewTax = TAG_CATEGORIES.hook_type.values.includes(tags.hook_type);
+  if (isNewTax) return tags;
+  // Migrate hook_type
   if (TAG_MIGRATION[tags.hook_type]) migrated.hook_type = TAG_MIGRATION[tags.hook_type];
-  // Migrate old pain_point/benefit to pain_benefit
-  if (tags.pain_point && TAG_MIGRATION[tags.pain_point]) migrated.pain_benefit = TAG_MIGRATION[tags.pain_point];
-  if (tags.benefit && TAG_MIGRATION[tags.benefit]) migrated.pain_benefit = migrated.pain_benefit || TAG_MIGRATION[tags.benefit];
-  migrated.confidence = 'inferred';
+  // Migrate format
+  if (tags.format && TAG_MIGRATION[tags.format]) migrated.format = TAG_MIGRATION[tags.format];
+  // Migrate pain_benefit (single string → array of new values)
+  const pb = tags.pain_benefit || tags.pain_point;
+  if (pb) {
+    if (Array.isArray(pb)) {
+      migrated.pain_benefit = pb.map(v => TAG_MIGRATION[v] || v);
+    } else {
+      migrated.pain_benefit = TAG_MIGRATION[pb] ? [TAG_MIGRATION[pb]] : [pb];
+    }
+  }
+  // Migrate old pain_point/benefit fields
+  if (tags.benefit && TAG_MIGRATION[tags.benefit]) {
+    if (!migrated.pain_benefit) migrated.pain_benefit = [];
+    migrated.pain_benefit.push(TAG_MIGRATION[tags.benefit]);
+  }
+  // Migrate audience
+  if (tags.icp_target && TAG_MIGRATION[tags.icp_target]) migrated.icp_target = TAG_MIGRATION[tags.icp_target];
+  // Migrate tone
+  if (tags.emotional_tone && TAG_MIGRATION[tags.emotional_tone]) migrated.emotional_tone = TAG_MIGRATION[tags.emotional_tone];
+  migrated.confidence = 0.5;
   migrated._migrated = true;
   return migrated;
 }
@@ -10523,58 +10584,47 @@ function buildTaggerPrompt(batch) {
     return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}${titleLine}${bodyLine}${descLine}${ctaLine}${freqLine}`;
   }).join('\n');
 
-  return `You are Lens, Cuemath's creative audit AI. Tag these ad creatives.
+  return `You are Lens, Cuemath's creative tagging engine. Tag each ad creative using ONLY the values listed below. Return valid JSON only — no preamble, no markdown, no explanation.
 
-IMPORTANT: image/video thumbnail arrives first, then ad copy, then headline, then ad name LAST. Do not anchor on ad name — tag what you see and read.
+IMPORTANT: You receive inputs in this order: 1) Image or video thumbnail (visual first) 2) Ad body copy 3) Headline 4) Ad name (LAST — do not anchor on this). Tag what you actually see and read. Do not infer tags from the ad name alone.
 
 CREATIVES:
 ${creatives}
 
-## TAGGING TAXONOMY
+FORMAT (pick exactly 1): Static image | Video | Influencer UGC | Testimonial video | Vernacular testimonial | Product video | Brand video
 
-### FORMAT (pick exactly 1):
-Static image | Video | Influencer UGC | Testimonial video | Vernacular testimonial | Product video | Brand video
+HOOK TYPE (pick exactly 1):
+- Math anchor: opens with math problem, equation, or specific skill gap. NOT for general academic anxiety.
+- Problem: present-tense learning struggle or parent frustration. NOT for future risk (use Fear/urgency).
+- Fear / urgency: future risk, falling behind, or time pressure. NOT for present struggles (use Problem).
+- Parent testimonial: parent leads the hook, speaking or quoted opening the ad. NOT if parent appears mid-ad only.
+- Statistic: opens with a data point or proof number. NOT if stat appears mid-copy.
+- Question: direct question to the parent. NOT if fear-based (use Fear/urgency).
+- Lifestyle / emotional: aspiration, warmth, family moment, pride. NOT if a clear problem or fear is present.
+- Competitive: directly references another tutor, brand, or compares.
+- Offer / price: discount, free trial, or price point as the hook. NOT if free trial is just the CTA button.
+- Grade badge: specific grade or board call-out leads the ad.
+- Seasonal: season, holiday, or exam period is the hook.
 
-### HOOK TYPE (pick exactly 1):
-- Math anchor: opens with math problem or skill gap
-- Problem: present-tense learning struggle
-- Fear / urgency: future risk or falling behind
-- Parent testimonial: parent leads the hook
-- Statistic: opens with data point
-- Question: direct question to parent
-- Lifestyle / emotional: aspiration, warmth, family
-- Competitive: references another brand or tutor
-- Offer / price: discount or free trial as hook
-- Grade badge: specific grade or board call-out
-- Seasonal: season, holiday, exam period
+PAIN POINT (array, 1-2 values max): Grades & school | Confidence & anxiety | Strong foundations | Future readiness | Tutor quality | Indian roots | Competition prep
 
-### PAIN POINT (array, 1-2 values):
-Grades & school | Confidence & anxiety | Strong foundations | Future readiness | Tutor quality | Indian roots | Competition prep
+TONE (pick exactly 1): Testimonial | Aspirational | Confident | Urgency | Comparison | Offer / promo | Seasonal
 
-### TONE (pick exactly 1):
-Testimonial | Aspirational | Confident | Urgency | Comparison | Offer / promo | Seasonal
+AUDIENCE (pick exactly 1): NRI parents | Expat parents | Local parents | Gujarati speaking | Telugu speaking | Tamil speaking | High school parents
 
-### AUDIENCE (pick exactly 1):
-NRI parents | Expat parents | Local parents | Gujarati speaking | Telugu speaking | Tamil speaking | High school parents
+OFFER PRESENT: true if specific promotion beyond standard free trial ("First month at ₹999", "50% off"). false if standard free trial CTA only.
 
-### OFFER PRESENT: true/false
-true only if specific promotion beyond standard free trial.
+TALENT NAME: detect from ad name or copy. Known names: Keerthi, Priyanshul, Shweta Negi, Mital, Swetha, Payal, Gunjan, Jharna, Damla, Kaira, Sarita, Rituja, Deepthi, Jia, Neha, Surveen, Jasleen, Chetan Patel, Kinjal Gandhi, Haiyan, Jasmine, Sameer, Nancy, Manan, Madhavi, Anushree, Priyanka, Shalini, Silvia, Rishva, Keerthana, Minal, Anandi, Stuti, Aditya, Joyita, Shruti, Kasi Madi, Edison, Gunjan, Varun, Sathish, Aaron, Bryan
+If detected: set talent_name to the name. Also set format = Influencer UGC if format would otherwise be Video or Unknown.
 
-### TALENT NAME: detect from ad name or copy:
-Keerthi, Priyanshul, Shweta Negi, Mital, Swetha, Payal, Gunjan, Jharna, Damla, Kaira, Sarita, Rituja, Deepthi, Jia, Neha, Surveen, Jasleen, Chetan Patel, Kinjal Gandhi, Haiyan, Jasmine, Sameer, Nancy
-If detected: set talent_name, set format to Influencer UGC if format would otherwise be Video or Unknown.
+SETTING (pick 1 or null): Home | Studio | Outdoor | Screen recording | Animation
 
-### SETTING (pick 1 or null):
-Home | Studio | Outdoor | Screen recording | Animation
+PRODUCTION STYLE (pick 1): UGC | Studio shoot | Motion graphic | Screen record
 
-### PRODUCTION STYLE (pick 1):
-UGC | Studio shoot | Motion graphic | Screen record
+CONFIDENCE: 0.0-1.0. Below 0.7 = set flag_for_review:true. Lower confidence when visual is unclear, copy is ambiguous, or multiple hooks are equally present.
 
-### CONFIDENCE: 0.0-1.0
-Below 0.7 = flag for human review.
-
-Return ONLY a JSON array. Each object:
-[{"format":"","hook_type":"","pain_point":["",""],"tone":"","audience":"","offer_present":false,"offer_detail":null,"talent_name":null,"setting":null,"production_style":"","confidence":0.0,"flag_for_review":false,"flag_reason":null}]
+Return ONLY a JSON array with one object per creative:
+[{"format":"","hook_type":"","pain_benefit":[""],"emotional_tone":"","icp_target":"","offer_present":false,"offer_detail":null,"talent_name":null,"setting":null,"production_style":"","confidence":0.0,"flag_for_review":false,"flag_reason":null}]
 `;
 }
 
