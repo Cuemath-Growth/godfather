@@ -3751,7 +3751,7 @@ async function fetchMetaCreatives() {
     try {
       let page = await callMetaAPI(`${account.id}/ads`, {
         fields: 'id,name,creative{thumbnail_url,image_url},status,effective_status',
-        limit: '100'
+        limit: '25'
       });
       let pageNum = 1;
       while (page && pageNum <= 20) {
