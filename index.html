@@ -3790,7 +3790,7 @@ async function fetchMetaCreatives() {
 }
 
 // ── Section 4: Daily Ad Insights + Fatigue Detection ──
-let metaAdData = []; // { date, ad_id, ad_name, adset_name, campaign_name, spend, impressions, reach, clicks, link_clicks, ctr, cpc, cpm, frequency, _account }
+let metaAdData = []; // { date, ad_id, ad_name, adset_name, campaign_name, spend, impressions, reach, clicks, ctr, cpc, cpm, frequency, _account }
 
 function loadCachedAdData() {
   const ts = parseInt(localStorage.getItem('gf_v2_adDataTs') || '0');
@@ -3810,30 +3810,29 @@ async function fetchMetaAdInsights() {
   const all = [];
   for (const account of accounts) {
     try {
+      // Safe top-level fields only — link_clicks is inside actions array, not a top-level field
       const insightParams = {
-        fields: 'date_start,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions',
+        fields: 'date_start,ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency',
         time_increment: '1',
         level: 'ad',
         time_range: JSON.stringify({ since: start, until: end }),
         limit: '500'
       };
-      console.log(`Fetching insights for ${account.name}...`, `${account.id}/insights`, insightParams);
+      console.log(`Fetching insights for ${account.name}...`);
       let page = await callMetaAPI(`${account.id}/insights`, insightParams);
       if (page.error) { console.error(`Ad insights ${account.name}:`, page.error); continue; }
       let pageNum = 1;
       while (page && pageNum <= 40) {
         if (page.data) {
           page.data.forEach(r => {
-            // Extract link_clicks from actions array
-            const linkClicks = (r.actions || []).find(a => a.action_type === 'link_click')?.value || 0;
             all.push({
               date: r.date_start,
-              ad_name: r.ad_name || '', adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
+              ad_id: r.ad_id || '', ad_name: r.ad_name || '',
+              adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
               spend: parseFloat(r.spend || 0),
               impressions: parseInt(r.impressions || 0),
               reach: parseInt(r.reach || 0),
               clicks: parseInt(r.clicks || 0),
-              link_clicks: parseInt(linkClicks),
               ctr: parseFloat(r.ctr || 0),
               cpc: parseFloat(r.cpc || 0),
               cpm: parseFloat(r.cpm || 0),
@@ -3899,8 +3898,8 @@ function detectFatigue() {
     const priorCtr = avg(prior, 'ctr');
     const recentCpm = avg(recent, 'cpm');
     const priorCpm = avg(prior, 'cpm');
-    const recentClicks = recent.reduce((s, r) => s + r.link_clicks, 0);
-    const priorClicks = prior.reduce((s, r) => s + r.link_clicks, 0);
+    const recentClicks = recent.reduce((s, r) => s + r.clicks, 0);
+    const priorClicks = prior.reduce((s, r) => s + r.clicks, 0);
     const recentSpend = avg(recent, 'spend');
     const ctrDrop = priorCtr > 0 ? (recentCtr - priorCtr) / priorCtr : 0;
     const cpmRise = priorCpm > 0 ? (recentCpm - priorCpm) / priorCpm : 0;
@@ -6323,7 +6322,6 @@ function renderDayByDay() {
         <th class="${thClass} text-right">CPC</th>
         <th class="${thClass} text-right">Freq</th>
         <th class="${thClass} text-right">QL</th>
-        <th class="${thClass} text-right">Click:QL</th>
       </tr>
     </thead><tbody>`;
 
@@ -6331,7 +6329,6 @@ function renderDayByDay() {
     const freq = r.frequency || 0;
     const rowBg = freq > 2.0 ? 'bg-red-50' : freq >= 1.5 ? 'bg-amber-50' : '';
     const ql = qlLookup[(r.ad_name + '|' + r.date)] || 0;
-    const clickQL = ql > 0 ? (r.link_clicks / ql).toFixed(1) : '—';
     const shortName = r.ad_name.length > 40 ? r.ad_name.slice(0, 40) + '...' : r.ad_name;
     html += `<tr class="${rowBg} border-b border-gray-100 hover:bg-surface-secondary">
       <td class="px-2 py-1.5 text-text-muted whitespace-nowrap">${r.date}</td>
@@ -6339,12 +6336,11 @@ function renderDayByDay() {
       <td class="px-2 py-1.5 text-right font-semibold">${r.spend > 0 ? '₹' + Math.round(r.spend).toLocaleString() : '—'}</td>
       <td class="px-2 py-1.5 text-right text-text-muted">${r.impressions.toLocaleString()}</td>
       <td class="px-2 py-1.5 text-right text-text-muted">${r.cpm > 0 ? '₹' + Math.round(r.cpm) : '—'}</td>
-      <td class="px-2 py-1.5 text-right">${r.link_clicks}</td>
+      <td class="px-2 py-1.5 text-right">${r.clicks}</td>
       <td class="px-2 py-1.5 text-right ${r.ctr > 1.5 ? 'text-accent-green' : r.ctr < 0.5 ? 'text-accent-red' : ''}">${r.ctr.toFixed(2)}%</td>
       <td class="px-2 py-1.5 text-right text-text-muted">${r.cpc > 0 ? '₹' + Math.round(r.cpc) : '—'}</td>
       <td class="px-2 py-1.5 text-right font-semibold ${freq > 2.0 ? 'text-accent-red' : freq >= 1.5 ? 'text-amber-600' : ''}">${freq > 0 ? freq.toFixed(1) : '—'}</td>
       <td class="px-2 py-1.5 text-right ${ql > 0 ? 'font-semibold' : 'text-text-muted'}">${ql || '—'}</td>
-      <td class="px-2 py-1.5 text-right text-text-muted">${clickQL}</td>
     </tr>`;
   });
 

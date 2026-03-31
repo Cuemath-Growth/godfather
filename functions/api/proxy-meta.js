@@ -33,14 +33,37 @@ export async function onRequest(context) {
     }
 
     // Build Meta Graph API URL
-    const url = new URL(`https://graph.facebook.com/v21.0/${endpoint}`);
+    // Use manual query string construction to avoid double-encoding JSON params like time_range
+    let queryParts = [];
     if (params) {
-      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+      Object.entries(params).forEach(([k, v]) => {
+        queryParts.push(`${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+      });
     }
-    url.searchParams.set('access_token', META_TOKEN);
+    queryParts.push(`access_token=${encodeURIComponent(META_TOKEN)}`);
+    const metaUrl = `https://graph.facebook.com/v21.0/${endpoint}?${queryParts.join('&')}`;
 
-    const res = await fetch(url.toString());
-    const data = await res.json();
+    const res = await fetch(metaUrl);
+    const responseText = await res.text();
+
+    // Try to parse as JSON, fall back to raw text error
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return Response.json(
+        { error: true, message: `Meta returned non-JSON (${res.status}): ${responseText.slice(0, 200)}` },
+        { status: res.status, headers: { 'Access-Control-Allow-Origin': '*' } }
+      );
+    }
+
+    // Forward Meta's error with details
+    if (!res.ok && data.error) {
+      return Response.json(data, {
+        status: res.status,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
+    }
 
     return Response.json(data, {
       status: res.status,
