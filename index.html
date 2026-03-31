@@ -91,6 +91,10 @@
     .sticky-col { position: sticky; left: 0; z-index: 1; background: inherit; }
     [title] { cursor: help; }
     .metric-label { border-bottom: 1px dashed rgba(156,163,175,0.4); }
+    details.oracle-accordion > summary { list-style: none; }
+    details.oracle-accordion > summary::-webkit-details-marker { display: none; }
+    details.oracle-accordion .chevron { transition: transform 0.2s; }
+    details.oracle-accordion[open] .chevron { transform: rotate(90deg); }
   </style>
 </head>
 <body class="text-text-primary min-h-screen">
@@ -292,8 +296,9 @@
           </div>
 
           <!-- Section 1: PAUSE NOW (accordion) -->
-          <details class="mb-6" id="oraclePause">
-            <summary class="flex items-center gap-2 cursor-pointer select-none py-2">
+          <details class="mb-6 oracle-accordion" id="oraclePause">
+            <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+              <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
               <div class="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
               <h3 class="text-sm font-bold">Pause Now</h3>
               <span id="pauseNowBadge" class="text-[10px] text-amber-700 font-bold px-1.5 py-0.5 rounded bg-amber-50"></span>
@@ -322,14 +327,15 @@
             <div id="oracleActionLog" class="space-y-1.5"></div>
           </div>
 
-          <!-- Section 2: MAKE MORE -->
-          <div class="mb-6" id="oracleMakeMore">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-accent-green flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg></div>
-              <h3 class="text-sm font-bold">Make More Of This</h3>
-              <span class="text-[10px] text-text-muted">— best performing campaigns to scale</span>
-              <div class="ml-auto relative">
-                <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg></button>
+          <!-- Section 2: MAKE MORE (accordion) -->
+          <details class="mb-6 oracle-accordion" id="oracleMakeMore">
+            <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+              <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <div class="w-6 h-6 rounded-lg bg-accent-green flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg></div>
+              <h3 class="text-sm font-bold">Make More</h3>
+              <span id="makeMoreBadge" class="text-[10px] text-green-700 font-bold px-1.5 py-0.5 rounded bg-green-50"></span>
+              <div class="ml-auto relative" onclick="event.stopPropagation()">
+                <button onclick="event.preventDefault();this.nextElementSibling.classList.toggle('hidden')" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg></button>
                 <div class="hidden absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-20 min-w-[160px]" onclick="this.classList.add('hidden')">
                   <button onclick="oracleBulkAction('make_more','done')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Mark all done</button>
                   <button onclick="oracleBulkAction('make_more','dismissed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Dismiss all</button>
@@ -338,9 +344,9 @@
                   <button onclick="oracleClearActions('make_more')" class="w-full text-left px-3 py-1.5 text-[11px] text-text-muted hover:bg-surface-tertiary">Reset actions</button>
                 </div>
               </div>
-            </div>
-            <div id="oracleMakeMoreList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary flex items-center gap-2"><svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Connect data to unlock</p></div>
-          </div>
+            </summary>
+            <div id="oracleMakeMoreList" class="mt-2"></div>
+          </details>
 
           <!-- Section 3: DEPLOY THESE -->
           <div class="mb-6" id="oracleDeploy">
@@ -3778,7 +3784,11 @@ function filterLeadsByMarket(data, market) {
 
 function filterCostByMarket(data, market) {
   if (!market || market === 'all') return data;
-  return data.filter(r => (r.country_segment || '').trim() === market);
+  return data.filter(r => {
+    const seg = (r.country_segment || '').trim();
+    if (market === 'MEA' || market === 'ME') return seg === 'ME' || seg === 'MEA';
+    return seg === market;
+  });
 }
 
 // ── Metric primitives — each filters the in-memory arrays directly ──
@@ -3976,9 +3986,9 @@ function getCampaignBreakdown(market, startDate, endDate) {
       return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
     }).length;
 
-    // Spend from costData where campaign_name matches
-    const spend = costData.filter(r => {
-      if (market && market !== 'all' && (r.country_segment || '').trim() !== market) return false;
+    // Spend from costData where campaign_name matches (meta only, market-filtered)
+    const spend = filterCostByMarket(costData, market).filter(r => {
+      if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
       const day = r.day || '';
       if (startDate && day < startDate) return false;
       if (endDate && day > endDate) return false;
@@ -4020,10 +4030,10 @@ function getAdBreakdown(market, startDate, endDate) {
       return (!startDate || d >= startDate) && (!endDate || d <= endDate) && String(r.paid) === '1';
     }).length;
 
-    // Spend: sum costData where campaign matches any campaign this ad appeared in
+    // Spend: sum costData where campaign matches (meta only, market-filtered)
     const campNames = new Set(a.rows.map(r => r.mx_utm_campaign).filter(Boolean));
-    const spend = costData.filter(r => {
-      if (market && market !== 'all' && (r.country_segment || '').trim() !== market) return false;
+    const spend = filterCostByMarket(costData, market).filter(r => {
+      if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
       const day = r.day || '';
       if (startDate && day < startDate) return false;
       if (endDate && day > endDate) return false;
@@ -6220,12 +6230,20 @@ function renderOracleCardsV2() {
   // ── MAKE MORE: top campaigns by CPTD where TD >= 3 ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
   const campBreakdown = getCampaignBreakdown(market, from || undefined, to || undefined);
+  // CPTD sanity: filter out implausibly low CPTD (< ₹5K = likely bad spend join)
   const topCampaigns = campBreakdown
-    .filter(c => c.td >= 3 && c.cptd > 0)
+    .filter(c => c.td >= 3 && c.cptd > 5000)
     .sort((a, b) => a.cptd - b.cptd)
     .slice(0, 5);
 
+  // Log suspicious campaigns for debugging
+  const suspicious = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0 && c.cptd < 5000);
+  if (suspicious.length) console.warn('Make More: filtered out', suspicious.length, 'campaigns with CPTD < ₹5K:', suspicious.map(c => ({ name: c.name.slice(0, 40), cptd: Math.round(c.cptd), spend: c.spend, td: c.td })));
+
   const visibleMake = topCampaigns.filter(c => isItemVisible('make:' + c.name));
+  const makeBadge = document.getElementById('makeMoreBadge');
+  if (makeBadge) makeBadge.textContent = visibleMake.length > 0 ? `${visibleMake.length} campaigns` : '';
+
   if (visibleMake.length) {
     let html = '<div class="space-y-2">';
     visibleMake.forEach((c, i) => {
@@ -6235,11 +6253,10 @@ function renderOracleCardsV2() {
       const opacity = isDone ? 'opacity-50' : '';
       const cptdColor = c.cptd < 40000 ? 'green' : c.cptd < 70000 ? 'orange' : 'red';
       const shortName = c.name.length > 40 ? c.name.slice(0, 40) + '...' : c.name;
+      const esc = s => s.replace(/'/g, "\\'");
       html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
         <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-accent-green-light flex items-center justify-center shrink-0">
-            <span class="text-xs font-bold text-green-700">#${i + 1}</span>
-          </div>
+          ${_oracleThumbnail(c.name)}
           <div class="flex-1 min-w-0">
             <p class="text-xs font-semibold truncate" title="${c.name}">${shortName}</p>
             <p class="text-[10px] text-text-muted">${c.td} TDs · ${c.ql} QLs · ${formatCurrency(c.spend)} spent</p>
@@ -6250,6 +6267,11 @@ function renderOracleCardsV2() {
             <p class="text-[9px] text-text-muted">CPTD</p>
           </div>
         </div>
+        ${!isDone ? `<div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
+          <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+        </div>` : ''}
       </div>`;
     });
     html += '</div>';
