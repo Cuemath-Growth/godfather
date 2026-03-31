@@ -1641,8 +1641,12 @@ async function callMetaAPI(endpoint, params) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ endpoint, params }),
   });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody?.error?.message || errBody?.message || `Meta proxy ${res.status}`);
+  }
   const data = await res.json();
-  if (data.error === true) throw new Error(data.message || 'Meta API proxy error');
+  if (data.error) throw new Error(data.error.message || data.error.error_user_msg || 'Meta API error');
   return data;
 }
 
@@ -3842,6 +3846,7 @@ async function fetchMetaAdInsights() {
         page = await callMetaAPI(ep, p);
       }
     } catch(e) { console.error(`Ad insights ${account.name}:`, e.message); }
+    console.log(`  ${account.name}: ${all.length} rows so far`);
   }
   metaAdData = all;
   console.log(`Meta ad insights: ${all.length} daily rows from ${accounts.length} accounts`);
@@ -4224,7 +4229,7 @@ function getAdBreakdown(market, startDate, endDate) {
     const adSpend = totalCampQLs > 0 ? spend * (ql / totalCampQLs) : (ql > 0 ? spend / campNames.size : 0);
 
     return {
-      name: a.name, spend: adSpend, ql, td: td_snap, enrolled,
+      name: a.name, spend: adSpend, campaignSpend: spend, ql, td: td_snap, enrolled,
       cptd: safeDivide(adSpend, td_snap),
       cpql: safeDivide(adSpend, ql),
     };
@@ -6295,13 +6300,13 @@ function renderOracleCardsV2() {
   const pauseList = document.getElementById('oraclePauseList');
   const adBreakdown = getAdBreakdown(market, pauseFrom, pauseTo);
   const spendLeaks = adBreakdown
-    .filter(a => a.spend > 50000 && a.td === 0)
-    .sort((a, b) => b.spend - a.spend)
+    .filter(a => (a.campaignSpend || a.spend) > 50000 && a.td === 0)
+    .sort((a, b) => (b.campaignSpend || b.spend) - (a.campaignSpend || a.spend))
     .slice(0, 8)
     .map(a => {
-      const cptqlStr = a.ql > 0 ? `CPTQL ${formatCurrency(a.spend / a.ql)}` : 'No QLs';
-      const cptdStr = a.td > 0 ? ` · CPTD ${formatCurrency(a.spend / a.td)}` : '';
-      return { ...a, _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · ${a.ql} QLs · ${cptqlStr}${cptdStr}` };
+      const displaySpend = a.campaignSpend || a.spend;
+      const cptqlStr = a.ql > 0 ? `CPTQL ${formatCurrency(displaySpend / a.ql)}` : 'No QLs';
+      return { ...a, spend: displaySpend, _type: 'spend', _signal: `${formatCurrency(displaySpend)} spent · ${a.ql} QLs · ${cptqlStr}` };
     });
 
   // Merge fatigue ads (Stage 2+3 only)
