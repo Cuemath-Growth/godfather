@@ -6693,7 +6693,23 @@ function renderOracleCardsV2() {
   const pauseLookback = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
   const pauseFrom = from < pauseLookback ? from : pauseLookback;
   const pauseList = document.getElementById('oraclePauseList');
-  const adCampData = getAdCampaignBreakdown(market, pauseFrom, to);
+  // Use the new clean data layer — date-aware, ad-level
+  const rawPerf = getAdPerformance(market, pauseFrom, to);
+  // Map to the field names the signal logic expects
+  const adCampData = rawPerf.map(r => ({
+    adName: r['Ad name'], campaignName: r['Campaign name'],
+    displayName: stripCampaignPrefix(r['Ad name']),
+    campaignContext: stripCampaignPrefix(r['Campaign name']),
+    market: r._market || '',
+    spend: r['Spent'], ql: r['QL'], tql: r['TQL'], td: r['TD'], enrolled: r['Paid'],
+    nri: r['NRI'], invalid: parseNumber(r['Invalid%']) * (r['QL'] + (r['TD']||0)) / 100,
+    totalLeads: r['QL'] + (parseNumber(r['Invalid%']) > 0 ? Math.round(r['QL'] / (1 - parseNumber(r['Invalid%'])/100)) - r['QL'] : 0),
+    nriPct: (r['NRI%'] || 0) / 100,
+    qlToTdPct: (r['QL-TD%'] || 0) / 100,
+    invalidPct: (r['Invalid%'] || 0) / 100,
+    cptql: r['CPTQL'], cptd: r['CPTD'],
+    _spendSource: r._spendSource,
+  }));
   const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
 
   const isPaused = (adName) => {
