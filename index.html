@@ -4343,28 +4343,13 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     spendMap[key] += r.spend || 0;
   });
 
-  // Step 3: Fallback spend from campaignMap (pro-rated) when metaAdData unavailable
-  // costData = campaign level spend only. Never use for ad/creative level metrics.
-  // This fallback is only used when metaAdData has no rows for this ad.
-
-  // Step 4: Merge
+  // Step 3: Merge — metaAdData spend ONLY. No campaign pro-rate fallback.
+  // costData = campaign level spend only. NEVER use for ad/creative level metrics.
+  let metaMatched = 0, metaMissed = 0;
   const results = Object.entries(qlMap).map(([key, data]) => {
     const metaSpend = spendMap[key];
-    const hasMetaSpend = metaSpend !== undefined && metaSpend > 0;
-
-    // If no metaAdData spend, try campaign-level pro-rate as fallback
-    let spend = hasMetaSpend ? metaSpend : null;
-    let spendSource = hasMetaSpend ? 'meta_insights' : 'unavailable';
-    if (!hasMetaSpend) {
-      const campSpend = getCampaignSpend(data.campaignName, market, startDate, endDate);
-      if (campSpend !== null) {
-        // Pro-rate: this ad's QLs / total campaign QLs * campaign spend
-        const campKey = (data.campaignName || '').toLowerCase().trim();
-        const totalCampQLs = Object.values(qlMap).filter(v => (v.campaignName || '').toLowerCase().trim() === campKey).reduce((s, v) => s + v.ql, 0);
-        spend = totalCampQLs > 0 ? campSpend * (data.ql / totalCampQLs) : null;
-        spendSource = 'campaign_prorated';
-      }
-    }
+    const hasSpend = metaSpend !== undefined && metaSpend > 0;
+    if (hasSpend) metaMatched++; else metaMissed++;
 
     return {
       adName: data.adName,
@@ -4372,11 +4357,29 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
       displayName: stripCampaignPrefix(data.adName),
       campaignContext: stripCampaignPrefix(data.campaignName),
       ql: data.ql,
-      spend,
-      cptql: spend !== null && data.ql > 0 ? spend / data.ql : null,
-      _spendSource: spendSource,
+      spend: hasSpend ? metaSpend : null,
+      cptql: hasSpend && data.ql > 0 ? metaSpend / data.ql : null,
+      _spendSource: hasSpend ? 'meta_insights' : 'unavailable',
     };
   });
+  // Step 4: Add ads from metaAdData that have spend but NO QLs in leadsData
+  // These are true budget burns — Meta recorded spend but zero leads came through
+  Object.entries(spendMap).forEach(([key, spend]) => {
+    if (qlMap[key]) return; // already in results
+    if (spend < 5000) return; // ignore tiny spend
+    const [adKey, campKey] = key.split('||');
+    // Find the original ad name (not lowercased)
+    const origRow = metaAdData.find(r => (r.ad_name || '').toLowerCase().trim() === adKey && (r.campaign_name || '').toLowerCase().trim() === campKey);
+    const adName = origRow?.ad_name || adKey;
+    const campName = origRow?.campaign_name || campKey;
+    results.push({
+      adName, campaignName: campName,
+      displayName: stripCampaignPrefix(adName),
+      campaignContext: stripCampaignPrefix(campName),
+      ql: 0, spend, cptql: null, _spendSource: 'meta_insights',
+    });
+  });
+  console.log(`Ad-level join: ${metaMatched} matched, ${metaMissed} unmatched. ${results.filter(r => r.ql === 0 && r.spend > 0).length} ads with spend but 0 QLs.`);
 
   return results.sort((a, b) => (a.cptql || Infinity) - (b.cptql || Infinity));
 }
