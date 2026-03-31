@@ -6129,10 +6129,21 @@ function _oracleThumbnail(name) {
 }
 
 function getCampaignThumbnail(campaignName) {
-  if (!metaCreatives.length || !campaignName) return null;
-  const q = campaignName.toLowerCase();
-  const match = metaCreatives.find(c => c.name.toLowerCase().includes(q));
-  return match ? (match.thumbnail_url || match.image_url || null) : null;
+  if (!campaignName) return null;
+  const q = (campaignName || '').toLowerCase();
+  // Look up tagger data by Campaign name field → get first ad's thumbnail
+  const taggerMatch = (state.taggerData || []).find(c => (c['Campaign name'] || '').toLowerCase() === q);
+  if (taggerMatch) {
+    const url = taggerMatch.thumbnail_url || taggerMatch.image_url;
+    if (url) return url;
+  }
+  // Fallback: any metaCreative whose ad name shares a prefix with campaign name (first 25 chars)
+  if (metaCreatives.length) {
+    const prefix = q.slice(0, 25);
+    const match = metaCreatives.find(c => c.name.toLowerCase().startsWith(prefix));
+    if (match) return match.thumbnail_url || match.image_url || null;
+  }
+  return null;
 }
 
 function oracleBulkAction(cardType, status) {
@@ -6193,9 +6204,6 @@ function renderOracleCardsV2() {
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 8);
 
-  // Thumbnail match logging
-  let thumbMatched = 0, thumbMissed = 0;
-
   const visiblePause = pauseAds.filter(a => isItemVisible('pause:' + a.name));
   const badge = document.getElementById('pauseNowBadge');
   if (badge) badge.textContent = visiblePause.length > 0 ? `${visiblePause.length} ads flagged` : '';
@@ -6212,7 +6220,6 @@ function renderOracleCardsV2() {
       const metricColor = isTopOffender ? 'text-red-700' : 'text-text-muted';
       const shortName = a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name;
       const thumbHtml = _oracleThumbnail(a.name);
-      if (thumbHtml.includes('<img')) thumbMatched++; else thumbMissed++;
       html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${shortName}">
         <div class="flex items-center gap-3">
           ${thumbHtml}
@@ -6229,46 +6236,19 @@ function renderOracleCardsV2() {
     if (totalWaste > 0) html += `<p class="text-[10px] text-amber-700 font-semibold mt-2">${formatCurrency(totalWaste)} recoverable · last 30 days</p>`;
     html += '</div>';
     pauseList.innerHTML = html;
-    console.log(`Pause Now thumbnails: ${thumbMatched} matched, ${thumbMissed} unmatched of ${visiblePause.length}`);
   } else {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 30 days).</p>';
   }
 
-  // ── MAKE MORE: top campaigns by CPTD where TD >= 3 ──
+  // ── MAKE MORE: top campaigns by CPTD where TD >= 3 and spend >= ₹10K ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
   const campBreakdown = getCampaignBreakdown(market, from || undefined, to || undefined);
-  // CPTD sanity: filter out implausibly low CPTD (< ₹5K = likely bad spend join)
-  const topCampaigns = campBreakdown
-    .filter(c => c.td >= 3 && c.cptd > 5000)
+  const allQualified = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0);
+  const hiddenLowSpend = allQualified.filter(c => c.spend < 10000);
+  const topCampaigns = allQualified
+    .filter(c => c.spend >= 10000)
     .sort((a, b) => a.cptd - b.cptd)
     .slice(0, 5);
-
-  // ── DEBUG: trace CPTD + thumbnail inputs ──
-  const _debugAll = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0).sort((a,b) => a.cptd - b.cptd);
-  console.log('=== MAKE MORE DEBUG ===');
-  _debugAll.slice(0, 5).forEach(c => {
-    // Campaign name comparison: leads vs cost
-    const costMatches = costData.filter(r => (r.campaign_name || '') === c.name);
-    const costMatchesMeta = costMatches.filter(r => (r.medium||'').trim().toLowerCase() === 'meta');
-    const costCampNames = [...new Set(costData.map(r => r.campaign_name))].filter(n => n.toLowerCase().includes(c.name.slice(0, 20).toLowerCase()));
-    console.log('Campaign:', c.name);
-    console.log('  TDs:', c.td, '| spend:', Math.round(c.spend), '| CPTD:', Math.round(c.cptd));
-    console.log('  costData exact matches:', costMatches.length, '(meta:', costMatchesMeta.length, ')');
-    console.log('  costData partial matches:', costCampNames.slice(0, 3));
-    console.log('  leads mx_utm_campaign sample:', leadsData.filter(r => r.mx_utm_campaign === c.name).slice(0, 1).map(r => r.mx_utm_campaign)[0]);
-    // Thumbnail debug
-    const thumbResult = getCreativeThumbnail(c.name);
-    const campThumbResult = getCampaignThumbnail(c.name);
-    console.log('  thumbnail — getCreativeThumbnail:', thumbResult ? 'HIT' : 'MISS', '| getCampaignThumbnail:', campThumbResult ? 'HIT' : 'MISS');
-    if (!campThumbResult && metaCreatives.length) {
-      const q = c.name.toLowerCase().slice(0, 30);
-      const partial = metaCreatives.filter(mc => mc.name.toLowerCase().includes(q)).length;
-      console.log('  metaCreatives partial name match (first 30 chars):', partial, '| search:', q);
-    }
-  });
-  console.log('=== END DEBUG ===');
-  const suspicious = campBreakdown.filter(c => c.td >= 3 && c.cptd > 0 && c.cptd < 5000);
-  if (suspicious.length) console.warn('Make More: filtered', suspicious.length, 'with CPTD < ₹5K');
 
   const visibleMake = topCampaigns.filter(c => isItemVisible('make:' + c.name));
   const makeBadge = document.getElementById('makeMoreBadge');
@@ -6304,10 +6284,11 @@ function renderOracleCardsV2() {
         </div>` : ''}
       </div>`;
     });
+    if (hiddenLowSpend.length) html += `<p class="text-[10px] text-text-muted mt-2">${hiddenLowSpend.length} campaign${hiddenLowSpend.length > 1 ? 's' : ''} hidden — insufficient spend data (&lt;₹10K). Check Meta Ads Manager directly.</p>`;
     html += '</div>';
     makeMoreList.innerHTML = html;
   } else {
-    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 3+ TDs found.</p>';
+    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No campaigns with 3+ TDs and sufficient spend data found.</p>';
   }
 }
 
