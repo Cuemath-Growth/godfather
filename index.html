@@ -5705,8 +5705,10 @@ function crmMetricsForDate(c, fromDate, toDate) {
 }
 
 function renderOracleActions() {
+  // Skip Pause Now + Make More rendering — handled by renderOracleCardsV2 when Section 2 data is loaded
+  const _s2Active = leadsData.length > 0;
   const data = getDashboardFilteredData();
-  if (!data.length) {
+  if (!data.length && !_s2Active) {
     // Show clear message instead of leaving placeholders
     const msg = state.taggerData.length === 0
       ? '<p class="text-xs text-amber-700 py-3 px-4 bg-amber-50 rounded-xl border border-amber-200">No creative data loaded. Go to Settings → pull Meta Ads or connect your Google Sheet.</p>'
@@ -5919,7 +5921,9 @@ function renderOracleActions() {
 
   // Week-over-week removed — not requested. Add back only if explicitly asked.
 
-  // ── SECTION 1: PAUSE NOW ──
+  // ── SECTION 1: PAUSE NOW (skip if Section 2 handles it) ──
+  if (_s2Active) { /* renderOracleCardsV2 handles Pause Now + Make More */ }
+  else {
   const pauseList = document.getElementById('oraclePauseList');
   // Budget leaks: high spend with 0 TDs AND low QLs (don't flag creatives generating good lead volume)
   const dedupKey = c => (c['Ad name']||'').slice(-25);
@@ -6070,6 +6074,7 @@ function renderOracleActions() {
   } else {
     makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">Not enough data per audience (need 3+ ads). Pull more data or wait for tagging to complete.</p>';
   }
+  } // end _s2Active else block
 
   // ── SECTION 3: DEPLOY THESE ──
   const deployList = document.getElementById('oracleDeployList');
@@ -6444,18 +6449,35 @@ function renderOracleCardsV2() {
   const market = dashCountry === 'all' ? null : dashCountry;
   const { from, to } = getGlobalDateRange();
 
-  // ── PAUSE NOW: ad+campaign level, uses global date range ──
+  // ── PAUSE NOW: high spend + 0 QLs, OR high CPTQL (>2x portfolio avg) ──
   const pauseList = document.getElementById('oraclePauseList');
   const adCampData = getAdCampaignBreakdown(market, from, to);
-  const spendLeaks = adCampData
-    .filter(a => a.spend !== null && a.spend > 50000 && a.ql === 0)
+  const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
+  const avgCPTQL_2x = avgCPTQL * 2;
+
+  // Type 1: high spend, zero QLs
+  const zeroQL = adCampData
+    .filter(a => a.spend !== null && a.spend > 30000 && a.ql === 0)
     .sort((a, b) => b.spend - a.spend)
-    .slice(0, 8)
+    .slice(0, 4)
     .map(a => ({
       name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
-      spend: a.spend, ql: a.ql, td: 0, cptql: null,
+      spend: a.spend, ql: 0, cptql: null,
       _type: 'spend', _signal: `${formatCurrency(a.spend)} spent · 0 QLs`,
     }));
+
+  // Type 2: has QLs but CPTQL > 2x portfolio avg (inefficient)
+  const highCPTQL = adCampData
+    .filter(a => a.spend !== null && a.spend > 20000 && a.ql >= 2 && a.cptql > avgCPTQL_2x)
+    .sort((a, b) => b.cptql - a.cptql)
+    .slice(0, 4)
+    .map(a => ({
+      name: a.adName, displayName: a.displayName, campaignContext: a.campaignContext,
+      spend: a.spend, ql: a.ql, cptql: a.cptql,
+      _type: 'spend', _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql/avgCPTQL)}x avg) · ${a.ql} QLs · ${formatCurrency(a.spend)}`,
+    }));
+
+  const spendLeaks = [...zeroQL, ...highCPTQL];
 
   // Merge fatigue ads (Stage 2+3 only)
   const fatigueAds = detectFatigue()
