@@ -369,16 +369,6 @@
             <div id="oracleInfluencerList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary">e.g. "Creator @mathwithmaya — 12K views, 4.2% ER, 8 enrolments → scale budget"</p></div>
           </div>
 
-          <!-- Section 5: MARKET HEALTH -->
-          <div class="mb-6" id="oracleMarketHealth">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-accent-blue flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-              <h3 class="text-sm font-bold">Market Health</h3>
-              <span class="text-[10px] text-text-muted">— performance by geo</span>
-            </div>
-            <div id="oracleMarketHealthList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary">e.g. "US: ₹12.4K CPTQL (green) · India: ₹680 CPTQL (green) · AUS: ₹18.2K CPTQL (amber)"</p></div>
-          </div>
-
           <!-- Module 1: Win/Loss Summary (Top 5 Performers + Budget Drains) -->
           <div class="mb-6" id="oracleWinLoss">
             <div class="flex items-center gap-2 mb-3">
@@ -387,16 +377,6 @@
               <span class="text-[10px] text-text-muted">— top and bottom performers by CPTD</span>
             </div>
             <div id="oracleModule1"></div>
-          </div>
-
-          <!-- Module 2: Country Breakdown (replaces simple Market Health) -->
-          <div class="mb-6" id="oracleCountrySection">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-gradient-cool flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-              <h3 class="text-sm font-bold">Market Intelligence</h3>
-              <span class="text-[10px] text-text-muted">— per-geo performance + seasonal context</span>
-            </div>
-            <div id="oracleModule2"></div>
           </div>
 
           <!-- Hidden compat containers for remaining modules -->
@@ -3862,7 +3842,7 @@ async function _fetchMetaInsightsRange(since, until, onProgress) {
   for (const account of accounts) {
     try {
       const insightParams = {
-        fields: 'date_start,ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency',
+        fields: 'date_start,ad_id,ad_name,adset_name,campaign_name,spend,impressions,reach,clicks,ctr,cpc,cpm,frequency,actions,cost_per_action_type',
         time_increment: '1',
         level: 'ad',
         time_range: JSON.stringify({ since, until }),
@@ -3875,6 +3855,14 @@ async function _fetchMetaInsightsRange(since, until, onProgress) {
       while (page && pageNum <= 40) {
         if (page.data) {
           page.data.forEach(r => {
+            // Extract lead count from actions array
+            const actions = r.actions || [];
+            const leadAction = actions.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
+            const leads = leadAction ? parseInt(leadAction.value || 0) : 0;
+            // Extract cost per lead
+            const cpaArr = r.cost_per_action_type || [];
+            const cplAction = cpaArr.find(a => a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead');
+            const costPerLead = cplAction ? parseFloat(cplAction.value || 0) : 0;
             all.push({
               date: r.date_start,
               ad_id: r.ad_id || '', ad_name: r.ad_name || '',
@@ -3883,6 +3871,7 @@ async function _fetchMetaInsightsRange(since, until, onProgress) {
               reach: parseInt(r.reach || 0), clicks: parseInt(r.clicks || 0),
               ctr: parseFloat(r.ctr || 0), cpc: parseFloat(r.cpc || 0),
               cpm: parseFloat(r.cpm || 0), frequency: parseFloat(r.frequency || 0),
+              leads: leads, cost_per_lead: costPerLead,
               _account: account.market
             });
           });
@@ -4355,19 +4344,22 @@ function getAdPerformance(market, startDate, endDate) {
   Object.values(leadMap).forEach(e => { e.td = Math.min(e.td, e.ql); e.enrolled = Math.min(e.enrolled, e.td); });
 
   // Step 2: Spend metrics per ad (from metaAdData, date-aware)
-  const spendMap = {}; // key: normalizedAdName → { spend, impressions, clicks, adName, campaign, adset }
+  // Primary key: ad_id (stable), secondary: normalizedAdName (for CRM join)
+  const spendMap = {}; // key: normalizedAdName → { spend, impressions, clicks, leads, adName, campaign, adset, ad_id }
+  const spendByAdId = {}; // ad_id → same object (for dedup)
   metaAdData.forEach(r => {
-    const rStart = r.date_min || r.date || '';
-    const rEnd = r.date_max || r.date || '';
-    if (start && rEnd < start) return;
-    if (end && rStart > end) return;
+    const rDate = r.date || '';
+    if (start && rDate < start) return;
+    if (end && rDate > end) return;
     const key = normalizeAdName(r.ad_name);
     if (!key) return;
-    if (!spendMap[key]) spendMap[key] = { spend: 0, impressions: 0, clicks: 0, adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '', account: r._account || '' };
+    if (!spendMap[key]) spendMap[key] = { spend: 0, impressions: 0, clicks: 0, leads: 0, adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '', account: r._account || '', ad_id: r.ad_id || '' };
     const s = spendMap[key];
     s.spend += r.spend || 0;
     s.impressions += parseInt(r.impressions) || 0;
     s.clicks += parseInt(r.clicks) || 0;
+    s.leads += parseInt(r.leads) || 0;
+    if (r.ad_id) spendByAdId[r.ad_id] = s;
   });
 
   // Step 3: Campaign-level spend from costData — used as fallback per-ad when metaAdData has no match
@@ -4392,32 +4384,41 @@ function getAdPerformance(market, startDate, endDate) {
     const spend = spendMap[key] || null;
     const tag = _tagMap[key] || {};
 
-    // Skip budget burns below threshold if no QLs
+    // Skip budget burns below threshold if no QLs and no significant spend
     if (lead.ql === 0 && (!spend || spend.spend < 5000)) return;
 
-    // Ad name: prefer original case from leads, then spend, then tag
-    const adName = lead.adName || spend?.adName || key;
-    const campaign = lead.campaign || spend?.campaign || tag.campaign || '';
+    // Ad name: prefer Meta name (authoritative), then CRM, then tag
+    const adName = spend?.adName || lead.adName || key;
+    const campaign = spend?.campaign || lead.campaign || tag.campaign || '';
     const adset = spend?.adset || tag.adset || '';
 
-    // Market
-    const mkt = lead._market || matchMarketFromText(' ' + campaign.toUpperCase() + ' ');
+    // Market: prefer account-level market from Meta, then CRM, then infer from name
+    const metaMarket = spend?.account ? ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' }[spend.account] || '') : '';
+    const mkt = metaMarket || lead._market || matchMarketFromText(' ' + campaign.toUpperCase() + ' ');
     const adMarket = mkt === 'Unknown' ? '' : mkt;
     // Skip if market filter and doesn't match
     if (market && market !== 'all' && adMarket && adMarket !== market) return;
 
-    // Spend: metaAdData first, then costData campaign pro-rate as fallback
+    // Spend: ALWAYS use metaAdData when available (accurate ad-level spend)
     let adSpend = spend ? spend.spend : null;
     let spendSource = spend ? 'meta_insights' : null;
+    // Fallback: campaign pro-rate ONLY when Meta data is completely missing
     if (adSpend === null && lead.ql > 0) {
       const campKey = normalizeAdName(campaign);
       const campTotal = campSpendMap[campKey] || 0;
       if (campTotal > 0) {
-        // Pro-rate: this ad's QL share of campaign spend
         const campQLs = Object.values(leadMap).filter(l => normalizeAdName(l.campaign) === campKey).reduce((s, l) => s + l.ql, 0);
         adSpend = campQLs > 0 ? campTotal * (lead.ql / campQLs) : null;
         spendSource = adSpend !== null ? 'campaign_prorated' : null;
       }
+    }
+
+    // QL: use CRM count when available, else Meta leads count
+    const metaLeads = spend?.leads || 0;
+    if (lead.ql === 0 && metaLeads > 0) {
+      lead.ql = metaLeads;
+      // No NRI/TD data from Meta — mark as meta-only
+      lead._metaOnly = true;
     }
 
     // Impressions/clicks from metaAdData
@@ -6644,6 +6645,23 @@ function getCampaignThumbnail(campaignName) {
   return null;
 }
 
+function oracleSaveNote(itemId, note) {
+  const existing = _oracleActions.find(a => a.item_id === itemId);
+  if (existing) {
+    existing.note = note;
+    supabaseUpsert('oracle_actions', [existing]);
+  } else {
+    // Create a new action entry just for the note (status = 'noted')
+    const row = {
+      item_id: itemId, card_type: itemId.startsWith('pause:') ? 'pause' : 'make_more',
+      status: 'noted', note: note, item_name: '',
+      actioned_by: 'naina', actioned_at: new Date().toISOString(), snooze_until: null
+    };
+    _oracleActions.push(row);
+    supabaseUpsert('oracle_actions', [row]);
+  }
+}
+
 function oracleBulkAction(cardType, status) {
   const prefix = cardType === 'pause' ? 'pause:' : 'make:';
   const items = _oracleActions.filter(a => a.item_id.startsWith(prefix));
@@ -6667,10 +6685,15 @@ function oracleClearActions(cardType) {
 
 function _pauseCardActions(itemId, shortName) {
   const esc = s => s.replace(/'/g, "\\'");
-  return `<div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
-    <button onclick="oracleAction('${esc(itemId)}','pause','done','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
-    <button onclick="oracleAction('${esc(itemId)}','pause','dismissed','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
-    <button onclick="oracleAction('${esc(itemId)}','pause','snoozed','${esc(shortName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+  const existingNote = getOracleAction(itemId)?.note || '';
+  const noteId = 'note_' + itemId.replace(/[^a-zA-Z0-9]/g, '_');
+  return `<div class="mt-2 pt-2 border-t border-gray-100">
+    <div class="flex items-center gap-1.5 mb-1.5">
+      <button onclick="oracleAction('${esc(itemId)}','pause','done','${esc(shortName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+      <button onclick="oracleAction('${esc(itemId)}','pause','dismissed','${esc(shortName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+      <button onclick="oracleAction('${esc(itemId)}','pause','snoozed','${esc(shortName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+    </div>
+    <input type="text" id="${noteId}" placeholder="Add a note..." value="${esc(existingNote)}" onblur="oracleSaveNote('${esc(itemId)}', this.value)" onkeydown="if(event.key==='Enter'){this.blur()}" class="w-full text-[11px] px-3 py-1.5 rounded-lg border border-gray-200 bg-surface-secondary text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none" />
   </div>`;
 }
 
@@ -6760,12 +6783,10 @@ function renderOracleCardsV2() {
   const { from, to } = getGlobalDateRange();
 
   // ── PAUSE NOW: CPTQL > 2x market avg — flag inefficient ads ──
-  // Use wider lookback (min 90 days) so short date ranges still show results
-  const pauseLookback = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
-  const pauseFrom = from < pauseLookback ? from : pauseLookback;
+  // Respect user's date selection — no artificial widening
   const pauseList = document.getElementById('oraclePauseList');
   // Use the new clean data layer — date-aware, ad-level
-  const rawPerf = getAdPerformance(market, pauseFrom, to);
+  const rawPerf = getAdPerformance(market, from, to);
   // Map to the field names the signal logic expects
   const adCampData = rawPerf.map(r => ({
     adName: r['Ad name'], campaignName: r['Campaign name'],
@@ -6866,16 +6887,16 @@ function renderOracleCardsV2() {
       const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED' }[a._type] || '';
       const displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
       const campCtx = a.campaignContext || '';
-      const geoTag = a.market ? `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
+      const geoTag = a.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
       const thumbHtml = _oracleThumbnail(a.name);
-      html += `<div class="p-3 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
+      html += `<div class="p-4 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
         <div class="flex items-center gap-3">
           ${thumbHtml}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[8px] px-1.5 py-0.5 rounded ${isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
-            ${campCtx ? `<p class="text-[9px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
-            <p class="text-[10px] ${metricColor}">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
-            ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
+            <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
+            ${campCtx ? `<p class="text-[11px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
+            <p class="text-xs ${metricColor} mt-0.5">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
+            ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
         </div>
         ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
@@ -6899,11 +6920,14 @@ function renderOracleCardsV2() {
   const avgNriPct = (() => { const us = adCampData.filter(a => a.market === 'US' && a.ql >= 3); return us.length ? us.reduce((s, a) => s + a.nriPct, 0) / us.length : 0.5; })();
   const avgQlToTd = (() => { const withTd = adCampData.filter(a => a.ql >= 5); return withTd.length ? withTd.reduce((s, a) => s + a.qlToTdPct, 0) / withTd.length : 0.1; })();
 
+  // Exclude any ad already flagged in Pause Now — prevents contradictory recommendations
+  const pauseNames = new Set(pauseAds.map(a => normalizeAdName(a.name)));
+
   // Score each ad: works WITH or WITHOUT spend data
   // With spend: CPTQL efficiency is primary signal
   // Without spend: TQL volume + NRI% + funnel conversion are signals
   const makeAds = adCampData
-    .filter(a => a.tql >= 3) // minimum: 3 TQLs to be meaningful
+    .filter(a => a.tql >= 3 && !pauseNames.has(normalizeAdName(a.adName))) // minimum: 3 TQLs, not in Pause Now
     .filter(a => {
       if (a.spend !== null && a.cptql !== null) return a.cptql < portfolioCPTQL * 1.2; // has spend: must be efficient
       return a.tql >= 5; // no spend data: need stronger volume signal
@@ -6958,26 +6982,33 @@ function renderOracleCardsV2() {
       const opacity = isDone ? 'opacity-50' : '';
       const cpqlColor = c.cptql < 5000 ? 'green' : c.cptql < 10000 ? 'orange' : 'red';
       const esc = s => s.replace(/'/g, "\\'");
-      const geoTag = c.market ? `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${c.market}</span>` : '';
-      html += `<div class="p-3 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${c.displayName}">
+      const geoTag = c.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${c.market}</span>` : '';
+      html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${c.displayName}">
         <div class="flex items-center gap-3">
           ${_oracleThumbnail(c.adName)}
           <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold truncate" title="${c.adName}">${c.displayName} ${geoTag}</p>
-            <p class="text-[9px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
-            <p class="text-[10px] text-text-muted">${c._makeSignals?.length ? c._makeSignals.join(' · ') : `${c.tql} TQLs · ${formatCurrency(c.spend)} spent`}</p>
-            ${isDone ? `<p class="text-[9px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
+            <p class="text-sm font-semibold truncate" title="${c.adName}">${c.displayName} ${geoTag}</p>
+            <p class="text-[11px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
+            <p class="text-xs text-text-muted mt-0.5">${c._makeSignals?.length ? c._makeSignals.join(' · ') : `${c.tql} TQLs · ${formatCurrency(c.spend)} spent`}</p>
+            ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
           <div class="text-right shrink-0">
-            <p class="text-sm font-bold text-accent-${cpqlColor}">${formatCurrency(c.cptql)}</p>
-            <p class="text-[9px] text-text-muted">CPTQL</p>
+            <p class="text-base font-bold text-accent-${cpqlColor}">${formatCurrency(c.cptql)}</p>
+            <p class="text-[11px] text-text-muted">CPTQL</p>
           </div>
         </div>
-        ${!isDone ? `<div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
-          <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(c.displayName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
-          <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(c.displayName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
-          <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(c.displayName)}')" class="text-[10px] px-2.5 py-1 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
-        </div>` : ''}
+        ${!isDone ? (() => {
+          const makeNoteId = 'note_' + itemId.replace(/[^a-zA-Z0-9]/g, '_');
+          const makeExistingNote = getOracleAction(itemId)?.note || '';
+          return `<div class="mt-2 pt-2 border-t border-gray-100">
+            <div class="flex items-center gap-1.5 mb-1.5">
+              <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(c.displayName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+              <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(c.displayName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+              <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(c.displayName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+            </div>
+            <input type="text" id="${makeNoteId}" placeholder="Add a note..." value="${esc(makeExistingNote)}" onblur="oracleSaveNote('${esc(itemId)}', this.value)" onkeydown="if(event.key==='Enter'){this.blur()}" class="w-full text-[11px] px-3 py-1.5 rounded-lg border border-gray-200 bg-surface-secondary text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none" />
+          </div>`;
+        })() : ''}
       </div>`;
     });
     html += '</div>';
