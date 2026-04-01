@@ -2843,67 +2843,70 @@ function init() {
       }
     }, 50);
   });
-  // ── Section 2 boot: load leads + cost data ──
+  // ── BOOT: Load ALL data first, render ONCE ──
+  // Show loading state immediately
+  document.getElementById('dashboardEmpty').classList.add('hidden');
+  document.getElementById('dashboardContent').classList.remove('hidden');
+  document.getElementById('dataTimestamp').textContent = 'Loading data...';
+
+  // Phase 1: Load from localStorage cache (instant, non-blocking fallback)
   const hasCached = loadCachedData();
-  if (hasCached) {
-    document.getElementById('dashboardEmpty').classList.add('hidden');
-    document.getElementById('dashboardContent').classList.remove('hidden');
-    updateDataStatusLine();
-    console.log(`Boot: cache hit — ${leadsData.length} leads, ${costData.length} cost rows`);
-    buildLookupMaps();
-    // Trigger CRM merge with cached leadsData (fixes 0 TDs when state._crmLeads is empty)
-    if (state.taggerData.length && leadsData.length) { mergeCRMWithMeta(); }
-  }
-  // Fetch fresh data if credentials exist (async, non-blocking)
+  if (hasCached) console.log(`Boot: localStorage cache — ${leadsData.length} leads, ${costData.length} cost`);
+  loadCachedCreatives();
+
+  // Phase 2: Load ALL async data sources in PARALLEL, then render once
   const _bootSheetUrl = localStorage.getItem('gf_sheetUrl');
   const _bootApiKey = localStorage.getItem('gf_googleKey');
-  if (_bootSheetUrl && _bootApiKey) {
-    if (!hasCached) {
-      document.getElementById('dashboardEmpty').classList.add('hidden');
-      document.getElementById('dashboardContent').classList.remove('hidden');
-      document.getElementById('dataTimestamp').textContent = 'Loading data...';
+
+  const bootPromises = [
+    // Supabase: metaAdData (primary spend source, 32K rows)
+    loadCachedAdData().then(ok => { if (ok) console.log(`Boot: ${metaAdData.length} metaAdData rows`); return ok; }).catch(e => { console.error('Boot metaAdData:', e); return false; }),
+    // Supabase: oracle actions (Pause Now/Make More card states)
+    loadOracleActions().catch(e => { console.error('Boot oracle:', e); }),
+    // Google Sheets: CRM leads + cost data (only if credentials exist)
+    (_bootSheetUrl && _bootApiKey)
+      ? fetchSheetData(_bootSheetUrl, _bootApiKey).then(c => { console.log(`Boot: ${c.leads} leads, ${c.cost} cost`); return c; }).catch(e => { console.error('Boot sheets:', e); return null; })
+      : Promise.resolve(null),
+  ];
+
+  Promise.all(bootPromises).then(([metaOk, , sheetsResult]) => {
+    // ALL data loaded — now render exactly once
+    console.log(`Boot: ALL data ready — metaAdData:${metaAdData.length}, leadsData:${leadsData.length}, costData:${costData.length}`);
+
+    // Build lookup maps (tag map, ad name map)
+    buildLookupMaps();
+    if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
+
+    // Invalidate any stale caches from Phase 1 localStorage loads
+    invalidateAdPerfCache();
+
+    // SINGLE RENDER PASS — all data available, no race conditions
+    updateDataStatusLine();
+    navigateTo('dashboard');
+    renderLibrary();
+
+    if (!leadsData.length && !metaAdData.length && !hasCached) {
+      document.getElementById('dashboardEmpty').classList.remove('hidden');
+      document.getElementById('dashboardContent').classList.add('hidden');
     }
-    fetchSheetData(_bootSheetUrl, _bootApiKey).then(counts => {
-      console.log(`Boot: ${counts.leads} leads, ${counts.cost} cost rows`);
-      buildLookupMaps();
-      updateDataStatusLine();
-      // Re-trigger CRM merge now that leadsData is available (fixes 0 TDs when state._crmLeads is empty)
-      if (state.taggerData.length && leadsData.length) { mergeCRMWithMeta(); }
-      if (state.currentView === 'dashboard') try { onDashboardFilterChange(); } catch(e) {}
-    }).catch(e => {
-      console.error('Boot fetch failed:', e);
-      if (hasCached) updateDataStatusLine(); // show cached status
-      else document.getElementById('dataTimestamp').textContent = 'Load failed — check Settings';
-    });
-  } else if (!hasCached) {
-    document.getElementById('dashboardEmpty').classList.remove('hidden');
-  }
-  // Load oracle actions from Supabase (non-blocking)
-  loadOracleActions().then(() => {
-    if (state.currentView === 'dashboard' && leadsData.length) try { renderOracleCardsV2(); } catch(e) {}
-  });
-  // Section 3+4: Meta creatives + daily insights — cache first, then parallel background fetch
-  loadCachedCreatives();
-  loadCachedAdData().then(loaded => {
-    if (loaded) {
-      console.log(`Boot: ${metaAdData.length} ad data rows from cache`);
-      // Critical: invalidate caches and re-render now that metaAdData is available
-      // (first render ran before this async load completed, caching ₹0 spend)
-      invalidateAdPerfCache();
-      if (state.currentView === 'dashboard') onDashboardFilterChange();
+
+    // Background: incremental Meta sync (non-blocking, won't cause re-render race)
+    if (_IS_DEPLOYED) {
+      setTimeout(() => {
+        fetchMetaCreatives();
+        fetchMetaAdInsights();
+      }, 3000); // 3s delay so UI is responsive first
     }
-    if (_IS_DEPLOYED) { fetchMetaCreatives(); fetchMetaAdInsights(); }
+
+    // Legacy: fetch tagger/Meta sheet data + Supabase
+    refreshData();
+    if (state.preferences.refreshInterval > 0) {
+      setInterval(refreshData, state.preferences.refreshInterval);
+    }
   });
-  // Always start on Dashboard
-  navigateTo('dashboard');
-  // Legacy: fetch tagger/Meta sheet data + Supabase (auto-runs on every boot)
-  refreshData();
-  if (state.preferences.refreshInterval > 0) {
-    setInterval(refreshData, state.preferences.refreshInterval);
-  }
-  renderLibrary();
-  // Show onboarding for first-time users (after a short delay so page renders first)
-  setTimeout(showOnboarding, 500);
+
+  // Show onboarding for first-time users
+  setTimeout(showOnboarding, 2000);
 }
 
 // ==================== NAVIGATION ====================
