@@ -8993,7 +8993,7 @@ function updateGenerateMode() {
 
 async function generateContent() {
   const briefOnly = document.getElementById('briefOnlyToggle')?.checked;
-  const useApi = !briefOnly && state.apiKey;
+  const useApi = !briefOnly && (state.apiKey || _IS_DEPLOYED);
   const brief = {
     market: document.getElementById('briefMarket').value,
     platform: getActivePill('platformPills'), format: getActivePill('formatPills'),
