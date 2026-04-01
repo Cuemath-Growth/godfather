@@ -4323,7 +4323,9 @@ function getAdPerformance(market, startDate, endDate) {
   if (_adPerfCache.key === cacheKey && _adPerfCache.data.length) return _adPerfCache.data;
 
   // Step 1: Lead metrics per ad (from leadsData, date-aware, cohort counting)
+  // Join key: try mx_utm_adcontent first, then mx_utm_term (which often contains the exact Meta ad name)
   const leadMap = {}; // key: normalizedAdName → metrics
+  const leadAliasMap = {}; // secondary key (from utm_term) → primary key (from adcontent)
   const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
   filteredLeads.forEach(r => {
     const d = r.lead_created_date || '';
@@ -4339,6 +4341,11 @@ function getAdPerformance(market, startDate, endDate) {
     if (String(r.paid) === '1') e.enrolled++;
     if (String(r.invalid) === '1') e.invalid++;
     if ((r.ethnicity || '').toLowerCase().includes('nri')) e.nri++;
+    // Register utm_term as alias if it looks like an ad name (not numeric, not empty, not keyword)
+    const termKey = normalizeAdName(r.mx_utm_term || '');
+    if (termKey && termKey !== key && termKey.length > 30 && !/^\d+$/.test(termKey)) {
+      leadAliasMap[termKey] = key;
+    }
   });
   // Clamp: TD ≤ QL, Enrolled ≤ TD
   Object.values(leadMap).forEach(e => { e.td = Math.min(e.td, e.ql); e.enrolled = Math.min(e.enrolled, e.td); });
@@ -4376,11 +4383,14 @@ function getAdPerformance(market, startDate, endDate) {
   });
 
   // Step 4: Union join — all ad names from both sides
+  // Use alias map: if a Meta ad name matches a utm_term alias, link it to the CRM lead entry
   const allKeys = new Set([...Object.keys(leadMap), ...Object.keys(spendMap)]);
   const results = [];
 
   allKeys.forEach(key => {
-    const lead = leadMap[key] || { adName: '', campaign: '', ql: 0, td: 0, enrolled: 0, nri: 0, invalid: 0, totalLeads: 0, _market: '' };
+    // Try direct match first, then alias (utm_term → adcontent mapping)
+    const aliasKey = leadAliasMap[key];
+    const lead = leadMap[key] || (aliasKey ? leadMap[aliasKey] : null) || { adName: '', campaign: '', ql: 0, td: 0, enrolled: 0, nri: 0, invalid: 0, totalLeads: 0, _market: '' };
     const spend = spendMap[key] || null;
     const tag = _tagMap[key] || {};
 
