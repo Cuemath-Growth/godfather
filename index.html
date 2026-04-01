@@ -6961,7 +6961,8 @@ function renderOracleCardsV2() {
     _spendSource: r._spendSource,
     _hasCRM: r._hasCRM,
   }));
-  const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
+  const _pm0 = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0 ? getPortfolioMetrics(market, from, to) : null;
+  const avgCPTQL = _pm0 ? (_pm0.cptql || 20000) : (getQL() > 0 ? getSpend() / getQL() : 20000);
 
   const isPaused = (adName) => {
     const key = normalizeAdName(adName);
@@ -7085,7 +7086,7 @@ function renderOracleCardsV2() {
 
   // ── MAKE MORE: multi-signal — efficient + right audience + converting ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
-  const portfolioCPTQL = getQL() > 0 ? getSpend() / getQL() : Infinity;
+  const portfolioCPTQL = _pm0 ? (_pm0.cptql || Infinity) : (getQL() > 0 ? getSpend() / getQL() : Infinity);
   const avgNriPct = (() => { const us = adCampData.filter(a => a.market === 'US' && a.ql >= 3); return us.length ? us.reduce((s, a) => s + a.nriPct, 0) / us.length : 0.5; })();
   const avgQlToTd = (() => { const withTd = adCampData.filter(a => a.ql >= 5); return withTd.length ? withTd.reduce((s, a) => s + a.qlToTdPct, 0) / withTd.length : 0.1; })();
 
@@ -7851,9 +7852,11 @@ function renderMetricTicker() {
     }
   }
 
-  // Section 2: all metrics from leadsData + costData
+  // Use getPortfolioMetrics when available (clean data layer), fallback to getMarketMetrics (legacy)
   const market = dashCountry === 'all' ? null : dashCountry;
-  const m = getMarketMetrics(market, from || undefined, to || undefined);
+  const _usePortfolio = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
+  const pm = _usePortfolio ? getPortfolioMetrics(market, from, to) : null;
+  const m = _usePortfolio ? { spend: pm.spend, ql: pm.ql, tql: pm.tql, td: pm.td, enrolled: pm.paid, cptql: pm.cptql, cptd: pm.cptd, cac: pm.cac, ql_td_pct: pm.qlTdPct / 100, nri: pm.nri, revenue: 0, invalid: 0, ts: 0, asian: 0, roas: null } : getMarketMetrics(market, from || undefined, to || undefined);
   const totalSpend = m.spend;
   const cptql = m.cptql || 0;
   const cptd = m.cptd || 0;
@@ -7861,7 +7864,7 @@ function renderMetricTicker() {
   const tqlTdPct = m.ql_td_pct ? m.ql_td_pct * 100 : 0;
   const roas = m.roas ? m.roas.toFixed(2) : null;
   // Compat shim so the rest of renderMetricTicker keeps working
-  const crm = { ql: m.ql, tql: m.tql, td: m.td, paid: m.enrolled, revenue: m.revenue, invalid: m.invalid, ts: m.ts, nri: m.nri, asian: m.asian };
+  const crm = { ql: m.ql, tql: m.tql, td: m.td, paid: m.enrolled, revenue: m.revenue || 0, invalid: m.invalid || 0, ts: m.ts || 0, nri: m.nri || 0, asian: m.asian || 0 };
 
   if (totalSpend > 0 || crm.td > 0) {
     // ── PRIOR PERIOD for trends ──
@@ -7876,9 +7879,9 @@ function renderMetricTicker() {
       const pf = priorFrom.toISOString().slice(0,10), pt = priorTo.toISOString().slice(0,10);
       const _fmtD = d => { const _m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const _d=new Date(d); return _m[_d.getMonth()]+' '+_d.getDate(); };
       priorLabel = `vs ${_fmtD(pf)} – ${_fmtD(pt)}`;
-      const pm = getMarketMetrics(market, pf, pt);
-      priorSpend = pm.spend;
-      priorCrm = { tql: pm.tql, td: pm.td, paid: pm.enrolled, ql: pm.ql, revenue: pm.revenue };
+      const _pm = _usePortfolio ? getPortfolioMetrics(market, pf, pt) : getMarketMetrics(market, pf, pt);
+      priorSpend = _pm.spend;
+      priorCrm = { tql: _pm.tql, td: _pm.td, paid: _pm.paid || _pm.enrolled, ql: _pm.ql, revenue: _pm.revenue || 0 };
     }
     const priorCptd = priorCrm.td > 0 && priorSpend > 0 ? priorSpend / priorCrm.td : 0;
     const priorCptql = priorCrm.tql > 0 && priorSpend > 0 ? priorSpend / priorCrm.tql : 0;
@@ -7905,8 +7908,8 @@ function renderMetricTicker() {
     let bestGeo = '', worstGeo = '', bestCptd = Infinity, worstCptd = 0;
     if (dashCountry === 'all') {
       ['US','India','AUS','MEA','UK'].forEach(g => {
-        const gm = getMarketMetrics(g, from || undefined, to || undefined);
-        if (gm.td > 2 && gm.spend > 0) {
+        const gm = _usePortfolio ? getPortfolioMetrics(g, from, to) : getMarketMetrics(g, from || undefined, to || undefined);
+        if ((gm.td || 0) > 2 && gm.spend > 0) {
           const gc = gm.spend / gm.td;
           if (gc < bestCptd) { bestCptd = gc; bestGeo = g; }
           if (gc > worstCptd) { worstCptd = gc; worstGeo = g; }
