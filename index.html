@@ -10935,11 +10935,13 @@ function renderLensAggregateMetrics() {
   const geoFilter = (state.currentView === 'intel') ? intelGeo : taggerGeo;
   const resolvedGeo = geoFilter;
 
-  // Section 2: costData + leadsData — same source as Dashboard KPI cards
-  if (!leadsData.length) return;
+  // Use getPortfolioMetrics (clean data layer) when available
+  if (!leadsData.length && !metaAdData.length) return;
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
-  const m = getMarketMetrics(resolvedGeo === 'all' ? null : resolvedGeo, fromDate, toDate);
+  const _market = resolvedGeo === 'all' ? null : resolvedGeo;
+  const _usePM = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
+  const m = _usePM ? (() => { const p = getPortfolioMetrics(_market, fromDate, toDate); return { spend: p.spend, ql: p.ql, tql: p.tql, td: p.td, enrolled: p.paid, cptql: p.cptql, cptd: p.cptd, cac: p.cac }; })() : getMarketMetrics(_market, fromDate, toDate);
   if (!m || m.spend === 0) return;
   const srcLabel = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All time';
 
@@ -10981,20 +10983,22 @@ function showTaggerResults() {
   // Show export/backup buttons + thumbnail status
   const _expBtn = document.getElementById('taggerExportBtn'); if (_expBtn) _expBtn.style.display = '';
   const _bkpBtn = document.getElementById('taggerBackupBtn'); if (_bkpBtn) _bkpBtn.style.display = '';
-  const _tc = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+  const _taggerSource = metaAdData.length > 0 ? getAdPerformance(null, null, null) : (state.taggerData || []);
+  const _tc = _taggerSource.filter(c => c['thumbnail_url'] || c['image_url']).length;
   const _te = document.getElementById('taggerThumbCount');
   if (_te) _te.textContent = _tc > 0 ? `${_tc} thumbnails` : 'No thumbnails';
   const _tb = document.getElementById('taggerThumbBtn');
-  if (_tb) _tb.classList.toggle('hidden', _tc > state.taggerData.length * 0.5);
+  if (_tb) _tb.classList.toggle('hidden', _tc > _taggerSource.length * 0.5);
   // Render accurate aggregate metrics from perf tracker + CRM
   renderLensAggregateMetrics();
   // Match tagged ads to Library source assets
   matchAdsToLibrary();
   renderTaggerInsights();
   renderActiveTaggerTab();
-  // Auto-run Sentinel on new data (Sentinel reads tagger data for funnel analysis)
-  if (state.taggerData.length) {
-    state.sentinelOutput = runSentinelAnalysis(state.taggerData, 'US');
+  // Auto-run Sentinel on new data — use clean data layer when available
+  const _sentinelData = metaAdData.length > 0 ? getAdPerformance(null, null, null) : state.taggerData;
+  if (_sentinelData.length) {
+    state.sentinelOutput = runSentinelAnalysis(_sentinelData, 'US');
     saveState('sentinelOutput', state.sentinelOutput);
     // Auto-refresh Lens Creative Intel after Sentinel completes
     if (document.getElementById('ciContent')) renderCreativeIntel();
