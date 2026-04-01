@@ -2610,6 +2610,15 @@ const PATTERN_LIBRARY = {
     { name: 'Understanding vs Memorization', structure: 'Hook: "Your child passes tests... but can they explain WHY?" > Problem: memorization fragility > Solution: Cuemath conceptual approach > Proof: parent quote > CTA' },
     { name: 'Productive Struggle', structure: 'Hook: "What if struggling IS the learning?" > Problem: parents rescue too fast > Solution: Cuemath productive struggle method > Proof: neuroscience backing > CTA' },
     { name: 'AI World Readiness', structure: 'Hook: "AI can calculate. Can your child think?" > Problem: calculator dependency > Solution: MathFit thinking skills > Proof: future-ready framing > CTA' },
+    { name: 'PAS (Problem-Agitate-Solution)', structure: 'Hook: name specific problem > Agitate: consequences if ignored > Solution: Cuemath system > Proof > CTA. From SOP copywriting formulas.' },
+    { name: 'BAB (Before-After-Bridge)', structure: 'Before: current struggle > After: transformation vision > Bridge: how Cuemath gets them there > CTA' },
+    { name: 'Myth vs Reality', structure: 'Hook: common myth ("math is about memorizing formulas") > Reality reveal > Cuemath approach > Proof > CTA' },
+    { name: 'Social Proof / Quirky', structure: '0-4s: meme or bold stat > 4-20s: rapid-cut proof cards > 20-30s: VO explains method > End card + CTA. High-retention format.' },
+    { name: 'Topic-Wise Fix', structure: 'Hook: name specific topic (fractions, decimals, algebra) > Show the gap > Cuemath topicwise approach > Before/after > CTA' },
+  ],
+  'US': [
+    { name: 'Competition Prep', structure: 'Hook: "AMC 8 / Math Kangaroo / MOEMS" > Problem: generic tutoring not enough > Solution: trained competition tutors > Proof: student results > CTA' },
+    { name: 'NRI Parent Relief', structure: 'Hook: relatable NRI parenting moment > "Back home we had..." > Cuemath brings Indian tutor quality online > Community proof > CTA' },
   ],
 },
 'AI Video': {
@@ -2623,6 +2632,10 @@ const PATTERN_LIBRARY = {
   '_universal': [
     { name: '9-Scene Template', structure: 'Hook (pattern interrupt) > Personal connection ("As a parent...") > Problem reveal (specific struggle) > Discovery ("A friend told me about...") > First experience ("The first class...") > Specific result ("Within 3 months...") > Broader benefit ("Now she actually enjoys...") > Social proof ("400K+ parents") > CTA ("Link in bio")' },
     { name: 'Day in My Life', structure: 'Daily routine context > Math homework moment > Cuemath class clip > Child confidence moment > Parent reflection > CTA' },
+    { name: 'BEAT Format (60-75s organic)', structure: 'BEAT 1 (0-20s): Organic lifestyle opening, no product > BEAT 2 (20-35s): Natural pivot to child starting class > BEAT 3 (35-50s): Finding Cuemath — dedicated tutor, personalized curriculum > BEAT 4 (50-62s): Learning moment — child demonstrates thinking > BEAT 5 (62-70s): CTA + end card' },
+    { name: 'Vox Pop Format', structure: 'Parent holds mic to child > Quiz-style math questions > Child demonstrates thinking > "See? That\'s what Cuemath does" > CTA' },
+    { name: 'POV/Vlog Format', structure: 'POV: "You\'re a [grade] grader..." > Direct to camera selfie-style > Show math moment > Friend recommends Cuemath > Transformation > CTA' },
+    { name: 'Talking Points (Unscripted)', structure: '5 categories: 1) Primary USP (3 phrases), 2) What is Cuemath (2-3 lines), 3) Secondary USP (3 benefits), 4) MathFit philosophy, 5) Personal outcome. CTA: free trial + link in bio' },
   ],
 },
 'UGC Ad': {
@@ -2641,6 +2654,16 @@ const PATTERN_LIBRARY = {
   '_universal': [
     { name: 'Brand Search Pattern', structure: '3+ headlines with "Cuemath" > Value props (1:1, Top Tutors, Personalized) > Trust signals (400K parents, 4.9 rating) > CTA headlines' },
     { name: 'Keyword Search Pattern', structure: 'Intent-matching headlines (no brand required) > Problem-aware descriptions > Solution-oriented > CTA' },
+    { name: 'Proven Brand Headlines (from live campaigns)', structure: 'Cuemath - Online Math Tuition | Math Class That Builds Toppers | Cuemath: Kids Math Tutoring | B to A+ Made Easy with Cuemath | Learn Math 1:1 with Cuemath | Top Tutors for Math at Cuemath | 4L+ Parents Trust Cuemath | Cuemath Rated 4.9★ by Parents' },
+    { name: 'Proven Keyword Headlines', structure: 'Online Math Tutoring for Kids | Personalized Math Help | Math Tutoring for Class K-8 | Stop Your Child Fearing Math | 1-On-1 Math Online Classes | Crack Online Math Like a Pro | Sign Up For Free Demo Class' },
+    { name: 'PMax Asset Pattern', structure: 'Mix 5 headline styles: Brand+Value, Proof+Trust, Benefit+Outcome, Question+Pain, CTA+Urgency. Long headlines: expand with specific grade/curriculum. Descriptions: alternate emotional vs rational' },
+    { name: 'DGen Pattern', structure: 'Conversational headline (benefit-first) > Visual: parent-child moment or platform screenshot > Description: 1 sentence problem + 1 sentence solution > LP: signup or trial page' },
+  ],
+  'India': [
+    { name: 'India Brand Keywords', structure: 'Top CBSE & ICSE Cuemath Tutors | Master School Math with Cuemath | Boost Math Marks With Cuemath | Cuemath Classes For CBSE Math | Cuemath Classes For ICSE Math | 95% Saw Results With Cuemath' },
+  ],
+  'US': [
+    { name: 'US Brand Keywords', structure: 'We Turn Kids Into Math Toppers | Best Online Classes For Kids | 1:1 Online Math Coaching | Online Math class for A+ Grade | Flexible, Results-Driven Math | Learn From Indian Math Experts' },
   ],
 },
 'Product Video': {
@@ -8948,9 +8971,18 @@ async function generateContent() {
       .join(', ');
   }
 
+  // Get feedback loop context
+  const feedbackCtx = getForgeFeedbackContext(brief);
+  let feedbackLine = '';
+  if (feedbackCtx) {
+    const won = JSON.parse(localStorage.getItem('gf_forgeFeedback') || '[]').filter(f => f.status === 'won' && f.format === brief.format).length;
+    const deployed = JSON.parse(localStorage.getItem('gf_forgeFeedback') || '[]').filter(f => f.status === 'deployed' && f.format === brief.format).length;
+    if (won || deployed) feedbackLine = `\n**Feedback:** ${won} won, ${deployed} deployed for this format. Avoid repeating deployed angles.`;
+  }
+
   const briefText = `**BRIEF** — ${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}
 **Market:** ${brief.market} | **Platform:** ${brief.platform} | **ICP:** ${brief.icpType}
-**Segment:** ${brief.segment} | **Funnel:** ${brief.funnel}${brief.angle ? '\n**Angle:** ' + brief.angle : ''}${brief.offer ? '\n**Offer:** ' + brief.offer : ''}${winningCtx}${perfCtx}`;
+**Segment:** ${brief.segment} | **Funnel:** ${brief.funnel}${brief.angle ? '\n**Angle:** ' + brief.angle : ''}${brief.offer ? '\n**Offer:** ' + brief.offer : ''}${winningCtx}${perfCtx}${feedbackLine}`;
 
   // Show brief in the output panel
   document.getElementById('generateEmpty').classList.add('hidden');
@@ -9010,7 +9042,8 @@ function getCurrentBriefFull() {
     patterns: getPatternContext(brief),
     outputTemplate: getFormatOutputTemplate(brief.format, brief.subFormat),
     winningFormula: state.activeWinningFormula || null,
-    sentinel: state.sentinelOutput ? { top: state.sentinelOutput.top_performers?.slice(0,5), bottom: state.sentinelOutput.bottom_performers?.slice(0,5) } : null
+    sentinel: state.sentinelOutput ? { top: state.sentinelOutput.top_performers?.slice(0,5), bottom: state.sentinelOutput.bottom_performers?.slice(0,5) } : null,
+    feedback: getForgeFeedbackContext(brief)
   };
 }
 
@@ -9705,9 +9738,73 @@ function setForgeStatus(status) {
   latest.statusDate = new Date().toISOString();
   saveState('generationHistory', state.generationHistory);
   document.querySelectorAll('.forge-status-btn').forEach(b => b.style.opacity = '0.4');
-  event.target.style.opacity = '1';
-  event.target.style.ring = '2px';
+  if (event?.target) { event.target.style.opacity = '1'; }
   showToast(`Marked as ${status}`);
+
+  // FEEDBACK LOOP: when "deployed" or "won", save to Supabase for tracking
+  if (status === 'deployed' || status === 'won') {
+    const brief = latest.brief || {};
+    const feedbackRow = {
+      id: latest.id,
+      format: brief.format || '',
+      sub_format: brief.subFormat || '',
+      market: brief.market || '',
+      platform: brief.platform || '',
+      icp_type: brief.icpType || '',
+      segment: brief.segment || '',
+      angle: brief.angle || '',
+      status: status,
+      created_at: latest.date || new Date().toISOString(),
+      deployed_at: new Date().toISOString(),
+      content_preview: (latest.content || '').substring(0, 500)
+    };
+    supabaseUpsert('forge_feedback', [feedbackRow]).catch(() => {});
+    // Also save locally
+    const feedback = JSON.parse(localStorage.getItem('gf_forgeFeedback') || '[]');
+    feedback.push(feedbackRow);
+    localStorage.setItem('gf_forgeFeedback', JSON.stringify(feedback.slice(-100)));
+  }
+}
+
+// ---- Feedback Loop: get past generation performance for the brief builder ----
+function getForgeFeedbackContext(brief) {
+  const feedback = JSON.parse(localStorage.getItem('gf_forgeFeedback') || '[]');
+  if (!feedback.length) return '';
+
+  // Filter to same format + market
+  const relevant = feedback.filter(f =>
+    (f.format === brief.format || !brief.format) &&
+    (f.market === brief.market || !brief.market)
+  );
+  if (!relevant.length) return '';
+
+  const deployed = relevant.filter(f => f.status === 'deployed');
+  const won = relevant.filter(f => f.status === 'won');
+
+  let ctx = '\n\n## PAST GENERATION FEEDBACK\n';
+  ctx += `${deployed.length} deployed, ${won.length} marked as won for ${brief.format || 'all formats'} in ${brief.market || 'all markets'}.\n`;
+
+  // Show winning angles
+  if (won.length) {
+    ctx += '\n**Winning angles (marked "Won"):**\n';
+    won.slice(-5).forEach(w => {
+      ctx += `- ${w.format}${w.sub_format ? ' > ' + w.sub_format : ''} | ${w.segment} | "${w.angle || 'no angle'}" (${new Date(w.deployed_at).toLocaleDateString()})\n`;
+    });
+  }
+
+  // Show deployed angle frequency
+  const angleCounts = {};
+  deployed.forEach(d => {
+    const key = d.angle || d.segment || 'Generic';
+    angleCounts[key] = (angleCounts[key] || 0) + 1;
+  });
+  const topAngles = Object.entries(angleCounts).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  if (topAngles.length) {
+    ctx += '\n**Most deployed angles:** ' + topAngles.map(([a,c]) => `${a} (${c}x)`).join(', ') + '\n';
+    ctx += 'Try a DIFFERENT angle from these to avoid creative fatigue.\n';
+  }
+
+  return ctx;
 }
 
 // ==================== REFINEMENT ====================
