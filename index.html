@@ -1040,22 +1040,22 @@
 
       <!-- ========== LIBRARY VIEW ========== -->
       <div id="view-library" class="view hidden p-6">
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded-lg bg-gradient-warm flex items-center justify-center">
               <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
             </div>
             <div>
-              <h2 class="text-lg font-bold" style="display:none">Library</h2>
-              <p class="text-xs text-text-muted" style="display:none">Your creative assets</p>
+              <h2 class="text-lg font-bold">Creative Library</h2>
+              <p class="text-[10px] text-text-muted" id="librarySummaryLine">Your creative assets</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
-          <button onclick="fetchLibrarySheet().then(()=>renderLibrary())" class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200">Refresh</button>
           <select id="libraryFilter" style="display:none" onchange="renderLibrary()">
             <option value="all">All Geos</option>
             <option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="APAC">APAC</option><option value="India">India</option><option value="UK">UK</option>
           </select>
+          <input id="librarySearch" type="text" placeholder="Search creatives..." class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 w-48" oninput="renderLibrary()" />
           <select id="libraryTypeFilter" class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none" onchange="renderLibrary()">
             <option value="all">All Formats</option>
             <option value="Static">Statics</option>
@@ -1063,27 +1063,29 @@
             <option value="Testimonial">Testimonials</option>
           </select>
           <select id="librarySort" class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none" onchange="renderLibrary()">
-            <option value="cptd">Sort: CPTD (best)</option>
-            <option value="spend">Sort: Spend (highest)</option>
-            <option value="newest">Sort: Newest</option>
+            <option value="newest">Newest first</option>
+            <option value="name">Name A-Z</option>
+            <option value="format">By format</option>
           </select>
           <button onclick="tagUnanalysedLibrary()" id="tagUnanalysedBtn" class="px-3 py-2 rounded-xl text-sm font-semibold bg-gradient-cool text-white hover:opacity-90 transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
             Tag Unanalysed
           </button>
+          <button onclick="fetchLibrarySheet().then(()=>renderLibrary())" class="btn-secondary p-2 rounded-lg border border-gray-200" title="Refresh">
+            <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          </button>
           <button onclick="openUploadDrawer()" class="px-3 py-2 rounded-xl text-sm font-semibold bg-accent-purple text-white hover:opacity-90 transition flex items-center gap-1.5">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Add Creative
+            Add
           </button>
           </div>
         </div>
-        <p class="text-[9px] text-text-muted mb-2" id="libraryLegend" style="display:none">&check; = live in market</p>
         <div id="libraryLoading" class="text-center py-16">
           <div class="w-12 h-12 rounded-2xl bg-gradient-warm flex items-center justify-center mx-auto mb-3 animate-pulse"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></div>
           <p class="text-sm text-text-muted">Loading library...</p>
           <div class="flex justify-center gap-1 mt-2"><div class="w-2 h-2 bg-accent-purple rounded-full dot-bounce"></div><div class="w-2 h-2 bg-accent-blue rounded-full dot-bounce" style="animation-delay:0.15s"></div><div class="w-2 h-2 bg-accent-teal rounded-full dot-bounce" style="animation-delay:0.3s"></div></div>
         </div>
-        <div id="libraryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        <div id="libraryGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div>
         <div id="libraryEmpty" class="text-center py-16 hidden">
           <div class="w-16 h-16 rounded-2xl bg-surface-tertiary flex items-center justify-center mx-auto mb-4">
             <svg class="w-8 h-8 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
@@ -2968,6 +2970,7 @@ function navigateTo(view) {
     if (le) le.classList.add('hidden');
     if (lg) lg.innerHTML = '';
     if (!state._libraryDeployments) loadLibraryDeployments().catch(() => {});
+    if (!state._libraryNotes) loadLibraryNotes().catch(() => {});
     fetchLibrarySheet(); startLibraryPolling();
   } else { stopLibraryPolling(); }
   // Auto-compute winning formula when switching to generate
@@ -13941,14 +13944,20 @@ function applyLibraryTagCache() {
 }
 
 // ---- Cross-reference Library creatives with Lens tagger data ----
+// Library redesign: only keep CRM-matched ads (QL>0 or TD>0) so we don't show ₹4L / 0 QLs.
+// Performance data is NOT shown on cards — this match is for tags + thumbnails only.
 function matchLibraryToLens(libraryCards) {
   if (!libraryCards.length) return libraryCards;
-  // Use getAdPerformance (clean data layer) when available, fallback to tagger
   const { from, to } = getGlobalDateRange();
   const perfAvailable = typeof getAdPerformance === 'function' && metaAdData.length > 0;
-  const cleanData = perfAvailable ? getAdPerformance(null, from, to) : (state.taggerData?.length ? sanitizeTaggerData(state.taggerData) : []);
+  const rawData = perfAvailable ? getAdPerformance(null, from, to) : (state.taggerData?.length ? sanitizeTaggerData(state.taggerData) : []);
+  // FILTER: only ads with CRM match (QL > 0 or TD > 0)
+  const cleanData = rawData.filter(c => {
+    const ql = parseFloat(c['QL']||c['ql']||0) || 0;
+    const td = parseFloat(c['TD']||c['td']||0) || 0;
+    return ql > 0 || td > 0;
+  });
   if (!cleanData.length) return libraryCards;
-  // Build tokenized index of tagger creatives — uses full dataset (Library shows all-time creative performance)
   const tokenize = s => (s||'').toLowerCase().replace(/[+&]/g, '_').split(/[_\-\s]+/).filter(t => t.length >= 3 && !/^\d+$/.test(t));
   const taggerIndex = cleanData.map(c => ({
     tokens: tokenize(c['Ad name'] || c['Creative name'] || ''),
@@ -13958,9 +13967,7 @@ function matchLibraryToLens(libraryCards) {
   libraryCards.forEach(card => {
     const libTokens = tokenize(card.name);
     if (!libTokens.length) return;
-    // Find best tagger match by token overlap
     let bestMatch = null, bestScore = 0, bestSpend = 0;
-    // Aggregate across all matching tagger entries (same creative, multiple ad sets)
     const matches = [];
     for (const t of taggerIndex) {
       const setA = new Set(libTokens), setB = new Set(t.tokens);
@@ -13979,89 +13986,64 @@ function matchLibraryToLens(libraryCards) {
       }
     }
     if (!bestMatch) return;
-    // Aggregate metrics across all matching ads
-    let totalSpend = 0, totalQL = 0, totalTQL = 0, totalTD = 0, totalNRI = 0;
-    const audienceCounts = {};
-    matches.forEach(m => {
-      totalSpend += parseFloat(m['Spent']||m['spent']||0) || 0;
-      totalQL += parseFloat(m['QL']||m['ql']||0) || 0;
-      totalTQL += parseFloat(m['TQL']||m['tql']||0) || 0;
-      totalTD += parseFloat(m['TD']||m['td']||0) || 0;
-      totalNRI += parseFloat(m['NRI']||m['nri']||0) || 0;
-      // Track which audiences this creative was shown to
-      const aud = extractAudience(m);
-      if (!audienceCounts[aud]) audienceCounts[aud] = { spend: 0, td: 0, ql: 0 };
-      audienceCounts[aud].spend += parseFloat(m['Spent']||m['spent']||0) || 0;
-      audienceCounts[aud].td += parseFloat(m['TD']||m['td']||0) || 0;
-      audienceCounts[aud].ql += parseFloat(m['QL']||m['ql']||0) || 0;
-    });
-    // Find the audience where this creative performed best (lowest CPTD with >=1 TD, or most QLs)
-    let bestAudience = '', bestAudCPTD = Infinity;
-    Object.entries(audienceCounts).forEach(([aud, d]) => {
-      if (d.td >= 1 && d.spend / d.td < bestAudCPTD) { bestAudCPTD = d.spend / d.td; bestAudience = aud; }
-    });
-    if (!bestAudience) { // fallback: audience with most QLs
-      let maxQL = 0;
-      Object.entries(audienceCounts).forEach(([aud, d]) => { if (d.ql > maxQL) { maxQL = d.ql; bestAudience = aud; } });
-    }
+    // Only attach tags + thumbnail — NO perf metrics on Library cards
     card._lensMatch = {
       tags: bestMatch.tags || null,
-      spend: totalSpend,
-      ql: totalQL,
-      tql: totalTQL,
-      td: totalTD,
-      nri: totalNRI,
-      cptql: totalQL > 0 ? totalSpend / totalQL : 0,
-      cptd: totalTD > 0 ? totalSpend / totalTD : 0,
-      adCount: matches.length,
-      market: bestMatch._market || '',
-      creativeType: bestMatch['Creative type'] || '',
       thumbnail_url: bestMatch.thumbnail_url || bestMatch.image_url || '',
-      ad_title: bestMatch.ad_title || '',
-      ad_body: bestMatch.ad_body || '',
-      bestAudience: bestAudience,
-      bestAudCPTD: bestAudCPTD < Infinity ? bestAudCPTD : 0,
-      audiences: audienceCounts
+      creativeType: bestMatch['Creative type'] || '',
+      adCount: matches.length
     };
   });
   return libraryCards;
 }
 
-// ---- Recommend best audience for a creative based on similar ads' performance ----
-const _audRecCache = {};
-function recommendAudienceForCreative(hookType, format) {
-  if (!state.taggerData?.length) return null;
-  const cacheKey = `${hookType||''}|${format||''}`;
-  if (_audRecCache[cacheKey] !== undefined) return _audRecCache[cacheKey];
-  const audPerf = {};
-  state.taggerData.forEach(c => {
-    const tags = c.tags || {};
-    const cHook = tags.hook_type || '';
-    const cFmt = (c['Creative type']||'').toLowerCase();
-    // Match by hook type OR format
-    const hookMatch = hookType && cHook === hookType;
-    const fmtMatch = format && ((format.toLowerCase() === 'video' && cFmt.includes('video')) || (format.toLowerCase() !== 'video' && !cFmt.includes('video')));
-    if (!hookMatch && !fmtMatch) return;
-    const aud = extractAudience(c);
-    const spend = parseNumber(c['Spent']||c['spent']||0);
-    const td = parseNumber(c['TD']||c['td']||0);
-    const ql = parseNumber(c['QL']||c['ql']||0);
-    if (!audPerf[aud]) audPerf[aud] = { spend: 0, td: 0, ql: 0, count: 0 };
-    audPerf[aud].spend += spend;
-    audPerf[aud].td += td;
-    audPerf[aud].ql += ql;
-    audPerf[aud].count++;
-  });
-  // Find audience with best CPTD (min 2 TDs for significance)
-  let best = null, bestCPTD = Infinity;
-  Object.entries(audPerf).forEach(([aud, d]) => {
-    if (d.td >= 2 && d.spend > 0) {
-      const cptd = d.spend / d.td;
-      if (cptd < bestCPTD) { bestCPTD = cptd; best = { audience: aud, cptd: cptd, ads: d.count, tds: Math.round(d.td) }; }
+// ---- Library Notes (Supabase) ----
+// state._libraryNotes = { creative_name: { note, updated_at } }
+async function loadLibraryNotes() {
+  try {
+    const rows = await supabaseGet('library_notes', 'select=*');
+    if (rows && rows.length) {
+      state._libraryNotes = {};
+      rows.forEach(r => { state._libraryNotes[r.creative_name] = { note: r.note, updated_at: r.updated_at }; });
+      return;
     }
-  });
-  _audRecCache[cacheKey] = best;
-  return best;
+  } catch(e) { console.warn('loadLibraryNotes:', e.message); }
+  // Fallback: localStorage
+  try { state._libraryNotes = JSON.parse(localStorage.getItem('gf_libraryNotes') || '{}'); } catch(_) { state._libraryNotes = {}; }
+}
+
+let _noteSaveTimeout = {};
+function saveLibraryNote(creativeName, noteText) {
+  if (!state._libraryNotes) state._libraryNotes = {};
+  state._libraryNotes[creativeName] = { note: noteText, updated_at: new Date().toISOString() };
+  localStorage.setItem('gf_libraryNotes', JSON.stringify(state._libraryNotes));
+  // Debounced Supabase save
+  if (_noteSaveTimeout[creativeName]) clearTimeout(_noteSaveTimeout[creativeName]);
+  _noteSaveTimeout[creativeName] = setTimeout(async () => {
+    const id = Math.abs(hashCode(creativeName));
+    await supabaseUpsert('library_notes', [{ id, creative_name: creativeName, note: noteText, updated_at: new Date().toISOString() }]);
+  }, 1500);
+}
+
+// ---- Library Tag Edit ----
+function editLibraryTag(creativeName, tagKey, currentValue) {
+  const TAG_OPTIONS = {
+    hook_type: ['Math Anchor', 'Social Proof', 'Testimonial', 'Fear/Urgency', 'Offer/Price', 'Authority', 'Question Hook', 'Seasonal/Event', 'Problem-Solution', 'Curiosity'],
+    pain_benefit: ['Confidence', 'Grades & School', 'Tutor Quality', 'Personalization', 'Thinking vs Calculating', 'Fun & Engagement', 'Competition Prep', 'Foundation Building', 'Parent Peace of Mind'],
+    emotional_tone: ['Confident', 'Aspirational', 'Empathetic', 'Urgent', 'Playful', 'Authoritative', 'Warm', 'Inspirational'],
+    icp_target: ['NRI Parents', 'All Audiences', 'Non-NRI Parents', 'Asian Parents', 'Tamil Speaking', 'Hindi Speaking', 'Telugu Speaking', 'Gujarati Speaking']
+  };
+  const options = TAG_OPTIONS[tagKey];
+  if (!options) return;
+  const newVal = prompt(`Edit ${tagKey.replace(/_/g, ' ')} for "${creativeName}":\n\nOptions: ${options.join(', ')}\n\nCurrent: ${currentValue || 'none'}`, currentValue || '');
+  if (newVal === null) return;
+  const cache = JSON.parse(localStorage.getItem('gf_libraryTagCache') || '{}');
+  if (!cache[creativeName]) cache[creativeName] = {};
+  cache[creativeName][tagKey] = newVal;
+  localStorage.setItem('gf_libraryTagCache', JSON.stringify(cache));
+  applyLibraryTagCache();
+  renderLibrary();
+  showToast(`Updated ${tagKey.replace(/_/g, ' ')} for "${creativeName.substring(0, 30)}..."`);
 }
 
 // ---- Normalize sheet row to a standard card object ----
@@ -14107,317 +14089,202 @@ function normalizeLibraryRow(row) {
   };
 }
 
-// ---- Render Library ----
+// ---- Render Library (Redesigned: operational creative tracker) ----
 function renderLibrary() {
   const filter = document.getElementById('libraryFilter').value;
   const typeFilter = document.getElementById('libraryTypeFilter')?.value || 'all';
+  const searchQuery = (document.getElementById('librarySearch')?.value || '').toLowerCase().trim();
   const grid = document.getElementById('libraryGrid');
   const empty = document.getElementById('libraryEmpty');
   const loading = document.getElementById('libraryLoading');
+  const summaryLine = document.getElementById('librarySummaryLine');
   if (loading) loading.classList.add('hidden');
   const GEO_BADGE = {US:'purple',AUS:'green',MEA:'orange',APAC:'blue',India:'pink'};
 
-  // Use sheet data if available, otherwise fallback to CREATIVE_ASSETS
   const useSheet = state._librarySheet && state._librarySheet.length > 0;
   let sheetCards = useSheet ? state._librarySheet.map(normalizeLibraryRow).filter(c => c.name) : [];
-  // Cross-reference with Lens tagger data for tags + performance
+  // Cross-reference with Lens data (for tags + thumbnails only, CRM-matched ads only)
   sheetCards = matchLibraryToLens(sheetCards);
-  // Apply content type filter (Static/Video/Testimonial)
-  if (typeFilter !== 'all') {
-    sheetCards = sheetCards.filter(c => c.contentType === typeFilter);
-  }
-  let legacyAssets = useSheet ? [] : CREATIVE_ASSETS;
 
-  // Apply geo filter — sheets use TRUE/FALSE for shared/live status
+  // Filters
+  if (typeFilter !== 'all') sheetCards = sheetCards.filter(c => c.contentType === typeFilter);
   if (filter !== 'all') {
     sheetCards = sheetCards.filter(c => {
       const statusKey = { US: 'usStatus', AUS: 'auStatus', India: 'inStatus', MEA: 'meaStatus', APAC: 'apacStatus' }[filter];
       const val = (c[statusKey] || '').toLowerCase();
       return val === 'true' || val === 'live' || val === 'yes' || val === 'deployed';
     });
-    legacyAssets = legacyAssets.filter(a => a.geos.includes(filter));
+  }
+  if (searchQuery) {
+    sheetCards = sheetCards.filter(c => {
+      const hay = [c.name, c.format, c.designer, c.hookType, c.frame, c.language, c.notes].join(' ').toLowerCase();
+      return hay.includes(searchQuery);
+    });
   }
 
-  let generated = state.library || [];
-  if (filter !== 'all') {
-    generated = generated.filter(item => (item.platform || '').includes(filter) || (item.market || '').includes(filter));
-  }
-
-  if (!sheetCards.length && !legacyAssets.length && !generated.length) {
-    if (useSheet) {
-      const colNames = state._librarySheet.length > 0 ? Object.keys(state._librarySheet[0]).join(', ') : 'none';
-      grid.innerHTML = `<div class="col-span-3 text-center py-12 text-sm text-text-muted"><p class="font-semibold mb-2">Sheet loaded (${state._librarySheet.length} rows) but no matching columns found.</p><p class="mb-1">Expected columns: Creative Name, Format, Notion Link, US Status, IN Status, AU Status, MEA Status, Hook Type, Frame, Language, etc.</p><p class="text-xs opacity-70">Found columns: ${colNames}</p></div>`;
+  if (!sheetCards.length) {
+    if (useSheet && !searchQuery) {
+      const colNames = state._librarySheet.length > 0 ? Object.keys(state._librarySheet[0]).slice(0, 8).join(', ') : 'none';
+      grid.innerHTML = `<div class="col-span-full text-center py-12 text-sm text-text-muted"><p class="font-semibold mb-2">Sheet loaded (${state._librarySheet.length} rows) but no matching columns found.</p><p class="text-xs opacity-70">Found: ${colNames}</p></div>`;
+      empty.classList.add('hidden');
+    } else if (searchQuery) {
+      grid.innerHTML = `<div class="col-span-full text-center py-12 text-sm text-text-muted">No creatives match "${searchQuery}"</div>`;
       empty.classList.add('hidden');
     } else {
       grid.innerHTML = '';
       empty.classList.remove('hidden');
-      document.getElementById('libraryLegend').style.display = 'none';
     }
+    if (summaryLine) summaryLine.textContent = 'Your creative assets';
     return;
   }
   empty.classList.add('hidden');
-  document.getElementById('libraryLegend').style.display = '';
+
+  // Sort
+  const sortBy = document.getElementById('librarySort')?.value || 'newest';
+  if (sortBy === 'newest') {
+    const MONTH_ORDER = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+    const mIdx = m => MONTH_ORDER[(m||'').toLowerCase()] || 0;
+    const wIdx = w => parseInt((w||'').replace(/\D/g,'')) || 0;
+    sheetCards.sort((a,b) => (mIdx(b.month) - mIdx(a.month)) || (wIdx(b.week) - wIdx(a.week)));
+  }
+  else if (sortBy === 'name') sheetCards.sort((a,b) => a.name.localeCompare(b.name));
+  else if (sortBy === 'format') sheetCards.sort((a,b) => (a.format || '').localeCompare(b.format || ''));
+
+  // Summary line
+  const fmtCounts = {};
+  let unanalysedCount = 0;
+  sheetCards.forEach(c => {
+    fmtCounts[c.format || 'Unknown'] = (fmtCounts[c.format || 'Unknown'] || 0) + 1;
+    if (!c._lensMatch?.tags && !c.hookType && !c._raw?._cachedTags) unanalysedCount++;
+  });
+  const fmtSummary = Object.entries(fmtCounts).map(([k,v]) => `${v} ${k}`).join(' \u00B7 ');
+  const lastFetch = state._libraryLastFetchTime ? ` \u00B7 Synced ${new Date(state._libraryLastFetchTime).toLocaleTimeString()}` : '';
+  if (summaryLine) summaryLine.textContent = `${sheetCards.length} creatives \u00B7 ${fmtSummary}${lastFetch}`;
+
+  // Tag button state
+  const tagBtn = document.getElementById('tagUnanalysedBtn');
+  if (tagBtn) {
+    tagBtn.disabled = unanalysedCount === 0;
+    tagBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg> ' + (unanalysedCount > 0 ? 'Tag ' + unanalysedCount : 'All Tagged');
+  }
+
+  // Determine "NEW" threshold: last 7 days or newest month in data
+  const now = Date.now();
+  const NEW_DAYS = 7;
 
   let html = '';
+  const notes = state._libraryNotes || {};
 
-  // P0: Deployment Tracker
-  html += renderDeploymentTracker();
+  sheetCards.forEach(c => {
+    const safeName = (c.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    const safeNameAttr = (c.name || '').replace(/"/g, '&quot;');
 
-  // ── Deploy Queue — assets with good CPTD not yet live in all markets ──
-  if (sheetCards.length) {
-    const withPerf = sheetCards.filter(c => c._lensMatch && c._lensMatch.cptd > 0);
-    if (withPerf.length) {
-      const avgCptd = withPerf.reduce((s, c) => s + c._lensMatch.cptd, 0) / withPerf.length;
-      const deployQueue = [];
-      withPerf.forEach(c => {
-        if (c._lensMatch.cptd >= avgCptd) return;
-        const mkts = [
-          { key: 'US', val: c.usStatus },
-          { key: 'IN', val: c.inStatus },
-          { key: 'AUS', val: c.auStatus },
-          { key: 'MEA', val: c.meaStatus },
-          { key: 'APAC', val: c.apacStatus }
-        ];
-        const notLive = mkts.filter(m => {
-          const lv = (m.val || '').toLowerCase();
-          return lv !== 'live' && lv !== 'active' && lv !== 'true' && lv !== 'yes';
-        }).map(m => m.key);
-        if (notLive.length > 0) {
-          deployQueue.push({ name: c.name, markets: notLive, cptd: c._lensMatch.cptd });
-        }
-      });
-      if (deployQueue.length) {
-        const fCur = v => v >= 100000 ? '\u20B9' + (v/100000).toFixed(1) + 'L' : v >= 1000 ? '\u20B9' + (v/1000).toFixed(1) + 'K' : '\u20B9' + Math.round(v);
-        html += `<div class="col-span-1 md:col-span-2 lg:col-span-3 mb-4">
-          <div class="bg-gradient-to-r from-green-50 to-teal-50 border border-green-200 rounded-xl p-4">
-            <p class="text-xs font-bold text-green-700 mb-2">Deploy Queue (${deployQueue.length} asset${deployQueue.length > 1 ? 's' : ''}) &mdash; below-avg CPTD, not live everywhere</p>
-            <div class="flex flex-wrap gap-2">
-              ${deployQueue.slice(0, 10).map(d => `<div class="bg-white/80 rounded-lg px-3 py-1.5 border border-green-100 text-[11px]">
-                <span class="font-semibold text-text-primary">${d.name.length > 40 ? d.name.substring(0, 40) + '...' : d.name}</span>
-                <span class="text-text-muted mx-1">\u2192</span>
-                <span class="font-medium text-green-700">${d.markets.join(', ')}</span>
-                <span class="text-text-muted ml-1">CPTD ${fCur(d.cptd)}</span>
-              </div>`).join('')}
-              ${deployQueue.length > 10 ? `<span class="text-[10px] text-text-muted self-center">+${deployQueue.length - 10} more</span>` : ''}
-            </div>
-          </div>
-        </div>`;
-      }
-    }
-  }
+    // NEW badge — if month contains current month or added recently
+    const isNew = c.week && c.week.toLowerCase().includes('w') && c.month && (() => {
+      // Heuristic: if month matches current month name or is latest in set
+      const curMonth = new Date().toLocaleString('default', { month: 'long' });
+      return c.month.toLowerCase().includes(curMonth.toLowerCase().substring(0, 3));
+    })();
 
-  // ── Sort sheet cards ──
-  const sortBy = document.getElementById('librarySort')?.value || 'cptd';
-  if (sortBy === 'cptd') sheetCards.sort((a,b) => (a._lensMatch?.cptd || Infinity) - (b._lensMatch?.cptd || Infinity));
-  else if (sortBy === 'spend') sheetCards.sort((a,b) => (b._lensMatch?.spend || 0) - (a._lensMatch?.spend || 0));
-  else if (sortBy === 'newest') sheetCards.sort((a,b) => (b.month || '').localeCompare(a.month || ''));
+    // Thumbnail: Lens match → Meta thumbnail
+    const thumbUrl = c._lensMatch?.thumbnail_url || '';
 
-  // ── Sheet-driven cards ──
-  if (sheetCards.length) {
-    const lastFetch = state._libraryLastFetchTime ? `Last synced: ${new Date(state._libraryLastFetchTime).toLocaleTimeString()}` : '';
-    const fmtCounts = {};
-    let lensMatchCount = 0, unanalysedCount = 0;
-    sheetCards.forEach(c => { fmtCounts[c.format || 'Unknown'] = (fmtCounts[c.format || 'Unknown'] || 0) + 1; if (c._lensMatch?.spend > 0) lensMatchCount++; if (!c._lensMatch?.tags && !c.hookType && !c._raw?._cachedTags) unanalysedCount++; });
-    const fmtSummary = Object.entries(fmtCounts).map(([k,v]) => `${v} ${k}`).join(' · ') + (lensMatchCount > 0 ? ` · ${lensMatchCount} with perf data` : '');
-    // Show/hide Tag Unanalysed button
-    const tagBtn = document.getElementById('tagUnanalysedBtn');
-    if (tagBtn) { tagBtn.disabled = unanalysedCount === 0; tagBtn.textContent = ''; tagBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg> ' + (unanalysedCount > 0 ? 'Tag ' + unanalysedCount + ' Unanalysed' : 'All Tagged'); }
-    html += `<div class="col-span-1 md:col-span-2 lg:col-span-3 mb-2"><div class="flex items-center justify-between">
-      <div class="flex items-center gap-3"><h3 class="text-sm font-bold">Creative Library (${sheetCards.length})</h3><span class="text-[10px] text-text-muted">${fmtSummary}</span></div>
-      <span class="text-[10px] text-text-muted">${lastFetch}</span>
-    </div></div>`;
+    // Format badge
+    const fmtColor = { 'Static': 'blue', 'Video': 'purple', 'Influencer': 'pink', 'Animated': 'teal', 'Carousel': 'orange', 'Testimonial': 'green' };
+    const fmtC = fmtColor[c.format] || 'purple';
 
-    sheetCards.forEach(c => {
-      // Market status pills (Shared for + Live Status)
-      const markets = [
-        { key: 'US', val: c.usStatus },
-        { key: 'IN', val: c.inStatus },
-        { key: 'AUS', val: c.auStatus },
-        { key: 'MEA', val: c.meaStatus },
-        { key: 'APAC', val: c.apacStatus }
-      ];
-      const statusPills = markets.map(m => {
-        if (!m.val) return `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${m.key} \u2014</span>`;
-        const lv = m.val.toLowerCase();
-        const isShared = lv === 'true' || lv === 'yes';
-        const isLive = lv === 'live' || lv === 'active';
-        const isDraft = lv === 'draft' || lv === 'ready' || lv === 'pending';
-        const isPaused = lv === 'paused' || lv === 'stopped' || lv === 'off';
-        const isFalse = lv === 'false' || lv === 'no';
-        const gc = GEO_BADGE[m.key === 'IN' ? 'India' : m.key] || 'purple';
-        if (isLive) return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-accent-${gc}-light text-accent-${gc}">\u2713 ${m.key} Live</span>`;
-        if (isShared) return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-accent-${gc}-light text-accent-${gc}">\u2713 ${m.key}</span>`;
-        if (isDraft) return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-accent-orange-light text-amber-700">${m.key} Draft</span>`;
-        if (isPaused) return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-accent-red-light text-red-700">${m.key} Paused</span>`;
-        if (isFalse) return `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${m.key}</span>`;
-        return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-surface-tertiary text-text-muted">${m.key} ${m.val}</span>`;
-      }).join(' ');
+    // Tags — from sheet columns first, then Lens cross-ref, then AI cache
+    const lt = c._lensMatch?.tags;
+    const ct = c._raw?._cachedTags;
+    const pickTag = (sheetVal, lensKey, cacheKey) => {
+      if (sheetVal && sheetVal !== 'Unknown') return sheetVal;
+      if (lt?.[lensKey] && lt[lensKey] !== 'Unknown') return lt[lensKey];
+      if (ct?.[cacheKey] && ct[cacheKey] !== 'Unknown') return ct[cacheKey];
+      return null;
+    };
+    const tagPairs = [];
+    const hook = pickTag(c.hookType, 'hook_type', 'hook_type');
+    if (hook) tagPairs.push({ label: tagLabel(hook), color: 'purple', key: 'hook_type' });
+    const frame = pickTag(c.frame, 'pain_benefit', 'pain_benefit');
+    if (frame) tagPairs.push({ label: tagLabel(frame), color: 'red', key: 'pain_benefit' });
+    const tone = pickTag(null, 'emotional_tone', 'emotional_tone');
+    if (tone) tagPairs.push({ label: tagLabel(tone), color: 'pink', key: 'emotional_tone' });
+    const audience = pickTag(null, 'icp_target', 'icp_target');
+    if (audience) tagPairs.push({ label: tagLabel(audience), color: 'orange', key: 'icp_target' });
+    const lang = pickTag(c.language, 'language', 'language');
+    if (lang) tagPairs.push({ label: lang, color: 'blue', key: 'language' });
+    // Clickable tags for editing
+    const tagHtml = tagPairs.map(t =>
+      `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-accent-${t.color}-light text-accent-${t.color} font-medium cursor-pointer hover:ring-1 hover:ring-accent-${t.color}/40" onclick="editLibraryTag('${safeName}','${t.key}','${(t.label||'').replace(/'/g,"\\'")}')" title="Click to edit ${t.key.replace(/_/g,' ')}">${t.label}</span>`
+    ).join(' ');
+    // If no tags, show "add tag" button
+    const noTagsHtml = tagPairs.length === 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted cursor-pointer hover:bg-gray-200" onclick="editLibraryTag('${safeName}','hook_type','')">+ Add tag</span>` : '';
 
-      // Tags — from sheet columns first, then Lens cross-ref, then AI cache
-      const tags = [];
-      const lt = c._lensMatch?.tags;
-      const ct = c._raw?._cachedTags;
-      const pickTag = (sheetVal, lensKey, cacheKey) => {
-        if (sheetVal && sheetVal !== 'Unknown') return sheetVal;
-        if (lt?.[lensKey] && lt[lensKey] !== 'Unknown') return lt[lensKey];
-        if (ct?.[cacheKey] && ct[cacheKey] !== 'Unknown') return ct[cacheKey];
-        return null;
-      };
-      const hook = pickTag(c.hookType, 'hook_type', 'hook_type');
-      if (hook) tags.push({ label: tagLabel(hook), color: 'purple' });
-      const frame = pickTag(c.frame, 'pain_benefit', 'pain_benefit');
-      if (frame) tags.push({ label: tagLabel(frame), color: 'red' });
-      const tone = pickTag(null, 'emotional_tone', 'emotional_tone');
-      if (tone) tags.push({ label: tagLabel(tone), color: 'pink' });
-      const audience = pickTag(null, 'icp_target', 'icp_target');
-      if (audience) tags.push({ label: tagLabel(audience), color: 'orange' });
-      const lang = pickTag(c.language, 'language', 'language');
-      if (lang) tags.push({ label: lang, color: 'blue' });
-      const tagHtml = tags.map(t => `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-accent-${t.color}-light text-accent-${t.color} font-medium">${t.label}</span>`).join(' ');
+    // Market deployment pills
+    const markets = [
+      { key: 'US', val: c.usStatus },
+      { key: 'IN', val: c.inStatus },
+      { key: 'AUS', val: c.auStatus },
+      { key: 'MEA', val: c.meaStatus },
+      { key: 'APAC', val: c.apacStatus }
+    ];
+    const statusPills = markets.map(m => {
+      if (!m.val) return `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${m.key} \u2014</span>`;
+      const lv = m.val.toLowerCase();
+      const isShared = lv === 'true' || lv === 'yes';
+      const isLive = lv === 'live' || lv === 'active';
+      const gc = GEO_BADGE[m.key === 'IN' ? 'India' : m.key] || 'purple';
+      if (isLive) return `<span class="text-[8px] px-1.5 py-0.5 rounded-full font-medium bg-accent-${gc}-light text-accent-${gc}">\u2713 ${m.key}</span>`;
+      if (isShared) return `<span class="text-[8px] px-1.5 py-0.5 rounded-full font-medium bg-accent-${gc}-light text-accent-${gc}">\u2713 ${m.key}</span>`;
+      if (lv === 'false' || lv === 'no') return `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${m.key}</span>`;
+      return `<span class="text-[8px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${m.key}</span>`;
+    }).join(' ');
 
-      // Format badge
-      const fmtColor = { 'Static': 'blue', 'Video': 'purple', 'Influencer': 'pink', 'Animated': 'teal', 'Carousel': 'orange', 'Testimonial': 'green' };
-      const fmtC = fmtColor[c.format] || 'purple';
+    // Notes — editable inline
+    const savedNote = notes[c.name]?.note || c.notes || '';
+    const noteId = 'libNote_' + Math.abs(hashCode(c.name));
 
-      // Performance metrics from Lens cross-reference
-      const lm = c._lensMatch;
-      // P0: "Mark Live" buttons for not-live markets
-      const _lmCptd = lm ? Math.round(lm.cptd || 0) : 0;
-      const _deployBtns = markets.filter(m => {
-        const lv = (m.val || '').toLowerCase();
-        return lv !== 'live' && lv !== 'active' && lv !== 'true' && lv !== 'yes';
-      }).filter(m => {
-        return !(state._libraryDeployments || []).some(d => d.creative_name === c.name && d.market === m.key && d.status === 'live');
-      }).slice(0, 3).map(m =>
-        `<button onclick="markCreativeLive('${(c.name||'').replace(/'/g,"\\'")}','${m.key}',${_lmCptd})" class="text-[8px] px-1.5 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200" title="Mark live in ${m.key}">+ ${m.key}</button>`
-      ).join(' ');
-      const fCur = v => v >= 100000 ? '\u20B9' + (v/100000).toFixed(1) + 'L' : v >= 1000 ? '\u20B9' + (v/1000).toFixed(1) + 'K' : '\u20B9' + Math.round(v);
-      let perfHtml = '';
-      if (lm && lm.spend > 0) {
-        const qlTdPct = lm.ql > 0 && lm.td > 0 ? Math.min(lm.td / lm.ql * 100, 100).toFixed(1) : 0;
-        perfHtml = `<div class="mt-2 pt-2 border-t border-gray-100">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[9px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-secondary font-medium">${fCur(lm.spend)} spent</span>
-            <span class="text-[9px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-secondary font-medium">${Math.round(lm.ql)} QLs</span>
-            ${lm.td > 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-secondary font-medium">${Math.round(lm.td)} TDs</span>` : ''}
-            ${qlTdPct > 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-secondary font-medium">${qlTdPct}% QL\u2192TD</span>` : ''}
-            ${lm.cptd > 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded font-semibold ${lm.cptd < 50000 ? 'bg-accent-green-light text-green-700' : lm.cptd < 100000 ? 'bg-accent-orange-light text-amber-700' : 'bg-accent-red-light text-red-700'}">CPTD ${fCur(lm.cptd)}</span>` : ''}
-            <span class="text-[8px] text-text-muted">${lm.adCount} ad${lm.adCount>1?'s':''}</span>
-          </div>
-          ${lm.bestAudience ? `<div class="mt-1.5 px-2 py-1.5 rounded-lg ${lm.bestAudCPTD > 0 && lm.bestAudCPTD < 50000 ? 'bg-green-50 border border-green-200' : 'bg-blue-50 border border-blue-200'}">
-            <p class="text-[10px] font-bold ${lm.bestAudCPTD > 0 && lm.bestAudCPTD < 50000 ? 'text-green-700' : 'text-blue-700'}">Best on: ${lm.bestAudience}${lm.bestAudCPTD > 0 ? ' \u2014 ' + fCur(lm.bestAudCPTD) + ' CPTD' : ''}</p>
-            ${Object.keys(lm.audiences || {}).length > 1 ? `<p class="text-[9px] text-text-muted mt-0.5">Also ran: ${Object.entries(lm.audiences).filter(([a]) => a !== lm.bestAudience).map(([a, d]) => a + ' (' + Math.round(d.ql) + ' QL)').join(', ')}</p>` : ''}
-          </div>` : ''}
-        </div>`;
-      }
+    // Month/Week / Designer
+    const timeLabel = [c.month, c.week || ''].filter(Boolean).join(' \u00B7 ');
 
-      // For cards WITHOUT perf data, recommend targeting based on similar creatives
-      if (!perfHtml || !lm?.bestAudience) {
-        const hookForRec = pickTag(c.hookType, 'hook_type', 'hook_type');
-        const rec = recommendAudienceForCreative(hookForRec, c.format);
-        if (rec) {
-          perfHtml += `<div class="mt-1.5 px-2 py-1.5 rounded-lg bg-purple-50 border border-purple-200">
-            <p class="text-[10px] font-bold text-purple-700">Recommended: ${rec.audience}</p>
-            <p class="text-[9px] text-purple-600">Similar ${c.format || 'ads'} avg ${fCur(rec.cptd)} CPTD on this audience (${rec.tds} TDs across ${rec.ads} ads)</p>
-          </div>`;
-        }
-      }
-
-      // Status badge
-      const hasCachedTags = ct?.hook_type;
-      const analysedHtml = lm?.tags
-        ? `<span class="text-[9px] text-green-600 font-medium">Lens matched</span>`
-        : hasCachedTags
-          ? `<span class="text-[9px] text-accent-blue font-medium">AI tagged</span>`
-          : c.lastAnalysed
-            ? `<span class="text-[9px] text-text-muted">Analysed: ${c.lastAnalysed}</span>`
-            : `<span class="text-[9px] text-accent-orange font-medium">Not analysed</span>`;
-
-      // Confidence
-      const confStyles = { verified: 'bg-accent-green-light text-green-700', inferred: 'bg-accent-blue-light text-accent-blue', hypothesis: 'bg-accent-orange-light text-amber-700' };
-      const confHtml = c.confidence ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium ${confStyles[c.confidence.toLowerCase()] || 'bg-surface-tertiary text-text-muted'}">${c.confidence}</span>` : '';
-
-      // Month/Week
-      const timeLabel = [c.month, c.week || ''].filter(Boolean).join(' \u00B7 ');
-
-      const thumbUrl = lm?.image_url || lm?.thumbnail_url || '';
-      html += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 shadow-sm hover:shadow-md transition${lm?.spend > 0 ? '' : ' opacity-80'}">
-        ${thumbUrl ? `<img src="${thumbUrl}" class="w-full h-32 object-cover rounded-lg mb-3 cursor-pointer border border-gray-100" onclick="window.open('${thumbUrl}','_blank')" onerror="this.outerHTML=''" />` : ''}
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-accent-${fmtC}-light text-accent-${fmtC}">${c.format || 'Unknown'}</span>
-          </div>
-          <div class="flex items-center gap-1.5">${confHtml} ${analysedHtml}</div>
+    html += `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition group">
+      ${thumbUrl ? `<div class="relative"><img src="${thumbUrl}" class="w-full h-36 object-cover cursor-pointer" onclick="window.open('${thumbUrl}','_blank')" onerror="this.parentElement.outerHTML=''" />${isNew ? '<span class="absolute top-2 left-2 text-[9px] px-2 py-0.5 rounded-full bg-accent-purple text-white font-bold shadow-sm">NEW</span>' : ''}</div>` : (isNew ? `<div class="px-4 pt-3"><span class="text-[9px] px-2 py-0.5 rounded-full bg-accent-purple text-white font-bold">NEW</span></div>` : '')}
+      <div class="p-3.5">
+        <div class="flex items-center gap-1.5 mb-2">
+          <span class="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-accent-${fmtC}-light text-accent-${fmtC}">${c.format || 'Unknown'}</span>
+          ${c._lensMatch?.adCount ? `<span class="text-[8px] text-text-muted">${c._lensMatch.adCount} ad${c._lensMatch.adCount > 1 ? 's' : ''} matched</span>` : ''}
         </div>
-        <div class="flex items-start justify-between mb-1">
+        <div class="flex items-start justify-between mb-2">
           ${c.notionLink
-            ? `<a href="${c.notionLink}" target="_blank" class="text-sm font-medium text-text-primary hover:text-accent-purple transition">${c.name}</a>`
-            : `<p class="text-sm font-medium">${c.name}</p>`}
-          <div class="flex items-center gap-1 shrink-0 ml-2">
-            ${c.notionLink ? `<a href="${c.notionLink}" target="_blank" title="Open in Notion" class="text-text-muted hover:text-accent-purple"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4.5A2.5 2.5 0 016.5 2H18l4 4v13.5a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 014 19.5v-15zM18 8V3.5L21.5 7H18.5a.5.5 0 01-.5-.5V8z"/></svg></a>` : ''}
-            ${c.driveLink ? `<a href="${c.driveLink}" target="_blank" title="Open in Drive" class="text-text-muted hover:text-accent-blue"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8.01 18.02l2.47-4.27H22l-2.47 4.27H8.01zm6.47-4.27L8.5 3.53h4.98l5.98 10.22h-4.98zM2 18.02L7.98 7.8l2.47 4.27-3.5 5.95H2z"/></svg></a>` : ''}
+            ? `<a href="${c.notionLink}" target="_blank" class="text-[13px] font-semibold text-text-primary hover:text-accent-purple transition leading-tight">${c.name}</a>`
+            : `<p class="text-[13px] font-semibold leading-tight">${c.name}</p>`}
+          <div class="flex items-center gap-1 shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition">
+            ${c.notionLink ? `<a href="${c.notionLink}" target="_blank" title="Notion" class="text-text-muted hover:text-accent-purple"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4.5A2.5 2.5 0 016.5 2H18l4 4v13.5a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 014 19.5v-15zM18 8V3.5L21.5 7H18.5a.5.5 0 01-.5-.5V8z"/></svg></a>` : ''}
+            ${c.driveLink ? `<a href="${c.driveLink}" target="_blank" title="Drive" class="text-text-muted hover:text-accent-blue"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M8.01 18.02l2.47-4.27H22l-2.47 4.27H8.01zm6.47-4.27L8.5 3.53h4.98l5.98 10.22h-4.98zM2 18.02L7.98 7.8l2.47 4.27-3.5 5.95H2z"/></svg></a>` : ''}
           </div>
         </div>
-        ${(() => { const h = lm?.ad_title || ''; const b = lm?.ad_body || ''; return (h || b) ? `<p class="text-[9px] text-text-secondary leading-tight mb-1.5" title="${(h+' — '+b).replace(/"/g,'&quot;')}">${h ? '<b>'+h.slice(0,50)+(h.length>50?'…':'')+'</b>' : ''}${h&&b?' — ':''}${b ? b.slice(0,80)+(b.length>80?'…':'') : ''}</p>` : ''; })()}
-        <div class="flex flex-wrap gap-1 mb-2">${statusPills}${_deployBtns ? ' ' + _deployBtns : ''}</div>
-        ${tagHtml ? `<div class="flex flex-wrap gap-1 mb-2">${tagHtml}</div>` : ''}
-        ${perfHtml}
-        ${c.notes ? `<p class="text-[10px] text-text-muted mt-1">${c.notes}</p>` : ''}
-        <div class="flex items-center justify-between mt-2">
-          ${c.designer ? `<p class="text-[10px] text-text-muted">Designer: ${c.designer}</p>` : '<span></span>'}
+        <div class="flex flex-wrap gap-1 mb-2">${tagHtml}${noTagsHtml}</div>
+        <div class="flex flex-wrap gap-0.5 mb-2">${statusPills}</div>
+        <textarea id="${noteId}" rows="1" placeholder="Add note..." class="w-full text-[11px] text-text-secondary bg-surface-secondary/50 border border-transparent hover:border-gray-200 focus:border-accent-purple/30 focus:ring-1 focus:ring-accent-purple/20 rounded-lg px-2.5 py-1.5 resize-none placeholder:text-text-muted/60 transition" oninput="saveLibraryNote('${safeName}',this.value);this.style.height='auto';this.style.height=this.scrollHeight+'px'">${savedNote.replace(/</g,'&lt;')}</textarea>
+        <div class="flex items-center justify-between mt-1.5">
+          ${c.designer ? `<span class="text-[9px] text-text-muted">${c.designer}</span>` : '<span></span>'}
           ${timeLabel ? `<span class="text-[9px] text-text-muted">${timeLabel}</span>` : ''}
         </div>
-      </div>`;
-    });
-  }
-
-  // ── Legacy CREATIVE_ASSETS fallback ──
-  if (legacyAssets.length) {
-    html += `<div class="col-span-1 md:col-span-2 lg:col-span-3 mb-2"><div class="flex items-center justify-between">
-      <h3 class="text-sm font-bold">Creative Assets (${legacyAssets.length})</h3>
-      <span class="text-[10px] text-text-muted">${!useSheet ? 'Connect Library Sheet in Settings for auto-sync' : ''}</span>
-    </div></div>`;
-    legacyAssets.forEach(a => {
-      const geoBadges = a.geos.map(g => {
-        const c = GEO_BADGE[g] || 'purple';
-        const isLive = a.live.includes(g);
-        return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium ${isLive ? `bg-accent-${c}-light text-accent-${c}` : 'bg-surface-tertiary text-text-muted'}">${g}${isLive ? ' \u2713' : ''}</span>`;
-      }).join(' ');
-      const perfHtml = a.ctr ? `<div class="flex gap-3 mt-2 pt-2 border-t border-gray-100"><span class="text-[10px] text-text-muted">CTR: <strong class="text-text-primary">${a.ctr}</strong></span>${a.cpl ? `<span class="text-[10px] text-text-muted">CPL: <strong class="text-text-primary">${formatCurrency(a.cpl)}</strong></span>` : ''}</div>` : '';
-      html += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 insight-card shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-accent-purple-light text-accent-purple">${a.month} ${a.week}</span>
-          <span class="text-[10px] text-text-muted">${a.designer}</span>
-        </div>
-        <a href="${a.link}" target="_blank" class="text-sm font-medium text-text-primary hover:text-accent-purple transition block mb-2">${a.name}${a.sets ? ` <span class="text-text-muted font-normal">(${a.sets} sets)</span>` : ''}</a>
-        <div class="flex flex-wrap gap-1">${geoBadges}</div>
-        ${a.notes ? `<p class="text-[10px] text-text-muted mt-1.5">${a.notes}</p>` : ''}
-        ${perfHtml}
-      </div>`;
-    });
-  }
-
-  // ── AI-generated items ──
-  if (generated.length) {
-    html += `<div class="col-span-1 md:col-span-2 lg:col-span-3 mt-4 mb-2"><h3 class="text-sm font-bold">AI-Generated Content (${generated.length})</h3></div>`;
-    generated.forEach((item, idx) => {
-      html += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-accent-blue-light text-accent-blue">${item.platform || 'Meta'}</span>
-          <span class="text-[10px] text-text-muted">${item.date ? new Date(item.date).toLocaleDateString() : ''}</span>
-        </div>
-        <p class="text-sm font-medium mb-2">${item.market || ''} · ${item.segment || ''}</p>
-        <p class="text-xs text-text-secondary line-clamp-3">${(item.content || '').substring(0, 200)}...</p>
-        <div class="flex gap-2 mt-3">
-          <button onclick="loadFromLibrary(${item.id})" class="flex-1 py-1.5 btn-secondary rounded-lg text-[10px] font-semibold border border-gray-200">Load</button>
-          <button onclick="deleteFromLibrary(${item.id})" class="py-1.5 px-3 rounded-lg text-[10px] font-semibold text-accent-red hover:bg-accent-red-light border border-gray-200">Delete</button>
-        </div>
-      </div>`;
-    });
-  }
+      </div>
+    </div>`;
+  });
 
   grid.innerHTML = html;
+  // Auto-size note textareas
+  grid.querySelectorAll('textarea').forEach(ta => { if (ta.value) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; } });
 }
+
+// Legacy compatibility — keep empty stubs for functions removed from Library
+function recommendAudienceForCreative() { return null; }
+function renderDeploymentTracker_LEGACY() { return ''; }
+
+// ---- Render Library (LEGACY — kept for reference, remove later) ----
+function renderLibrary_LEGACY_REMOVED() { /* stripped in Library redesign */ }
 function loadFromLibrary(id) {
   const item = state.library.find(x => x.id === id);
   if (!item) return;
