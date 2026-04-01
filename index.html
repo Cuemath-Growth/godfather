@@ -602,13 +602,13 @@
               <div class="flex items-center gap-2">
                 <button onclick="generateContent()" id="generateBtn" class="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-primary">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                  <span id="generateBtnLabel">Build Brief</span>
+                  <span id="generateBtnLabel">Generate</span>
                 </button>
                 <span id="modelBadge" class="text-[9px] px-2.5 py-1.5 rounded-lg bg-accent-purple-light text-accent-purple font-bold whitespace-nowrap">Sonnet</span>
               </div>
               <label class="flex items-center gap-2 text-[10px] text-text-muted cursor-pointer px-1">
-                <input type="checkbox" id="useApiToggle" class="accent-purple-600 w-3.5 h-3.5 rounded" onchange="updateGenerateMode()" />
-                <span>Generate via API <span class="text-text-muted/60">(uses credits)</span></span>
+                <input type="checkbox" id="briefOnlyToggle" class="accent-purple-600 w-3.5 h-3.5 rounded" onchange="updateGenerateMode()" />
+                <span>Brief only <span class="text-text-muted/60">(no API, copy to clipboard)</span></span>
               </label>
             </div>
             <button onclick="resetForge()" class="w-full py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-primary hover:bg-surface-tertiary transition-colors mt-2">Reset All Fields</button>
@@ -1662,6 +1662,9 @@ async function fetchImageAsBase64(imageUrl) {
   if (data.error === true) throw new Error(data.message || 'Image proxy error');
   return data; // { base64, mimeType }
 }
+
+// Google Sheets API key (restricted to Sheets API + referrer-locked)
+const GOOGLE_API_KEY = localStorage.getItem('gf_googleKey') || 'AIzaSyBpsf0wJBwmNNNX_BU23bebBF1DBhm4fZM';
 
 // Supabase shared backend (anon key is public by design — RLS handles auth)
 const SUPABASE_URL = localStorage.getItem('gf_supabaseUrl') || 'https://lcixlyyzlnzeiqjdbxfh.supabase.co';
@@ -3155,8 +3158,8 @@ function init() {
   loadCachedCreatives();
 
   // Phase 2: Load ALL async data sources in PARALLEL, then render once
-  const _bootSheetUrl = localStorage.getItem('gf_sheetUrl');
-  const _bootApiKey = localStorage.getItem('gf_googleKey');
+  const _bootSheetUrl = localStorage.getItem('gf_sheetUrl') || state.sheetConfig.crmLeadsUrl;
+  const _bootApiKey = GOOGLE_API_KEY;
 
   const bootPromises = [
     // Supabase: metaAdData (primary spend source, 32K rows)
@@ -3475,7 +3478,7 @@ function initApiKeySettings() {
   const sk = document.getElementById('settingsSupabaseKey');
   if (ck && API_KEY) ck.value = API_KEY.substring(0, 12) + '...';
   if (gk && GEMINI_KEY) gk.value = GEMINI_KEY.substring(0, 10) + '...';
-  const GOOGLE_KEY = localStorage.getItem('gf_googleKey') || '';
+  const GOOGLE_KEY = GOOGLE_API_KEY;
   if (gok && GOOGLE_KEY) gok.value = GOOGLE_KEY.substring(0, 10) + '...';
   if (su && SUPABASE_URL) su.value = SUPABASE_URL;
   if (sk && SUPABASE_KEY) sk.value = SUPABASE_KEY.substring(0, 15) + '...';
@@ -3877,7 +3880,7 @@ async function testLibraryConfig() {
   try {
     const info = parseSheetUrl(url);
     if (!info) throw new Error('Invalid URL');
-    const apiKey = localStorage.getItem('gf_googleKey');
+    const apiKey = GOOGLE_API_KEY;
     if (!apiKey) throw new Error('Set Google API Key in Data Source first');
     const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${info.id}?key=${apiKey}&fields=sheets.properties`);
     const data = await res.json();
@@ -3917,7 +3920,7 @@ function saveDataSource() {
   localStorage.setItem('gf_sheetUrl', sheetUrl);
   if (!apiKey.includes('...')) localStorage.setItem('gf_googleKey', apiKey);
   showToast('Saved! Loading data...');
-  fetchSheetData(sheetUrl, localStorage.getItem('gf_googleKey')).then(counts => {
+  fetchSheetData(sheetUrl, GOOGLE_API_KEY).then(counts => {
     showToast(`Loaded ${counts.leads} leads + ${counts.cost} cost rows`);
     updateDataStatusLine();
   }).catch(e => showToast('Load failed: ' + e.message));
@@ -3979,8 +3982,8 @@ function renderPreviewTable(tabName, rows) {
 
 function loadSettingsFields() {
   const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-  set('settingsSheetUrl', localStorage.getItem('gf_sheetUrl'));
-  const gk = localStorage.getItem('gf_googleKey');
+  set('settingsSheetUrl', localStorage.getItem('gf_sheetUrl') || state.sheetConfig.crmLeadsUrl);
+  const gk = GOOGLE_API_KEY;
   if (gk) set('settingsGoogleApiKey', gk.substring(0, 10) + '...');
   // API keys
   set('settingsClaudeKey', API_KEY);
@@ -4894,7 +4897,9 @@ function getAdPerformance(market, startDate, endDate) {
     const tag = _tagMap[key] || {};
     const adMarket = a.market || '';
     const isUS = adMarket === 'US' || adMarket === 'Canada';
-    const tql = isUS ? a.nri : a.ql;
+    const isIBMarket = adMarket === 'India' || adMarket === 'ME' || adMarket === 'MEA';
+    // Per-market TQL: US=NRI, India/MEA=IB/IGCSE boards, others=all QLs
+    const tql = isUS ? a.nri : (isIBMarket ? (a.ibCount || a.ql) : a.ql);
     const adSpend = a.spend > 0 ? a.spend : null;
     const spendSource = a.hasMeta ? 'meta_insights' : (adSpend ? 'campaign_prorated' : null);
 
@@ -4982,9 +4987,24 @@ function getPortfolioMetrics(market, from, to) {
 
   const totalQL = attrQL + unQL;
   const totalNRI = attrNRI + unNRI;
-  const totalTQL = (market === 'US' || market === 'Canada') ? totalNRI : totalQL;
   const totalTD = attrTD + unTD;
   const totalPaid = attrPaid + unPaid;
+
+  // TQL: use proper per-market logic from getTQL() — not the broken "US ? NRI : QL" shortcut
+  // US/Canada = NRI only; India/MEA = IB/IGCSE boards only; AUS/UK/APAC = all QLs
+  let totalTQL;
+  if (market === 'US' || market === 'Canada') {
+    totalTQL = totalNRI;
+  } else if (market === 'India' || market === 'ME' || market === 'MEA') {
+    // For India/MEA, TQL = IB/IGCSE board leads only — use getTQL for accuracy
+    totalTQL = typeof getTQL === 'function' ? getTQL(market, _from, _to) : totalQL;
+  } else if (market && market !== 'all') {
+    // AUS, UK, APAC — all QLs qualify
+    totalTQL = totalQL;
+  } else {
+    // All Geo — apply per-market logic to each lead
+    totalTQL = typeof getTQL === 'function' ? getTQL(null, _from, _to) : totalQL;
+  }
 
   return {
     spend: attrSpend, ql: totalQL, nri: totalNRI, tql: totalTQL,
@@ -7289,7 +7309,7 @@ function renderDayByDay() {
 
 function renderOracleCardsV2() {
   if (!leadsData.length) {
-    const hasCredentials = localStorage.getItem('gf_sheetUrl') && localStorage.getItem('gf_googleKey');
+    const hasCredentials = (localStorage.getItem('gf_sheetUrl') || state.sheetConfig.crmLeadsUrl) && GOOGLE_API_KEY;
     if (hasCredentials) {
       const spinner = '<div class="text-center py-4"><div class="w-5 h-5 border-2 border-amber-300/30 border-t-amber-400 rounded-full animate-spin mx-auto mb-1.5"></div><p class="text-[10px] text-text-muted">Loading...</p></div>';
       document.getElementById('oraclePauseList').innerHTML = spinner;
@@ -8231,7 +8251,7 @@ function renderMetricTicker() {
 
   // Guard: don't render stale tagger numbers — wait for Section 2 data
   if (!leadsData.length) {
-    const hasCredentials = localStorage.getItem('gf_sheetUrl') && localStorage.getItem('gf_googleKey');
+    const hasCredentials = (localStorage.getItem('gf_sheetUrl') || state.sheetConfig.crmLeadsUrl) && GOOGLE_API_KEY;
     if (hasCredentials) {
       container.innerHTML = '<div class="text-center py-8"><div class="w-6 h-6 border-2 border-accent-purple/30 border-t-accent-purple rounded-full animate-spin mx-auto mb-2"></div><p class="text-xs text-text-muted">Loading portfolio data...</p></div>';
       return;
@@ -8242,7 +8262,9 @@ function renderMetricTicker() {
   const market = dashCountry === 'all' ? null : dashCountry;
   const _usePortfolio = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
   const pm = _usePortfolio ? getPortfolioMetrics(market, from, to) : null;
-  const m = _usePortfolio ? { spend: pm.spend, ql: pm.ql, tql: pm.tql, td: pm.td, enrolled: pm.paid, cptql: pm.cptql, cptd: pm.cptd, cac: pm.cac, ql_td_pct: pm.qlTdPct / 100, nri: pm.nri, revenue: 0, invalid: 0, ts: 0, asian: 0, roas: null } : getMarketMetrics(market, from || undefined, to || undefined);
+  // Wire TS from getTS() — getPortfolioMetrics doesn't compute it
+  const _portfolioTS = _usePortfolio && typeof getTS === 'function' ? getTS(market, from, to) : 0;
+  const m = _usePortfolio ? { spend: pm.spend, ql: pm.ql, tql: pm.tql, td: pm.td, enrolled: pm.paid, cptql: pm.cptql, cptd: pm.cptd, cac: pm.cac, ql_td_pct: pm.qlTdPct / 100, nri: pm.nri, revenue: 0, invalid: 0, ts: _portfolioTS, asian: 0, roas: null } : getMarketMetrics(market, from || undefined, to || undefined);
   const totalSpend = m.spend;
   const cptql = m.cptql || 0;
   const cptd = m.cptd || 0;
@@ -8953,13 +8975,14 @@ function generateFromTemplate() {
 }
 
 function updateGenerateMode() {
-  const useApi = document.getElementById('useApiToggle')?.checked;
+  const briefOnly = document.getElementById('briefOnlyToggle')?.checked;
   const label = document.getElementById('generateBtnLabel');
-  if (label) label.textContent = useApi ? 'Generate' : 'Build Brief';
+  if (label) label.textContent = briefOnly ? 'Build Brief' : 'Generate';
 }
 
 async function generateContent() {
-  const useApi = document.getElementById('useApiToggle')?.checked && state.apiKey;
+  const briefOnly = document.getElementById('briefOnlyToggle')?.checked;
+  const useApi = !briefOnly && state.apiKey;
   const brief = {
     market: document.getElementById('briefMarket').value,
     platform: getActivePill('platformPills'), format: getActivePill('formatPills'),
@@ -14408,7 +14431,7 @@ async function fetchLibrarySheet(silent) {
   try {
     const info = parseSheetUrl(baseUrl);
     if (!info) throw new Error('Invalid library sheet URL');
-    const apiKey = localStorage.getItem('gf_googleKey');
+    const apiKey = GOOGLE_API_KEY;
     let allRows = [];
 
     // Helper: fetch a sheet tab via Sheets API (authenticated, not CSV export)
