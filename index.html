@@ -2884,7 +2884,11 @@ function validateBrand(text) {
     }
   }
 
-  // Duplicate word scan
+  // Duplicate word scan — skip for long-form formats (scripts, influencer, UGC, testimonial)
+  const LONG_FORM_FORMATS = ['Video - Reel','YouTube Video','AI Video','UGC Ad','Influencer Script','Product Video','Testimonial Script'];
+  const currentFormat = state.currentBrief?.format || '';
+  const skipDuplicates = LONG_FORM_FORMATS.includes(currentFormat) || text.length > 2000;
+  if (skipDuplicates) return violations; // Return early — duplicate check not useful for scripts
   const COMMON_WORDS = new Set(['a','an','the','is','are','was','were','be','been','to','for','of','in','on','at','by','with','and','or','but','not','your','their','our','it','this','that','from','will','can','they','them','we','you','my','has','have','had','do','does','did','more','most','than']);
   function stemWord(w) { return w.replace(/(tion|ment|ing|ed|er|ly|s)$/i, ''); }
   const blocks = text.split(/(?:Option\s+\d+|---)/i).filter(b => b.trim());
