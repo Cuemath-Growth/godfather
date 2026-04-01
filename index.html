@@ -4417,27 +4417,11 @@ function getAdPerformanceDaily(market, startDate, endDate) {
       crm = crmDaily[aliasKey];
       claimedCRM.add(aliasKey);
     }
-    // Match 3: creative signature — strip date suffixes, match Meta creative in CRM name
-    // Handles: Meta "Static_W-Ch-Strong-Foundations_230226" ↔ CRM "...LeadGen_NA_Static_W-Ch-Strong-Foundations_241025"
-    if (!crm) {
-      const metaStripped = _stripDateSuffix(m.normName);
-      if (metaStripped.length >= 10) {
-        // Check if any CRM creative signature contains this Meta creative (or vice versa)
-        const metaNoFormat = metaStripped.replace(/^(static|video|carousel|image)_/, '');
-        for (const crmSig of crmCreativeKeys) {
-          if (crmSig.includes(metaStripped) || metaStripped.includes(crmSig) ||
-              (metaNoFormat.length >= 8 && crmSig.includes(metaNoFormat))) {
-            const matchedNormName = crmCreativeLookup[crmSig];
-            const subKey = matchedNormName + '|' + d;
-            if (crmDaily[subKey] && !claimedCRM.has(subKey)) {
-              crm = crmDaily[subKey];
-              claimedCRM.add(subKey);
-              break;
-            }
-          }
-        }
-      }
-    }
+    // Match 3: DISABLED — creative signature matching caused cross-contamination.
+    // Multiple ad versions share the same creative name (e.g. "Master-Algebra_180226"
+    // vs "Master-Algebra_190226"). Stripping dates collapsed them, attributing leads
+    // from one version to another's spend → unreliable CPTQL.
+    // TODO: Re-enable with version-aware matching (same creative + same campaign).
 
     const metaMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' })[m.account] || '';
     const mkt = metaMarket || crm?.market || matchMarketFromText(' ' + m.campaign.toUpperCase() + ' ');
