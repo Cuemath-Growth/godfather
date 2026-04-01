@@ -4377,7 +4377,25 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   // Clamp TD ≤ QL, Paid ≤ TD per daily row
   Object.values(crmDaily).forEach(c => { c.td = Math.min(c.td, c.ql); c.paid = Math.min(c.paid, c.td); });
 
-  // Step 3: Join — for each Meta daily row, find matching CRM daily row
+  // Step 3: Build creative signature index for fuzzy matching
+  // Meta ads often have short creative-only names (e.g. "Static_W-Ch-Strong-Foundations_230226")
+  // while CRM has full campaign path ending with the same creative. The creative signature
+  // is the name minus the date suffix (which differs between Meta and CRM).
+  function _stripDateSuffix(name) {
+    return name.replace(/_\d{6}$/, '').replace(/_\d{2}_\w{3}_\d{4}$/, '').replace(/_\d{2}_\d{2}_\d{4}$/, '');
+  }
+  // Build lookup: stripped CRM creative → original normName
+  const crmCreativeLookup = {}; // stripped creative sig → normName
+  const crmNormNames = [...new Set(Object.values(crmDaily).map(c => c.normName))];
+  crmNormNames.forEach(normName => {
+    const stripped = _stripDateSuffix(normName);
+    crmCreativeLookup[stripped] = normName;
+    // Also index without underscores (CRM sometimes drops separators: "TestimonialGunjan" vs "Testimonial_Gunjan")
+    crmCreativeLookup[stripped.replace(/_/g, '')] = normName;
+  });
+  const crmCreativeKeys = Object.keys(crmCreativeLookup);
+
+  // Step 4: Join — for each Meta daily row, find matching CRM daily row
   const claimedCRM = new Set(); // prevent double-counting
   const results = [];
 
@@ -4389,12 +4407,36 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const aliasKey = aliasName ? (aliasName + '|' + d) : null;
 
     let crm = null;
+    // Match 1: exact name match
     if (crmDaily[directKey] && !claimedCRM.has(directKey)) {
       crm = crmDaily[directKey];
       claimedCRM.add(directKey);
-    } else if (aliasKey && crmDaily[aliasKey] && !claimedCRM.has(aliasKey)) {
+    }
+    // Match 2: utm_term alias
+    else if (aliasKey && crmDaily[aliasKey] && !claimedCRM.has(aliasKey)) {
       crm = crmDaily[aliasKey];
       claimedCRM.add(aliasKey);
+    }
+    // Match 3: creative signature — strip date suffixes, match Meta creative in CRM name
+    // Handles: Meta "Static_W-Ch-Strong-Foundations_230226" ↔ CRM "...LeadGen_NA_Static_W-Ch-Strong-Foundations_241025"
+    if (!crm) {
+      const metaStripped = _stripDateSuffix(m.normName);
+      if (metaStripped.length >= 10) {
+        // Check if any CRM creative signature contains this Meta creative (or vice versa)
+        const metaNoFormat = metaStripped.replace(/^(static|video|carousel|image)_/, '');
+        for (const crmSig of crmCreativeKeys) {
+          if (crmSig.includes(metaStripped) || metaStripped.includes(crmSig) ||
+              (metaNoFormat.length >= 8 && crmSig.includes(metaNoFormat))) {
+            const matchedNormName = crmCreativeLookup[crmSig];
+            const subKey = matchedNormName + '|' + d;
+            if (crmDaily[subKey] && !claimedCRM.has(subKey)) {
+              crm = crmDaily[subKey];
+              claimedCRM.add(subKey);
+              break;
+            }
+          }
+        }
+      }
     }
 
     const metaMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' })[m.account] || '';
@@ -6866,11 +6908,8 @@ function renderOracleCardsV2() {
   // Use the new clean data layer — date-aware, ad-level
   const rawPerf = getAdPerformance(market, from, to);
   // Map to the field names the signal logic expects
-  // CRITICAL: Only include ads with CRM data for decision-making.
-  // Ads without CRM match show 0 QLs → would be falsely flagged as BURN.
-  const adCampData = rawPerf
-    .filter(r => r._hasCRM) // Must have CRM lead data to make Pause/Scale decisions
-    .map(r => ({
+  // Include all ads — CRM-matched and Meta-only. Mark unmatched so UI can flag them.
+  const adCampData = rawPerf.map(r => ({
     adName: r['Ad name'], campaignName: r['Campaign name'],
     displayName: stripCampaignPrefix(r['Ad name']),
     campaignContext: stripCampaignPrefix(r['Campaign name']),
@@ -6883,6 +6922,7 @@ function renderOracleCardsV2() {
     invalidPct: (r['Invalid%'] || 0) / 100,
     cptql: r['CPTQL'], cptd: r['CPTD'],
     _spendSource: r._spendSource,
+    _hasCRM: r._hasCRM,
   }));
   const avgCPTQL = getQL() > 0 ? getSpend() / getQL() : 20000;
 
@@ -6897,8 +6937,8 @@ function renderOracleCardsV2() {
     .filter(a => a.spend >= 15000 && a.ql === 0 && !isPaused(a.adName))
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 4)
-    .map(a => ({ ...a, name: a.adName, _type: 'burn', _priority: 1,
-      _signal: `${formatCurrency(a.spend)} spent · 0 QLs — pure waste` }));
+    .map(a => ({ ...a, name: a.adName, _type: 'burn', _priority: a._hasCRM ? 1 : 2,
+      _signal: `${formatCurrency(a.spend)} spent · 0 QLs${a._hasCRM ? ' — pure waste' : ' — ⚠️ no CRM link (may have leads under different name)'}` }));
 
   // ── SIGNAL 2: CPTQL too high — 2x+ market average ──
   const cptqlLeaks = adCampData
