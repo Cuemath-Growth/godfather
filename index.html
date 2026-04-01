@@ -4446,203 +4446,103 @@ function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; }
 
 // ── CLEAN DATA LAYER: getAdPerformance() ──
 // Single source of truth for ALL views. Joins leadsData (date-aware QLs/TDs) + metaAdData (date-aware spend).
-// Enriches with tags from _tagMap (built from taggerData). Returns backward-compatible field names.
+// Aggregates from getAdPerformanceDaily(). Single source of truth for all views.
+// Enriches with tags from _tagMap. Returns backward-compatible field names.
 function getAdPerformance(market, startDate, endDate) {
   const start = startDate || COST_DATA_START || '';
   const end = endDate || new Date().toISOString().slice(0, 10);
 
-  // Cache: return previous result if same params
   const cacheKey = `${market||'all'}|${start}|${end}`;
   if (_adPerfCache.key === cacheKey && _adPerfCache.data.length) return _adPerfCache.data;
 
-  // Step 1: Lead metrics per ad (from leadsData, date-aware, cohort counting)
-  // Join key: try mx_utm_adcontent first, then mx_utm_term (which often contains the exact Meta ad name)
-  const leadMap = {}; // key: normalizedAdName → metrics
-  const leadAliasMap = {}; // secondary key (from utm_term) → primary key (from adcontent)
-  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
-  filteredLeads.forEach(r => {
-    const d = r.lead_created_date || '';
-    if (start && d < start) return;
-    if (end && d > end) return;
-    const key = normalizeAdName(r.mx_utm_adcontent);
-    if (!key) return;
-    if (!leadMap[key]) leadMap[key] = { adName: r.mx_utm_adcontent, campaign: r.mx_utm_campaign || '', ql: 0, td: 0, enrolled: 0, nri: 0, invalid: 0, totalLeads: 0, _market: r.country_bucket || '' };
-    const e = leadMap[key];
-    e.totalLeads++;
-    if (String(r.qls) === '1') e.ql++;
-    if (String(r.trials_done) === '1') e.td++;
-    if (String(r.paid) === '1') e.enrolled++;
-    if (String(r.invalid) === '1') e.invalid++;
-    if ((r.ethnicity || '').toLowerCase().includes('nri')) e.nri++;
-    // Register utm_term as alias if it looks like an ad name (not numeric, not empty, not keyword)
-    const termKey = normalizeAdName(r.mx_utm_term || '');
-    if (termKey && termKey !== key && termKey.length > 30 && !/^\d+$/.test(termKey)) {
-      leadAliasMap[termKey] = key;
-    }
-  });
-  // Clamp: TD ≤ QL, Enrolled ≤ TD
-  Object.values(leadMap).forEach(e => { e.td = Math.min(e.td, e.ql); e.enrolled = Math.min(e.enrolled, e.td); });
+  // Aggregate daily rows by ad name
+  const daily = getAdPerformanceDaily(market, start, end);
+  const adMap = {}; // normName → aggregated metrics
 
-  // Step 2: Spend metrics per ad (from metaAdData, date-aware)
-  // Primary key: ad_id (stable), secondary: normalizedAdName (for CRM join)
-  const spendMap = {}; // key: normalizedAdName → { spend, impressions, clicks, leads, adName, campaign, adset, ad_id }
-  const spendByAdId = {}; // ad_id → same object (for dedup)
-  metaAdData.forEach(r => {
-    const rStart = r.date_min || r.date || '';
-    const rEnd = r.date_max || r.date || '';
-    if (start && rEnd < start) return;
-    if (end && rStart > end) return;
+  daily.forEach(r => {
     const key = normalizeAdName(r.ad_name);
     if (!key) return;
-    if (!spendMap[key]) spendMap[key] = { spend: 0, impressions: 0, clicks: 0, leads: 0, adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '', account: r._account || '', ad_id: r.ad_id || '' };
-    const s = spendMap[key];
-    s.spend += r.spend || 0;
-    s.impressions += parseInt(r.impressions) || 0;
-    s.clicks += parseInt(r.clicks) || 0;
-    s.leads += parseInt(r.leads) || 0;
-    if (r.ad_id) spendByAdId[r.ad_id] = s;
+    if (!adMap[key]) adMap[key] = {
+      adName: r.ad_name, campaign: r.campaign_name, adset: r.adset_name, ad_id: r.ad_id,
+      spend: 0, impressions: 0, clicks: 0,
+      ql: 0, nri: 0, td: 0, paid: 0, invalid: 0, totalLeads: 0,
+      market: r._market, source: r._source, hasMeta: false, hasCRM: false
+    };
+    const a = adMap[key];
+    a.spend += r.spend || 0;
+    a.impressions += r.impressions || 0;
+    a.clicks += r.clicks || 0;
+    a.ql += r.ql; a.nri += r.nri; a.td += r.td; a.paid += r.paid; a.invalid += r.invalid;
+    a.totalLeads += r.ql + r.invalid;
+    if (r._source === 'meta_insights') a.hasMeta = true;
+    if (r._crmMatched) a.hasCRM = true;
+    // Keep the most informative market/campaign
+    if (r._market && !a.market) a.market = r._market;
+    if (r.campaign_name && r.campaign_name.length > (a.campaign||'').length) a.campaign = r.campaign_name;
+    if (r.adset_name && !a.adset) a.adset = r.adset_name;
   });
 
-  // Step 3: Campaign-level spend from costData — used as fallback per-ad when metaAdData has no match
-  const campSpendMap = {};
-  costData.forEach(r => {
-    if ((r.medium || '').trim().toLowerCase() !== 'meta') return;
-    const key = normalizeAdName(r.campaign_name);
-    if (!key) return;
-    const day = r.day || '';
-    if (start && day < start) return;
-    if (end && day > end) return;
-    if (!campSpendMap[key]) campSpendMap[key] = 0;
-    campSpendMap[key] += parseFloat(r.amount_spent) || 0;
-  });
+  // Clamp TD ≤ QL, Paid ≤ TD at aggregate level
+  Object.values(adMap).forEach(a => { a.td = Math.min(a.td, a.ql); a.paid = Math.min(a.paid, a.td); });
 
-  // Step 4: Union join — Meta spend is primary, CRM leads enrich with funnel data
-  // First: build reverse alias map so we can claim CRM entries and prevent double-counting
-  const claimedLeadKeys = new Set(); // tracks which leadMap keys have been consumed by a spendMap match
-  const aliasReverse = {}; // spendMap key → leadMap key (via utm_term alias)
-  Object.keys(spendMap).forEach(metaKey => {
-    if (leadMap[metaKey]) return; // direct match exists, no alias needed
-    const aliasKey = leadAliasMap[metaKey];
-    if (aliasKey && leadMap[aliasKey]) aliasReverse[metaKey] = aliasKey;
-  });
-
-  // Process spendMap keys FIRST (Meta ads with spend — authoritative source)
-  const allKeys = new Set([...Object.keys(spendMap), ...Object.keys(leadMap)]);
   const results = [];
-
-  allKeys.forEach(key => {
-    const spend = spendMap[key] || null;
-    const tag = _tagMap[key] || {};
-
-    // Resolve CRM lead data: direct match → alias match → empty
-    let leadKey = null;
-    let lead = null;
-    if (leadMap[key]) {
-      leadKey = key;
-      lead = leadMap[key];
-    } else if (aliasReverse[key] && !claimedLeadKeys.has(aliasReverse[key])) {
-      leadKey = aliasReverse[key];
-      lead = leadMap[leadKey];
-    }
-    // If this leadMap entry was already claimed by a Meta ad via alias, skip this CRM-only key
-    if (!spend && !lead) return;
-    if (!spend && leadKey && claimedLeadKeys.has(leadKey)) return;
-
-    // Mark lead entry as claimed to prevent double-counting
-    if (lead && leadKey) claimedLeadKeys.add(leadKey);
-
-    // Use a copy of lead data to avoid mutation
-    const ql = lead?.ql || 0;
-    const td = lead?.td || 0;
-    const enrolled = lead?.enrolled || 0;
-    const nri = lead?.nri || 0;
-    const invalid = lead?.invalid || 0;
-    const totalLeads = lead?.totalLeads || 0;
-
+  Object.entries(adMap).forEach(([key, a]) => {
     // Skip: no leads AND no significant spend
-    if (ql === 0 && (!spend || spend.spend < 5000)) return;
+    if (a.ql === 0 && a.spend < 5000) return;
 
-    // Ad name: prefer Meta name (authoritative), then CRM, then tag
-    const adName = spend?.adName || lead?.adName || key;
-    const campaign = spend?.campaign || lead?.campaign || tag.campaign || '';
-    const adset = spend?.adset || tag.adset || '';
-
-    // Market: prefer account-level market from Meta, then CRM, then infer from name
-    const metaMarket = spend?.account ? ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' }[spend.account] || '') : '';
-    const mkt = metaMarket || lead?._market || matchMarketFromText(' ' + campaign.toUpperCase() + ' ');
-    const adMarket = mkt === 'Unknown' ? '' : mkt;
-    if (market && market !== 'all' && adMarket && adMarket !== market) return;
-
-    // Spend: ALWAYS use metaAdData when available (accurate ad-level spend)
-    let adSpend = spend ? spend.spend : null;
-    let spendSource = spend ? 'meta_insights' : null;
-    // Fallback: campaign pro-rate ONLY when Meta data is completely missing
-    if (adSpend === null && ql > 0) {
-      const campKey = normalizeAdName(campaign);
-      const campTotal = campSpendMap[campKey] || 0;
-      if (campTotal > 0) {
-        const campQLs = Object.values(leadMap).filter(l => normalizeAdName(l.campaign) === campKey).reduce((s, l) => s + l.ql, 0);
-        adSpend = campQLs > 0 ? campTotal * (ql / campQLs) : null;
-        spendSource = adSpend !== null ? 'campaign_prorated' : null;
-      }
-    }
-
-    // Impressions/clicks from metaAdData
-    const impressions = spend?.impressions || 0;
-    const clicks = spend?.clicks || 0;
-
-    // TQL (market-aware): US/Canada = NRI count, other markets = QL count
+    const tag = _tagMap[key] || {};
+    const adMarket = a.market || '';
     const isUS = adMarket === 'US' || adMarket === 'Canada';
-    const tql = isUS ? nri : ql;
+    const tql = isUS ? a.nri : a.ql;
+    const adSpend = a.spend > 0 ? a.spend : null;
+    const spendSource = a.hasMeta ? 'meta_insights' : (adSpend ? 'campaign_prorated' : null);
 
-    // Derived metrics — all from local copies, no mutation
-    const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-    const cpc = clicks > 0 ? (adSpend || 0) / clicks : 0;
-    const cpql = adSpend !== null && ql > 0 ? adSpend / ql : null;
+    const ctr = a.impressions > 0 ? (a.clicks / a.impressions) * 100 : 0;
+    const cpc = a.clicks > 0 ? (a.spend || 0) / a.clicks : 0;
+    const cpql = adSpend !== null && a.ql > 0 ? adSpend / a.ql : null;
     const cptql = adSpend !== null && tql > 0 ? adSpend / tql : null;
-    const cptd = adSpend !== null && td > 0 ? adSpend / td : null;
-    const clickToQl = clicks > 0 ? (ql / clicks) * 100 : 0;
-    const qlTdPct = ql > 0 ? (td / ql) * 100 : 0;
-    const nriPct = ql > 0 ? nri / ql : 0;
+    const cptd = adSpend !== null && a.td > 0 ? adSpend / a.td : null;
+    const clickToQl = a.clicks > 0 ? (a.ql / a.clicks) * 100 : 0;
+    const qlTdPct = a.ql > 0 ? (a.td / a.ql) * 100 : 0;
+    const nriPct = a.ql > 0 ? a.nri / a.ql : 0;
 
     results.push({
-      // Backward-compatible field names (renderers read these)
-      'Ad name': adName, 'ad name': adName,
-      'Campaign name': campaign, 'campaign name': campaign,
-      'Ad set name': adset, 'ad set name': adset,
+      'Ad name': a.adName, 'ad name': a.adName,
+      'Campaign name': a.campaign, 'campaign name': a.campaign,
+      'Ad set name': a.adset, 'ad set name': a.adset,
       'Creative type': tag.type || '', 'creative type': tag.type || '',
       'Spent': adSpend, 'spent': adSpend,
-      'Impressions': impressions, 'impressions': impressions,
-      'Clicks': clicks, 'clicks': clicks,
-      'QL': ql, 'ql': ql,
-      'TD': td, 'td': td,
-      'NRI': nri, 'nri': nri,
+      'Impressions': a.impressions, 'impressions': a.impressions,
+      'Clicks': a.clicks, 'clicks': a.clicks,
+      'QL': a.ql, 'ql': a.ql,
+      'TD': a.td, 'td': a.td,
+      'NRI': a.nri, 'nri': a.nri,
       'TQL': tql, 'tql': tql,
-      'Paid': enrolled, 'paid': enrolled,
+      'Paid': a.paid, 'paid': a.paid,
       'TS': 0, 'ts': 0,
       'CPTD': cptd, 'cptd': cptd,
       'CPQL': cpql, 'cpql': cpql,
       'CPTQL': cptql, 'cptql': cptql,
-      'CPNRI': isUS && adSpend !== null && nri > 0 ? adSpend / nri : null,
+      'CPNRI': isUS && adSpend !== null && a.nri > 0 ? adSpend / a.nri : null,
       'CTR': ctr, 'CPC': cpc,
       'QL-TD%': qlTdPct, 'QL→TD%': qlTdPct, 'Click→QL%': clickToQl,
       'NRI%': nriPct * 100,
-      'Invalid%': totalLeads > 0 ? (invalid / totalLeads) * 100 : 0,
+      'Invalid%': a.totalLeads > 0 ? (a.invalid / a.totalLeads) * 100 : 0,
       thumbnail_url: tag.thumb || _adMap?.[key]?.thumbnail_url || '',
       image_url: _adMap?.[key]?.image_url || tag.thumb || '',
       tags: tag.tags || {},
       _market: adMarket,
       _spendSource: spendSource,
-      _date: '', // no single date for aggregated result
+      _hasCRM: a.hasCRM,
+      _date: '',
     });
   });
 
-  const metaMatched = results.filter(r => r._spendSource === 'meta_insights').length;
+  const metaCount = results.filter(r => r._spendSource === 'meta_insights').length;
   const prorated = results.filter(r => r._spendSource === 'campaign_prorated').length;
   const noSpend = results.filter(r => !r._spendSource).length;
-  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads | ${metaMatched} meta_insights, ${prorated} campaign_prorated, ${noSpend} no_spend | ${claimedLeadKeys.size} CRM entries claimed via alias | ${Object.keys(leadMap).length} leads, ${Object.keys(spendMap).length} meta`);
+  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads | ${metaCount} meta, ${prorated} prorated, ${noSpend} no_spend | aggregated from ${daily.length} daily rows`);
 
-  // Sort by spend descending (budget allocation view)
   results.sort((a, b) => (b['Spent'] || 0) - (a['Spent'] || 0));
 
   _adPerfCache = { key: cacheKey, data: results };
