@@ -2885,7 +2885,13 @@ function init() {
   // Section 3+4: Meta creatives + daily insights — cache first, then parallel background fetch
   loadCachedCreatives();
   loadCachedAdData().then(loaded => {
-    if (loaded) console.log(`Boot: ${metaAdData.length} ad data rows from cache`);
+    if (loaded) {
+      console.log(`Boot: ${metaAdData.length} ad data rows from cache`);
+      // Critical: invalidate caches and re-render now that metaAdData is available
+      // (first render ran before this async load completed, caching ₹0 spend)
+      invalidateAdPerfCache();
+      if (state.currentView === 'dashboard') onDashboardFilterChange();
+    }
     if (_IS_DEPLOYED) { fetchMetaCreatives(); fetchMetaAdInsights(); }
   });
   // Always start on Dashboard
@@ -3678,7 +3684,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
   costData = parseSheetValues(costJson.values);
 
   // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
-  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','revenue','Revenue','board (ME)','board','mx_utm_campaign','mx_utm_adcontent'];
+  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','revenue','Revenue','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term'];
   const slimLeads = leadsData.map(r => {
     const s = {};
     LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
