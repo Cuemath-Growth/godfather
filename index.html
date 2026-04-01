@@ -492,10 +492,21 @@
               <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Format</label>
               <div class="flex flex-wrap gap-1.5" id="formatPills">
                 <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="Static Ad">Static Ad</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Video - Reel">Video - Reel</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Video - YouTube">Video - YouTube</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Video - Reel">Video Reel</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="YouTube Video">YouTube Video</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Carousel">Carousel</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Google Ads">Google Ads</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="AI Video">AI Video</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="UGC Ad">UGC Ad</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Influencer Script">Influencer Script</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Product Video">Product Video</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Testimonial Script">Testimonial Script</button>
               </div>
+            </div>
+            <!-- Sub-Format (conditional) -->
+            <div class="mb-4 hidden" id="subFormatSection">
+              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Sub-Format</label>
+              <div class="flex flex-wrap gap-1.5" id="subFormatPills"></div>
             </div>
 
             <!-- ICP Type -->
@@ -587,10 +598,13 @@
               </div>
             </div>
 
-            <button onclick="generateContent()" id="generateBtn" class="w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-primary">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              Generate
-            </button>
+            <div class="flex items-center gap-2">
+              <button onclick="generateContent()" id="generateBtn" class="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-primary">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Build Brief
+              </button>
+              <span id="modelBadge" class="text-[9px] px-2.5 py-1.5 rounded-lg bg-accent-purple-light text-accent-purple font-bold whitespace-nowrap">Sonnet</span>
+            </div>
             <button onclick="resetForge()" class="w-full py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-primary hover:bg-surface-tertiary transition-colors mt-2">Reset All Fields</button>
             </div><!-- /briefPanel -->
           </div>
@@ -2403,6 +2417,257 @@ const BANNED_SUBSTITUTIONS = {
   'learning centre': "Cuemath's platform"
 };
 
+// ==================== FORMAT CONFIG & MODEL ROUTING ====================
+const FORMAT_CONFIG = {
+  'Static Ad':          { model: 'sonnet', subFormats: null, maxTokens: 4096 },
+  'Video - Reel':       { model: 'opus',   subFormats: null, maxTokens: 6000 },
+  'YouTube Video':      { model: 'opus',   subFormats: null, maxTokens: 6000 },
+  'Carousel':           { model: 'sonnet', subFormats: null, maxTokens: 4096 },
+  'Google Ads':         { model: 'sonnet', subFormats: ['Brand Search','Keyword Search','PMax','DGen'], maxTokens: 4096 },
+  'AI Video':           { model: 'opus',   subFormats: ['AI Brand Video','AI Performance Video'], maxTokens: 8192 },
+  'UGC Ad':             { model: 'opus',   subFormats: null, maxTokens: 6000 },
+  'Influencer Script':  { model: 'opus',   subFormats: null, maxTokens: 6000 },
+  'Product Video':      { model: 'opus',   subFormats: null, maxTokens: 6000 },
+  'Testimonial Script': { model: 'opus',   subFormats: ['Parent Testimonial','Student Testimonial'], maxTokens: 6000 },
+};
+
+function getModelForFormat(format) {
+  const config = FORMAT_CONFIG[format];
+  if (!config) return 'claude-sonnet-4-20250514';
+  return config.model === 'opus' ? 'claude-opus-4-20250514' : 'claude-sonnet-4-20250514';
+}
+
+function getMaxTokensForFormat(format) {
+  return FORMAT_CONFIG[format]?.maxTokens || 4096;
+}
+
+function onFormatChange(format) {
+  const config = FORMAT_CONFIG[format];
+  const section = document.getElementById('subFormatSection');
+  const pills = document.getElementById('subFormatPills');
+  const aspectSection = document.getElementById('aspectSection');
+  const badge = document.getElementById('modelBadge');
+  // Sub-format pills
+  if (config?.subFormats) {
+    pills.innerHTML = config.subFormats.map((sf, i) =>
+      `<button class="pill-btn${i===0?' active':''} px-3 py-1.5 rounded-lg text-xs" data-value="${sf}">${sf}</button>`
+    ).join('');
+    setupPillGroup('subFormatPills');
+    section.classList.remove('hidden');
+  } else {
+    section.classList.add('hidden');
+    pills.innerHTML = '';
+  }
+  // Hide aspect ratio for text-only formats (Google Ads)
+  if (aspectSection) {
+    aspectSection.style.display = (format === 'Google Ads') ? 'none' : '';
+  }
+  // Model badge
+  if (badge) {
+    const isOpus = config?.model === 'opus';
+    badge.textContent = isOpus ? 'Opus' : 'Sonnet';
+    badge.className = `text-[9px] px-2.5 py-1.5 rounded-lg font-bold whitespace-nowrap ${isOpus ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple'}`;
+  }
+}
+
+// ==================== SOP RULES (extracted from Performance Creative SOP) ====================
+const SOP_RULES = {
+'Static Ad': `## SOP: STATIC AD RULES
+- Headline MUST include "Math" (never omit)
+- Badge: default "Rated 4.9 on Trustpilot". Alternatives: "Top 1% Tutors", market-specific proof
+- Subline: expand headline promise with a USP or proof pointer (RTB)
+- Visual hierarchy: Hero Line > Subline > Badge > CTA Button
+- CTA: "Book a Free Class" or "Book a Free 1:1 Class" (never deviate)
+- Primary Text: 2 lines max, 20-25 words total. Line 1 = pain point. Line 2 = resolution/outcome
+- Headline: ≤40 chars. Description: ≤30 chars
+- Never use more than 1 exclamation mark per ad
+- Outcome hierarchy: Understanding > Confidence > Grades (in that order)
+- Verb choices: "Build" (not "unlock"), "Strengthen" (not "boost"), "Develop" (not "hack")`,
+
+'Video - Reel': `## SOP: VIDEO REEL RULES (PERFORMANCE VIDEO)
+- Structure: Hook (0-3s) > Problem (3-8s) > Solution (8-20s) > Proof (20-25s) > CTA (25-30s)
+- Hook: stat/fear/problem-based, pattern-interrupt. Must be math-anchored or testimonial. NEVER lifestyle-only
+- Hook determines 80% of performance — invest here
+- Problem: name parent's SPECIFIC pain (not generic "struggling")
+- Solution: pick USP from winning data signals — use tags that perform best for this market+ICP
+- Proof: metric or testimonial. "400K+ parents", "Rated 4.9", specific outcome
+- CTA: VERBAL + ON-SCREEN TEXT. "Book a free trial class at cuemath.com"
+- Total: 15-30 seconds. On-screen text overlays at hook + end card
+- Include: timecodes, visual direction, voiceover, on-screen text for each scene`,
+
+'YouTube Video': `## SOP: YOUTUBE VIDEO RULES
+- Hook in first 5 seconds (must retain past skip button)
+- Full script: 15s or 30s format
+- Problem-agitate-solve structure
+- Include end screen CTA direction
+- On-screen text at key moments`,
+
+'Carousel': `## SOP: CAROUSEL RULES
+- 3-5 cards. Each must work standalone AND as sequence
+- Card 1: Hook (thumb-stop) — bold statement or provocative question
+- Card 2: Problem or insight. Card 3: Solution — Cuemath approach
+- Card 4: Proof — testimonial or metric. Card 5: CTA + badge
+- Each card: headline (5-8 words) + supporting text (10-15 words)
+- Visual consistency across all cards`,
+
+'Google Ads': `## SOP: GOOGLE ADS RULES
+- Headlines: STRICT 30 chars max (Google rejects 31+). Generate 15 headlines minimum
+- Descriptions: STRICT 90 chars max. Generate 4 descriptions minimum
+- CTA: "Book a Free Class" or "Start Free Trial" (never "Sign Up")
+### Sub-format specific:
+- Brand Search: include "Cuemath" in at least 3 headlines. Lead with brand + value prop
+- Keyword Search: lead with search intent, answer the query. Brand optional in headlines
+- PMax: asset group with max variety — mix emotional, proof, and offer angles. Cover all asset types (headlines, long headlines, descriptions, image direction, video direction)
+- DGen (Demand Gen): conversational, benefit-first. Display + search hybrid. Include image direction + landing page suggestion`,
+
+'AI Video': `## SOP: AI VIDEO RULES
+### AI Brand Video:
+- Premium storytelling, 45-60 seconds. Cinematic visual direction
+- Emotional arc: tension > insight > resolution > brand moment
+- First 3-4 seconds stay human (not tech). AI appears briefly, never leads
+- Must reference Cuemath pedagogy (Cue don't tell, productive struggle, MathFit)
+- Provide: shot-by-shot with timecodes, visual prompts, voiceover, on-screen text, music/mood
+- Reference concepts: The Building (geometry in architecture), The Aeroplane (breaking problems into parts), The Bridge (reasoning through struggle)
+### AI Performance Video:
+- Quick-turn, 15-30 seconds. Data-driven hook. Direct response oriented
+- Shot-by-shot direction with visual descriptions, voiceover, on-screen text
+- Must reference winning data signals from tagger/sentinel`,
+
+'UGC Ad': `## SOP: UGC AD RULES
+- Must feel authentic, NOT scripted. Use conversational parent language
+- Parent POV opening: "As a mom/dad..." or "When my child..."
+- Problem-solution-proof arc in 30 seconds
+- Must include specific detail (child's grade, specific math topic, time period for results)
+- End with natural CTA: "I'd say just try the free class" or "Honestly, just book the trial"
+- Primary Text: match the organic feel — no marketing speak
+- Include b-roll suggestions (child at desk, parent smiling, screen showing progress)`,
+
+'Influencer Script': `## SOP: INFLUENCER SCRIPT RULES
+- 9-scene structure: Hook > Personal connection > Problem reveal > Discovery > Experience > Specific result > Broader benefit > Social proof > CTA
+- Hook must be math-anchored or testimonial (NEVER lifestyle-only)
+- Tone: organic, conversational. Include specific details from performance data
+- Provide: 3-5 talking points, 2 hook options, do's/don'ts list
+- CTA: verbal + visual (spoken + on-screen text + link in bio mention)
+- Total: 30-45 seconds ideal. Include b-roll suggestions and caption guidance
+- Do NOT sound like a commercial. Sound like a friend recommending something that worked`,
+
+'Product Video': `## SOP: PRODUCT VIDEO RULES
+- Show the Cuemath platform/app in action
+- Structure: Problem > Platform walkthrough > Feature highlight > Outcome > CTA
+- Must demonstrate MathFit skills: FUAR (Fluency, Understanding, Application, Reasoning)
+- Include specific UI callouts: Talk-o-Meter, personalized learning path, tutor interaction, smart whiteboard
+- 20-40 seconds. Screen recording direction + voiceover script
+- End with: "See it for yourself — book a free class"`,
+
+'Testimonial Script': `## SOP: TESTIMONIAL SCRIPT RULES
+### Parent Testimonial:
+- Emotional journey arc. Before/after structure with timeline
+- Must include: child's grade, specific struggle, specific improvement, time period
+- Natural conversational tone. Provide interview prompt questions for the speaker
+- Structure: "Before Cuemath..." > "We tried..." > "Then we found Cuemath" > "Now my child..." > "I'd recommend it because..."
+### Student Testimonial:
+- Confidence transformation. "I used to... now I..." structure
+- Must include at least one specific MathFit outcome (understanding, not just grades)
+- Authentic kid voice — not adult copy in a child's mouth
+### Both: 30-45 seconds. Include b-roll suggestions`,
+};
+
+const VERNACULAR_GUIDELINES = `## VERNACULAR CREATIVE GUIDELINES
+### Telugu Arc:
+- Hook: Telugu pain point (Roman + Telugu script). Body: Mix English brand terms + Telugu emotional language
+- CTA: English CTA + Telugu reinforcement. Provide BOTH transliterated (Roman) AND native script
+- Top hooks: outcome/tutor quality first
+### Gujarati Arc:
+- Similar structure. Gujju family dynamics — multi-generational household context
+- Festival hooks (Navratri, Uttarayan) perform well. Roman + Gujarati script
+### Tamil Arc:
+- Academic rigor framing. Tamil parents value competition prep + school alignment
+- Mix Tamil emotional language with English technical terms`;
+
+// ==================== PATTERN LIBRARY (proven patterns from Notion + Drive) ====================
+const PATTERN_LIBRARY = {
+'Static Ad': {
+  'US': [
+    { name: 'K-2 NRI Foundation', structure: 'Headline: question about child\'s math understanding > Subline: 1:1 Indian tutor + personalized > Badge: Grades K-2 > CTA: Book a Free Class' },
+    { name: '3-5 Competition Prep', structure: 'Headline: competition name (AMC 8/Math Kangaroo/MOEMS) + readiness > Subline: trained by expert Indian tutors > Badge: grade range > CTA' },
+    { name: 'Asian Targeting', structure: 'Headline: accelerated/advanced math > Subline: culturally aligned tutors + competition track > Badge: grade + program > CTA' },
+  ],
+  'MEA': [
+    { name: 'MEA IB/British Curriculum', structure: 'Headline: IB/British/American curriculum alignment > Subline: US-quality tutoring, Trustpilot proof > Badge: curriculum type > CTA' },
+  ],
+  'AUS': [
+    { name: 'NAPLAN Prep', structure: 'Headline: NAPLAN readiness + confidence > Subline: personalized prep with top tutors > Badge: grade band > CTA' },
+  ],
+  '_seasonal': [
+    { name: 'Easter/Spring', structure: 'Seasonal context > Pivot to math enrichment > Offer/urgency > CTA. Tie the season to "fresh start" or "spring into confidence"' },
+    { name: 'New Year', structure: 'Resolution framing > "This year, your child masters math" > Personalization angle > CTA' },
+    { name: 'Back to School', structure: 'New school year anxiety > Cuemath as preparation > Confidence outcome > CTA' },
+    { name: 'Diwali (NRI)', structure: 'Festival context > Gift of education framing > NRI social proof > Offer > CTA' },
+  ],
+},
+'Video - Reel': {
+  '_universal': [
+    { name: 'Understanding vs Memorization', structure: 'Hook: "Your child passes tests... but can they explain WHY?" > Problem: memorization fragility > Solution: Cuemath conceptual approach > Proof: parent quote > CTA' },
+    { name: 'Productive Struggle', structure: 'Hook: "What if struggling IS the learning?" > Problem: parents rescue too fast > Solution: Cuemath productive struggle method > Proof: neuroscience backing > CTA' },
+    { name: 'AI World Readiness', structure: 'Hook: "AI can calculate. Can your child think?" > Problem: calculator dependency > Solution: MathFit thinking skills > Proof: future-ready framing > CTA' },
+  ],
+},
+'AI Video': {
+  '_universal': [
+    { name: 'The Building (Brand)', structure: 'Child sees building > traces geometry > deconstructs into shapes > "MathFit is seeing patterns where others see walls" > Cuemath endcard. Cinematic, 20s.' },
+    { name: 'The Aeroplane (Brand)', structure: 'Child watches plane > breaks flight into forces > hand-drawn vectors appear > "MathFit is breaking big questions into solvable parts" > endcard. 20s.' },
+    { name: 'The Bridge (Brand)', structure: 'AI solves instantly > child pauses, reasons through > builds understanding > "Clear thinking is rare. That\'s MathFit" > endcard. 20s.' },
+  ],
+},
+'Influencer Script': {
+  '_universal': [
+    { name: '9-Scene Template', structure: 'Hook (pattern interrupt) > Personal connection ("As a parent...") > Problem reveal (specific struggle) > Discovery ("A friend told me about...") > First experience ("The first class...") > Specific result ("Within 3 months...") > Broader benefit ("Now she actually enjoys...") > Social proof ("400K+ parents") > CTA ("Link in bio")' },
+    { name: 'Day in My Life', structure: 'Daily routine context > Math homework moment > Cuemath class clip > Child confidence moment > Parent reflection > CTA' },
+  ],
+},
+'UGC Ad': {
+  '_universal': [
+    { name: 'Parent Testimonial', structure: '"As a mom of a 4th grader..." > Before (specific struggle) > What they tried > Cuemath discovery > After (specific improvement + timeline) > Natural CTA "Just try the free class"' },
+    { name: 'Homework Moment', structure: 'Scene: parent watching child do homework > Before: frustration > After: confidence > "This is what Cuemath did for us" > CTA' },
+  ],
+},
+'Testimonial Script': {
+  '_universal': [
+    { name: 'Parent Journey', structure: 'Interview Q: "What was math like before?" > Struggle story > "How did you find Cuemath?" > Discovery > "What changed?" > Transformation > "What would you tell other parents?" > Recommendation' },
+    { name: 'Student Confidence', structure: '"I used to hate math because..." > Specific fear/struggle > "My Cuemath tutor showed me..." > Aha moment > "Now I..." > Confidence proof > Smile/pride moment' },
+  ],
+},
+'Google Ads': {
+  '_universal': [
+    { name: 'Brand Search Pattern', structure: '3+ headlines with "Cuemath" > Value props (1:1, Top Tutors, Personalized) > Trust signals (400K parents, 4.9 rating) > CTA headlines' },
+    { name: 'Keyword Search Pattern', structure: 'Intent-matching headlines (no brand required) > Problem-aware descriptions > Solution-oriented > CTA' },
+  ],
+},
+'Product Video': {
+  '_universal': [
+    { name: 'Platform Walkthrough', structure: 'Problem: "One-size-fits-all doesn\'t work" > Open app > Show personalized path > Highlight Talk-o-Meter > Show tutor interaction > Outcome: "Every child learns differently" > CTA' },
+  ],
+},
+};
+
+function getPatternContext(brief) {
+  const fmtPatterns = PATTERN_LIBRARY[brief.format] || {};
+  const marketPatterns = fmtPatterns[brief.market] || [];
+  const universalPatterns = fmtPatterns['_universal'] || [];
+  const seasonalPatterns = fmtPatterns['_seasonal'] || [];
+  const all = [...marketPatterns, ...universalPatterns, ...seasonalPatterns];
+  if (!all.length) return '';
+  let ctx = '\n\n## PROVEN PATTERNS FOR THIS FORMAT\nAdapt these structures — don\'t copy verbatim. Bring fresh angles informed by the winning formula data.\n';
+  all.forEach(p => { ctx += `- **${p.name}**: ${p.structure}\n`; });
+  return ctx;
+}
+
+function getSopRules(brief) {
+  const rules = SOP_RULES[brief.format] || '';
+  const vernac = (brief.market === 'India' || (brief.icpType || '').includes('NRI')) ? '\n' + VERNACULAR_GUIDELINES : '';
+  return rules + vernac;
+}
+
 // ── Seasonal Calendar (all geos) ──
 const SEASONAL_CALENDAR = [
   // US — School Rhythm
@@ -2825,6 +3090,10 @@ function init() {
   setupPillGroup('platformPills');
   setupPillGroup('formatPills');
   setupPillGroup('icpPills');
+  // Format change handler — sub-formats + model badge
+  document.getElementById('formatPills').addEventListener('click', () => {
+    setTimeout(() => { onFormatChange(getActivePill('formatPills')); }, 50);
+  });
   // Auto-recompute winning formula when market or ICP changes
   document.getElementById('briefMarket').addEventListener('change', () => {
     if (state.taggerData.length) {
@@ -8646,80 +8915,103 @@ function generateFromTemplate() {
 }
 
 async function generateContent() {
-  if (state.isGenerating) return;
-  if (!state.apiKey) { generateFromTemplate(); return; }
-  state.isGenerating = true;
-  const btn = document.getElementById('generateBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<div class="flex gap-1"><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.15s"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.3s"></div></div>';
-  document.getElementById('generateEmpty').classList.add('hidden');
-  document.getElementById('generateResult').classList.add('hidden');
-  document.getElementById('generateLoading').classList.remove('hidden');
-
   const brief = {
     market: document.getElementById('briefMarket').value,
     platform: getActivePill('platformPills'), format: getActivePill('formatPills'),
+    subFormat: getActivePill('subFormatPills') || null,
     icpType: getActivePill('icpPills'), segment: document.getElementById('briefSegment').value,
     funnel: document.getElementById('briefFunnel').value,
     angle: document.getElementById('briefAngle').value, offer: document.getElementById('briefOffer').value
   };
   state.currentBrief = brief;
+  localStorage.setItem('gf_currentBrief', JSON.stringify(brief));
 
-  const mode = state.outputMode;
+  // Build the brief summary for display + clipboard
+  const sopRules = getSopRules(brief);
+  const patterns = getPatternContext(brief);
+  const fmtTemplate = getFormatOutputTemplate(brief.format, brief.subFormat);
 
-  try {
-    // Step 1: Generate copy (for 'text' or 'both')
-    if (mode === 'text' || mode === 'both') {
-      const sys = buildSystemPrompt(brief);
-      const msg = buildUserMessage(brief);
-      state.conversationHistory = [{role:'user',content:msg}];
-      const result = await callClaude([{role:'user',content:msg}], false, sys);
-      showResult(result, brief);
-      // Hide the image section inline if text-only
-      if (mode === 'text') {
-        document.getElementById('imageGenSection').style.display = 'none';
-      }
-    }
-
-    // Step 2: Generate image (for 'image' or 'both')
-    if (mode === 'image' || mode === 'both') {
-      if (mode === 'image') {
-        // No copy — show result container with just image
-        document.getElementById('generateLoading').classList.add('hidden');
-        document.getElementById('generateResult').classList.remove('hidden');
-        document.getElementById('refinementBar').style.display = 'none';
-        document.getElementById('resultPlatform').textContent = brief.platform;
-        document.getElementById('resultMarket').textContent = brief.market;
-        document.getElementById('resultSegment').textContent = brief.segment;
-        document.getElementById('resultContent').innerHTML = '';
-        document.getElementById('imageGenSection').style.display = '';
-        // Build a prompt directly from the brief
-        state.lastGeneratedContent = `Platform: ${brief.platform}, Market: ${brief.market}, ICP: ${brief.icpType}, Segment: ${brief.segment}, Angle: ${brief.angle || 'Brand awareness'}`;
-      }
-
-      // Auto-set aspect based on platform
-      const platformAspect = { 'Meta':'1:1', 'YouTube':'16:9', 'WhatsApp':'1:1', 'Landing Page':'16:9' };
-      const bestAspect = platformAspect[brief.platform] || '1:1';
-      if (brief.format === 'Video - Reel') state.selectedAspect = '9:16';
-      else if (brief.format === 'Video - YouTube') state.selectedAspect = '16:9';
-      else state.selectedAspect = bestAspect;
-
-      // Show image loading
-      document.getElementById('imageLoading').classList.remove('hidden');
-      document.getElementById('imageOutput').classList.add('hidden');
-      document.getElementById('imageGenSection').style.display = '';
-
-      // Generate image
-      await generateImage();
-    }
-  } catch(e) {
-    document.getElementById('generateLoading').classList.add('hidden');
-    document.getElementById('generateEmpty').classList.remove('hidden');
-    showToast('Error: '+e.message);
+  // Get winning formula context if available
+  let winningCtx = '';
+  if (state.activeWinningFormula && Object.keys(state.activeWinningFormula).length) {
+    winningCtx = '\n**Winning Formula:** ' + Object.entries(state.activeWinningFormula)
+      .filter(([cat]) => TAG_CATEGORIES[cat])
+      .map(([cat, data]) => `${TAG_CATEGORIES[cat]?.label || cat}: "${tagLabel(data.tag)}"`)
+      .join(' + ');
   }
-  state.isGenerating = false;
-  btn.disabled = false;
-  btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Generate';
+
+  // Get top performers from Sentinel
+  let perfCtx = '';
+  if (state.sentinelOutput?.top_performers?.length) {
+    perfCtx = '\n**Top Performers:** ' + state.sentinelOutput.top_performers.slice(0, 3)
+      .map(p => `"${(p.name||'').substring(0,40)}" (CPQL ${formatCurrency(p.cpql)})`)
+      .join(', ');
+  }
+
+  const briefText = `**BRIEF** — ${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}
+**Market:** ${brief.market} | **Platform:** ${brief.platform} | **ICP:** ${brief.icpType}
+**Segment:** ${brief.segment} | **Funnel:** ${brief.funnel}${brief.angle ? '\n**Angle:** ' + brief.angle : ''}${brief.offer ? '\n**Offer:** ' + brief.offer : ''}${winningCtx}${perfCtx}`;
+
+  // Show brief in the output panel
+  document.getElementById('generateEmpty').classList.add('hidden');
+  document.getElementById('generateResult').classList.remove('hidden');
+  document.getElementById('resultPlatform').textContent = brief.platform;
+  document.getElementById('resultMarket').textContent = brief.market;
+  document.getElementById('resultSegment').textContent = brief.segment;
+  document.getElementById('imageGenSection').style.display = 'none';
+  document.getElementById('refinementBar').style.display = 'none';
+
+  const modelLabel = getModelForFormat(brief.format).includes('opus') ? 'Opus' : 'Sonnet';
+  document.getElementById('resultContent').innerHTML = `
+    <div class="mb-4 p-4 rounded-xl bg-surface-secondary border border-gray-200">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-bold">Brief Ready</h3>
+        <span class="text-[9px] px-2 py-0.5 rounded-full ${modelLabel === 'Opus' ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple'} font-bold">${modelLabel}-quality</span>
+      </div>
+      ${markdownToHtml(briefText)}
+    </div>
+    <div class="p-4 rounded-xl border-2 border-dashed border-accent-purple/30 bg-accent-purple-light/20 text-center">
+      <p class="text-sm font-semibold text-accent-purple mb-1">Ask Godfather to generate</p>
+      <p class="text-xs text-text-muted mb-3">Say: <code class="bg-white px-2 py-0.5 rounded text-accent-purple font-mono text-[11px]">/godfather copy</code> then "Generate from brief"</p>
+      <p class="text-[10px] text-text-muted">Or paste this brief directly. No API credits used — runs on your Claude Code bandwidth.</p>
+    </div>
+    <div class="mt-4 p-3 rounded-lg bg-surface-tertiary">
+      <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Output Template</p>
+      <pre class="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed" style="max-height:200px;overflow-y:auto">${fmtTemplate.replace(/</g,'&lt;').substring(0, 800)}${fmtTemplate.length > 800 ? '\n...' : ''}</pre>
+    </div>
+    ${sopRules ? `<details class="mt-3"><summary class="text-[10px] font-bold text-text-muted uppercase tracking-wider cursor-pointer">SOP Rules for ${brief.format}</summary><pre class="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed mt-2 p-3 bg-surface-tertiary rounded-lg" style="max-height:200px;overflow-y:auto">${sopRules.replace(/</g,'&lt;')}</pre></details>` : ''}
+    ${patterns ? `<details class="mt-3"><summary class="text-[10px] font-bold text-text-muted uppercase tracking-wider cursor-pointer">Proven Patterns</summary><pre class="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed mt-2 p-3 bg-surface-tertiary rounded-lg" style="max-height:200px;overflow-y:auto">${patterns.replace(/</g,'&lt;')}</pre></details>` : ''}`;
+
+  // Copy brief to clipboard
+  const clipboardText = briefText + '\n\n---\nFormat template:\n' + fmtTemplate;
+  navigator.clipboard.writeText(clipboardText).catch(() => {});
+  showToast('Brief saved — ask Godfather to generate (no credits used)');
+}
+
+// Godfather can call this to inject generated content back into the dashboard
+function injectGeneratedContent(content) {
+  if (!state.currentBrief) { showToast('No brief configured'); return; }
+  const brief = state.currentBrief;
+  showResult(content, brief);
+  document.getElementById('refinementBar').style.display = '';
+  showToast('Content injected from Godfather');
+}
+
+// Read the current brief (for Godfather to access via JS console)
+function getCurrentBrief() {
+  return state.currentBrief || JSON.parse(localStorage.getItem('gf_currentBrief') || 'null');
+}
+function getCurrentBriefFull() {
+  const brief = getCurrentBrief();
+  if (!brief) return null;
+  return {
+    brief,
+    sopRules: getSopRules(brief),
+    patterns: getPatternContext(brief),
+    outputTemplate: getFormatOutputTemplate(brief.format, brief.subFormat),
+    winningFormula: state.activeWinningFormula || null,
+    sentinel: state.sentinelOutput ? { top: state.sentinelOutput.top_performers?.slice(0,5), bottom: state.sentinelOutput.bottom_performers?.slice(0,5) } : null
+  };
 }
 
 function buildSystemPrompt(brief) {
@@ -9030,6 +9322,10 @@ USE these patterns as your baseline. Don't invent new structures — adapt what'
 
 ${getLibraryContext(brief)}
 
+${getSopRules(brief)}
+
+${getPatternContext(brief)}
+
 ## HARD RULES
 1. BE SHORT. Respect every character limit. Include char counts in parentheses for headlines/descriptions.
 2. MathFit(TM) on first mention only. Can omit TM after that in body copy.
@@ -9042,62 +9338,283 @@ ${getLibraryContext(brief)}
 9. Parent-facing ALWAYS. Never address children directly. "Your child will..." not "You will learn..."
 10. Outcomes over feelings — what the child will DO, not how they will FEEL.
 11. Every ad must ladder back to MathFit(TM) as the outcome.
-12. "Why These Work" section is MANDATORY with real data grounding. Never skip it.`;
+12. "Why These Work" section is MANDATORY with real data grounding. Never skip it.
+13. Every option MUST include Meta Ad Copy (Headline ≤40 chars, Primary Text ≤250 chars, Description ≤30 chars, CTA) regardless of format. Even for Google Ads, Influencer Scripts, or Video formats — always bundle the Meta companion copy.`;
 }
 function buildUserMessage(brief) {
-  let m = `Create 3 production-ready options for:\n**Market:** ${brief.market}\n**Platform:** ${brief.platform}\n**Format:** ${brief.format}\n**ICP:** ${brief.icpType}\n**Segment:** ${brief.segment}\n**Funnel:** ${brief.funnel}`;
+  let m = `Create 3 production-ready options for:\n**Market:** ${brief.market}\n**Platform:** ${brief.platform}\n**Format:** ${brief.format}`;
+  if (brief.subFormat) m += `\n**Sub-Format:** ${brief.subFormat}`;
+  m += `\n**ICP:** ${brief.icpType}\n**Segment:** ${brief.segment}\n**Funnel:** ${brief.funnel}`;
   if (brief.angle) m += `\n**Angle:** ${brief.angle}`;
   if (brief.offer) m += `\n**Offer:** ${brief.offer}`;
+  m += '\n\n' + getFormatOutputTemplate(brief.format, brief.subFormat);
+  return m;
+}
 
-  // Format-specific output instructions
-  const fmt = (brief.format || '').toLowerCase();
-  if (fmt.includes('video') || fmt.includes('reel')) {
-    m += `\n\n**OUTPUT AS VIDEO SCRIPT.** Each option must follow this structure:
+function getFormatOutputTemplate(format, subFormat) {
+  const META_COPY_BLOCK = `\n*Meta Ad Copy (MANDATORY for every option):*
+- **Headline:** [≤40 chars] (XX chars)
+- **Primary Text:** [≤250 chars, 2 lines max, 20-25 words. Line 1 = pain, Line 2 = resolution] (XX chars)
+- **Description:** [≤30 chars] (XX chars)
+- **CTA:** Book a Free Class`;
+
+  const VIDEO_SCRIPT_TEMPLATE = `**OUTPUT AS VIDEO SCRIPT.** Each option:
 
 ---
 **Option X** — [2-word angle label]
 
-*Script:*
-- **HOOK (0-3s):** [Pattern-interrupt opening. Must be math-anchored or testimonial — NEVER lifestyle-only. 1-2 sentences max.]
-- **PROBLEM (3-8s):** [Name the parent's specific pain. Not generic.]
-- **SOLUTION (8-20s):** [Cuemath's approach — pick the USP that works best from data. Reference MathFit, 1:1, personalised path, cue-don't-tell, etc.]
-- **PROOF (20-25s):** [Metric, testimonial, or social proof. "400K+ parents", "Rated 4.9 on Trustpilot", specific outcome.]
-- **CTA (25-30s):** [Must be VERBAL + ON-SCREEN TEXT. "Book a free trial class at cuemath.com"]
+| Time | Visual Direction | Voiceover | On-Screen Text |
+|------|-----------------|-----------|----------------|
+| **0-3s (HOOK)** | [Visual description] | [1-2 sentences, pattern-interrupt] | [Bold hook text] |
+| **3-8s (PROBLEM)** | [Visual] | [Parent's specific pain] | [Key phrase] |
+| **8-20s (SOLUTION)** | [Visual] | [Cuemath approach + data-backed USP] | [Value prop] |
+| **20-25s (PROOF)** | [Visual] | [Metric/testimonial] | [Proof point] |
+| **25-30s (CTA)** | [End card layout] | "Book a free trial class at cuemath.com" | [CTA + badge + logo] |
 
-*On-Screen Text Overlays:*
-- Hook text: [Bold text shown in first 3 seconds]
-- End card: [CTA + badge + logo placement]
-
-*Meta Ad Copy:*
-- Primary Text: [125 chars, parent-facing]
-- Headline: [40 chars]
-- Description: [30 chars]
+*Music/Mood:* [Direction]
+${META_COPY_BLOCK}
 
 ---
+The hook determines 80% of performance — invest here.`;
 
-Total: 15-30 seconds for performance video, 30-45 seconds for influencer.
-Tone should be organic with specific pointers that can be edited later.
-The hook determines 80% of performance — make it count.`;
-  } else if (fmt.includes('carousel')) {
-    m += `\n\n**OUTPUT AS CAROUSEL.** Each option must have 3-5 cards:
+  const templates = {
+    'Static Ad': `Keep it SHORT. Each option = one complete static ad:
+
+---
+**Option X** — [2-word angle label]
+
+*Creative Copy (on-image):*
+- **Hero Line:** [5-8 words, must include "Math"]
+- **Subline:** [8-12 words, USP or proof pointer]
+- **Badge:** [e.g., "Rated 4.9 on Trustpilot" or "Grades 3-8"]
+- **CTA Button:** "Book a Free Class"
+
+*Visual Direction:* [Brief description of imagery/layout]
+${META_COPY_BLOCK}
+
+*Why This Works:* [1-2 sentences grounded in data]
+---
+Follow character limits strictly. Include char counts in parentheses.`,
+
+    'Video - Reel': VIDEO_SCRIPT_TEMPLATE,
+    'YouTube Video': VIDEO_SCRIPT_TEMPLATE.replace('25-30s', '25-30s').replace('15-30 seconds', '15-30 seconds') + '\nFor YouTube: hook must retain past the 5-second skip button.',
+
+    'Carousel': `**OUTPUT AS CAROUSEL.** Each option = 3-5 cards:
 
 ---
 **Option X** — [angle label]
 
-*Card 1 (Hook):* [Bold statement or question — this is the thumb-stop]
-*Card 2:* [Problem or insight]
-*Card 3:* [Solution — Cuemath's approach]
-*Card 4:* [Proof — testimonial or metric]
-*Card 5 (CTA):* [Clear action + badge]
+| Card | Headline (5-8 words) | Supporting Text (10-15 words) | Visual Direction |
+|------|---------------------|------------------------------|-----------------|
+| **Card 1 (Hook)** | [Thumb-stop statement/question] | [Expand the hook] | [Visual] |
+| **Card 2 (Problem)** | [Pain point] | [Specific relatable detail] | [Visual] |
+| **Card 3 (Solution)** | [Cuemath approach] | [USP detail] | [Visual] |
+| **Card 4 (Proof)** | [Testimonial/metric] | [Specific outcome] | [Visual] |
+| **Card 5 (CTA)** | [Action statement] | [Badge + urgency] | [CTA button + logo] |
+${META_COPY_BLOCK}
+---`,
 
-*Meta Ad Copy:*
-- Primary Text: [125 chars]
-- Headline: [40 chars]
----`;
-  } else {
-    m += '\n\nKeep it SHORT. Bundle each option as one complete static ad with Platform Copy + Creative Copy (on-image text). Follow character limits strictly.';
-  }
-  return m;
+    'Google Ads': (function() {
+      if (subFormat === 'Brand Search') return `**OUTPUT: GOOGLE BRAND SEARCH ADS**
+
+Generate **3 ad group variations**, each containing:
+- **15 Headlines** (STRICT 30 chars max each — include char count). At least 3 must include "Cuemath"
+- **4 Descriptions** (STRICT 90 chars max each — include char count)
+- **Sitelink suggestions** (4 per group)
+
+Format each headline as: \`Headline: [text] (XX chars)\`
+Format each description as: \`Description: [text] (XX chars)\`
+
+Lead with brand + value prop. Trust signals: "400K+ Parents", "Rated 4.9", "Top 1% Tutors".
+${META_COPY_BLOCK}`;
+      if (subFormat === 'Keyword Search') return `**OUTPUT: GOOGLE KEYWORD SEARCH ADS**
+
+Generate **3 ad group variations** (each targeting a different keyword intent), each containing:
+- **15 Headlines** (STRICT 30 chars max — include char count). Lead with search intent, answer the query. Brand optional.
+- **4 Descriptions** (STRICT 90 chars max — include char count)
+- **Target keyword suggestion** per group
+
+Format: \`Headline: [text] (XX chars)\` and \`Description: [text] (XX chars)\`
+${META_COPY_BLOCK}`;
+      if (subFormat === 'PMax') return `**OUTPUT: GOOGLE PERFORMANCE MAX ASSET GROUP**
+
+Generate **3 asset group variations**, each containing:
+- **5 Headlines** (30 chars max)
+- **5 Long Headlines** (90 chars max)
+- **5 Descriptions** (90 chars max)
+- **Image Direction** (3 concepts with visual descriptions)
+- **Video Direction** (15s script outline)
+
+Mix emotional, proof, and offer angles across groups. Maximum asset variety.
+${META_COPY_BLOCK}`;
+      if (subFormat === 'DGen') return `**OUTPUT: GOOGLE DEMAND GEN ADS**
+
+Generate **3 options**, each containing:
+- **Headline:** [≤40 chars] (XX chars)
+- **Long Headline:** [≤90 chars] (XX chars)
+- **Description:** [≤90 chars] (XX chars)
+- **Image Direction:** [Visual concept for the ad image]
+- **Landing Page Suggestion:** [Recommended LP + why]
+
+Tone: conversational, benefit-first. Think display + search hybrid.
+${META_COPY_BLOCK}`;
+      return `Select a sub-format (Brand Search, Keyword Search, PMax, or DGen) for specific output.`;
+    })(),
+
+    'AI Video': (function() {
+      if (subFormat === 'AI Brand Video') return `**OUTPUT: AI BRAND VIDEO CONCEPTS** (45-60 seconds each)
+
+Generate **3 cinematic concepts**, each with:
+
+---
+**Concept X: [Title]** — [1-line premise]
+
+| Time | Visual Scene (AI Video Prompt) | Voiceover | On-Screen Text |
+|------|-------------------------------|-----------|----------------|
+| **0-4s** | [Cinematic opening — stay human, not tech] | [Hook line] | [Optional text] |
+| **4-8s** | [Child's perspective/discovery] | [Bridge to insight] | |
+| **8-15s** | [Core metaphor visualization] | [MathFit philosophy] | [Key phrase] |
+| **15-18s** | [Resolution/transformation moment] | [Brand statement] | [MathFit™] |
+| **18-20s** | [End card: Cuemath logo + CTA] | [CTA line] | [Book a Free Class] |
+
+*Music/Mood:* [Cinematic direction]
+*Production Notes:* [Key visual requirements]
+${META_COPY_BLOCK}
+
+---
+Reference concepts: The Building (geometry in architecture), The Aeroplane (breaking problems into parts), The Bridge (reasoning through struggle). Create NEW concepts in this spirit.`;
+      if (subFormat === 'AI Performance Video') return `**OUTPUT: AI PERFORMANCE VIDEO** (15-30 seconds each)
+
+${VIDEO_SCRIPT_TEMPLATE}
+Data-driven hook required. Direct response CTA. Quick-turn production.`;
+      return `Select a sub-format (AI Brand Video or AI Performance Video).`;
+    })(),
+
+    'UGC Ad': `**OUTPUT: UGC AD SCRIPTS** (30 seconds, parent POV)
+
+Generate **3 options**, each with:
+
+---
+**Option X** — [angle label]
+
+*Script (natural, conversational — NOT scripted-sounding):*
+- **Opening (0-5s):** "As a [mom/dad] of a [grade] grader..." [Specific personal detail]
+- **Before (5-12s):** [What math was like before — specific struggle, not generic]
+- **Discovery (12-18s):** [How they found Cuemath — keep it natural]
+- **After (18-25s):** [Specific improvement with timeline: "Within X months..."]
+- **CTA (25-30s):** [Natural recommendation: "I'd say just try the free class" or "Honestly, just book the trial"]
+
+*B-Roll Suggestions:* [3-4 visual moments to capture]
+*Caption:* [Social media caption, 2-3 lines]
+${META_COPY_BLOCK}
+
+---
+Must feel authentic. Include specific details (child's grade, math topic, time period). NO marketing speak.`,
+
+    'Influencer Script': `**OUTPUT: INFLUENCER SCRIPTS** (30-45 seconds)
+
+Generate **3 options**, each with:
+
+---
+**Option X** — [angle label]
+
+*9-Scene Script:*
+1. **HOOK (0-3s):** [Pattern-interrupt — math-anchored, NOT lifestyle. 2 hook options provided]
+2. **PERSONAL (3-6s):** [Influencer's connection: "As a parent..."]
+3. **PROBLEM (6-10s):** [Specific struggle they relate to]
+4. **DISCOVERY (10-14s):** [How they found Cuemath: "A friend told me..." or "I saw this ad..."]
+5. **EXPERIENCE (14-20s):** [First class experience — specific detail]
+6. **RESULT (20-25s):** [Concrete outcome: "Within 3 months, she went from..."]
+7. **BROADER BENEFIT (25-30s):** [Beyond grades: confidence, thinking, enjoyment]
+8. **SOCIAL PROOF (30-35s):** [400K+ parents, ratings, named award]
+9. **CTA (35-40s):** [Verbal + visual: "Link in my bio" + on-screen text + CTA button]
+
+*Talking Points:* [5 key points to hit]
+*Do's:* [3 guidelines]
+*Don'ts:* [3 things to avoid]
+*B-Roll Suggestions:* [4-5 visual moments]
+*Caption:* [Instagram/YouTube caption]
+${META_COPY_BLOCK}
+
+---
+Sound like a friend recommending, NOT a commercial. Include specific details the influencer can personalize.`,
+
+    'Product Video': `**OUTPUT: PRODUCT VIDEO SCRIPTS** (20-40 seconds)
+
+Generate **3 options**, each with:
+
+---
+**Option X** — [angle label]
+
+| Time | Screen Recording Direction | Voiceover | On-Screen Text |
+|------|--------------------------|-----------|----------------|
+| **0-3s** | [Problem setup — generic tutoring or worksheet visual] | [Hook: problem statement] | [Hook text] |
+| **3-10s** | [Open Cuemath platform — show personalized path] | [Introduce the solution] | [Feature name] |
+| **10-20s** | [Feature walkthrough — Talk-o-Meter, smart whiteboard, or tutor interaction] | [Explain the magic: how it works] | [Key benefit] |
+| **20-30s** | [Show progress/outcome screen] | [Result: what the child gains] | [Proof point] |
+| **30-35s** | [End card: logo + CTA] | "See it for yourself — book a free class" | [CTA + badge] |
+
+*UI Callouts to Feature:* [Specific platform elements to showcase]
+${META_COPY_BLOCK}
+
+---
+Must demonstrate MathFit skills (Fluency, Understanding, Application, Reasoning).`,
+
+    'Testimonial Script': (function() {
+      if (subFormat === 'Parent Testimonial') return `**OUTPUT: PARENT TESTIMONIAL SCRIPTS** (30-45 seconds)
+
+Generate **3 options**, each with:
+
+---
+**Option X** — [angle: e.g., "Anxiety to Confidence" or "Memorization to Understanding"]
+
+*Interview Prompt Questions:*
+1. "What was math like for [child's name] before Cuemath?"
+2. "What had you tried before?"
+3. "What changed after joining Cuemath?"
+4. "Can you share a specific moment when you saw the difference?"
+5. "What would you tell another parent considering Cuemath?"
+
+*Expected Script Flow:*
+- **Before (0-10s):** "[Child] used to [specific struggle]. I remember [specific moment]..."
+- **Turning Point (10-20s):** "We found Cuemath and [first experience detail]..."
+- **After (20-35s):** "Now [child] [specific improvement]. Just last week, [concrete example]..."
+- **Recommendation (35-45s):** "If your child [relatable situation], I'd say [natural CTA]..."
+
+*B-Roll Suggestions:* [4-5 shots: child studying, parent smiling, screen showing progress, family moment]
+${META_COPY_BLOCK}
+
+---
+Must include: child's grade, specific struggle, specific improvement, timeline. Natural tone — coach the speaker, don't script them.`;
+      if (subFormat === 'Student Testimonial') return `**OUTPUT: STUDENT TESTIMONIAL SCRIPTS** (30-45 seconds)
+
+Generate **3 options**, each with:
+
+---
+**Option X** — [angle: e.g., "From Fear to Confidence"]
+
+*Interview Prompt Questions:*
+1. "How did you feel about math before?"
+2. "What was your first Cuemath class like?"
+3. "What's different now?"
+4. "What's your favorite thing about Cuemath?"
+
+*Expected Script Flow:*
+- **Before (0-8s):** "I used to [specific fear/struggle]. Like when [concrete example]..."
+- **Change (8-20s):** "My Cuemath tutor [name] showed me [specific method]... and suddenly it clicked"
+- **Now (20-35s):** "Now I [specific confidence proof]. I even [achievement]..."
+- **Close (35-40s):** [Smile/pride moment]
+
+*B-Roll:* [Child at desk, solving problems, tutor interaction, confident moment]
+${META_COPY_BLOCK}
+
+---
+Authentic kid voice — NOT adult copy in a child's mouth. Include at least one MathFit outcome (understanding, not just grades).`;
+      return `Select a sub-format (Parent Testimonial or Student Testimonial).`;
+    })(),
+  };
+
+  return templates[format] || 'Create 3 production-ready options. Each must include creative copy + Meta Ad Copy (Headline, Primary Text, Description, CTA). Follow brand guidelines strictly.';
 }
 function showResult(content, brief) {
   document.getElementById('generateLoading').classList.add('hidden');
@@ -9124,7 +9641,19 @@ function showResult(content, brief) {
     <p class="text-xs text-amber-700 mt-1">This segment has the highest churn risk per strategy doc. Copy may attract high-intent leads who churn after competition season. Pair with retention-focused nurture sequence.</p>
   </div>` : '';
 
-  document.getElementById('resultContent').innerHTML = validationHtml + markdownToHtml(content) + whyWarning + accelBanner;
+  // Option count check
+  const optionCount = (content.match(/\*\*Option \d+\*\*/gi) || content.match(/\*\*Concept \d+/gi) || content.match(/## Option \d+/gi) || []).length;
+  const optionWarning = optionCount > 0 && optionCount < 3 ? `<div class="mt-3 p-3 rounded-lg border border-orange-200 bg-accent-orange-light">
+    <span class="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Only ${optionCount} option(s) generated</span>
+    <p class="text-xs text-amber-700 mt-1">Expected 3 options. Try refining with: "Generate the missing options with different angles."</p>
+  </div>` : '';
+
+  // Model used indicator
+  const modelUsed = getModelForFormat(brief.format);
+  const modelLabel = modelUsed.includes('opus') ? 'Opus' : 'Sonnet';
+  const modelInfo = `<div class="mb-3 flex items-center gap-2"><span class="text-[9px] px-2 py-0.5 rounded-full ${modelUsed.includes('opus') ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple'} font-bold">${modelLabel}</span><span class="text-[9px] text-text-muted">${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}</span></div>`;
+
+  document.getElementById('resultContent').innerHTML = modelInfo + validationHtml + markdownToHtml(content) + optionWarning + whyWarning + accelBanner;
   // Character count for ad copy limits
   const plainText = content.replace(/[#*_`>\[\]()]/g, '').trim();
   const lines = plainText.split('\n').filter(l => l.trim());
@@ -9191,7 +9720,9 @@ async function refineContent() {
   document.getElementById('generateResult').classList.add('hidden');
   state.conversationHistory.push({role:'user',content:fb});
   try {
-    const result = await callClaude(state.conversationHistory, false, buildSystemPrompt(state.currentBrief));
+    const model = getModelForFormat(state.currentBrief.format);
+    const maxTokens = getMaxTokensForFormat(state.currentBrief.format);
+    const result = await callClaude(state.conversationHistory, false, buildSystemPrompt(state.currentBrief), model, maxTokens);
     showResult(result, state.currentBrief);
     // Track refinement version
     const _fvEntry = state.forgeVersions.find(e => e.id === state._currentForgeId); if (_fvEntry) { _fvEntry.versions.push({content: result, timestamp: new Date().toISOString(), label: 'v' + (_fvEntry.versions.length + 1)}); renderForgeVersions(); }
@@ -13448,7 +13979,7 @@ function updateFormulaIndicator() {
   const f = state.activeWinningFormula;
   if (!f || !Object.keys(f).length) { indicator.classList.add('hidden'); return; }
   indicator.classList.remove('hidden');
-  const text = Object.entries(f).map(([cat,data]) => `${TAG_CATEGORIES[cat].label}: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)})`).join(' + ');
+  const text = Object.entries(f).filter(([cat]) => TAG_CATEGORIES[cat]).map(([cat,data]) => `${TAG_CATEGORIES[cat].label}: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)})`).join(' + ');
   document.getElementById('formulaIndicatorText').textContent = text;
 }
 
@@ -15135,10 +15666,12 @@ function exportInfluencerXLSX() {
 }
 
 // ==================== CLAUDE API ====================
-async function callClaude(messages, jsonMode=false, systemPrompt=null) {
+async function callClaude(messages, jsonMode=false, systemPrompt=null, model=null, maxTokens=null) {
   let system = systemPrompt || '';
   if (jsonMode) system = system + '\nRespond with ONLY valid JSON. No markdown fences.';
-  const data = await callClaudeAPI('claude-sonnet-4-20250514', system, messages, 4096);
+  const selectedModel = model || 'claude-sonnet-4-20250514';
+  const tokens = maxTokens || (selectedModel.includes('opus') ? 8192 : 4096);
+  const data = await callClaudeAPI(selectedModel, system, messages, tokens);
   return data.content[0].text;
 }
 
@@ -15176,6 +15709,11 @@ function resetForge() {
     btn.classList.toggle('active', isFirst);
   });
   const wf = document.getElementById('winningFormulaIndicator'); if (wf) wf.classList.add('hidden');
+  // Reset sub-format
+  const subSection = document.getElementById('subFormatSection'); if (subSection) subSection.classList.add('hidden');
+  const subPills = document.getElementById('subFormatPills'); if (subPills) subPills.innerHTML = '';
+  // Reset model badge
+  onFormatChange('Static Ad');
   showToast('Forge reset');
 }
 
