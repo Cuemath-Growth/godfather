@@ -6866,7 +6866,11 @@ function renderOracleCardsV2() {
   // Use the new clean data layer — date-aware, ad-level
   const rawPerf = getAdPerformance(market, from, to);
   // Map to the field names the signal logic expects
-  const adCampData = rawPerf.map(r => ({
+  // CRITICAL: Only include ads with CRM data for decision-making.
+  // Ads without CRM match show 0 QLs → would be falsely flagged as BURN.
+  const adCampData = rawPerf
+    .filter(r => r._hasCRM) // Must have CRM lead data to make Pause/Scale decisions
+    .map(r => ({
     adName: r['Ad name'], campaignName: r['Campaign name'],
     displayName: stripCampaignPrefix(r['Ad name']),
     campaignContext: stripCampaignPrefix(r['Campaign name']),
