@@ -4310,6 +4310,139 @@ function buildLookupMaps() {
 
 let _tagMap = {}; // { normalizedAdName: { tags, type, thumb, campaign, adset } }
 let _adPerfCache = { key: '', data: [] }; // cache for getAdPerformance
+let _dailyCache = { key: '', data: [] }; // cache for getAdPerformanceDaily
+
+// ── DAILY DATA LAYER: getAdPerformanceDaily() ──
+// Returns one row per ad per day. This is the foundational data model.
+// Meta API → daily spend/impressions/clicks per ad
+// CRM → daily QLs/NRIs per ad (by lead_created_date)
+// CRM → TDs attributed to lead's creation date (cohort attribution)
+function getAdPerformanceDaily(market, startDate, endDate) {
+  const start = startDate || COST_DATA_START || '';
+  const end = endDate || new Date().toISOString().slice(0, 10);
+  const cacheKey = `daily|${market||'all'}|${start}|${end}`;
+  if (_dailyCache.key === cacheKey && _dailyCache.data.length) return _dailyCache.data;
+
+  // Step 1: Meta API — daily spend per ad (keyed by normalizedAdName + date)
+  const metaDaily = {}; // key: "normName|date" → { spend, impressions, clicks, adName, campaign, adset, account, ad_id }
+  metaAdData.forEach(r => {
+    const d = r.date || '';
+    if (start && d < start) return;
+    if (end && d > end) return;
+    const normName = normalizeAdName(r.ad_name);
+    if (!normName) return;
+    const key = normName + '|' + d;
+    if (!metaDaily[key]) metaDaily[key] = { date: d, normName, adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '', ad_id: r.ad_id || '', account: r._account || '', spend: 0, impressions: 0, clicks: 0 };
+    const m = metaDaily[key];
+    m.spend += r.spend || 0;
+    m.impressions += parseInt(r.impressions) || 0;
+    m.clicks += parseInt(r.clicks) || 0;
+  });
+
+  // Step 2: CRM — daily leads per ad (keyed by normalizedAdName + lead_created_date)
+  // Also build utm_term alias map for the join
+  const crmDaily = {}; // key: "normName|date" → { ql, nri, td, paid, invalid }
+  const termAlias = {}; // normTerm → normAdcontent
+  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
+  filteredLeads.forEach(r => {
+    const d = r.lead_created_date || '';
+    if (start && d < start) return;
+    if (end && d > end) return;
+    const normName = normalizeAdName(r.mx_utm_adcontent);
+    if (!normName) return;
+    const key = normName + '|' + d;
+    if (!crmDaily[key]) crmDaily[key] = { date: d, normName, adName: r.mx_utm_adcontent, campaign: r.mx_utm_campaign || '', market: r.country_bucket || '', ql: 0, nri: 0, td: 0, paid: 0, invalid: 0, total: 0 };
+    const c = crmDaily[key];
+    c.total++;
+    if (String(r.qls) === '1') c.ql++;
+    if ((r.ethnicity || '').toLowerCase().includes('nri')) c.nri++;
+    if (String(r.trials_done) === '1') c.td++;
+    if (String(r.paid) === '1') c.paid++;
+    if (String(r.invalid) === '1') c.invalid++;
+    // Register utm_term alias
+    const termNorm = normalizeAdName(r.mx_utm_term || '');
+    if (termNorm && termNorm !== normName && termNorm.length > 30 && !/^\d+$/.test(termNorm)) {
+      termAlias[termNorm] = normName;
+    }
+  });
+  // Clamp TD ≤ QL, Paid ≤ TD per daily row
+  Object.values(crmDaily).forEach(c => { c.td = Math.min(c.td, c.ql); c.paid = Math.min(c.paid, c.td); });
+
+  // Step 3: Join — for each Meta daily row, find matching CRM daily row
+  const claimedCRM = new Set(); // prevent double-counting
+  const results = [];
+
+  // Process Meta rows first (authoritative spend source)
+  Object.values(metaDaily).forEach(m => {
+    const d = m.date;
+    const directKey = m.normName + '|' + d;
+    const aliasName = termAlias[m.normName];
+    const aliasKey = aliasName ? (aliasName + '|' + d) : null;
+
+    let crm = null;
+    if (crmDaily[directKey] && !claimedCRM.has(directKey)) {
+      crm = crmDaily[directKey];
+      claimedCRM.add(directKey);
+    } else if (aliasKey && crmDaily[aliasKey] && !claimedCRM.has(aliasKey)) {
+      crm = crmDaily[aliasKey];
+      claimedCRM.add(aliasKey);
+    }
+
+    const metaMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' })[m.account] || '';
+    const mkt = metaMarket || crm?.market || matchMarketFromText(' ' + m.campaign.toUpperCase() + ' ');
+    const adMarket = mkt === 'Unknown' ? '' : mkt;
+    if (market && market !== 'all' && adMarket && adMarket !== market) return;
+
+    const ql = crm?.ql || 0;
+    const nri = crm?.nri || 0;
+    const td = crm?.td || 0;
+    const paid = crm?.paid || 0;
+    const isUS = adMarket === 'US' || adMarket === 'Canada';
+    const tql = isUS ? nri : ql;
+
+    results.push({
+      date: d, ad_name: m.adName, ad_id: m.ad_id, campaign_name: m.campaign, adset_name: m.adset,
+      spend: m.spend, impressions: m.impressions, clicks: m.clicks,
+      ql, nri, tql, td, paid, invalid: crm?.invalid || 0,
+      cpql: ql > 0 ? m.spend / ql : null,
+      cptql: tql > 0 ? m.spend / tql : null,
+      cptd: td > 0 ? m.spend / td : null,
+      ctr: m.impressions > 0 ? (m.clicks / m.impressions) * 100 : 0,
+      cpc: m.clicks > 0 ? m.spend / m.clicks : 0,
+      _market: adMarket, _source: 'meta_insights', _crmMatched: !!crm
+    });
+  });
+
+  // Process unclaimed CRM rows (leads without Meta spend match)
+  Object.entries(crmDaily).forEach(([key, c]) => {
+    if (claimedCRM.has(key)) return;
+    if (c.ql === 0) return;
+    const mkt = c.market || matchMarketFromText(' ' + c.campaign.toUpperCase() + ' ');
+    const adMarket = mkt === 'Unknown' ? '' : mkt;
+    if (market && market !== 'all' && adMarket && adMarket !== market) return;
+    const isUS = adMarket === 'US' || adMarket === 'Canada';
+    const tql = isUS ? c.nri : c.ql;
+    results.push({
+      date: c.date, ad_name: c.adName, ad_id: '', campaign_name: c.campaign, adset_name: '',
+      spend: null, impressions: 0, clicks: 0,
+      ql: c.ql, nri: c.nri, tql, td: c.td, paid: c.paid, invalid: c.invalid,
+      cpql: null, cptql: null, cptd: null, ctr: 0, cpc: 0,
+      _market: adMarket, _source: 'crm_only', _crmMatched: true
+    });
+  });
+
+  results.sort((a, b) => b.date.localeCompare(a.date) || (b.spend || 0) - (a.spend || 0));
+
+  const metaRows = results.filter(r => r._source === 'meta_insights').length;
+  const crmOnly = results.filter(r => r._source === 'crm_only').length;
+  const matched = results.filter(r => r._crmMatched).length;
+  console.log(`getAdPerformanceDaily(${market||'all'}, ${start}, ${end}): ${results.length} daily rows | ${metaRows} meta, ${crmOnly} crm-only | ${matched} with CRM match`);
+
+  _dailyCache = { key: cacheKey, data: results };
+  return results;
+}
+
+function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; }
 
 // ── CLEAN DATA LAYER: getAdPerformance() ──
 // Single source of truth for ALL views. Joins leadsData (date-aware QLs/TDs) + metaAdData (date-aware spend).
@@ -4517,7 +4650,7 @@ function getAdPerformance(market, startDate, endDate) {
 }
 
 // Invalidate cache when data sources change
-function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; }
+function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; _dailyCache = { key: '', data: [] }; }
 
 function getCampaignSpend(campaignName, market, startDate, endDate) {
   // Fast path: use pre-built map for all-time, all-market
