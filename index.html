@@ -9437,8 +9437,16 @@ ${offerLine}
   document.getElementById('resultMarket').textContent = brief.market;
   document.getElementById('resultSegment').textContent = brief.segment;
   document.getElementById('resultContent').innerHTML = markdownToHtml(content);
-  document.getElementById('refinementBar').style.display = 'none';
+  document.getElementById('refinementBar').style.display = '';
   document.getElementById('imageGenSection').style.display = 'none';
+  // Reset feedback buttons
+  document.querySelectorAll('.forge-status-btn').forEach(b => b.style.opacity = '1');
+  // Save to generation history for feedback tracking
+  const genId = Date.now();
+  state._currentForgeId = genId;
+  state.generationHistory.unshift({ id: genId, brief: {...brief}, content, date: new Date().toISOString(), status: null });
+  if (state.generationHistory.length > 50) state.generationHistory = state.generationHistory.slice(0, 50);
+  localStorage.setItem('gf_generationHistory', JSON.stringify(state.generationHistory));
   navigator.clipboard.writeText(content).catch(() => {});
   showToast('Copy generated \u2014 copied to clipboard');
 }
