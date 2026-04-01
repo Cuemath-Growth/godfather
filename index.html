@@ -285,16 +285,6 @@
           <!-- Week-over-Week removed — not requested -->
           <div class="mb-6 hidden" id="wowSection"></div>
 
-          <!-- CMO Decisions: CPTD Diagnosis + Budget Reallocation -->
-          <div class="mb-6" id="oracleCMODecisions">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-gradient-brand flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></div>
-              <h3 class="text-sm font-bold">CMO Decisions</h3>
-              <span class="text-[10px] text-text-muted">— why CPTD changed + where to shift budget</span>
-            </div>
-            <div id="oracleCMOList" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
-          </div>
-
           <!-- Section 1: PAUSE NOW (accordion) -->
           <details class="mb-6 oracle-accordion" id="oraclePause">
             <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
@@ -369,18 +359,8 @@
             <div id="oracleInfluencerList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary">e.g. "Creator @mathwithmaya — 12K views, 4.2% ER, 8 enrolments → scale budget"</p></div>
           </div>
 
-          <!-- Module 1: Win/Loss Summary (Top 5 Performers + Budget Drains) -->
-          <div class="mb-6" id="oracleWinLoss">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-gradient-brand flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg></div>
-              <h3 class="text-sm font-bold">Win / Loss Summary</h3>
-              <span class="text-[10px] text-text-muted">— top and bottom performers by CPTD</span>
-            </div>
-            <div id="oracleModule1"></div>
-          </div>
-
-          <!-- Hidden compat containers for remaining modules -->
-          <div class="hidden"><div id="oracleModule3"></div><div id="oracleModule4"></div><div id="oracleModule5"></div><div id="oracleModule6"></div><div id="oracleModule7"></div><div id="pipelineActive"></div><div id="pipelineForge"></div><div id="pipelineGaps"></div><div id="pipelineGapsList"></div><div id="pipelineUpcomingWindows"></div><div id="briefsGrid"></div></div>
+          <!-- Hidden compat containers (legacy, kept for JS references) -->
+          <div class="hidden"><div id="oracleModule1"></div><div id="oracleModule3"></div><div id="oracleModule4"></div><div id="oracleModule5"></div><div id="oracleModule6"></div><div id="oracleModule7"></div><div id="oracleCMOList"></div><div id="pipelineActive"></div><div id="pipelineForge"></div><div id="pipelineGaps"></div><div id="pipelineGapsList"></div><div id="pipelineUpcomingWindows"></div><div id="briefsGrid"></div></div>
 
           <!-- Oracle Chatbot — hidden until data is confirmed live -->
           <div class="mt-6 bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden" id="oracleChatContainer" style="display:none">
@@ -522,10 +502,10 @@
             <div class="mb-4">
               <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">ICP Type</label>
               <div class="flex flex-wrap gap-1.5" id="icpPills">
-                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="NRI">NRI</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Non-NRI">Non-NRI</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Asian">Asian</button>
+                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="NRI">NRI Parents</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Non-NRI">Expat Parents</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Universal">All Audiences</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="HighSchool">High School</button>
               </div>
             </div>
 
@@ -998,7 +978,7 @@
             <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1" id="ciTabs">
               <button class="pill-btn active px-4 py-2 rounded-lg text-xs font-semibold" data-ci-tab="winning" onclick="switchCITab('winning')">What's Working</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-ci-tab="decay" onclick="switchCITab('decay')">Creative Health</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-ci-tab="matrix" onclick="switchCITab('matrix')">Deep Dive</button>
+              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold hidden" data-ci-tab="matrix" onclick="switchCITab('matrix')" id="deepDiveTabBtn">Deep Dive</button>
             </div>
             <select id="ciFilterCountry" style="display:none" onchange="onCICountryChange()">
               <option value="all">All Markets</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="India">India</option><option value="UK">UK</option><option value="APAC">APAC</option>
@@ -4584,6 +4564,55 @@ function getAdPerformance(market, startDate, endDate) {
   return results;
 }
 
+// ── getPortfolioMetrics() — single source of truth for Dashboard KPIs ──
+// Combines attributed (Meta+CRM joined) + unattributed (CRM-only, no ad name) leads
+function getPortfolioMetrics(market, from, to) {
+  const perf = getAdPerformance(market, from, to);
+  const _from = from || COST_DATA_START || '';
+  const _to = to || new Date().toISOString().slice(0, 10);
+
+  // Attributed metrics (ads with both spend and/or CRM data)
+  const attrSpend = perf.reduce((s, r) => s + (r['Spent'] || 0), 0);
+  const attrQL = perf.reduce((s, r) => s + (r['QL'] || 0), 0);
+  const attrNRI = perf.reduce((s, r) => s + (r['NRI'] || 0), 0);
+  const attrTQL = perf.reduce((s, r) => s + (r['TQL'] || 0), 0);
+  const attrTD = perf.reduce((s, r) => s + (r['TD'] || 0), 0);
+  const attrPaid = perf.reduce((s, r) => s + (r['Paid'] || 0), 0);
+
+  // Unattributed CRM leads (no ad name → can't be matched to any Meta ad)
+  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
+  let unQL = 0, unNRI = 0, unTD = 0, unPaid = 0;
+  filteredLeads.forEach(r => {
+    const d = r.lead_created_date || '';
+    if (_from && d < _from) return;
+    if (_to && d > _to) return;
+    const adName = (r.mx_utm_adcontent || '').trim();
+    if (adName.length > 5) return; // has ad name → already counted in attributed
+    if (String(r.qls) === '1') unQL++;
+    if ((r.ethnicity || '').toLowerCase().includes('nri')) unNRI++;
+    if (String(r.trials_done) === '1') unTD++;
+    if (String(r.paid) === '1') unPaid++;
+  });
+
+  const totalQL = attrQL + unQL;
+  const totalNRI = attrNRI + unNRI;
+  const totalTQL = (market === 'US' || market === 'Canada') ? totalNRI : totalQL;
+  const totalTD = attrTD + unTD;
+  const totalPaid = attrPaid + unPaid;
+
+  return {
+    spend: attrSpend, ql: totalQL, nri: totalNRI, tql: totalTQL,
+    td: totalTD, paid: totalPaid,
+    cptql: totalTQL > 0 ? attrSpend / totalTQL : null,
+    cptd: totalTD > 0 ? attrSpend / totalTD : null,
+    qlTdPct: totalQL > 0 ? (totalTD / totalQL) * 100 : 0,
+    cac: totalPaid > 0 ? attrSpend / totalPaid : null,
+    _attributed: { spend: attrSpend, ql: attrQL, td: attrTD, paid: attrPaid },
+    _unattributed: { ql: unQL, td: unTD, paid: unPaid },
+    _attributedPct: totalQL > 0 ? Math.round(attrQL / totalQL * 100) : 0,
+  };
+}
+
 // Invalidate cache when data sources change
 function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; _dailyCache = { key: '', data: [] }; }
 
@@ -6886,6 +6915,30 @@ function renderOracleCardsV2() {
   const market = dashCountry === 'all' ? null : dashCountry;
   const { from, to } = getGlobalDateRange();
 
+  // ── Weekly trend helper: this week vs last week for any ad ──
+  const _today = new Date();
+  const _thisWeekStart = new Date(_today); _thisWeekStart.setDate(_today.getDate() - 7);
+  const _lastWeekStart = new Date(_today); _lastWeekStart.setDate(_today.getDate() - 14);
+  const _twStr = _thisWeekStart.toISOString().slice(0, 10);
+  const _lwStr = _lastWeekStart.toISOString().slice(0, 10);
+  const _todayStr = _today.toISOString().slice(0, 10);
+
+  // Pre-compute weekly data from daily layer (cached, fast)
+  const _dailyData = typeof getAdPerformanceDaily === 'function' ? getAdPerformanceDaily(market, _lwStr, _todayStr) : [];
+  function _getWeeklyTrend(adName) {
+    const key = normalizeAdName(adName);
+    const rows = _dailyData.filter(r => normalizeAdName(r.ad_name) === key);
+    const tw = rows.filter(r => r.date >= _twStr);
+    const lw = rows.filter(r => r.date >= _lwStr && r.date < _twStr);
+    const twSpend = tw.reduce((s, r) => s + (r.spend || 0), 0);
+    const lwSpend = lw.reduce((s, r) => s + (r.spend || 0), 0);
+    const twQL = tw.reduce((s, r) => s + r.ql, 0);
+    const lwQL = lw.reduce((s, r) => s + r.ql, 0);
+    if (twSpend < 1000 && lwSpend < 1000) return null; // not enough data
+    const trend = lwQL > 0 && twQL === 0 ? 'declining' : twQL > lwQL * 1.3 ? 'improving' : twQL < lwQL * 0.7 ? 'declining' : 'stable';
+    return { twSpend, lwSpend, twQL, lwQL, trend, label: trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : '→' };
+  }
+
   // ── PAUSE NOW: CPTQL > 2x market avg — flag inefficient ads ──
   // Respect user's date selection — no artificial widening
   const pauseList = document.getElementById('oraclePauseList');
@@ -6921,16 +6974,24 @@ function renderOracleCardsV2() {
     .filter(a => a.spend >= 15000 && a.ql === 0 && !isPaused(a.adName))
     .sort((a, b) => b.spend - a.spend)
     .slice(0, 4)
-    .map(a => ({ ...a, name: a.adName, _type: 'burn', _priority: a._hasCRM ? 1 : 2,
-      _signal: `${formatCurrency(a.spend)} spent · 0 QLs${a._hasCRM ? ' — pure waste' : ' — ⚠️ no CRM link (may have leads under different name)'}` }));
+    .map(a => {
+      const wt = _getWeeklyTrend(a.adName);
+      const trendStr = wt ? ` · ${wt.label} ${formatCurrency(wt.twSpend)} this wk` : '';
+      return { ...a, name: a.adName, _type: 'burn', _priority: a._hasCRM ? 1 : 2, _trend: wt,
+        _signal: `${formatCurrency(a.spend)} spent · 0 QLs${a._hasCRM ? ' — pure waste' : ' — ⚠️ no CRM link'}${trendStr}` };
+    });
 
   // ── SIGNAL 2: CPTQL too high — 2x+ market average ──
   const cptqlLeaks = adCampData
     .filter(a => a.spend !== null && a.tql >= 3 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
     .sort((a, b) => b.spend - a.spend) // sort by spend (biggest waste first, not worst CPTQL)
     .slice(0, 5)
-    .map(a => ({ ...a, name: a.adName, _type: 'cptql', _priority: 2,
-      _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.tql} TQLs · ${formatCurrency(a.spend)}` }));
+    .map(a => {
+      const wt = _getWeeklyTrend(a.adName);
+      const trendStr = wt ? ` · ${wt.label} ${wt.twQL}QL this wk vs ${wt.lwQL} last` : '';
+      return { ...a, name: a.adName, _type: 'cptql', _priority: 2, _trend: wt,
+        _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.tql} TQLs${trendStr}` };
+    });
 
   // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
   const wrongAudience = adCampData
@@ -6991,7 +7052,9 @@ function renderOracleCardsV2() {
       const cardBg = isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200';
       const metricColor = isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted';
       const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED' }[a._type] || '';
-      const displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
+      // Fix numeric ad IDs: if displayName is all digits (>15 chars), fall back to campaign or adset
+      let displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
+      if (/^\d{10,}/.test(displayName)) displayName = a.campaignContext || a.adName?.slice(0, 40) || displayName;
       const campCtx = a.campaignContext || '';
       const geoTag = a.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
       const thumbHtml = _oracleThumbnail(a.name);
@@ -7070,7 +7133,12 @@ function renderOracleCardsV2() {
       // Spend info if available
       if (a.spend !== null && !signals.some(s => s.includes('CPTQL'))) signals.push(formatCurrency(a.spend) + ' spent');
 
-      return { ...a, _score: score, _makeSignals: signals };
+      // Weekly trend
+      const wt = _getWeeklyTrend(a.adName);
+      if (wt && wt.trend === 'improving') { score += 0.3; signals.push(`${wt.label} improving (${wt.lwQL}→${wt.twQL} QLs)`); }
+      else if (wt && wt.trend === 'declining') { score -= 0.2; signals.push(`${wt.label} declining (${wt.lwQL}→${wt.twQL} QLs)`); }
+
+      return { ...a, _score: score, _makeSignals: signals, _trend: wt };
     })
     .sort((a, b) => b._score - a._score)
     .slice(0, 8);
@@ -10284,6 +10352,24 @@ const TAG_MIGRATION = {
   'Conceptual understanding': 'Strong foundations', 'Confidence': 'Confidence & anxiety',
   'Personalized learning': 'Tutor quality', 'Future-ready': 'Future readiness',
   'Better grades': 'Grades & school', 'Problem-solving skills': 'Strong foundations',
+  // Intermediate human-readable taxonomy (from mid-migration era)
+  'Parent pain point': 'Problem', 'Parent Pain Point': 'Problem',
+  'Grade improvement': 'Grades & school', 'Grade Improvement': 'Grades & school',
+  'Indian identity': 'Indian roots', 'Indian Identity': 'Indian roots',
+  'MathFit identity': 'Strong foundations', 'MathFit Identity': 'Strong foundations',
+  'Question hook': 'Question', 'Question Hook': 'Question',
+  'Math problem opener': 'Math anchor', 'Math Problem Opener': 'Math anchor',
+  'Seasonal / event': 'Seasonal', 'Seasonal/Event': 'Seasonal',
+  'Platform/Tech': 'Product video', 'Platform / Tech': 'Product video',
+  'Curriculum aligned': 'Strong foundations', 'Curriculum Aligned': 'Strong foundations',
+  'Parent testimonial hook': 'Parent testimonial',
+  'Influencer / UGC': 'Influencer UGC',
+  'All Audiences': 'NRI parents', 'all audiences': 'NRI parents',
+  'Non-NRI Parents': 'Expat parents', 'Non NRI Parents': 'Expat parents',
+  'NRI Parents': 'NRI parents',
+  'High School Parents': 'High school parents',
+  'Telugu Speaking': 'Telugu speaking', 'Tamil Speaking': 'Tamil speaking',
+  'Gujarati Speaking': 'Gujarati speaking',
 };
 
 // Tag cache: keyed by ad name, stores tags so we never re-tag the same creative
@@ -14630,6 +14716,21 @@ function renderSentinelTop5() {
 
   renderRows(state.sentinelOutput.top5, 'sentinelTop5');
   renderRows(state.sentinelOutput.bottom5, 'sentinelBottom5');
+
+  // Auto-populate Top 5 / Bottom 5 from getAdPerformance if Sentinel hasn't run yet
+  if (!state.sentinelOutput?.top5?.length) {
+    try {
+      const { from, to } = getGlobalDateRange();
+      const geoVal = document.getElementById('sentinelGeo')?.value || 'all';
+      const market = geoVal === 'all' ? null : geoVal;
+      const perf = getAdPerformance(market, from, to).filter(r => r['TD'] > 0 && r['Spent'] > 0);
+      const withCPTD = perf.map(r => ({ ...r, _cptd: r['Spent'] / r['TD'] })).sort((a, b) => a._cptd - b._cptd);
+      const top5 = withCPTD.slice(0, 5).map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
+      const bottom5 = withCPTD.slice(-5).reverse().map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
+      renderRows(top5, 'sentinelTop5');
+      renderRows(bottom5, 'sentinelBottom5');
+    } catch (e) { console.error('Auto-populate top/bottom:', e); }
+  }
 }
 
 function renderSentinelTable() {
