@@ -8935,43 +8935,501 @@ function generateFromBrief(brief) {
   setTimeout(() => generateContent(), 100);
 }
 
-// ── TEMPLATE-BASED COPY GENERATION — works without API key ──
+// ── TEMPLATE-BASED COPY GENERATION — zero API credits ──
 function generateFromTemplate() {
-  const brief = {
+  const brief = state.currentBrief || {
     market: document.getElementById('briefMarket')?.value || 'US',
     platform: getActivePill('platformPills') || 'Meta',
     format: getActivePill('formatPills') || 'Static Ad',
+    subFormat: getActivePill('subFormatPills') || null,
     icpType: getActivePill('icpPills') || 'NRI',
     segment: document.getElementById('briefSegment')?.value || 'Foundation Rebuilder',
     funnel: document.getElementById('briefFunnel')?.value || 'TOFU',
     angle: document.getElementById('briefAngle')?.value || '',
     offer: document.getElementById('briefOffer')?.value || ''
   };
-  const SEGMENT_HOOKS = {
-    'Foundation Rebuilder': { trigger: 'child passes tests through memorization', angle: 'understand the WHY behind math', cta: 'Book a free MathFit\u2122 assessment' },
-    'Personalisation Seeker': { trigger: 'child doesn\u2019t fit one-size-fits-all', angle: 'a learning system built around your child', cta: 'See your child\u2019s personalized plan' },
-    'Confidence Builder': { trigger: 'child is hesitant, doesn\u2019t volunteer', angle: 'watch your child become confident in math', cta: 'Start your child\u2019s confidence journey' },
-    'Accelerator': { trigger: 'exam pressure, advanced aspirations', angle: 'challenge your child to think deeper', cta: 'Explore advanced math coaching' }
+  const SEG = {
+    'Foundation Rebuilder': { trigger: 'child passes tests through memorization but can\u2019t explain WHY', angle: 'understand the WHY behind math', pain: 'getting by on memorization \u2014 but you can feel it\u2019s fragile', transform: 'Now she explains her thinking. Not just the answer \u2014 the reasoning.', cta: 'Book a Free MathFit\u2122 Class' },
+    'Personalisation Seeker': { trigger: 'child doesn\u2019t fit one-size-fits-all classroom pace', angle: 'a learning system built around your child', pain: 'too fast in some areas, too slow in others \u2014 no class keeps up', transform: 'His tutor adjusts every lesson to exactly where he is. No gaps, no boredom.', cta: 'See Your Child\u2019s Personalized Plan' },
+    'Confidence Builder': { trigger: 'child is hesitant, doesn\u2019t volunteer, avoids math', angle: 'watch your child become confident in math', pain: 'avoiding math homework, never raising their hand, saying "I\u2019m just not a math person"', transform: 'Last week she volunteered to solve a problem on the board. First time ever.', cta: 'Start Your Child\u2019s Confidence Journey' },
+    'Accelerator': { trigger: 'child needs challenge beyond school curriculum', angle: 'challenge your child to think deeper, not just faster', pain: 'bored in class, finishing early, not being stretched', transform: 'He\u2019s now tackling competition-level problems and loving the challenge.', cta: 'Explore Advanced Math Coaching' }
   };
-  const MARKET_TONE = {
-    'US': { tone: 'Warm, community-focused', proof: 'Join 50,000+ NRI families', lang: '' },
-    'India': { tone: 'Board-exam aware, aspirational', proof: 'Trusted by IB & IGCSE families', lang: '' },
-    'AUS': { tone: 'Achievement-focused', proof: 'NAPLAN & selective school ready', lang: '' },
-    'MEA': { tone: 'Premium, international', proof: 'Built for IB & Cambridge families', lang: '' },
-    'UK': { tone: 'Thoughtful, understated', proof: 'Loved by British curriculum families', lang: '' }
+  const MKT = {
+    'US': { tone: 'Warm, community-focused', proof: '50,000+ NRI families', badge: 'Rated 4.9 on Trustpilot', curr: 'Common Core & state standards', comp: 'AMC 8, Math Kangaroo, MOEMS' },
+    'India': { tone: 'Board-exam aware, aspirational', proof: '4 lakh+ parents', badge: 'Trusted by IB & IGCSE families', curr: 'CBSE, ICSE, IB, IGCSE', comp: 'Olympiad, NTSE, JEE Foundation' },
+    'AUS': { tone: 'Achievement-focused', proof: 'Australian families', badge: 'NAPLAN & selective school ready', curr: 'Australian curriculum', comp: 'NAPLAN, selective school prep' },
+    'MEA': { tone: 'Premium, international', proof: 'families across the Middle East', badge: 'Built for IB & Cambridge', curr: 'IB, British, American curriculum', comp: 'IB exams, Cambridge assessments' },
+    'UK': { tone: 'Thoughtful, understated', proof: 'UK families', badge: 'Aligned to UK curriculum', curr: 'UK National Curriculum, GCSE', comp: 'GCSE, 11+, entrance exams' }
   };
-  const seg = SEGMENT_HOOKS[brief.segment] || SEGMENT_HOOKS['Foundation Rebuilder'];
-  const mkt = MARKET_TONE[brief.market] || MARKET_TONE['US'];
-  const customAngle = brief.angle ? `\n\n**Custom angle:** ${brief.angle}` : '';
-  const offerLine = brief.offer ? `\n**Offer:** ${brief.offer}` : '';
-  const isInfluencer = brief.platform === 'Influencer';
+  const ATOMS = [
+    'MathFit\u2122 isn\u2019t about getting answers faster. It\u2019s about thinking better.',
+    'Tricks fade. Understanding compounds.',
+    'Rote memorization is fragile. Understanding is forever.',
+    'The future belongs to thinkers, not human calculators.',
+    'We make it meaningful, not easy.',
+    'Real math confidence comes from figuring things out yourself.',
+    'If your child can explain why, they\u2019ll never forget how.',
+    'AI calculates. Humans must think. We build thinkers.'
+  ];
+  const seg = SEG[brief.segment] || SEG['Foundation Rebuilder'];
+  const mkt = MKT[brief.market] || MKT['US'];
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const atom1 = pick(ATOMS), atom2 = pick(ATOMS.filter(a => a !== atom1)), atom3 = pick(ATOMS.filter(a => a !== atom1 && a !== atom2));
+  const offerLine = brief.offer ? `\n\n**\ud83c\udf81 ${brief.offer}**` : '';
+  const angleLine = brief.angle ? `\n*Custom angle: ${brief.angle}*\n` : '';
+  const META_COPY = (hl, pt, desc) => `\n**Meta Ad Copy:**\n- **Headline:** ${hl}\n- **Primary Text:** ${pt}\n- **Description:** ${desc}\n- **CTA:** Book a Free Class`;
+
   let content = '';
-  if (isInfluencer) {
-    content = `### Influencer Script (30 seconds)\n\n**Hook (0-3s):**\n"Does your child ${seg.trigger}? Here\u2019s what changed everything for mine."\n\n**Problem (3-8s):**\n"I noticed my child could solve problems but couldn\u2019t explain WHY. That\u2019s when I knew something was missing."\n\n**Solution (8-18s):**\n"We started Cuemath \u2014 and within weeks, the difference was real. ${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}. The tutor doesn\u2019t just teach \u2014 they make my child THINK."\n\n**Proof (18-25s):**\n"${mkt.proof}. MathFit\u2122 isn\u2019t about shortcuts. It\u2019s about building real understanding."\n\n**CTA (25-30s):**\n"${seg.cta} \u2014 link in bio. Trust me, your child will thank you."${customAngle}${offerLine}\n\n---\n*Tone: ${mkt.tone}. Segment: ${brief.segment}.*`;
+  const fmt = brief.format;
+
+  if (fmt === 'Static Ad') {
+    content = `## 3 Static Ad Options \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 Emotional Lead
+
+*Creative Copy (on-image):*
+- **Hero Line:** "Your Child Deserves to ${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}" (${('Your Child Deserves to ' + seg.angle).length} chars)
+- **Subline:** 1:1 MathFit\u2122 coaching with top tutors. ${mkt.badge}.
+- **Badge:** ${mkt.badge}
+- **CTA Button:** "Book a Free Class"
+
+*Visual Direction:* Child and tutor on whiteboard, warm lighting, collaborative moment. Clean layout with hero line prominent.
+${META_COPY('"${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}" (${seg.angle.length + 1} chars)', `Every parent notices when their ${seg.trigger}. Cuemath\u2019s 1:1 MathFit\u2122 system builds deep understanding \u2014 not memorization. ${mkt.proof} trust us.${offerLine}`, 'Making Kids MathFit\u2122 | 1:1 Tutoring')}
+
+---
+**Option 2** \u2014 Proof Lead
+
+*Creative Copy (on-image):*
+- **Hero Line:** "${mkt.proof} Can\u2019t Be Wrong About Math" (${(mkt.proof + " Can't Be Wrong About Math").length} chars)
+- **Subline:** ${atom1}
+- **Badge:** "Top 1% Tutors \u00B7 ${mkt.curr}"
+- **CTA Button:** "Book a Free Class"
+
+*Visual Direction:* Bold typography, gradient background, social proof badges visible. Numbers prominent.
+${META_COPY(`${mkt.proof} Trust Cuemath`, `${atom1}\n\nYour child\u2019s ${seg.pain}. Our top 1% tutors specialize in turning that around \u2014 one personalized class at a time. ${seg.cta}.${offerLine}`, 'Top 1% Tutors | Personalized Plans')}
+
+---
+**Option 3** \u2014 Question Lead
+
+*Creative Copy (on-image):*
+- **Hero Line:** "Can Your Child Explain Math, Not Just Solve It?"
+- **Subline:** ${atom2}
+- **Badge:** ${mkt.badge}
+- **CTA Button:** "Book a Free Class"
+
+*Visual Direction:* Child thinking (not just writing), thoughtful expression. Warm, calm aesthetic per brand guidelines.
+${META_COPY('Can Your Child Explain Math?', `What if your child could explain WHY, not just memorize HOW?\n\nThat\u2019s MathFit\u2122. Deep understanding. Real confidence. A system built around YOUR child. ${seg.cta}.${offerLine}`, `${atom3.substring(0, 30)}`)}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'Video - Reel' || fmt === 'YouTube Video') {
+    content = `## 3 Video Script Options \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 Understanding vs Memorization
+
+| Time | Visual Direction | Voiceover | On-Screen Text |
+|------|-----------------|-----------|----------------|
+| **0-3s (HOOK)** | Close-up of child looking confused at worksheet | "Your child passes tests\u2026 but can they explain WHY?" | **Can they explain WHY?** |
+| **3-8s (PROBLEM)** | Parent watching child struggle with homework | "${seg.pain}. Sound familiar?" | *${seg.trigger}* |
+| **8-20s (SOLUTION)** | Tutor and child on Cuemath whiteboard, child has lightbulb moment | "Cuemath\u2019s MathFit\u2122 system pairs your child with a top 1% tutor who builds deep understanding. Not memorization \u2014 real thinking." | **1:1 MathFit\u2122 Coaching** |
+| **20-25s (PROOF)** | Parent testimonial clip or stat card | "${seg.transform} ${mkt.proof} trust Cuemath." | **${mkt.badge}** |
+| **25-30s (CTA)** | End card: Cuemath logo + offer badge + CTA | "${seg.cta}. Link in bio." | **${seg.cta}** |
+
+*Music/Mood:* Warm, building momentum. Piano + light percussion.
+${META_COPY('Your Child Passes Tests... But Can They Explain Why?', `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s 1:1 MathFit\u2122 tutoring builds real understanding. ${mkt.proof} trust us.${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122 | Book Free Class')}
+
+---
+**Option 2** \u2014 AI World Readiness
+
+| Time | Visual Direction | Voiceover | On-Screen Text |
+|------|-----------------|-----------|----------------|
+| **0-3s (HOOK)** | Split screen: AI solving math instantly / child thinking | "AI can calculate. Can your child THINK?" | **AI calculates. Humans must think.** |
+| **3-8s (PROBLEM)** | Montage: worksheets, speed drills, calculator dependency | "We\u2019re raising a generation of calculators. Not thinkers." | *The problem with math today* |
+| **8-20s (SOLUTION)** | Cuemath class: tutor asking "why?" child reasoning through | "MathFit\u2122 is the ability to reason, see patterns, and solve problems you\u2019ve never seen before. That\u2019s what Cuemath builds." | **MathFit\u2122 = Thinking, Not Calculating** |
+| **20-25s (PROOF)** | Happy parent quote overlay + child volunteering in class | "${seg.transform}" | **${mkt.badge}** |
+| **25-30s (CTA)** | End card with logo, badge, CTA button | "Make your child MathFit\u2122. ${seg.cta}." | **Book a Free Class** |
+
+*Music/Mood:* Bold, future-forward. Electronic undertone with warm resolve.
+${META_COPY('AI Calculates. Can Your Child Think?', `${atom3}\n\nCuemath\u2019s MathFit\u2122 system builds the thinking skills AI can\u2019t replace. 1:1 tutoring with top 1% coaches.${offerLine}\n\n${seg.cta}.`, 'Build Thinkers, Not Calculators')}
+
+---
+**Option 3** \u2014 Parent Transformation Story
+
+| Time | Visual Direction | Voiceover | On-Screen Text |
+|------|-----------------|-----------|----------------|
+| **0-3s (HOOK)** | Parent looking worried at report card | "I thought my child was doing fine in math. I was wrong." | **"I was wrong about my child\u2019s math."** |
+| **3-8s (PROBLEM)** | Child getting by but not understanding | "${seg.pain}. The grades looked OK\u2026 but something wasn\u2019t clicking." | *Grades \u2260 Understanding* |
+| **8-20s (SOLUTION)** | First Cuemath class \u2014 tutor patiently guiding | "Then we tried Cuemath. One class. That\u2019s all it took to see the difference. The tutor didn\u2019t give answers \u2014 she made my child THINK." | **1:1 with Top 1% Tutors** |
+| **20-25s (PROOF)** | Child confidently solving, parent smiling | "${seg.transform}" | **${mkt.proof}** |
+| **25-30s (CTA)** | End card | "${seg.cta}. The first class is free." | **Book a Free Class** |
+
+*Music/Mood:* Emotional, authentic. Acoustic guitar, building to hopeful.
+${META_COPY('"I Was Wrong About My Child\u2019s Math"', `${seg.transform}\n\nCuemath\u2019s MathFit\u2122 system turned everything around. 1:1 with top 1% tutors who build understanding, not memorization.${offerLine}\n\n${seg.cta}.`, 'Real Stories | Real Confidence')}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'Carousel') {
+    content = `## 3 Carousel Options \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 The MathFit\u2122 Journey
+
+| Card | Headline | Supporting Text | Visual |
+|------|----------|----------------|--------|
+| **Card 1 (Hook)** | Your child solves math. But can they explain it? | The difference between passing and truly understanding | Child staring at math problem, thoughtful |
+| **Card 2 (Problem)** | ${seg.trigger.charAt(0).toUpperCase() + seg.trigger.slice(1)} | ${seg.pain} | Parent and child at homework table |
+| **Card 3 (Solution)** | Meet MathFit\u2122 by Cuemath | 1:1 coaching with top 1% tutors who build real understanding | Tutor + child on smart whiteboard |
+| **Card 4 (Proof)** | "${seg.transform.replace(/"/g, '')}" | ${mkt.proof} trust Cuemath. ${mkt.badge}. | Testimonial layout with parent photo |
+| **Card 5 (CTA)** | ${seg.cta} | The first class is free. Zero commitment. | CTA button + logo + offer badge |
+${META_COPY(`"${atom1.substring(0, 38)}"`, `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s MathFit\u2122 changes that. ${mkt.proof} already trust us.${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
+
+---
+**Option 2** \u2014 Myth vs Reality
+
+| Card | Headline | Supporting Text | Visual |
+|------|----------|----------------|--------|
+| **Card 1 (Hook)** | 5 Myths About Math That Are Holding Your Child Back | Swipe to see the truth \u2192 | Bold text, dark background |
+| **Card 2** | Myth: "Math is about memorizing formulas" | Reality: ${atom1} | Crossed-out myth, green reality |
+| **Card 3** | Myth: "Some kids just aren\u2019t math people" | Reality: Every child can think mathematically with the right system | Same visual treatment |
+| **Card 4** | Myth: "Good grades = good understanding" | Reality: ${seg.trigger}. Grades can hide gaps. | Same treatment |
+| **Card 5 (CTA)** | The Reality: MathFit\u2122 by Cuemath | 1:1 tutoring that builds thinkers. ${seg.cta}. | CTA + logo + badge |
+${META_COPY('5 Math Myths Holding Your Child Back', `Myth: "Math is about memorizing formulas."\nReality: ${atom1}\n\nCuemath\u2019s MathFit\u2122 builds deep understanding. ${seg.cta}.${offerLine}`, 'Swipe for the truth \u2192')}
+
+---
+**Option 3** \u2014 Before & After
+
+| Card | Headline | Supporting Text | Visual |
+|------|----------|----------------|--------|
+| **Card 1 (Hook)** | What changed for this ${brief.market} family? | A real transformation story \u2192 | Family silhouette, warm tones |
+| **Card 2 (Before)** | Before Cuemath | ${seg.pain} | Muted colors, struggle imagery |
+| **Card 3 (During)** | The MathFit\u2122 Difference | Top 1% tutor + personalized plan + smart platform | Bright, collaborative imagery |
+| **Card 4 (After)** | After 3 months | ${seg.transform} | Bright, confident child |
+| **Card 5 (CTA)** | Your child\u2019s turn | ${seg.cta}. Free first class. | CTA button + badge |
+${META_COPY('What Changed for This Family?', `Before: ${seg.pain}.\nAfter: ${seg.transform}\n\n${seg.cta}. The first class is free.${offerLine}`, 'Real transformation | Free trial')}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'Google Ads') {
+    const sf = brief.subFormat || 'Brand Search';
+    if (sf === 'Brand Search' || sf === 'Keyword Search') {
+      const isBrand = sf === 'Brand Search';
+      content = `## Google ${sf} Ads \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Ad Group 1** \u2014 ${isBrand ? 'Brand + Value Prop' : 'Math Tutoring Intent'}
+
+**Headlines** (30 chars max):
+1. ${isBrand ? 'Cuemath - MathFit\u2122 Tutoring' : 'Online Math Tutoring for Kids'} (${isBrand ? 28 : 29} chars)
+2. ${isBrand ? 'Cuemath: Top 1% Math Tutors' : '1:1 Personalized Math Help'} (${isBrand ? 27 : 26} chars)
+3. ${isBrand ? 'Make Your Child MathFit\u2122' : 'Build Math Confidence Now'} (${isBrand ? 25 : 25} chars)
+4. ${isBrand ? 'Cuemath Rated 4.9\u2605 by Parents' : 'Expert Math Tutors Online'} (${isBrand ? 30 : 25} chars)
+5. ${isBrand ? '50K+ NRI Families Trust Us' : 'Stop Math Anxiety Today'} (${isBrand ? 26 : 23} chars)
+6. 1:1 Online Math Coaching (25 chars)
+7. Book a Free Math Class Now (27 chars)
+8. Personalized Math Plans (23 chars)
+9. Deep Understanding, Not Rote (28 chars)
+10. ${mkt.curr} Aligned (${(mkt.curr.split(',')[0] + ' Aligned').length} chars)
+11. Thinking > Calculating (23 chars)
+12. Real Confidence in Math (23 chars)
+13. ${isBrand ? 'Why Parents Choose Cuemath' : 'Math Help That Actually Works'} (${isBrand ? 25 : 29} chars)
+14. Free Trial Class Available (27 chars)
+15. Your Child Deserves Better (26 chars)
+
+**Descriptions** (90 chars max):
+1. ${isBrand ? `Cuemath\u2019s MathFit\u2122 system builds deep math understanding with top 1% tutors. Book free class.` : `Struggling with math? 1:1 online tutoring that builds real understanding. Book a free class.`}
+2. ${seg.trigger.charAt(0).toUpperCase() + seg.trigger.slice(1)}? Our tutors build thinkers, not memorizers. Try free.
+3. ${mkt.proof} trust Cuemath. Personalized 1:1 math coaching aligned to ${mkt.curr.split(',')[0]}. Start free.
+4. ${atom1} ${seg.cta}. Zero commitment.
+
+${isBrand ? '**Sitelinks:** About MathFit\u2122 | Meet Our Tutors | Parent Reviews | Free Trial Class' : '**Sitelinks:** How It Works | Pricing Plans | Parent Reviews | Book Free Class'}
+
+---
+**Ad Group 2** \u2014 ${isBrand ? 'Social Proof + Trust' : 'Grade-Specific'}
+
+**Headlines:**
+1. ${isBrand ? '4L+ Parents Trust Cuemath' : 'Math Help for Grades K-8'} (${isBrand ? 25 : 24} chars)
+2. ${isBrand ? 'Cuemath: Real Math Results' : `${mkt.comp.split(',')[0]} Math Prep`} (${isBrand ? 25 : (mkt.comp.split(',')[0] + ' Math Prep').length} chars)
+3. Top Tutors for Math Online (27 chars)
+4. ${brief.market === 'US' ? 'Indian Math Tutors for NRI' : `Best ${mkt.curr.split(',')[0]} Math Tutors`} (26 chars)
+5. Understanding > Memorizing (27 chars)
+6. 1:1 Math That Builds Thinkers (30 chars)
+7. Personalized Math Ecosystem (27 chars)
+8. See Results in 3 Months (23 chars)
+9. Expert-Led Online Classes (25 chars)
+10. ${atom2.substring(0, 30)} (${Math.min(atom2.length, 30)} chars)
+11. Future-Proof Math Skills (24 chars)
+12. Try Cuemath Free Today (22 chars)
+13. Smart Whiteboard + Tutor (24 chars)
+14. Curriculum-Aligned Plans (24 chars)
+15. Beyond Grades: Real Math (24 chars)
+
+**Descriptions:**
+1. ${seg.transform} Join ${mkt.proof} who chose Cuemath.
+2. Every child learns differently. Cuemath adapts to yours. Top 1% tutors, personalized plans. Free trial.
+3. ${atom1} Start with a free MathFit\u2122 assessment today.
+4. Aligned to ${mkt.curr}. 1:1 coaching that builds confidence and deep understanding. Book free class.
+${META_COPY(isBrand ? 'Cuemath - MathFit\u2122 Tutoring' : 'Online Math Tutoring for Kids', `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s top 1% tutors build real understanding. ${mkt.proof} trust us.${offerLine}\n\n${seg.cta}.`, isBrand ? 'Making Kids MathFit\u2122' : '1:1 Expert Math Tutoring')}
+
+---
+*${brief.market} | ${brief.segment} | ${sf} | Tone: ${mkt.tone}*`;
+    } else {
+      content = `## Google ${sf} Assets \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Asset Group 1** \u2014 Understanding First
+
+**Headlines (30 chars):** Cuemath MathFit\u2122 Tutoring | 1:1 Online Math Coaching | Top 1% Math Tutors | Build Real Math Skills | Book a Free Class Now
+**Long Headlines (90 chars):** Your child deserves a math tutor who builds understanding, not memorization. Try Cuemath free. | ${seg.transform} Join ${mkt.proof}.
+**Descriptions (90 chars):** ${atom1} Cuemath\u2019s top 1% tutors build thinkers. Free trial. | ${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}? Cuemath\u2019s MathFit\u2122 coaching changes that.
+**Image Direction:** Parent and child at laptop, warm tones, collaborative math moment. Clean, aspirational.
+${META_COPY('Build Real Math Understanding', `${atom1}\n\nCuemath\u2019s MathFit\u2122 system: top 1% tutors + personalized plans + smart platform.${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
+
+---
+*${brief.market} | ${brief.segment} | ${sf} | Tone: ${mkt.tone}*`;
+    }
+
+  } else if (fmt === 'Influencer Script') {
+    content = `## 3 Influencer Script Options \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 The Discovery Story (30-40s)
+
+*9-Scene Script:*
+1. **HOOK (0-3s):** "Stop scrolling if your ${seg.trigger}." [Direct to camera, urgent but warm]
+2. **PERSONAL (3-6s):** "As a parent, I noticed my child could solve problems but couldn\u2019t explain the thinking behind them."
+3. **PROBLEM (6-10s):** "The ${seg.pain}. I tried worksheets, YouTube tutorials, extra tutoring\u2026 nothing stuck."
+4. **DISCOVERY (10-14s):** "A friend told me about Cuemath. I was skeptical, but we tried one free class."
+5. **EXPERIENCE (14-20s):** "The tutor didn\u2019t just teach formulas. She asked my child WHY. Made him think, not memorize. I\u2019d never seen that before."
+6. **RESULT (20-25s):** "${seg.transform}"
+7. **BROADER BENEFIT (25-30s):** "It\u2019s not just about grades. My child actually ENJOYS math now. That\u2019s what MathFit\u2122 means."
+8. **SOCIAL PROOF (30-35s):** "${mkt.proof} chose Cuemath. ${mkt.badge}."
+9. **CTA (35-40s):** "${seg.cta} \u2014 link in my bio. The first class is free. Trust me." [Point to link]
+
+*Talking Points:* 1) ${seg.angle}, 2) Top 1% tutors who ask "why?", 3) ${mkt.proof}, 4) MathFit\u2122 = understanding, not speed, 5) Free first class
+*Do\u2019s:* Use your own child\u2019s name, share a specific moment, be authentic
+*Don\u2019ts:* Don\u2019t say "guaranteed grades", don\u2019t rush the CTA, don\u2019t sound scripted
+*B-Roll:* Child at Cuemath class, tutor interaction, child explaining math, parent proud moment
+*Caption:* "The moment I knew Cuemath was different? When my child explained math to ME. \ud83e\udde0 Link in bio for a free class. #MathFit #Cuemath"
+${META_COPY(`"Your Child ${seg.trigger.replace('child ', '')}?"`, `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s MathFit\u2122 changed everything. ${seg.transform}${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
+
+---
+**Option 2** \u2014 The Comparison (30s)
+
+*9-Scene Script:*
+1. **HOOK (0-3s):** "Math tutoring vs MathFit\u2122. Here\u2019s the difference." [Hold up two hands comparison]
+2. **PERSONAL (3-6s):** "We tried regular tutoring. My child memorized formulas and passed tests."
+3. **PROBLEM (6-10s):** "But ask her to explain it? Blank stare. The understanding wasn\u2019t there."
+4. **DISCOVERY (10-14s):** "Then we found Cuemath\u2019s MathFit\u2122 approach."
+5. **EXPERIENCE (14-20s):** "Instead of drilling answers, the tutor asked my child to think. To reason. To explain WHY."
+6. **RESULT (20-25s):** "${seg.transform}"
+7. **BROADER BENEFIT (25-30s):** "${atom1}"
+8. **SOCIAL PROOF (30-35s):** "${mkt.proof}. ${mkt.badge}."
+9. **CTA (35-40s):** "${seg.cta}. Link in bio \u2014 the free class will show you the difference." [Smile + point]
+
+*Caption:* "Regular tutoring: memorize, pass, forget. MathFit\u2122: understand, explain, remember forever. \u2728 Free class \u2192 link in bio"
+${META_COPY('Tutoring vs MathFit\u2122', `${atom1}\n\nCuemath doesn\u2019t drill answers. We build understanding. ${mkt.proof} already see the difference.${offerLine}\n\n${seg.cta}.`, 'Beyond tutoring | Free class')}
+
+---
+**Option 3** \u2014 The Honest Review (30s)
+
+*9-Scene Script:*
+1. **HOOK (0-3s):** "Honest Cuemath review after 3 months \u2014 no filter." [Casual, sitting on couch]
+2. **PERSONAL (3-6s):** "I\u2019ll tell you exactly what happened."
+3. **PROBLEM (6-10s):** "My child was ${seg.pain}."
+4. **DISCOVERY (10-14s):** "Someone in my community recommended Cuemath. I signed up for the free class."
+5. **EXPERIENCE (14-20s):** "The tutor was patient, asked questions instead of giving answers, and my child was actually engaged."
+6. **RESULT (20-25s):** "${seg.transform}"
+7. **BROADER BENEFIT (25-30s):** "The best part? It\u2019s not just math. It\u2019s confidence. My child volunteers now."
+8. **SOCIAL PROOF (30-35s):** "And I get why ${mkt.proof} chose this."
+9. **CTA (35-40s):** "Try the free class. You\u2019ll see in 45 minutes what I\u2019m talking about. Link in bio."
+
+*Caption:* "3-month honest review: \u2705 child explains math now \u2705 actually enjoys it \u2705 no more homework battles. Link in bio \ud83d\udc47"
+${META_COPY('Honest Cuemath Review: 3 Months', `${seg.transform}\n\n3 months in. No filter. This is what MathFit\u2122 did for us.${offerLine}\n\n${seg.cta}.`, '3 months of real results')}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'UGC Ad') {
+    content = `## 3 UGC Ad Scripts \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 The Realization (30s)
+
+- **Opening (0-5s):** "As a mom of a ${brief.market === 'India' ? '6th' : '4th'} grader, I thought my son was doing fine in math. He passed every test."
+- **Before (5-12s):** "But one day I asked him to explain how he solved a problem. And he couldn\u2019t. He\u2019d just memorized the steps. That scared me."
+- **Discovery (12-18s):** "A friend told me about Cuemath. The first class was free, so I thought why not."
+- **After (18-25s):** "${seg.transform} Within 3 months, he went from memorizing to actually understanding."
+- **CTA (25-30s):** "If your ${seg.trigger}, just try the free class. That\u2019s all I\u2019m saying."
+
+*B-Roll:* Child doing homework, parent\u2019s concerned face, Cuemath class on screen, child explaining math confidently
+*Caption:* The moment I realized good grades \u2260 real understanding. Free class link in bio \ud83d\udc47
+${META_COPY('"I Thought My Son Was Fine in Math"', `He passed every test. But he couldn\u2019t explain a single answer.\n\n${seg.transform} That\u2019s MathFit\u2122.${offerLine}\n\n${seg.cta}.`, 'Real parent | Real story')}
+
+---
+**Option 2** \u2014 The Homework Battle (30s)
+
+- **Opening (0-5s):** "Every night it was the same fight. Homework time = meltdown time."
+- **Before (5-12s):** "My daughter would cry, I\u2019d get frustrated, and we\u2019d both end up upset. ${seg.pain}."
+- **Discovery (12-18s):** "I saw a Cuemath ad and honestly just wanted someone else to deal with the math."
+- **After (18-25s):** "But what happened was so much better. Her tutor taught her to THINK through problems. ${seg.transform}"
+- **CTA (25-30s):** "We haven\u2019t had a homework meltdown in months. If this sounds like your house \u2014 try the free class."
+
+*B-Roll:* Kitchen table homework scene, frustrated moment, calm Cuemath class, child solving independently
+${META_COPY('Homework Meltdowns? We Fixed That', `Every night was a battle. Then we tried Cuemath.\n\n${seg.transform}${offerLine}\n\nFree class \u2192 ${seg.cta}.`, 'No more homework tears')}
+
+---
+**Option 3** \u2014 The Surprise (30s)
+
+- **Opening (0-5s):** "OK so this actually surprised me about Cuemath."
+- **Before (5-12s):** "I signed up because my child was ${seg.pain}. I expected another tutor who\u2019d drill formulas."
+- **Discovery (12-18s):** "Instead, the Cuemath tutor asked my child questions. Made her think. Didn\u2019t give a single answer."
+- **After (18-25s):** "I was like\u2026 is this even tutoring? But then ${seg.transform}"
+- **CTA (25-30s):** "It\u2019s called MathFit\u2122 and honestly, it\u2019s different. Free class in bio."
+
+*B-Roll:* Parent watching class through door, surprised expression, child\u2019s confident moment
+${META_COPY('This Surprised Me About Cuemath', `I expected formula drilling. I got something way better.\n\n${seg.transform}${offerLine}\n\n${seg.cta}.`, 'Not your average tutoring')}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'Testimonial Script') {
+    const isParent = (brief.subFormat || 'Parent Testimonial').includes('Parent');
+    content = `## 3 ${isParent ? 'Parent' : 'Student'} Testimonial Scripts \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 ${isParent ? 'The Understanding Journey' : 'From Fear to Confidence'}
+
+*Interview Prompt Questions:*
+1. "${isParent ? 'What was math like for your child before Cuemath?' : 'How did you feel about math before?'}"
+2. "${isParent ? 'What had you tried before?' : 'What was your first Cuemath class like?'}"
+3. "${isParent ? 'What changed after joining Cuemath?' : 'What\u2019s different now?'}"
+4. "${isParent ? 'Can you share a specific moment when you saw the difference?' : 'What\u2019s your favorite thing about Cuemath?'}"
+5. "${isParent ? 'What would you tell another parent considering Cuemath?' : 'What would you tell a friend about Cuemath?'}"
+
+*Expected Script Flow:*
+- **Before (0-10s):** "${isParent ? `My child was ${seg.pain}. The grades looked fine but I could tell something was off.` : `I used to ${seg.trigger.replace('child ', '')}. Math class made me anxious.`}"
+- **Turning Point (10-20s):** "${isParent ? `We found Cuemath and the first class was eye-opening. The tutor didn\u2019t just teach \u2014 she made my child THINK.` : `My Cuemath tutor was different. She didn\u2019t give me answers. She asked me questions until I figured it out myself.`}"
+- **After (20-35s):** "${isParent ? seg.transform + ` It\u2019s been incredible to watch.` : `Now I actually enjoy math. I even help my friends with their homework.`}"
+- **Recommendation (35-45s):** "${isParent ? `If your ${seg.trigger}, just try the free class. You\u2019ll see the difference in 45 minutes.` : `If math stresses you out, try Cuemath. It\u2019s not what you think tutoring is.`}"
+
+*B-Roll:* ${isParent ? 'Child studying, parent watching proudly, Cuemath class on screen, family moment' : 'Student at desk, solving problems, smiling, tutor interaction'}
+${META_COPY(isParent ? '"I Saw the Difference in One Class"' : '"Math Doesn\u2019t Scare Me Anymore"', `${isParent ? seg.transform : 'I used to dread math. Now I explain it to my friends.'}\n\nMathFit\u2122 by Cuemath.${offerLine}\n\n${seg.cta}.`, isParent ? 'Real parent story' : 'Real student story')}
+
+---
+*${brief.market} | ${brief.segment} | ${isParent ? 'Parent' : 'Student'} Testimonial | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'AI Video') {
+    content = `## 3 AI Video Concepts \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Concept 1: The Pattern** \u2014 "MathFit\u2122 is seeing what others miss"
+
+| Time | Visual Scene (AI Prompt) | Voiceover | On-Screen Text |
+|------|--------------------------|-----------|----------------|
+| **0-4s** | A child walks through a city street. Camera slowly reveals geometric patterns in buildings, bridges, tiles. | "Math is everywhere. But most kids never see it." | |
+| **4-8s** | The patterns light up \u2014 golden ratio spirals, tessellations, symmetry lines appear like a hidden world | "Because they were taught to calculate. Not to think." | *Calculate \u2260 Think* |
+| **8-15s** | Child reaches out, traces a pattern. Numbers and equations flow from their fingertips naturally | "MathFit\u2122 is the ability to see patterns, reason through problems, and explain your thinking." | **MathFit\u2122** |
+| **15-18s** | Pull back to warm scene: child at desk with Cuemath tutor, same sense of wonder | "That\u2019s what Cuemath builds. One child at a time." | **Cuemath** |
+| **18-20s** | End card: Cuemath logo + "Making Kids MathFit\u2122" + CTA | "${seg.cta}." | **Book a Free Class** |
+
+*Music:* Cinematic piano, building wonder. Think Interstellar meets warmth.
+${META_COPY('Math Is Everywhere. Can Your Child See It?', `${atom1}\n\nCuemath builds the thinking skills that last forever.${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
+
+---
+**Concept 2: The Split** \u2014 "Two kids. Same problem. Different thinking."
+
+| Time | Visual Scene (AI Prompt) | Voiceover | On-Screen Text |
+|------|--------------------------|-----------|----------------|
+| **0-4s** | Split screen: two kids sit down with the same math problem | "Same problem. Same grade. Two very different minds." | |
+| **4-10s** | Left: child rapidly writes formula, gets answer, moves on. Right: child pauses, draws, thinks, reasons through | "One memorized the formula. The other understood the concept." | *Memorized vs Understood* |
+| **10-15s** | New problem (harder). Left: stuck, panics. Right: calmly applies reasoning to unfamiliar territory | "When the test changed, only one was ready." | **${atom2}** |
+| **15-18s** | Right child with Cuemath tutor, collaborative learning moment | "MathFit\u2122 builds thinkers who thrive on unfamiliar problems." | **Cuemath** |
+| **18-20s** | End card | "${seg.cta}." | **Book a Free Class** |
+
+*Music:* Tense/curious opening, resolving to warm confidence.
+${META_COPY('Same Problem. Two Different Minds.', `${atom2}\n\nCuemath\u2019s MathFit\u2122 builds the thinking that lasts.${offerLine}\n\n${seg.cta}.`, 'Understanding > Memorization')}
+
+---
+**Concept 3: The Future** \u2014 "In the age of AI, thinking is the only advantage"
+
+| Time | Visual Scene (AI Prompt) | Voiceover | On-Screen Text |
+|------|--------------------------|-----------|----------------|
+| **0-4s** | AI interface solving complex equations instantly. Beautiful, cold, efficient. | "AI can solve any math problem in milliseconds." | |
+| **4-8s** | Camera pulls back. A child watches the screen, then looks away, thinking | "So why teach math at all?" | *Why teach math?* |
+| **8-15s** | Child at whiteboard, working through a problem step by step, making mistakes, correcting, understanding | "Because math was never about the answer. It was about the thinking." | **AI calculates. Humans must think.** |
+| **15-18s** | Warm: child with Cuemath tutor, genuine moment of understanding | "Cuemath builds the one skill AI can\u2019t replace: clear thinking." | **MathFit\u2122** |
+| **18-20s** | End card | "Make your child MathFit\u2122 for the AI world." | **Book a Free Class** |
+
+*Music:* Electronic/futuristic opening, transitioning to warm human piano.
+${META_COPY('AI Calculates. Can Your Child Think?', `${atom3}\n\nCuemath\u2019s MathFit\u2122 builds the thinking skills AI can\u2019t replace.${offerLine}\n\n${seg.cta}.`, 'Future-proof math skills')}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'Product Video') {
+    content = `## 3 Product Video Scripts \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 Platform Walkthrough (30s)
+
+| Time | Screen Recording Direction | Voiceover | On-Screen Text |
+|------|--------------------------|-----------|----------------|
+| **0-3s** | Generic tutoring app: worksheet after worksheet, no interaction | "This is what most online math tutoring looks like." | **One-size-fits-all** |
+| **3-10s** | Open Cuemath app \u2014 show personalized learning path with child\u2019s name | "This is Cuemath. A personalized ecosystem built around YOUR child." | **MathFit\u2122 System** |
+| **10-20s** | Show: smart whiteboard with tutor drawing, Talk-o-Meter engagement gauge, interactive problem solving | "Top 1% tutors. A smart whiteboard that makes math visual. And a system that adapts to how your child thinks." | **Top 1% Tutors + Smart Platform** |
+| **20-25s** | Show: progress dashboard, confidence metrics, parent feedback view | "Real progress you can see. Real understanding you can hear when your child explains math." | **${seg.transform.substring(0, 40)}** |
+| **25-30s** | End card: logo + badge + CTA button | "${seg.cta}. See it for yourself." | **Book a Free Class** |
+
+*UI Callouts:* Personalized path, Talk-o-Meter, smart whiteboard drawing tools, progress dashboard
+${META_COPY('See Why ${mkt.proof} Chose This', `Most tutoring = worksheets. Cuemath = a thinking system.\n\nTop 1% tutors + smart platform + personalized plans.${offerLine}\n\n${seg.cta}.`, 'Not just tutoring | MathFit\u2122')}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
   } else {
-    content = `### Headline Options\n\n1. **"Your child deserves to ${seg.angle}"**\n2. **"MathFit\u2122: Where ${seg.trigger.replace('child ', 'kids who ')} learn to think"**\n3. **"Tricks fade. Understanding compounds. Make your child MathFit\u2122"**\n\n### Primary Text\n\n**Option A (Emotional lead):**\nEvery parent wants their child to succeed in math. But ${seg.trigger}.\n\nCuemath\u2019s MathFit\u2122 system pairs your child with a top 1% tutor who specializes in building deep understanding \u2014 not memorization. ${mkt.proof}.\n\n${seg.cta}.\n\n**Option B (Proof lead):**\n${mkt.proof} chose Cuemath for one reason: it works.\n\nOur personalized ecosystem \u2014 handpicked tutor + smart platform + conceptual curriculum \u2014 helps your child ${seg.angle}.\n\n"MathFit\u2122 isn\u2019t about getting answers faster. It\u2019s about thinking better."\n\n${seg.cta}.\n\n**Option C (Question lead):**\nWhat if your child could explain math, not just solve it?\n\nThat\u2019s what MathFit\u2122 means. Deep understanding. Real confidence. A system built around YOUR child.\n\n${seg.cta}.${customAngle}${offerLine}\n\n### Description\n- Making Kids MathFit\u2122 | 1:1 Expert Tutoring\n- Deep understanding beats memorization. Book a free trial.\n- Top 1% tutors. Personalized plans. Real results.\n\n---\n*Template mode \u2014 add Claude API key in Settings for AI-generated copy with performance context.*\n*Tone: ${mkt.tone}. Segment: ${brief.segment}. Platform: ${brief.platform}.*`;
+    // Fallback for any unhandled format
+    content = `## ${fmt} \u2014 ${brief.market} | ${brief.segment}
+${angleLine}
+---
+**Option 1** \u2014 Emotional Lead
+
+**Hook:** "${seg.trigger.charAt(0).toUpperCase() + seg.trigger.slice(1)}? Here\u2019s what ${mkt.proof} discovered."
+**Body:** ${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}. Cuemath\u2019s MathFit\u2122 system pairs your child with a top 1% tutor who builds deep understanding \u2014 not memorization.
+**Proof:** "${seg.transform}" \u2014 ${mkt.badge}
+**CTA:** ${seg.cta}
+${offerLine}
+${META_COPY(`"${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}"`, `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s MathFit\u2122 changes that. ${mkt.proof} trust us.${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
+
+---
+**Option 2** \u2014 Proof Lead
+
+**Hook:** "${mkt.proof} chose Cuemath. Here\u2019s why."
+**Body:** ${atom1} Our personalized ecosystem \u2014 top 1% tutor + smart platform + ${mkt.curr} alignment \u2014 helps your child ${seg.angle}.
+**Proof:** ${mkt.badge}
+**CTA:** ${seg.cta}
+${offerLine}
+
+---
+**Option 3** \u2014 Question Lead
+
+**Hook:** "What if your child could explain math, not just solve it?"
+**Body:** That\u2019s MathFit\u2122. ${atom2}. A system built around YOUR child with tutors who ask "why?" before giving answers.
+**Proof:** ${seg.transform}
+**CTA:** ${seg.cta}
+${offerLine}
+
+---
+*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
   }
-  // Show result
+
+  // Show result using the standard showResult flow
+  state.lastGeneratedContent = content;
+  state.currentBrief = brief;
   document.getElementById('generateEmpty')?.classList.add('hidden');
   document.getElementById('generateLoading')?.classList.add('hidden');
   document.getElementById('generateResult')?.classList.remove('hidden');
@@ -8981,8 +9439,8 @@ function generateFromTemplate() {
   document.getElementById('resultContent').innerHTML = markdownToHtml(content);
   document.getElementById('refinementBar').style.display = 'none';
   document.getElementById('imageGenSection').style.display = 'none';
-  state.lastGeneratedContent = content;
-  showToast('Generated from templates \u2014 add API key for AI copy');
+  navigator.clipboard.writeText(content).catch(() => {});
+  showToast('Copy generated \u2014 copied to clipboard');
 }
 
 function updateGenerateMode() {
@@ -8993,7 +9451,7 @@ function updateGenerateMode() {
 
 async function generateContent() {
   const briefOnly = document.getElementById('briefOnlyToggle')?.checked;
-  const useApi = !briefOnly && state.apiKey;
+  const useApi = false; // All generation is template-based — no API credits
   const brief = {
     market: document.getElementById('briefMarket').value,
     platform: getActivePill('platformPills'), format: getActivePill('formatPills'),
@@ -9034,76 +9492,9 @@ async function generateContent() {
     return;
   }
 
-  // BRIEF MODE: build brief for Godfather (no credits)
-  // Build the brief summary for display + clipboard
-  const sopRules = getSopRules(brief);
-  const patterns = getPatternContext(brief);
-  const fmtTemplate = getFormatOutputTemplate(brief.format, brief.subFormat);
-
-  // Get winning formula context if available
-  let winningCtx = '';
-  if (state.activeWinningFormula && Object.keys(state.activeWinningFormula).length) {
-    winningCtx = '\n**Winning Formula:** ' + Object.entries(state.activeWinningFormula)
-      .filter(([cat]) => TAG_CATEGORIES[cat])
-      .map(([cat, data]) => `${TAG_CATEGORIES[cat]?.label || cat}: "${tagLabel(data.tag)}"`)
-      .join(' + ');
-  }
-
-  // Get top performers from Sentinel
-  let perfCtx = '';
-  if (state.sentinelOutput?.top_performers?.length) {
-    perfCtx = '\n**Top Performers:** ' + state.sentinelOutput.top_performers.slice(0, 3)
-      .map(p => `"${(p.name||'').substring(0,40)}" (CPQL ${formatCurrency(p.cpql)})`)
-      .join(', ');
-  }
-
-  // Get feedback loop context
-  const feedbackCtx = getForgeFeedbackContext(brief);
-  let feedbackLine = '';
-  if (feedbackCtx) {
-    const won = JSON.parse(localStorage.getItem('gf_forgeFeedback') || '[]').filter(f => f.status === 'won' && f.format === brief.format).length;
-    const deployed = JSON.parse(localStorage.getItem('gf_forgeFeedback') || '[]').filter(f => f.status === 'deployed' && f.format === brief.format).length;
-    if (won || deployed) feedbackLine = `\n**Feedback:** ${won} won, ${deployed} deployed for this format. Avoid repeating deployed angles.`;
-  }
-
-  const briefText = `**BRIEF** — ${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}
-**Market:** ${brief.market} | **Platform:** ${brief.platform} | **ICP:** ${brief.icpType}
-**Segment:** ${brief.segment} | **Funnel:** ${brief.funnel}${brief.angle ? '\n**Angle:** ' + brief.angle : ''}${brief.offer ? '\n**Offer:** ' + brief.offer : ''}${winningCtx}${perfCtx}${feedbackLine}`;
-
-  // Show brief in the output panel
-  document.getElementById('generateEmpty').classList.add('hidden');
-  document.getElementById('generateResult').classList.remove('hidden');
-  document.getElementById('resultPlatform').textContent = brief.platform;
-  document.getElementById('resultMarket').textContent = brief.market;
-  document.getElementById('resultSegment').textContent = brief.segment;
-  document.getElementById('imageGenSection').style.display = 'none';
-  document.getElementById('refinementBar').style.display = 'none';
-
-  const modelLabel = getModelForFormat(brief.format).includes('opus') ? 'Opus' : 'Sonnet';
-  document.getElementById('resultContent').innerHTML = `
-    <div class="mb-4 p-4 rounded-xl bg-surface-secondary border border-gray-200">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-bold">Brief Ready</h3>
-        <span class="text-[9px] px-2 py-0.5 rounded-full ${modelLabel === 'Opus' ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple'} font-bold">${modelLabel}-quality</span>
-      </div>
-      ${markdownToHtml(briefText)}
-    </div>
-    <div class="p-4 rounded-xl border-2 border-dashed border-accent-purple/30 bg-accent-purple-light/20 text-center">
-      <p class="text-sm font-semibold text-accent-purple mb-1">Ask Godfather to generate</p>
-      <p class="text-xs text-text-muted mb-3">Say: <code class="bg-white px-2 py-0.5 rounded text-accent-purple font-mono text-[11px]">/godfather copy</code> then "Generate from brief"</p>
-      <p class="text-[10px] text-text-muted">Or paste this brief directly. No API credits used — runs on your Claude Code bandwidth.</p>
-    </div>
-    <div class="mt-4 p-3 rounded-lg bg-surface-tertiary">
-      <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Output Template</p>
-      <pre class="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed" style="max-height:200px;overflow-y:auto">${fmtTemplate.replace(/</g,'&lt;').substring(0, 800)}${fmtTemplate.length > 800 ? '\n...' : ''}</pre>
-    </div>
-    ${sopRules ? `<details class="mt-3"><summary class="text-[10px] font-bold text-text-muted uppercase tracking-wider cursor-pointer">SOP Rules for ${brief.format}</summary><pre class="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed mt-2 p-3 bg-surface-tertiary rounded-lg" style="max-height:200px;overflow-y:auto">${sopRules.replace(/</g,'&lt;')}</pre></details>` : ''}
-    ${patterns ? `<details class="mt-3"><summary class="text-[10px] font-bold text-text-muted uppercase tracking-wider cursor-pointer">Proven Patterns</summary><pre class="text-[10px] text-text-secondary whitespace-pre-wrap font-mono leading-relaxed mt-2 p-3 bg-surface-tertiary rounded-lg" style="max-height:200px;overflow-y:auto">${patterns.replace(/</g,'&lt;')}</pre></details>` : ''}`;
-
-  // Copy brief to clipboard
-  const clipboardText = briefText + '\n\n---\nFormat template:\n' + fmtTemplate;
-  navigator.clipboard.writeText(clipboardText).catch(() => {});
-  showToast('Brief saved — ask Godfather to generate (no credits used)');
+  // TEMPLATE GENERATION: instant, zero API credits
+  generateFromTemplate();
+  return;
 }
 
 // Godfather can call this to inject generated content back into the dashboard
@@ -11522,7 +11913,7 @@ async function tagCreatives(rawData) {
 // Runs ONLY on influencer-campaign ads with thumbnails that haven't been vision-scanned yet.
 // Results cached in localStorage (gf_visionCache) — each thumbnail scanned once.
 async function visionScanCreators() {
-  if (!state.apiKey) { showToast('Add Claude API key in Settings first.'); return; }
+  if (!state.apiKey && !_IS_DEPLOYED) { showToast('Add Claude API key in Settings first.'); return; }
   const visionCache = JSON.parse(localStorage.getItem('gf_visionCache') || '{}');
 
   // Find influencer ads with thumbnails that haven't been scanned
