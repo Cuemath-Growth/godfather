@@ -14520,7 +14520,12 @@ async function fetchLibrarySheet(silent) {
     if (silent && prevCount > 0 && allRows.length > prevCount) {
       showToast(`${allRows.length - prevCount} new creative(s) added`);
     }
+    // Load cached Notion thumbnails into state before render
+    state._notionThumbs = JSON.parse(localStorage.getItem('gf_notionThumbs') || '{}');
     renderLibrary();
+    // Fetch fresh Notion thumbnails in background (non-blocking)
+    const cards = allRows.map(normalizeLibraryRow).filter(c => c.name && c.notionLink);
+    fetchNotionThumbnails(cards);
   } catch (e) {
     console.error('Library sheet fetch error:', e);
     if (!silent) showToast('Failed to fetch library: ' + e.message);
@@ -14581,8 +14586,7 @@ function submitUploadDrawer() {
 async function tagUnanalysedLibrary() {
   if (!API_KEY) { showToast('Add Claude API key in Settings first.'); return; }
   const allCards = (state._librarySheet || []).map(normalizeLibraryRow).filter(c => c.name);
-  const matched = matchLibraryToLens(allCards);
-  const unanalysed = matched.filter(c => !c._lensMatch?.tags && !c.hookType);
+  const unanalysed = allCards.filter(c => !c.hookType && !c._raw?._cachedTags);
   if (!unanalysed.length) { showToast('All creatives are already tagged!'); return; }
 
   const btn = document.getElementById('tagUnanalysedBtn');
@@ -14655,6 +14659,84 @@ function applyLibraryTagCache() {
     // Store extra tags in hidden fields for the card renderer
     row._cachedTags = cached;
   });
+}
+
+// ---- Notion Thumbnail Fetching (via proxy) ----
+// Fetches first image from Notion pages, caches in localStorage + state
+async function fetchNotionThumbnails(cards) {
+  if (!cards.length) return;
+  const cache = JSON.parse(localStorage.getItem('gf_notionThumbs') || '{}');
+  const cacheAge = JSON.parse(localStorage.getItem('gf_notionThumbsTs') || '{}');
+  const now = Date.now();
+  const MAX_AGE = 50 * 60 * 1000; // 50 minutes (Notion URLs expire in 1hr)
+
+  // Collect unique Notion URLs that need fetching
+  const toFetch = [];
+  const seen = new Set();
+  cards.forEach(c => {
+    const url = c.notionLink;
+    if (!url || !url.includes('notion.so') || seen.has(url)) return;
+    seen.add(url);
+    // Skip if cached and fresh
+    if (cache[url] && cacheAge[url] && (now - cacheAge[url]) < MAX_AGE) return;
+    toFetch.push(url);
+  });
+
+  if (!toFetch.length) {
+    state._notionThumbs = cache;
+    return;
+  }
+
+  console.log(`Notion thumbs: fetching ${toFetch.length} pages...`);
+
+  // Extract page ID from Notion URL
+  function extractPageId(notionUrl) {
+    try {
+      const u = new URL(notionUrl);
+      const path = u.pathname;
+      // Format: /cuemath/Page-Name-UUID or just /UUID
+      const match = path.match(/([a-f0-9]{32})$/);
+      if (match) return match[1];
+      // Try with dashes
+      const dashMatch = path.match(/([a-f0-9-]{36})$/);
+      if (dashMatch) return dashMatch[1].replace(/-/g, '');
+      return null;
+    } catch { return null; }
+  }
+
+  // Fetch in batches of 5 to avoid hammering the proxy
+  const BATCH = 5;
+  for (let i = 0; i < toFetch.length; i += BATCH) {
+    const batch = toFetch.slice(i, i + BATCH);
+    const promises = batch.map(async url => {
+      const pageId = extractPageId(url);
+      if (!pageId) return;
+      try {
+        const res = await fetch('/api/proxy-notion', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ page_id: pageId })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.image_url) {
+            cache[url] = data.image_url;
+            cacheAge[url] = now;
+          }
+        }
+      } catch (e) { console.warn('Notion thumb error:', url, e.message); }
+    });
+    await Promise.all(promises);
+  }
+
+  // Save to localStorage and state
+  localStorage.setItem('gf_notionThumbs', JSON.stringify(cache));
+  localStorage.setItem('gf_notionThumbsTs', JSON.stringify(cacheAge));
+  state._notionThumbs = cache;
+  console.log(`Notion thumbs: ${Object.keys(cache).length} cached`);
+
+  // Re-render library with new thumbnails
+  renderLibrary();
 }
 
 // ---- Cross-reference Library creatives with Lens tagger data ----
@@ -14817,8 +14899,9 @@ function renderLibrary() {
 
   const useSheet = state._librarySheet && state._librarySheet.length > 0;
   let sheetCards = useSheet ? state._librarySheet.map(normalizeLibraryRow).filter(c => c.name) : [];
-  // Cross-reference with Lens data (for tags + thumbnails only, CRM-matched ads only)
-  sheetCards = matchLibraryToLens(sheetCards);
+  // Attach cached Notion thumbnails (no data/perf dependency)
+  const thumbCache = state._notionThumbs || {};
+  sheetCards.forEach(c => { c._notionThumb = thumbCache[c.notionLink] || ''; });
 
   // Filters
   if (typeFilter !== 'all') sheetCards = sheetCards.filter(c => c.contentType === typeFilter);
@@ -14869,7 +14952,7 @@ function renderLibrary() {
   let unanalysedCount = 0;
   sheetCards.forEach(c => {
     fmtCounts[c.format || 'Unknown'] = (fmtCounts[c.format || 'Unknown'] || 0) + 1;
-    if (!c._lensMatch?.tags && !c.hookType && !c._raw?._cachedTags) unanalysedCount++;
+    if (!c.hookType && !c._raw?._cachedTags) unanalysedCount++;
   });
   const fmtSummary = Object.entries(fmtCounts).map(([k,v]) => `${v} ${k}`).join(' \u00B7 ');
   const lastFetch = state._libraryLastFetchTime ? ` \u00B7 Synced ${new Date(state._libraryLastFetchTime).toLocaleTimeString()}` : '';
@@ -14900,19 +14983,17 @@ function renderLibrary() {
       return c.month.toLowerCase().includes(curMonth.toLowerCase().substring(0, 3));
     })();
 
-    // Thumbnail: Lens match → Meta thumbnail
-    const thumbUrl = c._lensMatch?.thumbnail_url || '';
+    // Thumbnail: Notion page image (via proxy) or cached
+    const thumbUrl = c._notionThumb || '';
 
     // Format badge
     const fmtColor = { 'Static': 'blue', 'Video': 'purple', 'Influencer': 'pink', 'Animated': 'teal', 'Carousel': 'orange', 'Testimonial': 'green' };
     const fmtC = fmtColor[c.format] || 'purple';
 
-    // Tags — from sheet columns first, then Lens cross-ref, then AI cache
-    const lt = c._lensMatch?.tags;
+    // Tags — from sheet columns or AI cache only (no data/Lens dependency)
     const ct = c._raw?._cachedTags;
     const pickTag = (sheetVal, lensKey, cacheKey) => {
       if (sheetVal && sheetVal !== 'Unknown') return sheetVal;
-      if (lt?.[lensKey] && lt[lensKey] !== 'Unknown') return lt[lensKey];
       if (ct?.[cacheKey] && ct[cacheKey] !== 'Unknown') return ct[cacheKey];
       return null;
     };
@@ -14966,7 +15047,6 @@ function renderLibrary() {
       <div class="p-3.5">
         <div class="flex items-center gap-1.5 mb-2">
           <span class="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-accent-${fmtC}-light text-accent-${fmtC}">${c.format || 'Unknown'}</span>
-          ${c._lensMatch?.adCount ? `<span class="text-[8px] text-text-muted">${c._lensMatch.adCount} ad${c._lensMatch.adCount > 1 ? 's' : ''} matched</span>` : ''}
         </div>
         <div class="flex items-start justify-between mb-2">
           ${c.notionLink
