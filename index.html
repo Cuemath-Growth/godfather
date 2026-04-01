@@ -598,12 +598,18 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-2">
-              <button onclick="generateContent()" id="generateBtn" class="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-primary">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                Build Brief
-              </button>
-              <span id="modelBadge" class="text-[9px] px-2.5 py-1.5 rounded-lg bg-accent-purple-light text-accent-purple font-bold whitespace-nowrap">Sonnet</span>
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <button onclick="generateContent()" id="generateBtn" class="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-primary">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                  <span id="generateBtnLabel">Build Brief</span>
+                </button>
+                <span id="modelBadge" class="text-[9px] px-2.5 py-1.5 rounded-lg bg-accent-purple-light text-accent-purple font-bold whitespace-nowrap">Sonnet</span>
+              </div>
+              <label class="flex items-center gap-2 text-[10px] text-text-muted cursor-pointer px-1">
+                <input type="checkbox" id="useApiToggle" class="accent-purple-600 w-3.5 h-3.5 rounded" onchange="updateGenerateMode()" />
+                <span>Generate via API <span class="text-text-muted/60">(uses credits)</span></span>
+              </label>
             </div>
             <button onclick="resetForge()" class="w-full py-2 rounded-lg text-xs font-medium text-text-muted hover:text-text-primary hover:bg-surface-tertiary transition-colors mt-2">Reset All Fields</button>
             </div><!-- /briefPanel -->
@@ -3267,6 +3273,11 @@ function navigateTo(view) {
     if (lg) lg.innerHTML = '';
     if (!state._libraryDeployments) loadLibraryDeployments().catch(() => {});
     if (!state._libraryNotes) loadLibraryNotes().catch(() => {});
+    // Render immediately if we have cached data, then refresh in background
+    if (state._librarySheet?.length) {
+      if (ll) ll.classList.add('hidden');
+      renderLibrary();
+    }
     fetchLibrarySheet(); startLibraryPolling();
   } else { stopLibraryPolling(); }
   // Auto-compute winning formula when switching to generate
@@ -8941,7 +8952,14 @@ function generateFromTemplate() {
   showToast('Generated from templates \u2014 add API key for AI copy');
 }
 
+function updateGenerateMode() {
+  const useApi = document.getElementById('useApiToggle')?.checked;
+  const label = document.getElementById('generateBtnLabel');
+  if (label) label.textContent = useApi ? 'Generate' : 'Build Brief';
+}
+
 async function generateContent() {
+  const useApi = document.getElementById('useApiToggle')?.checked && state.apiKey;
   const brief = {
     market: document.getElementById('briefMarket').value,
     platform: getActivePill('platformPills'), format: getActivePill('formatPills'),
@@ -8953,6 +8971,36 @@ async function generateContent() {
   state.currentBrief = brief;
   localStorage.setItem('gf_currentBrief', JSON.stringify(brief));
 
+  // API MODE: generate via Claude API (uses credits)
+  if (useApi) {
+    state.isGenerating = true;
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="flex gap-1"><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.15s"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.3s"></div></div>';
+    document.getElementById('generateEmpty').classList.add('hidden');
+    document.getElementById('generateResult').classList.add('hidden');
+    document.getElementById('generateLoading').classList.remove('hidden');
+    const model = getModelForFormat(brief.format);
+    const maxTokens = getMaxTokensForFormat(brief.format);
+    try {
+      const sys = buildSystemPrompt(brief);
+      const msg = buildUserMessage(brief);
+      state.conversationHistory = [{role:'user',content:msg}];
+      const result = await callClaude([{role:'user',content:msg}], false, sys, model, maxTokens);
+      showResult(result, brief);
+      document.getElementById('imageGenSection').style.display = 'none';
+    } catch(e) {
+      document.getElementById('generateLoading').classList.add('hidden');
+      document.getElementById('generateEmpty').classList.remove('hidden');
+      showToast('Error: '+e.message);
+    }
+    state.isGenerating = false;
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> <span id="generateBtnLabel">Generate</span>';
+    return;
+  }
+
+  // BRIEF MODE: build brief for Godfather (no credits)
   // Build the brief summary for display + clipboard
   const sopRules = getSopRules(brief);
   const patterns = getPatternContext(brief);
