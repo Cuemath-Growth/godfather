@@ -3586,15 +3586,18 @@ async function testLibraryConfig() {
 function initLibrarySettings() {
   const config = JSON.parse(localStorage.getItem('gf_libraryConfig') || 'null');
   if (config) {
-    state.sheetConfig.libraryUrl = config.url;
-    state.sheetConfig.libraryTabs = config.tabs;
+    state.sheetConfig.libraryUrl = config.url || state.sheetConfig.libraryUrl;
+    state.sheetConfig.libraryTabs = config.tabs?.length ? config.tabs : state.sheetConfig.libraryTabs;
   }
-  const urlEl = document.getElementById('settingsLibraryUrl');
-  const tabsEl = document.getElementById('settingsLibraryTabs');
-  if (urlEl) urlEl.value = state.sheetConfig.libraryUrl || '';
-  if (tabsEl && state.sheetConfig.libraryTabs?.length) {
-    tabsEl.value = state.sheetConfig.libraryTabs.map(t => `${t.gid}:${t.type}`).join(', ');
-  }
+  // Populate Settings UI (deferred — DOM may not be ready yet during boot)
+  setTimeout(() => {
+    const urlEl = document.getElementById('settingsLibraryUrl');
+    const tabsEl = document.getElementById('settingsLibraryTabs');
+    if (urlEl) urlEl.value = state.sheetConfig.libraryUrl || '';
+    if (tabsEl && state.sheetConfig.libraryTabs?.length) {
+      tabsEl.value = state.sheetConfig.libraryTabs.map(t => `${t.gid}:${t.type}`).join(', ');
+    }
+  }, 100);
 }
 
 function saveDataSource() {
