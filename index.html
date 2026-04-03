@@ -8435,12 +8435,14 @@ function renderMetricTicker() {
   }
 
   // Use getPortfolioMetrics when available (clean data layer), fallback to getMarketMetrics (legacy)
-  const market = dashCountry === 'all' ? null : dashCountry;
+  const market = dashCountry || 'all';
   const _usePortfolio = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
   const pm = _usePortfolio ? getPortfolioMetrics(market, from, to) : null;
-  // Wire TS from getTS() — getPortfolioMetrics doesn't compute it
-  const _portfolioTS = _usePortfolio && typeof getTS === 'function' ? getTS(market, from, to) : 0;
-  const m = _usePortfolio ? { spend: pm.spend, ql: pm.ql, tql: pm.tql, td: pm.td, enrolled: pm.paid, cptql: pm.cptql, cptd: pm.cptd, cac: pm.cac, ql_td_pct: pm.qlTdPct / 100, nri: pm.nri, invalid: 0, ts: _portfolioTS, asian: 0 } : getMarketMetrics(market, from || undefined, to || undefined);
+  // Wire metrics that getPortfolioMetrics doesn't compute
+  const _portfolioTS = _usePortfolio ? getTS(market, from, to) : 0;
+  const _portfolioInvalid = _usePortfolio ? getInvalid(market, from, to) : 0;
+  const _portfolioAsian = _usePortfolio ? getAsian(market, from, to) : 0;
+  const m = _usePortfolio ? { spend: pm.spend, ql: pm.ql, tql: pm.tql, td: pm.td, enrolled: pm.paid, cptql: pm.cptql, cptd: pm.cptd, cac: pm.cac, ql_td_pct: pm.qlTdPct / 100, nri: pm.nri, invalid: _portfolioInvalid, ts: _portfolioTS, asian: _portfolioAsian } : getMarketMetrics(market, from || undefined, to || undefined);
   const totalSpend = m.spend;
   const cptql = m.cptql || 0;
   const cptd = m.cptd || 0;
