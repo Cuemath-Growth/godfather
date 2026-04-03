@@ -4637,17 +4637,30 @@ function filterLeadsByMarket(data, market) {
   });
 }
 
+// costData uses country_segment for geo, campaign_name for sub-geo within APAC:
+//   ANZ_ = Australia, ANZ-NZ_ = NZ, ANZ-SG_ = Singapore, ANZ-UK_ = UK
 function filterCostByMarket(data, market) {
   if (market === 'all') return data;
-  if (!market) return [];  // empty market = empty result
+  if (!market) return [];
   return data.filter(r => {
-    const seg = (r.country_segment || '').trim();
-    const segL = seg.toLowerCase();
-    if (market === 'MEA' || market === 'ME') return seg === 'ME' || seg === 'MEA' || segL === 'mea' || segL === 'me';
-    if (market === 'AUS') return segL === 'apac' || segL === 'aus' || segL === 'anz';  // AUS spend is within APAC in costData
-    if (market === 'APAC') return segL === 'apac' || segL === 'aus' || segL === 'anz' || segL === 'row';
-    if (market === 'UK') return segL === 'uk';
-    return seg === market;
+    const seg = (r.country_segment || '').trim().toLowerCase();
+    const camp = (r.campaign_name || '').toUpperCase();
+    if (market === 'MEA' || market === 'ME') return seg === 'me' || seg === 'mea';
+    if (market === 'AUS') {
+      if (seg === 'aus' || seg === 'anz') return true;
+      // APAC rows: AUS = ANZ_ prefix (excludes ANZ-NZ_, ANZ-SG_, ANZ-UK_)
+      if (seg === 'apac' || seg === 'row') return camp.startsWith('ANZ_') || (/\bAUS\b/.test(camp)) || camp.includes('NAPLAN') || camp.includes('SELECTIVE');
+      return false;
+    }
+    if (market === 'UK') {
+      if (seg === 'uk') return true;
+      // UK can also appear as ANZ-UK_ within APAC
+      if (seg === 'apac' || seg === 'row') return camp.startsWith('ANZ-UK_');
+      return false;
+    }
+    if (market === 'APAC') return seg === 'apac' || seg === 'row' || seg === 'aus' || seg === 'anz';
+    // US, India — direct match
+    return seg === market.toLowerCase();
   });
 }
 
