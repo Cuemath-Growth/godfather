@@ -4998,8 +4998,10 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     // from one version to another's spend → unreliable CPTQL.
     // TODO: Re-enable with version-aware matching (same creative + same campaign).
 
-    const metaMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' })[m.account] || '';
-    const mkt = metaMarket || crm?.market || matchMarketFromText(' ' + m.campaign.toUpperCase() + ' ');
+    // Derive market from campaign name first (handles AUS/MEA/UK sub-markets within ROW account)
+    const campaignMarket = matchMarketFromText(' ' + m.campaign.toUpperCase() + ' ');
+    const accountMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'APAC' })[m.account] || '';
+    const mkt = (campaignMarket !== 'Unknown' ? campaignMarket : '') || crm?.market || accountMarket;
     const adMarket = mkt === 'Unknown' ? '' : mkt;
     if (market && market !== 'all' && adMarket !== market) return;
 
@@ -5213,7 +5215,7 @@ function getPortfolioMetrics(market, from, to) {
     totalTQL = totalQL;
   } else {
     // All Geo — apply per-market logic to each lead
-    totalTQL = typeof getTQL === 'function' ? getTQL(null, _from, _to) : totalQL;
+    totalTQL = typeof getTQL === 'function' ? getTQL('all', _from, _to) : totalQL;
   }
 
   // Cap TQL at QL — TQL is a subset of QL, can never exceed it
@@ -7191,6 +7193,7 @@ function renderOracleActions() {
 
   // ── SECTION 5: MARKET HEALTH (date-filtered from perf tracker + CRM) ──
   const marketList = document.getElementById('oracleMarketHealthList');
+  if (!marketList) return; // DOM element not rendered yet
   const mhGeos = ['US','India','AUS','MEA','UK','APAC'];
   const mhFrom = document.getElementById('dashboardDateFrom')?.value || '';
   const mhTo = document.getElementById('dashboardDateTo')?.value || '';
