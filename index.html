@@ -4984,7 +4984,12 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const accountMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'APAC' })[m.account] || '';
     const mkt = (campaignMarket !== 'Unknown' ? campaignMarket : '') || crm?.market || accountMarket;
     const adMarket = mkt === 'Unknown' ? '' : mkt;
-    if (market && market !== 'all' && adMarket !== market) return;
+    // Market hierarchy: APAC includes AUS/NZ/SG/ROW. US includes Canada.
+    if (market && market !== 'all') {
+      if (market === 'APAC') { if (!['APAC','AUS','ROW','Unknown',''].includes(adMarket)) return; }
+      else if (market === 'US') { if (adMarket !== 'US' && adMarket !== 'Canada') return; }
+      else { if (adMarket !== market) return; }
+    }
 
     const ql = crm?.ql || 0;
     const nri = crm?.nri || 0;
@@ -5013,7 +5018,12 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     if (!_isLPCampaign({ campaign: c.campaign, adName: c.adName })) return;
     const mkt = c.market || matchMarketFromText(' ' + c.campaign.toUpperCase() + ' ');
     const adMarket = mkt === 'Unknown' ? '' : mkt;
-    if (market && market !== 'all' && adMarket !== market) return;
+    // Market hierarchy: same as Meta rows above
+    if (market && market !== 'all') {
+      if (market === 'APAC') { if (!['APAC','AUS','ROW','Unknown',''].includes(adMarket)) return; }
+      else if (market === 'US') { if (adMarket !== 'US' && adMarket !== 'Canada') return; }
+      else { if (adMarket !== market) return; }
+    }
     const isUS = adMarket === 'US' || adMarket === 'Canada';
     const tql = isUS ? c.nri : c.ql;
     results.push({
