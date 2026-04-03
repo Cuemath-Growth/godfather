@@ -4205,6 +4205,18 @@ async function fetchSheetData(sheetUrl, apiKey) {
   });
   console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
   costData = parseSheetValues(costJson.values);
+  // DIAGNOSTIC: dump unique values for geo debugging
+  const _costSegs = {}, _costCols = costData[0] ? Object.keys(costData[0]) : [];
+  costData.forEach(r => { const s = (r.country_segment||'(empty)').trim(); _costSegs[s] = (_costSegs[s]||0)+1; });
+  console.log('costData columns:', JSON.stringify(_costCols));
+  console.log('costData country_segment values:', JSON.stringify(_costSegs));
+  console.log('costData sample row:', JSON.stringify(costData[0]));
+  const _leadBuckets = {};
+  leadsData.forEach(r => { const b = (r.country_bucket||'(empty)').trim(); _leadBuckets[b] = (_leadBuckets[b]||0)+1; });
+  console.log('leadsData country_bucket values:', JSON.stringify(_leadBuckets));
+  const _ethVals = {};
+  leadsData.filter(r => String(r.qls)==='1').forEach(r => { const e = (r.ethnicity||'(empty)').trim(); _ethVals[e] = (_ethVals[e]||0)+1; });
+  console.log('leadsData ethnicity values (QL=1 only):', JSON.stringify(_ethVals));
 
   // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
   const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term'];
@@ -6166,7 +6178,7 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   const qlTd = ql > 0 ? Math.min((td / ql * 100), 100) : 0;
   const tqlTd = tql > 0 ? Math.min((td / tql * 100), 100) : 0;
 
-  return { spend, impressions, clicks, ql, tql, nri, asian, invalid, ts, td, paid, cpql, cptql, cptd, cac, qlTd, tqlTd };
+  return { spend, ql, tql, nri, asian, invalid, ts, td, paid, cpql, cptql, cptd, cac, qlTd, tqlTd };
 }
 
 // PHASE_DEPRECATED: fetchPerfTrackerDaily — derived tab no longer read
