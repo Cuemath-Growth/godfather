@@ -5203,8 +5203,8 @@ function getPortfolioMetrics(market, from, to) {
     // AUS, UK, APAC — all QLs qualify
     totalTQL = totalQL;
   } else {
-    // All Geo — sum per-market TQLs from leadsData (ground truth)
-    totalTQL = ['US','AUS','MEA','UK','APAC'].reduce((sum, g) => sum + getTQL(g, _from, _to), 0);
+    // All Geo — per-row TQL logic from leadsData (iterates each row once, no double-counting)
+    totalTQL = getTQL('all', _from, _to);
   }
 
   return {
