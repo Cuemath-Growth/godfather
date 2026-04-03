@@ -89,7 +89,7 @@
 
     .gradient-text { background: linear-gradient(135deg, #7C3AED, #3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .sticky-col { position: sticky; left: 0; z-index: 1; background: inherit; }
-    [title] { cursor: help; }
+[title] { cursor: help; }
     .metric-label { border-bottom: 1px dashed rgba(156,163,175,0.4); }
     details.oracle-accordion > summary { list-style: none; }
     details.oracle-accordion > summary::-webkit-details-marker { display: none; }
@@ -102,9 +102,9 @@
 <!-- No setup needed — API key and sheets are pre-configured -->
 
 <!-- Main Layout -->
-<div class="flex h-screen overflow-y-auto">
+<div class="flex h-screen overflow-hidden">
   <!-- Sidebar Navigation -->
-  <nav class="w-[220px] bg-gradient-sidebar flex flex-col py-5 shrink-0 sticky top-0 h-screen">
+  <nav class="w-[220px] bg-gradient-sidebar flex flex-col py-5 shrink-0 sticky top-0 h-screen overflow-y-auto">
     <!-- Logo -->
     <div class="px-5 mb-5">
       <div class="flex items-center gap-3">
@@ -178,10 +178,10 @@
     <span id="refreshIcon" style="display:none"></span>
 
     <!-- Views Container -->
-    <main class="flex-1 bg-[#F8F9FC]">
+    <main class="flex-1 bg-[#F8F9FC] flex flex-col min-h-0">
 
       <!-- ========== GLOBAL FILTER BAR ========== -->
-      <div id="globalFilterBar" class="bg-white border-b border-gray-200/80 px-4 py-2 flex items-center gap-3 text-xs sticky top-0 z-10" style="min-height:40px">
+      <div id="globalFilterBar" class="bg-white border-b border-gray-200/80 px-4 py-2 flex items-center gap-3 text-xs shrink-0 z-10" style="min-height:40px">
         <span id="filterBarTitle" class="text-xs font-bold text-text-primary shrink-0 hidden"></span>
         <div class="h-4 w-px bg-gray-200 hidden" id="filterBarTitleDivider"></div>
         <input type="date" id="dashboardDateFrom" class="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-semibold shrink-0" style="width:120px" onchange="onGlobalFilterChange()" />
@@ -207,6 +207,18 @@
           <span class="status-badge disconnected text-[9px] shrink-0 pointer-events-none whitespace-nowrap" id="statusBadge"></span>
         </div>
       </div>
+
+      <!-- Boot loading overlay -->
+      <div id="bootLoader" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-surface-primary/90 backdrop-blur-sm">
+        <div class="text-center">
+          <div class="w-10 h-10 border-3 border-accent-purple/20 border-t-accent-purple rounded-full animate-spin mx-auto mb-4"></div>
+          <p class="text-sm font-semibold text-text-primary">Loading Godfather</p>
+          <p class="text-xs text-text-muted mt-1">Pulling CRM + Meta data...</p>
+        </div>
+      </div>
+
+      <!-- Scrollable views container (below fixed filter bar) -->
+      <div class="flex-1 overflow-y-auto">
 
       <!-- ========== DASHBOARD VIEW ========== -->
       <div id="view-dashboard" class="view p-6">
@@ -434,24 +446,20 @@
             <!-- Mode Toggle: Brief vs Freeform -->
             <div class="flex gap-1 mb-5 bg-surface-tertiary rounded-lg p-0.5">
               <button onclick="setGenerateMode('brief')" id="modeBriefBtn" class="flex-1 py-1.5 rounded-md text-xs font-semibold transition-all text-white" style="background:linear-gradient(135deg,#7C3AED,#3B82F6)">Brief</button>
-              <button onclick="setGenerateMode('freeform')" id="modeFreeformBtn" class="flex-1 py-1.5 rounded-md text-xs font-semibold text-text-muted transition-all">Freeform</button>
+              <button onclick="setGenerateMode('freeform')" id="modeFreeformBtn" class="flex-1 py-1.5 rounded-md text-xs font-semibold text-text-muted transition-all">Feedback</button>
             </div>
 
             <!-- Freeform Chat Panel (hidden by default) -->
             <div id="freeformPanel" class="hidden flex flex-col" style="height:calc(100vh - 200px)">
-              <div id="freeformMessages" class="flex-1 overflow-y-auto space-y-3 mb-3 pr-1">
-                <div class="text-center py-8">
-                  <p class="text-xs text-text-muted mb-3">Skip the brief — tell me what you need.</p>
-                  <div class="space-y-1.5">
-                    <button onclick="setFreeformInput('Write 3 Meta ad headlines for NRI parents in the US targeting Foundation Rebuilders')" class="block mx-auto text-[11px] text-accent-purple hover:underline cursor-pointer">"3 Meta headlines for NRI Foundation Rebuilders"</button>
-                    <button onclick="setFreeformInput('Create a 30-second influencer script about Indian math tutors for the US market')" class="block mx-auto text-[11px] text-accent-purple hover:underline cursor-pointer">"30s influencer script, Indian tutors, US"</button>
-                    <button onclick="setFreeformInput('Generate Google RSA headlines and descriptions for Personalization Seekers in Australia')" class="block mx-auto text-[11px] text-accent-purple hover:underline cursor-pointer">"Google RSA for AU Personalization Seekers"</button>
-                  </div>
+              <div class="flex-1 overflow-y-auto space-y-3 mb-3 pr-1">
+                <div class="text-center py-4">
+                  <p class="text-xs text-text-muted mb-2">Paste existing copy to get improved variants, or describe changes to the last output.</p>
                 </div>
+                <div id="freeformMessages" class="space-y-2"></div>
               </div>
-              <div class="flex gap-2">
-                <input id="freeformInput" type="text" placeholder="Describe what copy you need..." class="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-xs bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30" onkeydown="if(event.key==='Enter')sendFreeform()" />
-                <button onclick="sendFreeform()" id="freeformSendBtn" class="px-4 py-2.5 rounded-xl text-xs font-semibold btn-primary">Send</button>
+              <div class="flex flex-col gap-2">
+                <textarea id="freeformInput" rows="3" placeholder="Paste your current copy here, or describe what to change..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-xs bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 resize-none" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendFreeform()}"></textarea>
+                <button onclick="sendFreeform()" id="freeformSendBtn" class="w-full py-2.5 rounded-xl text-xs font-semibold btn-primary">Regenerate from Feedback</button>
               </div>
             </div>
 
@@ -481,6 +489,8 @@
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="YouTube">YouTube</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Email">Email</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="WhatsApp">WhatsApp</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="SMS">SMS</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="RCS">RCS</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Landing Page">Landing Page</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Newsletter">Newsletter</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Influencer">Influencer</button>
@@ -514,7 +524,7 @@
               <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">ICP Type</label>
               <div class="flex flex-wrap gap-1.5" id="icpPills">
                 <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="NRI">NRI Parents</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Non-NRI">Expat Parents</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Non-NRI">Non-NRI Parents</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Universal">All Audiences</button>
                 <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="HighSchool">High School</button>
               </div>
@@ -529,6 +539,36 @@
                 <option value="Confidence Builder">Confidence Builder (Supporting)</option>
                 <option value="Accelerator">Accelerator (Tertiary)</option>
                 <option value="Universal">All Audiences</option>
+              </select>
+            </div>
+
+            <!-- Grade Band -->
+            <div class="mb-4">
+              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Grade Band</label>
+              <select id="briefGrade" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 focus:border-accent-purple">
+                <option value="K-2">K-2 (Ages 4-7)</option>
+                <option value="3-5" selected>3-5 (Ages 7-11)</option>
+                <option value="6-8">6-8 (Ages 11-14)</option>
+                <option value="9-12">9-12 (Ages 14-18)</option>
+              </select>
+            </div>
+
+            <!-- Content Angle (LOC) -->
+            <div class="mb-4">
+              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Content Angle</label>
+              <select id="briefLOC" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 focus:border-accent-purple">
+                <option value="General" selected>General (Auto)</option>
+                <option value="Pedagogy">Pedagogy + MathFit Definition</option>
+                <option value="USPs">USPs — Feature-to-Outcome</option>
+                <option value="Trial">Trial Class Experience</option>
+                <option value="Acceleration">Acceleration Track</option>
+                <option value="Topicwise">Topicwise Fix (Fractions/Decimals/etc)</option>
+                <option value="Competition">Competition (AMC8/Kangaroo/MOEMS)</option>
+                <option value="HighSchool">High School (Gr 8-12)</option>
+                <option value="OnlineVsOffline">Online vs Offline</option>
+                <option value="GroupVs1on1">Group vs 1:1</option>
+                <option value="Quirky">Quirky / Social Proof</option>
+                <option value="ParentRelief">Parent Relief / Homework Independence</option>
               </select>
             </div>
 
@@ -571,24 +611,16 @@
             <!-- Output Mode -->
             <div class="mb-4">
               <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Output</label>
-              <div class="flex gap-1.5" id="outputModePills">
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs flex items-center gap-1" data-value="text" onclick="setOutputMode(this)">
+              <div class="flex gap-1.5" id="outputModePills" style="display:none!important">
+                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs flex items-center gap-1" data-value="text" onclick="setOutputMode(this)">
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
                   Copy Only
-                </button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs flex items-center gap-1" data-value="image" onclick="setOutputMode(this)">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  Image Only
-                </button>
-                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs flex items-center gap-1" data-value="both" onclick="setOutputMode(this)">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
-                  Copy + Image
                 </button>
               </div>
             </div>
 
             <!-- Aspect Ratio (shown for image/both modes) -->
-            <div class="mb-5" id="aspectSection">
+            <div class="mb-5" id="aspectSection" style="display:none!important">
               <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Image Size</label>
               <div class="flex flex-wrap gap-1.5" id="aspectPills">
                 <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="1:1" onclick="setAspect(this)">1:1</button>
@@ -1591,6 +1623,7 @@
         <div id="infTab-compare" class="inf-tab hidden"></div>
       </div>
 
+      </div><!-- end scrollable views container -->
     </main>
   </div>
 </div>
@@ -2023,7 +2056,7 @@ const state = {
   sheetConfig: (() => { const saved = JSON.parse(localStorage.getItem('gf_sheetConfig') || 'null') || {}; const filtered = {}; Object.entries(saved).forEach(([k,v]) => { if (v && v !== '') filtered[k] = v; }); return { ...DEFAULT_SHEETS, ...filtered, libraryTabs: DEFAULT_SHEETS.libraryTabs }; })(),
   preferences: JSON.parse(localStorage.getItem('gf_preferences') || '{"defaultMarket":"US","refreshInterval":1800000}'),
   rawData: JSON.parse(localStorage.getItem('gf_rawData') || '{"metaAds":null}'),
-  _crmLeads: null,       // CRM leads sheet — fetched fresh each session
+  // _crmLeads: REMOVED — all CRM data flows through leadsData (Google Sheets API leads!A:BG)
   _costsTracker: null,   // Costs tracker sheet — fetched fresh each session
   _regionalData: null,   // Regional performance sheet — fetched fresh each session
   _influencerData: null, // Influencer organic data sheet — fetched fresh each session
@@ -2407,6 +2440,101 @@ const ICP_GUIDE = `# CUEMATH ICP & TARGET AUDIENCE
 - Use parent's actual language: "understands the why," "patient teacher," "enjoying math now"
 - Never use jargon like "neuro-adaptive learning pathway"`;
 
+// ==================== NOTION INTELLIGENCE: GRADE TONES ====================
+const GRADE_TONE = {
+  'K-2': { label: 'Wonder Builder', tone: 'Warm, playful, celebratory. Short sentences. Every instruction is an encouragement.', speaks: 'A kind, enthusiastic teacher who makes everything exciting', says: '"Show me!" / "You did it!" / "Let\'s try again!"', never: 'Abstract instructions, anything implying failure', painFrame: 'hasn\'t fallen in love with math yet', transformFrame: 'lights up when math time comes' },
+  '3-5': { label: 'Logical Explorer', tone: 'Conversational but respectful. Acknowledges challenge without dramatising. Asks questions.', speaks: 'A smart friend who happens to be great at math', says: '"Why do you think that?" / "This is tricky — let\'s break it down."', never: 'Condescending simplifications, vague praise', painFrame: 'gets by but can\'t explain the thinking', transformFrame: 'reasons through problems and explains the why' },
+  '6-8': { label: 'Identity Seeker', tone: 'Direct and honest. No fake enthusiasm. Treats them as capable thinkers.', speaks: 'A slightly older peer who is genuinely good at this', says: '"This is challenging. Here\'s support." / "Most people find this hard before it clicks."', never: 'Anything childish, hollow encouragement', painFrame: 'losing confidence as math gets abstract', transformFrame: 'tackles algebra and geometry with real understanding' },
+  '9-12': { label: 'Future Planner', tone: 'Professional, direct, no fluff. Purpose-driven. Connects concepts to real goals.', speaks: 'A trusted senior who knows the path', says: '"This is AP-level material." / "This unlocks [career path]."', never: 'Anything infantilising, pointless encouragement', painFrame: 'needs depth for SAT/AP/competitive exams', transformFrame: 'approaches advanced math with clarity and strategy' }
+};
+
+// ==================== NOTION INTELLIGENCE: LINES OF COPY ====================
+const LOC_DATA = {
+  'General': { angle: '', hook: '' },
+  'Pedagogy': { angle: 'Math = thinking, not worksheets. MathFit\u2122 definition.', hook: 'What if math class taught your child to THINK \u2014 not just calculate?' },
+  'USPs': { angle: 'Feature-to-outcome: 1:1, top tutors, personalized ecosystem.', hook: 'One tutor. One student. 100% attention on YOUR child\'s thinking.' },
+  'Trial': { angle: 'Trial class experience: diagnose \u2192 teach \u2192 plan \u2192 next steps.', hook: 'In one free class, we\'ll show you exactly where your child stands \u2014 and what to do next.' },
+  'Acceleration': { angle: 'School improvement through structured acceleration.', hook: 'Your child isn\'t struggling \u2014 they\'re just not being challenged the right way.' },
+  'Topicwise': { angle: 'Single-topic fix: fractions, decimals, word problems, algebra basics.', hook: 'If fractions still don\'t make sense, it\'s not your child \u2014 it\'s how they were taught.' },
+  'Competition': { angle: 'AMC8/Kangaroo/MOEMS \u2014 non-routine problem-solving depth.', hook: 'Competition math isn\'t about tricks. It\'s about thinking no one else can copy.' },
+  'HighSchool': { angle: 'Grades 8-12: foundational clarity for SAT, AP, IB.', hook: 'The gap between "passing" and "mastering" shows up in high school. We close it.' },
+  'OnlineVsOffline': { angle: 'Online = interactive, math-first, not passive screen time.', hook: 'Online tutoring that\'s more interactive than any classroom \u2014 here\'s why.' },
+  'GroupVs1on1': { angle: '1:1 = full attention vs group = a slice of attention.', hook: 'In a group class, your child gets 8 minutes of attention. In Cuemath, they get 60.' },
+  'Quirky': { angle: 'Social proof cards + math-meme interstitials.', hook: '400,000 parents can\'t be wrong about their kids\' math.' },
+  'ParentRelief': { angle: 'Homework independence and weeknight stress reduction.', hook: 'What if homework time stopped being a battle \u2014 and started being their thing?' }
+};
+
+// ==================== NOTION INTELLIGENCE: HOOKS BY GRADE ====================
+const HOOKS_BANK = {
+  'K-2': [
+    'Most children form their relationship with math before Grade 3 \u2014 and it sticks.',
+    'Is your child building the right relationship with math?',
+    'The early years are the best time to build a strong math foundation.',
+    'What if your child could fall in love with math before they learn to fear it?',
+    'Gaps formed in K-2 are the #1 cause of math struggles later.',
+    'Give your child a confident head start in math.',
+    'From young learners to confident math thinkers.'
+  ],
+  '3-5': [
+    'Does your child rush through math questions without understanding?',
+    'Is your child dependent on you for math homework?',
+    'Silly mistakes aren\'t silly \u2014 they\'re signals of deeper gaps.',
+    'Is school math moving too slow for yours?',
+    'State assessments are coming. Is your child ready \u2014 or just memorizing?',
+    'Your child can get A\'s and still not understand math.',
+    'Still sitting with them for math homework?'
+  ],
+  '6-8': [
+    'The jump from arithmetic to algebra trips up even "good" math students.',
+    'Your child got by on memorization until now. Middle school changes that.',
+    'When math gets abstract, confidence is the first thing to go.',
+    'Pre-algebra gaps don\'t fix themselves. They compound.',
+    'If your child can\'t explain their answer, they don\'t truly understand it.'
+  ],
+  '9-12': [
+    'The gap between passing and mastering shows up on the SAT.',
+    'AP Calculus doesn\'t reward memorization. It rewards understanding.',
+    'High school math is where shortcuts stop working.',
+    'Your child needs clarity, not more practice sets.',
+    'College-level math starts in high school. Is your child ready?'
+  ]
+};
+
+// ==================== NOTION INTELLIGENCE: PROVEN HEADLINES ====================
+const PROVEN_HEADLINES = {
+  'US': {
+    static: ['India\'s Best Math Tutors for NRI Kids (K-12)', 'Top Indian Math Tutors for NRI Kids in the US', '1:1 Online Math Classes by Top Indian Tutors', 'Turn Math Confusion into Clarity', 'One Tutor. One Student. 100% Attention.'],
+    google: ['India\'s best 1:1 math tuition', 'Personalised 1:1 math tuition', 'Best Online tuition for math', 'Book a Free 1:1 trial class', 'Learn from top math tutors', '9/10 students improve grades'],
+    openers: ['Give your child the academic advantage of learning from \ud83c\uddee\ud83c\uddf3 Top Indian math tutors.', 'When your child has 100% dedicated attention, learning clicks faster.', 'True math mastery starts with understanding.', 'Make this year the one where math finally clicks.']
+  },
+  'India': {
+    static: ['India\'s Best 1:1 Math Tuition', 'Build Strong Math Foundations with Expert Tutors', 'Personalised 1:1 Math Coaching for CBSE/ICSE/IB'],
+    google: ['India\'s best 1:1 math tuition', 'Personalised 1:1 math tuition', 'Best Online tuition for math', 'Online math tuition for kids', 'Trusted by 4 Lakh+ parents'],
+    openers: ['Looking to strengthen your child\'s math foundation?', 'Give your child a confident start in math!', '4 lakh+ parents trust Cuemath for their child\'s math journey.']
+  },
+  'AUS': {
+    static: ['1:1 Personalised Classes for K-8', 'Expert Indian Tutors for NAPLAN Success', 'Build Math Confidence Year by Year'],
+    google: ['1:1 Online math class for kids', 'Best 1:1 online math coaching', 'Online maths program for kids', 'Top 1:1 maths teacher online'],
+    openers: ['NAPLAN prep that builds understanding \u2014 not just test tricks.', 'Give your child the head start that matters.']
+  },
+  'MEA': {
+    static: ['Expert Indian Tutors for IB & Cambridge', '1:1 Math Tutoring Built for IB Families', 'Personalised Math Coaching \u2014 IB/British/American Curriculum'],
+    google: ['Top 1% Indian Tutors', 'Improve Math Grades by 50%', 'Flexible, Results-Driven Math'],
+    openers: ['Give your child the math confidence that carries through IB and beyond.']
+  }
+};
+
+// ==================== NOTION INTELLIGENCE: VOCABULARY RULES ====================
+const VOCAB_OWN = ['MathFit', 'productive struggle', 'a coach who knows your child', 'mathematical thinking', 'coaching', 'MathFit journey', 'hyper-personalized coaching'];
+const VOCAB_CAREFUL = { 'tutoring': 'Avoid in US top-of-funnel. Use coaching/enrichment/learning program.', 'struggling': 'Only positive frame: "Struggling is where growth happens."', 'confidence': 'Pair with earned: "Confidence built through real understanding."', 'foundation gap': 'Frame as fixable and specific, never a verdict on the child.' };
+const VOCAB_NEVER = ['remedial','catch-up','falling behind','boost grades','improve scores','grade guarantee','shortcuts','tricks','hacks','speed math','calculate faster','mental math tricks','easy','simple','quick fix','gamified','gamification','AI-powered learning journey','holistic learning experience','personalised learning pathway','synergise','leverage','solution','Is your child falling behind?','Don\'t let your child miss this critical window','Before it\'s too late','Other kids are already ahead','Amazing!','Brilliant!','Fantastic!','You\'re so smart!','Don\'t worry, it\'s okay','Great job!'];
+
+// ==================== NOTION INTELLIGENCE: US PARENT ARCHETYPES ====================
+const US_ARCHETYPES = {
+  'Nurturer': { who: 'Progressive, values-led. Influenced by growth mindset, Montessori.', entry: 'Your child could love math', trust: 'Warmth, patience, genuine connection > credentials. Testimonials about child enthusiasm.', use: ['"Your child could love math"', 'Child engaged/curious imagery', '"Growing confidence" + grades', '"See what your child discovers"'], avoid: ['"Your child will ace math"', 'Achievement imagery', 'Grade data as primary proof', 'Urgency/scarcity/pressure'], redline: 'Fear-based language. Performance-only framing. Anything that looks like test prep.' },
+  'Laidback Guide': { who: 'Anti-tiger-parenting. Pro-balanced-childhood. Child autonomy.', entry: 'Math they\'ll actually want to do', trust: 'Child-led proof. Enthusiasm > grades. Flexible commitment. No-pressure.', use: ['"Math they\'ll actually want to do"', 'Child-led exploration imagery', 'Flexible, pause anytime', '"Let your child try it"'], avoid: ['"Competitive edge"', 'Enrichment language', 'Rigid curriculum framing', '"Enrol now"'], redline: 'Grade-obsessed language. Rigid curriculum. Anything that looks like Tiger Parenting.' }
+};
+
 // ==================== BANNED WORDS & BRAND VALIDATION ====================
 const BANNED_WORDS = [
   'classroom','center','centre','learning center','learning centre','tuition centre','tuition center',
@@ -2417,7 +2545,12 @@ const BANNED_WORDS = [
   'guaranteed marks','guaranteed grades',
   'quick results','fast improvement',
   'easy math','math is easy',
-  'speed tricks','shortcuts'
+  'speed tricks','shortcuts',
+  'remedial','catch-up','falling behind','boost grades','improve scores',
+  'tricks','hacks','speed math','calculate faster','mental math tricks',
+  'quick fix','gamified','gamification','AI-powered learning journey',
+  'holistic learning experience','personalised learning pathway',
+  'synergise','leverage','before it\'s too late','other kids are already ahead'
 ];
 
 const BANNED_SUBSTITUTIONS = {
@@ -2441,6 +2574,9 @@ const FORMAT_CONFIG = {
   'Influencer Script':  { model: 'opus',   subFormats: null, maxTokens: 6000 },
   'Product Video':      { model: 'opus',   subFormats: null, maxTokens: 6000 },
   'Testimonial Script': { model: 'opus',   subFormats: ['Parent Testimonial','Student Testimonial'], maxTokens: 6000 },
+  'Email':              { model: 'sonnet', subFormats: null, maxTokens: 4096 },
+  'SMS':                { model: 'sonnet', subFormats: null, maxTokens: 2048 },
+  'RCS':                { model: 'sonnet', subFormats: null, maxTokens: 2048 },
 };
 
 function getModelForFormat(format) {
@@ -2961,7 +3097,7 @@ function runDiagnostics() {
 
   // ── Data Sources ──
   check('Tagger data loaded', state.taggerData?.length > 0, `${state.taggerData?.length || 0} creatives`);
-  check('CRM leads loaded', state._crmLeads?.length > 0, `${state._crmLeads?.length || 0} leads`);
+  check('CRM leads loaded', leadsData?.length > 0, `${leadsData?.length || 0} leads`);
   check('Regional data loaded', state._regionalData?.length > 0, `${state._regionalData?.length || 0} rows`);
 
   if (state.taggerData?.length) {
@@ -3150,9 +3286,11 @@ function init() {
     }, 50);
   });
   // ── BOOT: Load ALL data first, render ONCE ──
-  // Show loading state immediately
+  // Show loading overlay immediately
   document.getElementById('dashboardEmpty').classList.add('hidden');
   document.getElementById('dashboardContent').classList.remove('hidden');
+  const _bootOverlay = document.getElementById('bootLoader');
+  if (_bootOverlay) _bootOverlay.classList.remove('hidden');
   document.getElementById('dataTimestamp').textContent = 'Loading data...';
 
   // Phase 1: Load from localStorage cache (instant, non-blocking fallback)
@@ -3185,6 +3323,16 @@ function init() {
 
     // Invalidate any stale caches from Phase 1 localStorage loads
     invalidateAdPerfCache();
+
+    // Hide boot loader
+    const _bl = document.getElementById('bootLoader');
+    if (_bl) _bl.classList.add('hidden');
+
+    // Pre-fill date inputs with defaults so user sees the active range
+    const _dfrom = document.getElementById('dashboardDateFrom');
+    const _dto = document.getElementById('dashboardDateTo');
+    if (_dfrom && !_dfrom.value) _dfrom.value = COST_DATA_START;
+    if (_dto && !_dto.value) _dto.value = new Date().toISOString().slice(0, 10);
 
     // SINGLE RENDER PASS — all data available, no race conditions
     updateDataStatusLine();
@@ -3833,7 +3981,7 @@ async function connectMetaApi() {
     // Backfill unknown tags locally
     backfillUnknownTags(state.taggerData);
     // Merge CRM data
-    if (state._crmLeads?.length) mergeCRMWithMeta();
+    if (leadsData.length) mergeCRMWithMeta();
     saveTaggerData();
     // Sync clean data to Supabase (replaces corrupted data)
     syncTaggerToSupabase(state.taggerData);
@@ -4461,9 +4609,24 @@ function updateDataStatusLine() {
 }
 
 // ── Market filter helpers ──
+// Ported from crmGeoMatchRow() — handles ME/MEA equivalence and AUS campaign-prefix detection
 function filterLeadsByMarket(data, market) {
-  if (!market || market === 'all') return data;
-  return data.filter(r => (r.country_bucket || '').trim() === market);
+  if (market === 'all') return data;
+  if (!market) return [];  // empty market = empty result, never leak all rows
+  const GEO_TERMS = { 'US':['us','usa','united states'], 'India':['india','in'], 'MEA':['mea','middle east','uae','saudi','me'], 'ME':['mea','middle east','uae','saudi','me'], 'UK':['uk','united kingdom'], 'ROW':['apac','others'], 'APAC':['apac','others'], 'Canada':['canada'] };
+  return data.filter(r => {
+    const cb = (r.country_bucket || r.region || '').trim().toLowerCase();
+    if (market === 'AUS') {
+      if (cb === 'aus' || cb === 'australia' || cb === 'anz') return true;
+      if (cb === 'apac' || cb === 'others') {
+        const camp = (r.mx_utm_campaign || '').toUpperCase();
+        return camp.startsWith('ANZ_') || camp.includes('_ANZ_') || /\bAUS\b/.test(camp) || camp.includes('NAPLAN') || camp.includes('SELECTIVE');
+      }
+      return false;
+    }
+    const terms = GEO_TERMS[market] || [market.toLowerCase()];
+    return terms.some(g => cb.includes(g));
+  });
 }
 
 function filterCostByMarket(data, market) {
@@ -4744,7 +4907,7 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const c = crmDaily[key];
     c.total++;
     if (String(r.qls) === '1') c.ql++;
-    if ((r.ethnicity || '').toLowerCase().includes('nri')) c.nri++;
+    { const _e = (r.ethnicity || '').toLowerCase(); if (_e.includes('nri') && !_e.startsWith('non')) c.nri++; }
     if (String(r.trials_done) === '1') c.td++;
     if (String(r.paid) === '1') c.paid++;
     if (String(r.invalid) === '1') c.invalid++;
@@ -4806,7 +4969,7 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const metaMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'ROW' })[m.account] || '';
     const mkt = metaMarket || crm?.market || matchMarketFromText(' ' + m.campaign.toUpperCase() + ' ');
     const adMarket = mkt === 'Unknown' ? '' : mkt;
-    if (market && market !== 'all' && adMarket && adMarket !== market) return;
+    if (market && market !== 'all' && adMarket !== market) return;
 
     const ql = crm?.ql || 0;
     const nri = crm?.nri || 0;
@@ -4832,9 +4995,10 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   Object.entries(crmDaily).forEach(([key, c]) => {
     if (claimedCRM.has(key)) return;
     if (c.ql === 0) return;
+    if (!_isLPCampaign({ campaign: c.campaign, adName: c.adName })) return;
     const mkt = c.market || matchMarketFromText(' ' + c.campaign.toUpperCase() + ' ');
     const adMarket = mkt === 'Unknown' ? '' : mkt;
-    if (market && market !== 'all' && adMarket && adMarket !== market) return;
+    if (market && market !== 'all' && adMarket !== market) return;
     const isUS = adMarket === 'US' || adMarket === 'Canada';
     const tql = isUS ? c.nri : c.ql;
     results.push({
@@ -4904,6 +5068,8 @@ function getAdPerformance(market, startDate, endDate) {
   Object.entries(adMap).forEach(([key, a]) => {
     // Skip: no leads AND no significant spend
     if (a.ql === 0 && a.spend < 5000) return;
+    // Skip: instant form campaigns — CRM can't attribute leads, data unreliable
+    if (!_isLPCampaign(a)) return;
 
     const tag = _tagMap[key] || {};
     const adMarket = a.market || '';
@@ -4921,7 +5087,7 @@ function getAdPerformance(market, startDate, endDate) {
     const cptd = adSpend !== null && a.td > 0 ? adSpend / a.td : null;
     const clickToQl = a.clicks > 0 ? (a.ql / a.clicks) * 100 : 0;
     const qlTdPct = a.ql > 0 ? (a.td / a.ql) * 100 : 0;
-    const nriPct = a.ql > 0 ? a.nri / a.ql : 0;
+    const nriPct = a.ql > 0 ? Math.min(a.nri / a.ql, 1) : 0;
 
     results.push({
       'Ad name': a.adName, 'ad name': a.adName,
@@ -4958,7 +5124,8 @@ function getAdPerformance(market, startDate, endDate) {
   const metaCount = results.filter(r => r._spendSource === 'meta_insights').length;
   const prorated = results.filter(r => r._spendSource === 'campaign_prorated').length;
   const noSpend = results.filter(r => !r._spendSource).length;
-  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads | ${metaCount} meta, ${prorated} prorated, ${noSpend} no_spend | aggregated from ${daily.length} daily rows`);
+  const _lpFilterCount = Object.values(adMap).filter(a => !_isLPCampaign(a) && a.spend >= 5000).length;
+  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads (${_lpFilterCount} instant-form excluded) | ${metaCount} meta, ${prorated} prorated, ${noSpend} no_spend | aggregated from ${daily.length} daily rows`);
 
   results.sort((a, b) => (b['Spent'] || 0) - (a['Spent'] || 0));
 
@@ -4991,7 +5158,7 @@ function getPortfolioMetrics(market, from, to) {
     const adName = (r.mx_utm_adcontent || '').trim();
     if (adName.length > 5) return; // has ad name → already counted in attributed
     if (String(r.qls) === '1') unQL++;
-    if ((r.ethnicity || '').toLowerCase().includes('nri')) unNRI++;
+    { const _e = (r.ethnicity || '').toLowerCase(); if (String(r.qls) === '1' && _e.includes('nri') && !_e.startsWith('non')) unNRI++; }
     if (String(r.trials_done) === '1') unTD++;
     if (String(r.paid) === '1') unPaid++;
   });
@@ -5016,6 +5183,9 @@ function getPortfolioMetrics(market, from, to) {
     // All Geo — apply per-market logic to each lead
     totalTQL = typeof getTQL === 'function' ? getTQL(null, _from, _to) : totalQL;
   }
+
+  // Cap TQL at QL — TQL is a subset of QL, can never exceed it
+  if (totalTQL > totalQL) totalTQL = totalQL;
 
   return {
     spend: attrSpend, ql: totalQL, nri: totalNRI, tql: totalTQL,
@@ -5180,7 +5350,7 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     if (String(r.trials_done) === '1') entry.td++;
     if (String(r.paid) === '1') entry.enrolled++;
     if (String(r.invalid) === '1') entry.invalid++;
-    if ((r.ethnicity || '').toLowerCase().includes('nri')) entry.nri++;
+    { const _e = (r.ethnicity || '').toLowerCase(); if (_e.includes('nri') && !_e.startsWith('non')) entry.nri++; }
   });
 
   // Step 2: Spend per ad+campaign from metaAdData (ad-level, exact)
@@ -5326,10 +5496,9 @@ function parseNumber(val) {
 }
 
 function mergeCRMWithMeta() {
-  // Use state._crmLeads if available, otherwise fall back to leadsData (same sheet, already loaded)
-  let rows = state._crmLeads?.length ? state._crmLeads : (typeof leadsData !== 'undefined' && leadsData.length ? leadsData : null);
-  const source = state._crmLeads?.length ? 'CRM sheet' : (rows ? 'leadsData fallback' : 'none');
-  console.log(`CRM merge: ${rows?.length || 0} leads (${source}), ${state.taggerData.length} creatives`);
+  // Single CRM data path: leadsData only (Google Sheets API leads!A:BG)
+  let rows = (typeof leadsData !== 'undefined' && leadsData.length) ? leadsData : null;
+  console.log(`CRM merge: ${rows?.length || 0} leads (leadsData), ${state.taggerData.length} creatives`);
   // Diagnostic: tagger market distribution + thumbnails
   const mktDist = {};
   let thumbCount = 0;
@@ -5646,21 +5815,7 @@ async function refreshData() {
   if (state.rawData.metaAds?.length > 0) metaOk = true;
 
   // Fetch ALL sheets (kept in memory — too large for localStorage)
-  if (state.sheetConfig.crmLeadsUrl) {
-    try {
-      // Filter CRM to Meta leads only + select needed columns (full sheet is 9.6MB / 13K rows — too large for browser)
-      // Fetch all columns, filter meta only server-side, parse by header name in JS
-      const crmQuery = "select * where G='meta'";
-      const csv = await fetchSheetAsCsv(state.sheetConfig.crmLeadsUrl, crmQuery);
-      state._crmLeads = parseCSV(csv);
-      console.log('CRM Leads fetched:', state._crmLeads.length, 'rows (Meta only)');
-      // Diagnostic: show unique geo values in CRM
-      const buckets = {}, regions = {};
-      state._crmLeads.forEach(r => { buckets[r.country_bucket||'(empty)'] = (buckets[r.country_bucket||'(empty)']||0)+1; regions[r.region||'(empty)'] = (regions[r.region||'(empty)']||0)+1; });
-      console.log('CRM country_bucket values:', buckets);
-      console.log('CRM region values:', regions);
-    } catch(e) { console.error('CRM Leads:', e); }
-  }
+  // PHASE_DEPRECATED: state._crmLeads CSV fetch removed — all CRM data now via leadsData (leads!A:BG)
   if (state.sheetConfig.costsTrackerUrl) {
     try { const csv = await fetchSheetAsCsv(state.sheetConfig.costsTrackerUrl); state._costsTracker = parseCSV(csv); console.log('Costs Tracker fetched:', state._costsTracker.length, 'rows'); } catch(e) { console.error('Costs Tracker:', e); }
   }
@@ -5743,7 +5898,7 @@ async function refreshData() {
   }
 
   // Merge CRM data into tagger data
-  if (state._crmLeads?.length && state.taggerData.length) mergeCRMWithMeta();
+  if (leadsData.length && state.taggerData.length) mergeCRMWithMeta();
 
   // Update indicators — green if sheet loaded OR tagger data exists (from Meta API pull)
   const dataOk = metaOk || state.taggerData.length > 0;
@@ -5916,13 +6071,13 @@ function getCostsTrackerMetrics(geoFilter) {
 
   // Fill funnel gaps from CRM ratios
   let nri = 0, ts = 0, paid = enrolled, revenue = 0;
-  if (state._crmLeads?.length) {
+  if (leadsData?.length) {
     // Compute CRM ratios per geo, apply to costs tracker absolutes
     geos.forEach(geo => {
       const m = ct[geo]?.meta;
       if (!m || !m.ql) return;
       // Filter CRM leads for this geo
-      const geoLeads = state._crmLeads.filter(r => {
+      const geoLeads = leadsData.filter(r => {
         const bucket = (r.country_bucket || '').trim();
         const region = (r.region || '').trim();
         if (geo === 'US') return bucket === 'US';
@@ -6004,7 +6159,7 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   };
 
   // QL filtered by lead_created_date
-  let qlFiltered = (state._crmLeads || []).filter(r => crmGeoMatch(r) && inRange(r.lead_created_date || ''));
+  let qlFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.lead_created_date || ''));
   const ql = qlFiltered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
   const nri = qlFiltered.filter(r => { const e = (r['ethnicity'] || '').toLowerCase(); return e.includes('nri') && !e.startsWith('non'); }).length;
   const asian = qlFiltered.filter(r => (r['ethnicity'] || '').toLowerCase().startsWith('asian')).length;
@@ -6029,11 +6184,11 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   } else { tql = ql; }
 
   // TD filtered by trial_done_date
-  let tdFiltered = (state._crmLeads || []).filter(r => crmGeoMatch(r) && inRange(r.trial_done_date || ''));
+  let tdFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.trial_done_date || ''));
   const td = tdFiltered.filter(r => parseNumber(r['trials_done'] || 0) > 0).length;
 
   // Paid filtered by paid_date, revenue uses parseRevenue()
-  let paidFiltered = (state._crmLeads || []).filter(r => crmGeoMatch(r) && inRange(r.paid_date || ''));
+  let paidFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.paid_date || ''));
   const paid = paidFiltered.filter(r => parseNumber(r['paid'] || 0) > 0).length;
   const revenue = paidFiltered.reduce((s, r) => s + parseRevenue(r), 0);
 
@@ -6300,7 +6455,7 @@ function onDashboardFilterChange() {
   // Show data source info and available date ranges
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
-  const m = (state._perfTrackerDaily?.length || state._crmLeads?.length) ? getOracleMetrics(fromDate, toDate, document.getElementById('dashboardCountryFilter')?.value || 'all') : null;
+  const m = (costData?.length || leadsData?.length) ? getOracleMetrics(fromDate, toDate, document.getElementById('dashboardCountryFilter')?.value || 'all') : null;
   const el = document.getElementById('dataDateRange');
   if (el) {
     const parts = [];
@@ -6317,9 +6472,9 @@ function onDashboardFilterChange() {
         parts.push('Perf: ' + fmtMo(pMin) + '\u2013' + fmtMo(pMax));
       }
     }
-    if (state._crmLeads?.length) {
+    if (leadsData?.length) {
       let cMin = '', cMax = '';
-      state._crmLeads.forEach(r => {
+      leadsData.forEach(r => {
         const d = r.lead_created_date || '';
         if (d && (!cMin || d < cMin)) cMin = d;
         if (d && (!cMax || d > cMax)) cMax = d;
@@ -6886,7 +7041,7 @@ function renderOracleActions() {
       const bM = b[1].t > 0 ? b[1].s/b[1].t : b[1].q > 0 ? b[1].s/b[1].q*3 : Infinity;
       return aM - bM;
     })[0];
-    return { aud, ads: ads.length, spend: totSpend, qlCount: totQL, tdCount: totTD, cpql: totQL > 0 ? totSpend/totQL : null, cptd: totTD >= 3 ? totSpend/totTD : null, bestHook, bestFmt };
+    return { aud, ads: ads.length, spend: totSpend, qlCount: totQL, tdCount: totTD, cpql: totQL > 0 ? totSpend/totQL : null, cptd: totTD >= 1 ? totSpend/totTD : null, bestHook, bestFmt };
   }).filter(r => r.ads >= 3 && r.qlCount > 0).sort((a,b) => (a.cptd||a.cpql*3||Infinity) - (b.cptd||b.cpql*3||Infinity));
 
   if (audRows.length) {
@@ -6939,7 +7094,21 @@ function renderOracleActions() {
   // ── SECTION 3: DEPLOY THESE ──
   const deployList = document.getElementById('oracleDeployList');
   const library = state._librarySheet ? state._librarySheet.map(normalizeLibraryRow).filter(c => c.name) : CREATIVE_ASSETS;
-  const _audRows = typeof audRows !== 'undefined' ? audRows : [];
+  // Compute audience rows here — audRows is only in scope when !_s2Active
+  const _deployAuds = {};
+  data.forEach(c => {
+    const aud = extractAudience(c);
+    if (!_deployAuds[aud]) _deployAuds[aud] = { spend: 0, ql: 0, td: 0, count: 0 };
+    const a = _deployAuds[aud];
+    a.spend += parseNumber(c['Spent']||c['spent']||0);
+    a.ql += parseNumber(c['QL']||c['ql']||0);
+    a.td += parseNumber(c['TD']||c['td']||0);
+    a.count++;
+  });
+  const _audRows = Object.entries(_deployAuds)
+    .map(([aud, v]) => ({ aud, ads: v.count, spend: v.spend, qlCount: v.ql, tdCount: v.td, cpql: v.ql > 0 ? v.spend/v.ql : null, cptd: v.td >= 1 ? v.spend/v.td : null }))
+    .filter(r => r.ads >= 3 && r.qlCount > 0)
+    .sort((a,b) => (a.cptd||a.cpql*3||Infinity) - (b.cptd||b.cpql*3||Infinity));
   if (library.length && _audRows.length) {
     // Match library assets to winning audience patterns
     const deployRecs = [];
@@ -7516,7 +7685,13 @@ function renderOracleCardsV2() {
   const makeAds = adCampData
     .filter(a => a.tql >= 3 && !pauseNames.has(normalizeAdName(a.adName))) // minimum: 3 TQLs, not in Pause Now
     .filter(a => {
-      if (a.spend !== null && a.cptql !== null) return a.cptql < portfolioCPTQL * 1.2; // has spend: must be efficient
+      if (a.spend !== null && a.cptql !== null) {
+        // Must pass ABSOLUTE threshold (green zone) — ₹15K CPTQL is never "make more" worthy
+        const mkt = a.market || geo || 'US';
+        const th = (SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US']).cpnri || { amber: 15000 };
+        if (a.cptql >= th.amber) return false; // above amber = red zone, never recommend
+        return a.cptql < portfolioCPTQL * 1.2; // within portfolio efficiency
+      }
       return a.tql >= 5; // no spend data: need stronger volume signal
     })
     .map(a => {
@@ -7553,8 +7728,8 @@ function renderOracleCardsV2() {
 
       // Weekly trend
       const wt = _getWeeklyTrend(a.adName);
-      if (wt && wt.trend === 'improving') { score += 0.3; signals.push(`${wt.label} improving (${wt.lwQL}→${wt.twQL} QLs)`); }
-      else if (wt && wt.trend === 'declining') { score -= 0.2; signals.push(`${wt.label} declining (${wt.lwQL}→${wt.twQL} QLs)`); }
+      if (wt && wt.trend === 'improving') { score += 0.3; signals.push(`${wt.label} ${wt.lwQL}→${wt.twQL} QLs (vs prior wk)`); }
+      else if (wt && wt.trend === 'declining') { score -= 0.2; signals.push(`${wt.label} ${wt.lwQL}→${wt.twQL} QLs (vs prior wk)`); }
 
       return { ...a, _score: score, _makeSignals: signals, _trend: wt };
     })
@@ -7572,14 +7747,16 @@ function renderOracleCardsV2() {
       const action = getOracleAction(itemId);
       const isDone = action?.status === 'done';
       const opacity = isDone ? 'opacity-50' : '';
-      const cpqlColor = c.cptql < 5000 ? 'green' : c.cptql < 10000 ? 'orange' : 'red';
+      const _mmMkt = c.market || geo || 'US';
+      const _mmTh = (SENTINEL_THRESHOLDS[_mmMkt] || SENTINEL_THRESHOLDS['US']).cpnri || { green: 10000, amber: 15000 };
+      const cpqlColor = (c.cptql !== null && c.cptql <= _mmTh.green) ? 'green' : (c.cptql !== null && c.cptql <= _mmTh.amber) ? 'orange' : 'red';
       const esc = s => s.replace(/'/g, "\\'");
-      const geoTag = c.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${c.market}</span>` : '';
+      const geoTag = c.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold shrink-0">${c.market}</span>` : '';
       html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${c.displayName}">
         <div class="flex items-center gap-3">
           ${_oracleThumbnail(c.adName)}
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold truncate" title="${c.adName}">${c.displayName} ${geoTag}</p>
+            <div class="flex items-center gap-2"><p class="text-sm font-semibold truncate" title="${c.adName}">${c.displayName}</p>${geoTag}</div>
             <p class="text-[11px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
             <p class="text-xs text-text-muted mt-0.5">${c._makeSignals?.length ? c._makeSignals.join(' · ') : `${c.tql} TQLs · ${formatCurrency(c.spend)} spent`}</p>
             ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
@@ -7624,7 +7801,7 @@ function renderOracleModules() {
   // Auto-compute top5/bottom5 from tagger data if Sentinel hasn't been run
   if (!s?.top5 && state.taggerData.length) {
     const dashData = getDashboardFilteredData();
-    const withQL = dashData.filter(c => parseNumber(c['QL']||c['ql']||0) >= 5);
+    const withQL = dashData.filter(c => parseNumber(c['QL']||c['ql']||0) >= 5 && /[a-zA-Z]/.test(c['Ad name']||c['ad name']||''));
     const spend = c => parseNumber(c['Spent']||c['spent']||0);
     const cptdVal = c => { const td = parseNumber(c['TD']||c['td']||0); return td >= 1 ? spend(c)/td : null; };
     const cpqlVal = c => { const ql = parseNumber(c['QL']||c['ql']||0); return ql > 0 ? spend(c)/ql : null; };
@@ -8946,7 +9123,9 @@ function generateFromTemplate() {
     segment: document.getElementById('briefSegment')?.value || 'Foundation Rebuilder',
     funnel: document.getElementById('briefFunnel')?.value || 'TOFU',
     angle: document.getElementById('briefAngle')?.value || '',
-    offer: document.getElementById('briefOffer')?.value || ''
+    offer: document.getElementById('briefOffer')?.value || '',
+    grade: document.getElementById('briefGrade')?.value || '3-5',
+    loc: document.getElementById('briefLOC')?.value || 'General'
   };
   const SEG = {
     'Foundation Rebuilder': { trigger: 'child passes tests through memorization but can\u2019t explain WHY', angle: 'understand the WHY behind math', pain: 'getting by on memorization \u2014 but you can feel it\u2019s fragile', transform: 'Now she explains her thinking. Not just the answer \u2014 the reasoning.', cta: 'Book a Free MathFit\u2122 Class' },
@@ -8973,6 +9152,12 @@ function generateFromTemplate() {
   ];
   const seg = SEG[brief.segment] || SEG['Foundation Rebuilder'];
   const mkt = MKT[brief.market] || MKT['US'];
+  const grade = GRADE_TONE[brief.grade] || GRADE_TONE['3-5'];
+  const loc = LOC_DATA[brief.loc] || LOC_DATA['General'];
+  const hooks = HOOKS_BANK[brief.grade] || HOOKS_BANK['3-5'];
+  const headlines = PROVEN_HEADLINES[brief.market] || PROVEN_HEADLINES['US'];
+  const pickHook = () => hooks[Math.floor(Math.random() * hooks.length)];
+  const pickHL = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const pick = arr => arr[Math.floor(Math.random() * arr.length)];
   const atom1 = pick(ATOMS), atom2 = pick(ATOMS.filter(a => a !== atom1)), atom3 = pick(ATOMS.filter(a => a !== atom1 && a !== atom2));
   const offerLine = brief.offer ? `\n\n**\ud83c\udf81 ${brief.offer}**` : '';
@@ -8983,46 +9168,53 @@ function generateFromTemplate() {
   const fmt = brief.format;
 
   if (fmt === 'Static Ad') {
-    content = `## 3 Static Ad Options \u2014 ${brief.market} | ${brief.segment}
-${angleLine}
+    const locHook = loc.hook || pickHook();
+    const locAngle = loc.angle ? `\n*Content Angle: ${loc.angle}*` : '';
+    content = `## 3 Static Ad Options \u2014 ${brief.market} | ${brief.segment} | ${grade.label} (${brief.grade})
+${angleLine}${locAngle}
+
 ---
-**Option 1** \u2014 Emotional Lead
+**Option 1** \u2014 Emotional Lead (${grade.label} tone)
 
 *Creative Copy (on-image):*
-- **Hero Line:** "Your Child Deserves to ${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}" (${('Your Child Deserves to ' + seg.angle).length} chars)
-- **Subline:** 1:1 MathFit\u2122 coaching with top tutors. ${mkt.badge}.
+- **Hero Line:** "${locHook.substring(0, 60)}" (${Math.min(locHook.length, 60)} chars)
+- **Subline:** 1:1 MathFit\u2122 coaching \u2014 ${grade.tone.split('.')[0].toLowerCase()}. ${mkt.badge}.
 - **Badge:** ${mkt.badge}
 - **CTA Button:** "Book a Free Class"
 
-*Visual Direction:* Child and tutor on whiteboard, warm lighting, collaborative moment. Clean layout with hero line prominent.
-${META_COPY('"${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}" (${seg.angle.length + 1} chars)', `Every parent notices when their ${seg.trigger}. Cuemath\u2019s 1:1 MathFit\u2122 system builds deep understanding \u2014 not memorization. ${mkt.proof} trust us.${offerLine}`, 'Making Kids MathFit\u2122 | 1:1 Tutoring')}
+*Visual Direction:* ${brief.grade === 'K-2' ? 'Child laughing during interactive math game, warm playful energy, tutor visible on screen' : brief.grade === '9-12' ? 'Focused teen at laptop, clean professional aesthetic, tutor discussing AP-level content' : 'Child and tutor on whiteboard, warm lighting, collaborative thinking moment'}. Clean layout, hero line prominent.
+${META_COPY('"' + seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1) + '"', "Every parent notices when their " + seg.trigger + ". Cuemath\u2019s 1:1 MathFit\u2122 system builds deep understanding \u2014 not memorization. " + mkt.proof + " trust us." + offerLine, "Making Kids MathFit\u2122 | 1:1 Coaching")}
 
 ---
 **Option 2** \u2014 Proof Lead
 
 *Creative Copy (on-image):*
-- **Hero Line:** "${mkt.proof} Can\u2019t Be Wrong About Math" (${(mkt.proof + " Can't Be Wrong About Math").length} chars)
+- **Hero Line:** "${pickHL(headlines.static)}" (${pickHL(headlines.static).length} chars)
 - **Subline:** ${atom1}
 - **Badge:** "Top 1% Tutors \u00B7 ${mkt.curr}"
 - **CTA Button:** "Book a Free Class"
 
-*Visual Direction:* Bold typography, gradient background, social proof badges visible. Numbers prominent.
-${META_COPY(`${mkt.proof} Trust Cuemath`, `${atom1}\n\nYour child\u2019s ${seg.pain}. Our top 1% tutors specialize in turning that around \u2014 one personalized class at a time. ${seg.cta}.${offerLine}`, 'Top 1% Tutors | Personalized Plans')}
+*Visual Direction:* Bold typography, gradient background, social proof badges visible.
+${META_COPY(mkt.proof + " Trust Cuemath", atom1 + "\\n\\nYour child\u2019s " + seg.pain + ". Our top 1% coaches specialize in turning that around \u2014 one personalized class at a time. " + seg.cta + "." + offerLine, "Top 1% Coaches | Personalized Plans")}
 
 ---
-**Option 3** \u2014 Question Lead
+**Option 3** \u2014 Grade-Specific Hook
 
 *Creative Copy (on-image):*
-- **Hero Line:** "Can Your Child Explain Math, Not Just Solve It?"
+- **Hero Line:** "${pickHook()}"
 - **Subline:** ${atom2}
 - **Badge:** ${mkt.badge}
 - **CTA Button:** "Book a Free Class"
 
-*Visual Direction:* Child thinking (not just writing), thoughtful expression. Warm, calm aesthetic per brand guidelines.
-${META_COPY('Can Your Child Explain Math?', `What if your child could explain WHY, not just memorize HOW?\n\nThat\u2019s MathFit\u2122. Deep understanding. Real confidence. A system built around YOUR child. ${seg.cta}.${offerLine}`, `${atom3.substring(0, 30)}`)}
+*Visual Direction:* ${brief.grade === 'K-2' ? 'Bright, warm, child discovering \u2014 not winning' : brief.grade === '6-8' ? 'Pre-teen thinking deeply, calm confident aesthetic' : 'Child engaged in thinking, calm aesthetic per brand guidelines'}.
+${META_COPY("Can Your Child Explain Math?", "What if your child could explain WHY, not just memorize HOW?\\n\\nThat\u2019s MathFit\u2122. A " + grade.label.toLowerCase() + " deserves a coach who " + grade.speaks.toLowerCase() + ". " + seg.cta + "." + offerLine, atom3.substring(0, 30))}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+**Proven Openers (tested in ${brief.market}):** ${headlines.openers.slice(0, 2).join(' | ')}
+**Grade Tone (${grade.label}):** ${grade.tone}
+**Vocabulary:** Use "${VOCAB_OWN.slice(0, 3).join('", "')}" \u2014 Avoid "${VOCAB_NEVER.slice(0, 3).join('", "')}"
+
+*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Video - Reel' || fmt === 'YouTube Video') {
     content = `## 3 Video Script Options \u2014 ${brief.market} | ${brief.segment}
@@ -9116,24 +9308,27 @@ ${META_COPY('What Changed for This Family?', `Before: ${seg.pain}.\nAfter: ${seg
 
   } else if (fmt === 'Google Ads') {
     const sf = brief.subFormat || 'Brand Search';
+    const isAUS = brief.market === 'AUS';
+    const mathWord = isAUS ? 'Maths' : 'Math';
+    const mathLower = isAUS ? 'maths' : 'math';
     if (sf === 'Brand Search' || sf === 'Keyword Search') {
       const isBrand = sf === 'Brand Search';
-      content = `## Google ${sf} Ads \u2014 ${brief.market} | ${brief.segment}
+      content = `## Google ${sf} Ads \u2014 ${brief.market} | ${brief.segment} | ${grade.label} (${brief.grade})
 ${angleLine}
 ---
 **Ad Group 1** \u2014 ${isBrand ? 'Brand + Value Prop' : 'Math Tutoring Intent'}
 
 **Headlines** (30 chars max):
-1. ${isBrand ? 'Cuemath - MathFit\u2122 Tutoring' : 'Online Math Tutoring for Kids'} (${isBrand ? 28 : 29} chars)
-2. ${isBrand ? 'Cuemath: Top 1% Math Tutors' : '1:1 Personalized Math Help'} (${isBrand ? 27 : 26} chars)
-3. ${isBrand ? 'Make Your Child MathFit\u2122' : 'Build Math Confidence Now'} (${isBrand ? 25 : 25} chars)
-4. ${isBrand ? 'Cuemath Rated 4.9\u2605 by Parents' : 'Expert Math Tutors Online'} (${isBrand ? 30 : 25} chars)
-5. ${isBrand ? '50K+ NRI Families Trust Us' : 'Stop Math Anxiety Today'} (${isBrand ? 26 : 23} chars)
-6. 1:1 Online Math Coaching (25 chars)
-7. Book a Free Math Class Now (27 chars)
-8. Personalized Math Plans (23 chars)
+1. ${isBrand ? 'Cuemath - MathFit\u2122 Tutoring' : `Online ${mathWord} Tutoring for Kids`} (${isBrand ? 28 : (`Online ${mathWord} Tutoring for Kids`).length} chars)
+2. ${isBrand ? `Cuemath: Top 1% ${mathWord} Tutors` : `1:1 Personalized ${mathWord} Help`} (${isBrand ? (`Cuemath: Top 1% ${mathWord} Tutors`).length : (`1:1 Personalized ${mathWord} Help`).length} chars)
+3. ${isBrand ? 'Make Your Child MathFit\u2122' : `Build ${mathWord} Confidence Now`} (${isBrand ? 25 : (`Build ${mathWord} Confidence Now`).length} chars)
+4. ${isBrand ? 'Cuemath Rated 4.9\u2605 by Parents' : `Expert ${mathWord} Tutors Online`} (${isBrand ? 30 : (`Expert ${mathWord} Tutors Online`).length} chars)
+5. ${isBrand ? `${mkt.proof} Trust Us` : `Stop ${mathWord} Anxiety Today`} (${isBrand ? (`${mkt.proof} Trust Us`).length : (`Stop ${mathWord} Anxiety Today`).length} chars)
+6. 1:1 Online ${mathWord} Coaching (${(`1:1 Online ${mathWord} Coaching`).length} chars)
+7. ${grade.label} ${mathWord} Coaching (${(`${grade.label} ${mathWord} Coaching`).length} chars)
+8. Personalized ${mathWord} Plans (${(`Personalized ${mathWord} Plans`).length} chars)
 9. Deep Understanding, Not Rote (28 chars)
-10. ${mkt.curr} Aligned (${(mkt.curr.split(',')[0] + ' Aligned').length} chars)
+10. ${mkt.curr.split(',')[0]} Aligned (${(mkt.curr.split(',')[0] + ' Aligned').length} chars)
 11. Thinking > Calculating (23 chars)
 12. Real Confidence in Math (23 chars)
 13. ${isBrand ? 'Why Parents Choose Cuemath' : 'Math Help That Actually Works'} (${isBrand ? 25 : 29} chars)
@@ -9152,10 +9347,10 @@ ${isBrand ? '**Sitelinks:** About MathFit\u2122 | Meet Our Tutors | Parent Revie
 **Ad Group 2** \u2014 ${isBrand ? 'Social Proof + Trust' : 'Grade-Specific'}
 
 **Headlines:**
-1. ${isBrand ? '4L+ Parents Trust Cuemath' : 'Math Help for Grades K-8'} (${isBrand ? 25 : 24} chars)
-2. ${isBrand ? 'Cuemath: Real Math Results' : `${mkt.comp.split(',')[0]} Math Prep`} (${isBrand ? 25 : (mkt.comp.split(',')[0] + ' Math Prep').length} chars)
-3. Top Tutors for Math Online (27 chars)
-4. ${brief.market === 'US' ? 'Indian Math Tutors for NRI' : `Best ${mkt.curr.split(',')[0]} Math Tutors`} (26 chars)
+1. ${isBrand ? '4L+ Parents Trust Cuemath' : `${mathWord} Help for ${grade.label}`} (${isBrand ? 25 : (`${mathWord} Help for ${grade.label}`).length} chars)
+2. ${isBrand ? `Cuemath: Real ${mathWord} Results` : `${mkt.comp.split(',')[0]} ${mathWord} Prep`} (${isBrand ? (`Cuemath: Real ${mathWord} Results`).length : (mkt.comp.split(',')[0] + ` ${mathWord} Prep`).length} chars)
+3. Top Tutors for ${mathWord} Online (${(`Top Tutors for ${mathWord} Online`).length} chars)
+4. ${brief.market === 'US' ? `Indian ${mathWord} Tutors for NRI` : `Best ${mkt.curr.split(',')[0]} ${mathWord} Tutors`} (${(brief.market === 'US' ? `Indian ${mathWord} Tutors for NRI` : `Best ${mkt.curr.split(',')[0]} ${mathWord} Tutors`).length} chars)
 5. Understanding > Memorizing (27 chars)
 6. 1:1 Math That Builds Thinkers (30 chars)
 7. Personalized Math Ecosystem (27 chars)
@@ -9194,65 +9389,144 @@ ${META_COPY('Build Real Math Understanding', `${atom1}\n\nCuemath\u2019s MathFit
     }
 
   } else if (fmt === 'Influencer Script') {
-    content = `## 3 Influencer Script Options \u2014 ${brief.market} | ${brief.segment}
+    const isUS = ['US','AUS','UK','Global'].includes(brief.market);
+    if (isUS) {
+      // US BUCKET: Partnership ads — ad copy + talking points only (creator makes their own video)
+      const realPatterns = [
+        { creator: 'Ana', pt: `Is ${brief.grade === '6-8' ? '7th' : '4th'} grade too early for advanced math? Not when your child is learning the logic behind it.`, hl: 'Get Ahead of the Math Curve' },
+        { creator: 'Ona', pt: `Good at math but still counting on fingers? Cuemath’s 1:1 online math tutoring helps kids think in numbers, not memorize.`, hl: 'Build Real Math Thinking Early' },
+        { creator: 'Damla', pt: `When your child feels supported in math, everything feels lighter. That’s why ${mkt.proof} choose Cuemath.`, hl: 'Confidence Starts With Comfort' },
+        { creator: 'Heena', pt: `How good does it feel when your child says ‘I love learning math’? That confidence comes from the right guidance and strong foundations.`, hl: 'Build Strong Math Foundations' },
+        { creator: 'Shweta', pt: `Is your child preparing for ${mkt.comp.split(',')[0]} but questions feel very different from school math? That’s because competitions test thinking, not speed.`, hl: 'Build Competition-Ready Math Confidence' },
+        { creator: 'Priyanshul', pt: `Looking for math classes that actually keep your child engaged? Cuemath’s 1:1 online classes with top 1% Indian tutors adapt to your child’s pace.`, hl: 'Learn Math with Top 1% Indian Tutors' }
+      ];
+      const p1 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
+      let p2 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
+      while (p2.creator === p1.creator) p2 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
+      let p3 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
+      while (p3.creator === p1.creator || p3.creator === p2.creator) p3 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
+
+      content = `## 3 Influencer Ad Copy Variants — ${brief.market} | ${brief.segment} | Partnership Ads
+*US Bucket: Content team provides ad copy ONLY. Creator makes their own video in their organic style.*
 ${angleLine}
----
-**Option 1** \u2014 The Discovery Story (30-40s)
-
-*9-Scene Script:*
-1. **HOOK (0-3s):** "Stop scrolling if your ${seg.trigger}." [Direct to camera, urgent but warm]
-2. **PERSONAL (3-6s):** "As a parent, I noticed my child could solve problems but couldn\u2019t explain the thinking behind them."
-3. **PROBLEM (6-10s):** "The ${seg.pain}. I tried worksheets, YouTube tutorials, extra tutoring\u2026 nothing stuck."
-4. **DISCOVERY (10-14s):** "A friend told me about Cuemath. I was skeptical, but we tried one free class."
-5. **EXPERIENCE (14-20s):** "The tutor didn\u2019t just teach formulas. She asked my child WHY. Made him think, not memorize. I\u2019d never seen that before."
-6. **RESULT (20-25s):** "${seg.transform}"
-7. **BROADER BENEFIT (25-30s):** "It\u2019s not just about grades. My child actually ENJOYS math now. That\u2019s what MathFit\u2122 means."
-8. **SOCIAL PROOF (30-35s):** "${mkt.proof} chose Cuemath. ${mkt.badge}."
-9. **CTA (35-40s):** "${seg.cta} \u2014 link in my bio. The first class is free. Trust me." [Point to link]
-
-*Talking Points:* 1) ${seg.angle}, 2) Top 1% tutors who ask "why?", 3) ${mkt.proof}, 4) MathFit\u2122 = understanding, not speed, 5) Free first class
-*Do\u2019s:* Use your own child\u2019s name, share a specific moment, be authentic
-*Don\u2019ts:* Don\u2019t say "guaranteed grades", don\u2019t rush the CTA, don\u2019t sound scripted
-*B-Roll:* Child at Cuemath class, tutor interaction, child explaining math, parent proud moment
-*Caption:* "The moment I knew Cuemath was different? When my child explained math to ME. \ud83e\udde0 Link in bio for a free class. #MathFit #Cuemath"
-${META_COPY(`"Your Child ${seg.trigger.replace('child ', '')}?"`, `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s MathFit\u2122 changed everything. ${seg.transform}${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
 
 ---
-**Option 2** \u2014 The Comparison (30s)
+**Variant 1** — Emotional Lead (pattern: ${p1.creator})
 
-*9-Scene Script:*
-1. **HOOK (0-3s):** "Math tutoring vs MathFit\u2122. Here\u2019s the difference." [Hold up two hands comparison]
-2. **PERSONAL (3-6s):** "We tried regular tutoring. My child memorized formulas and passed tests."
-3. **PROBLEM (6-10s):** "But ask her to explain it? Blank stare. The understanding wasn\u2019t there."
-4. **DISCOVERY (10-14s):** "Then we found Cuemath\u2019s MathFit\u2122 approach."
-5. **EXPERIENCE (14-20s):** "Instead of drilling answers, the tutor asked my child to think. To reason. To explain WHY."
-6. **RESULT (20-25s):** "${seg.transform}"
-7. **BROADER BENEFIT (25-30s):** "${atom1}"
-8. **SOCIAL PROOF (30-35s):** "${mkt.proof}. ${mkt.badge}."
-9. **CTA (35-40s):** "${seg.cta}. Link in bio \u2014 the free class will show you the difference." [Smile + point]
+**Primary Text:** ${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}. Sound familiar?
+${p1.pt}
+With Cuemath’s 1:1 MathFit™ coaching, your child works with a dedicated tutor who builds real understanding — not memorization. ${mkt.proof} trust us.
+${seg.cta}.
 
-*Caption:* "Regular tutoring: memorize, pass, forget. MathFit\u2122: understand, explain, remember forever. \u2728 Free class \u2192 link in bio"
-${META_COPY('Tutoring vs MathFit\u2122', `${atom1}\n\nCuemath doesn\u2019t drill answers. We build understanding. ${mkt.proof} already see the difference.${offerLine}\n\n${seg.cta}.`, 'Beyond tutoring | Free class')}
+**Headline:** ${p1.hl} (${p1.hl.length} chars)
+**Description:** 1:1 Online Math Coaching | MathFit™
+**CTA:** Book a Free Class
 
 ---
-**Option 3** \u2014 The Honest Review (30s)
+**Variant 2** — Proof Lead (pattern: ${p2.creator})
 
-*9-Scene Script:*
-1. **HOOK (0-3s):** "Honest Cuemath review after 3 months \u2014 no filter." [Casual, sitting on couch]
-2. **PERSONAL (3-6s):** "I\u2019ll tell you exactly what happened."
-3. **PROBLEM (6-10s):** "My child was ${seg.pain}."
-4. **DISCOVERY (10-14s):** "Someone in my community recommended Cuemath. I signed up for the free class."
-5. **EXPERIENCE (14-20s):** "The tutor was patient, asked questions instead of giving answers, and my child was actually engaged."
-6. **RESULT (20-25s):** "${seg.transform}"
-7. **BROADER BENEFIT (25-30s):** "The best part? It\u2019s not just math. It\u2019s confidence. My child volunteers now."
-8. **SOCIAL PROOF (30-35s):** "And I get why ${mkt.proof} chose this."
-9. **CTA (35-40s):** "Try the free class. You\u2019ll see in 45 minutes what I\u2019m talking about. Link in bio."
+**Primary Text:** ${p2.pt}
+${seg.transform}
+That’s what MathFit™ means — ${grade.tone.split('.')[0].toLowerCase()}.
+Book a free 1:1 class and see the difference.
 
-*Caption:* "3-month honest review: \u2705 child explains math now \u2705 actually enjoys it \u2705 no more homework battles. Link in bio \ud83d\udc47"
-${META_COPY('Honest Cuemath Review: 3 Months', `${seg.transform}\n\n3 months in. No filter. This is what MathFit\u2122 did for us.${offerLine}\n\n${seg.cta}.`, '3 months of real results')}
+**Headline:** ${p2.hl} (${p2.hl.length} chars)
+**Description:** ${mkt.badge} | Free Trial
+**CTA:** Book a Free Class
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+**Variant 3** — Comparison Lead (pattern: ${p3.creator})
+
+**Primary Text:** Regular tutoring: memorize, pass, forget.
+MathFit™: understand, explain, remember forever.
+${p3.pt}
+${atom1}
+${seg.cta} — the free class will show you the difference.
+
+**Headline:** ${p3.hl} (${p3.hl.length} chars)
+**Description:** Top 1% Coaches | Free 1:1 Class
+**CTA:** Book a Free Class
+
+---
+**Talking Points for Creator:**
+1. ${seg.angle} — mention your own child’s experience if possible
+2. The tutor asks “why?” instead of giving answers
+3. ${mkt.proof} trust Cuemath — mention the community
+4. MathFit™ = understanding, not speed or memorization
+5. Free first class — include verbal CTA + point to link
+
+**Do’s:** Use your child’s real name, share a specific “aha” moment, be authentic and conversational
+**Don’ts:** Don’t say “guaranteed grades”, don’t use “easy” or “tricks”, don’t rush the CTA
+**Script Suggestions (optional for creator):**
+- Hook: “Stop scrolling if your ${seg.trigger}.”
+- Discovery: “A friend told me about Cuemath. I was skeptical, but we tried one free class.”
+- Result: “${seg.transform}”
+- CTA: “Link in my bio. The first class is free. Trust me.”
+
+*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: authentic, organic, friend recommending*`;
+
+    } else {
+      // INDIA BUCKET: UGC scripted ads — full script + ad copy
+      content = `## 3 Influencer UGC Scripts — ${brief.market} | ${brief.segment} | Scripted UGC
+*India Bucket: Full script + ad copy. Runs from Cuemath’s ad handle.*
+${angleLine}
+
+---
+**Script 1** — The Discovery Story (30-40s)
+
+| Time | Direction | Script | On-Screen |
+|------|-----------|--------|-----------|
+| **0-3s** | Direct to camera, urgent but warm | “Stop scrolling if your ${seg.trigger}.” | Hook text overlay |
+| **3-8s** | Personal, relatable | “As a parent, I noticed my child could solve problems but couldn’t explain the thinking behind them.” | — |
+| **8-15s** | Problem resonance | “The ${seg.pain}. I tried worksheets, YouTube, extra tuition… nothing stuck.” | — |
+| **15-22s** | Cuemath experience | “Then we tried Cuemath. The tutor didn’t just teach formulas. She asked my child WHY. Made him think, not memorize.” | 1:1 MathFit™ Coaching |
+| **22-28s** | Transformation | “${seg.transform}” | ${mkt.badge} |
+| **28-35s** | MathFit framing | “It’s not just about marks. My child actually ENJOYS maths now. That’s what MathFit™ means.” | — |
+| **35-40s** | CTA | “${seg.cta}. Link in bio. The first class is free.” | CTA + logo |
+
+**Meta Ad Copy:**
+- **PT:** ${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}. Cuemath’s MathFit™ changed everything. ${seg.transform} ${seg.cta}.
+- **HL:** Your Child Deserves to ${seg.angle.charAt(0).toUpperCase() + seg.angle.slice(1)}
+- **Desc:** Making Kids MathFit™ | Free Trial
+- **CTA:** Book a Free Class
+
+---
+**Script 2** — The Comparison (30s)
+
+| Time | Direction | Script | On-Screen |
+|------|-----------|--------|-----------|
+| **0-3s** | Hold up two hands | “Tuition vs MathFit™. Here’s the difference.” | Tuition vs MathFit™ |
+| **3-10s** | Problem | “Regular tuition: memorize formulas, pass exams, forget everything. My child was doing that for 2 years.” | — |
+| **10-20s** | Solution | “Cuemath’s approach? The tutor asks my child to think. To reason. To explain WHY. ${atom1}” | 1:1 Coaching |
+| **20-28s** | Result | “${seg.transform} ${mkt.proof}.” | ${mkt.badge} |
+| **28-30s** | CTA | “${seg.cta}. Link in bio.” | CTA |
+
+**Meta Ad Copy:**
+- **PT:** ${atom1} Cuemath doesn’t drill answers. We build understanding. ${mkt.proof} already see the difference. ${seg.cta}.
+- **HL:** Tuition vs MathFit™
+- **Desc:** Beyond tuition | Free class
+- **CTA:** Book a Free Class
+
+---
+**Script 3** — Honest Review (30s)
+
+| Time | Direction | Script | On-Screen |
+|------|-----------|--------|-----------|
+| **0-3s** | Casual, on couch | “Honest Cuemath review after 3 months — no filter.” | 3 Month Review |
+| **3-10s** | Problem | “My child was ${seg.pain}.” | — |
+| **10-20s** | Experience | “The tutor was patient, asked questions instead of giving answers. My child was actually engaged.” | — |
+| **20-28s** | Result | “${seg.transform} And I get why ${mkt.proof} chose this.” | ${mkt.badge} |
+| **28-30s** | CTA | “Try the free class. You’ll see in 45 minutes what I’m talking about. Link in bio.” | CTA |
+
+**Meta Ad Copy:**
+- **PT:** ${seg.transform} 3 months in. No filter. This is what MathFit™ did for us. ${seg.cta}.
+- **HL:** Honest Cuemath Review: 3 Months
+- **Desc:** 3 months of real results
+- **CTA:** Book a Free Class
+
+---
+*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: organic, performance-heavy*`;
+    }
 
   } else if (fmt === 'UGC Ad') {
     content = `## 3 UGC Ad Scripts \u2014 ${brief.market} | ${brief.segment}
@@ -9391,6 +9665,146 @@ ${META_COPY('See Why ${mkt.proof} Chose This', `Most tutoring = worksheets. Cuem
 ---
 *${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
 
+  } else if (fmt === 'Email') {
+    const stage = brief.angle || 'QL \u2192 Book Trial';
+    content = `## 3 Email Variants \u2014 ${brief.market} | ${brief.segment} | ${grade.label}
+*Journey Stage: ${stage}*
+${angleLine}
+
+---
+**Variant 1** \u2014 MathFit\u2122 Philosophy Lead
+
+**Subject:** ${brief.market === 'India' ? `${seg.trigger.charAt(0).toUpperCase() + seg.trigger.slice(1)}? There\u2019s a better way.` : `In an AI world, math isn\u2019t about calculations anymore.`}
+**Preheader:** ${brief.icpType === 'NRI' ? 'A free guide by Cuemath\'s Founder \u2014 worth 15 minutes.' : 'Here\'s what\'s actually behind it.'}
+
+Hi {ParentName},
+
+${brief.icpType === 'Non-NRI' ? `If {ChildName} dreads math homework, shuts down when a problem gets hard, or says \u201cI\u2019m just not a math person\u201d \u2014 that\u2019s not a personality trait. It\u2019s a response to how math has been taught.` : `AI can already solve equations faster than any human. What it can\u2019t do is problem-solve, think logically under uncertainty, or break a complex situation into steps.`}
+
+${atom1}
+
+${brief.icpType === 'Non-NRI' ? `That shift is what every Cuemath class is built around. Whenever you\u2019re ready, {ChildName}\u2019s free 1:1 trial class is still open.` : `The ability to think through problems clearly, not just calculate answers, is what it means to be MathFit\u2122. It\u2019s the most important skill a child can build in this era.`}
+
+\u2192 **{CTA_BUTTON}** \u00b7 {Link}
+
+No pressure. No commitment.
+
+Team Cuemath
+Making Kids MathFit\u2122
+
+---
+**Variant 2** \u2014 Social Proof + Outcomes
+
+**Subject:** When kids become MathFit\u2122, real outcomes follow.
+**Preheader:** ${mkt.proof}. One thing in common.
+
+Hi {ParentName},
+
+${seg.transform}
+
+These aren\u2019t rare exceptions. It\u2019s what happens when a child stops memorizing formulas and starts thinking mathematically.
+
+*Here\u2019s what parents notice when their child becomes MathFit\u2122:*
+\u2b50 \u201c${seg.transform}\u201d \u2014 Cuemath Parent, ${brief.market}
+\u2b50 \u201cThe tutor doesn\u2019t give answers \u2014 she makes my child THINK.\u201d \u2014 Cuemath Parent
+\u2b50 \u201cMy child actually enjoys math now.\u201d \u2014 Cuemath Parent
+
+{ChildName}\u2019s trial class is where this starts \u2014 60 minutes, 1:1, with a tutor matched to their goals.
+
+\u2192 **{CTA_BUTTON}** \u00b7 {Link}
+
+Team Cuemath \u00b7 Making Kids MathFit\u2122
+
+---
+**Variant 3** \u2014 Trial Experience Preview
+
+**Subject:** What does a Cuemath class actually look like?
+**Preheader:** Problem-solving, logical thinking, and the foundation for school & competition success.
+
+Hi {ParentName},
+
+Wondering what a Cuemath class actually looks like?
+
+In every 1:1 class, kids solve fun puzzles, explain their thinking and approach, and learn to break complex problems step-by-step. They build the reasoning and thinking skills that help them accelerate at school, in competitions, and become MathFit\u2122.
+
+See what {ChildName} would experience.
+
+\u2192 **{CTA_BUTTON}** \u00b7 {Link}
+
+Have questions? Just reply to this email.
+
+Team Cuemath \u00b7 Making Kids MathFit\u2122
+
+---
+**Personalization tokens:** {ParentName}, {ChildName}, {Date}, {Time}, {TutorName}, {Link}, {CTA_BUTTON}
+**Journey note:** Adapt CTA_BUTTON per stage \u2014 \u201cBook Free Trial\u201d (QL\u2192TS), \u201cView Trial Details\u201d (TS\u2192TD), \u201cReschedule\u201d (drop-off), \u201cComplete Payment\u201d (post-trial)
+**ICP guidance:** NRI = AI-era framing + founder credibility. Non-NRI = math anxiety empathy + no-pressure. Asian = competition outcomes + named achievements.
+
+*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+
+  } else if (fmt === 'SMS') {
+    content = `## 3 SMS Variants \u2014 ${brief.market} | ${brief.segment}
+*Max 240 chars each. Journey Stage: ${brief.angle || 'QL \u2192 Book Trial'}*
+${angleLine}
+
+---
+**Variant 1** \u2014 Direct + Social Proof
+Cuemath: ${mkt.proof} chose us for a reason. {ChildName}\u2019s free 1:1 math trial is ready \u2014 ${brief.icpType === 'NRI' ? 'top Indian tutors, real understanding' : 'real understanding, not memorization'}. Book now: {Link}
+*(${('Cuemath: ' + mkt.proof + ' chose us for a reason. {ChildName}\'s free 1:1 math trial is ready \u2014 ' + (brief.icpType === 'NRI' ? 'top Indian tutors, real understanding' : 'real understanding, not memorization') + '. Book now: {Link}').length} chars + link)*
+
+---
+**Variant 2** \u2014 Urgency + Value
+Cuemath: {ChildName}\u2019s free 1:1 trial with a dedicated math coach is still open. See what MathFit\u2122 means in 60 mins. Book: {Link}
+*(${('Cuemath: {ChildName}\'s free 1:1 trial with a dedicated math coach is still open. See what MathFit\u2122 means in 60 mins. Book: {Link}').length} chars + link)*
+
+---
+**Variant 3** \u2014 Outcome-First
+Cuemath: \u201cMy child went from memorizing to actually understanding.\u201d \u2014 ${brief.market} parent. Try it free with {ChildName}: {Link}
+*(${('Cuemath: \u201cMy child went from memorizing to actually understanding.\u201d \u2014 ' + brief.market + ' parent. Try it free with {ChildName}: {Link}').length} chars + link)*
+
+---
+**Tokens:** {ChildName}, {ParentName}, {Link}
+**Rules:** Always start with \u201cCuemath:\u201d. Max 240 chars. No emojis. Link at end. One clear CTA.
+**Stage adaptation:** Change CTA verb \u2014 \u201cBook\u201d (new), \u201cReschedule\u201d (drop-off), \u201cComplete\u201d (payment), \u201cDownload\u201d (app)
+
+*${brief.market} | ${brief.segment} | ${brief.icpType}*`;
+
+  } else if (fmt === 'RCS') {
+    content = `## 3 RCS Variants \u2014 ${brief.market} | ${brief.segment}
+*Journey Stage: ${brief.angle || 'QL \u2192 Book Trial'}*
+${angleLine}
+
+---
+**Variant 1** \u2014 MathFit\u2122 Philosophy
+
+**Asset:** Clean, warm visual \u2014 ${brief.icpType === 'NRI' ? 'NRI family, child on Leap platform with tutor' : brief.icpType === 'Non-NRI' ? 'US-presenting parent and child together, relaxed, not stock' : 'Child engaged on Leap platform, warm tones'}. Overlay: \u201cFrom math fear to math confidence.\u201d
+**Headline:** ${brief.icpType === 'Non-NRI' ? 'Many parents thought their child couldn\'t love math.' : 'In an AI world, math isn\'t about calculations \u2014 it\'s about thinking.'}
+**Body:** ${brief.icpType === 'Non-NRI' ? `If you\u2019re tired of watching your child dread homework and lose confidence, this one class will change everything.` : `That\u2019s what we call MathFit \u2014 raising confident problem-solvers. Curious how to build this in {ChildName}?`}
+**Button:** ${brief.angle?.includes('Reschedule') ? 'Reschedule {ChildName}\'s Free Trial' : 'Book {ChildName}\'s Free Trial'}
+
+---
+**Variant 2** \u2014 Social Proof + Trial Preview
+
+**Asset:** Real in-session photograph \u2014 ${brief.icpType === 'NRI' ? 'NRI' : brief.icpType === 'Non-NRI' ? 'US-presenting' : 'Asian'} child visibly engaged, tutor present. Warm, unscripted. Overlay: ${mkt.badge} | ${mkt.proof}
+**Headline:** This is what a Cuemath class feels like.
+**Body:** This 1:1 trial is built around {ChildName}\u2019s needs and pace. From fun math puzzles to a dedicated tutor who gets them, it\u2019s the kind of class that makes kids say, \u201ccan we do another one?\u201d
+**Button:** ${brief.angle?.includes('Reschedule') ? 'Reschedule {ChildName}\'s Free Trial' : 'Book {ChildName}\'s Free Trial'}
+
+---
+**Variant 3** \u2014 Parent Testimonial
+
+**Asset:** Testimonial card design \u2014 parent quote + star rating + Trustpilot badge. Warm background.
+**Headline:** Most parents say this after their Cuemath trial: \u201cWe wish we had done it sooner.\u201d
+**Body:** Not because the class is magical, but because they finally see their child engage with math differently. Give {ChildName} the same experience.
+**Button:** ${brief.angle?.includes('Reschedule') ? 'Reschedule Free Trial' : 'Book Free Trial'}
+
+---
+**Asset specs:** 768 x 1028px, < 2MB
+**Tokens:** {ParentName}, {ChildName}, {Link}
+**ICP guidance:** NRI = Indian tutor trust signal. Non-NRI = empathy-first, no-pressure. Asian = competition outcomes + named achievements.
+
+*${brief.market} | ${brief.segment} | ${brief.icpType}*`;
+
   } else {
     // Fallback for any unhandled format
     content = `## ${fmt} \u2014 ${brief.market} | ${brief.segment}
@@ -9466,7 +9880,9 @@ async function generateContent() {
     subFormat: getActivePill('subFormatPills') || null,
     icpType: getActivePill('icpPills'), segment: document.getElementById('briefSegment').value,
     funnel: document.getElementById('briefFunnel').value,
-    angle: document.getElementById('briefAngle').value, offer: document.getElementById('briefOffer').value
+    angle: document.getElementById('briefAngle').value, offer: document.getElementById('briefOffer').value,
+    grade: document.getElementById('briefGrade')?.value || '3-5',
+    loc: document.getElementById('briefLOC')?.value || 'General'
   };
   state.currentBrief = brief;
   localStorage.setItem('gf_currentBrief', JSON.stringify(brief));
@@ -9664,6 +10080,38 @@ You are NOT a generic copywriter. Every output is engineered around Cuemath's sp
 ${BRAND_GUIDELINES}
 
 ${ICP_GUIDE}
+
+## BRAND PERSONALITY: THE GURU-COACH
+Not a Western life coach. The Guru illuminates the path without walking it for you. Guides through cueing, not telling. Treats every child equally because they see the same potential in all.
+- This is where the name comes from: CUEmath = cue the child toward discovery.
+- Four traits: Wise (knows the path), Empowering (cues, doesn't solve), Trusted (specificity releases anxiety), Human (real coaches, real relationships).
+- Shadow traits (NEVER be): Cheerleader (empty praise), Pressure machine (urgency/countdown), Cold/clinical (sterile), Arrogant (talks down).
+
+## VOICE RULES
+- Voice is CONSTANT: Authoritative without condescending. Direct and precise. Energising. Honest. Curious.
+- Tone VARIES by audience and context.
+- Acquisition tone: Confident and aspirational. Lead with what the child becomes. Never open with fear or deficit.
+
+## US PARENT ARCHETYPES (use when market = US)
+- THE NURTURER: Progressive, values-led. Entry frame: "Your child could love math." Trust = emotional resonance. Red line: fear-based, performance-only.
+- THE LAIDBACK GUIDE: Anti-tiger-parenting. Entry frame: "Math they'll actually want to do." Trust = child-led proof. Red line: rigid curriculum, enrichment language.
+
+## VOCABULARY RULES
+- OWN these words: MathFit, productive struggle, "a coach who knows your child", mathematical thinking, coaching, MathFit journey
+- USE WITH CARE: "tutoring" (avoid in US TOF), "struggling" (only positive), "confidence" (pair with earned)
+- NEVER USE: remedial, grade guarantee, shortcuts, tricks, gamified, AI-powered learning journey, "is your child falling behind?", "before it's too late"
+
+## COMPETITIVE POSITIONING
+Cuemath is the ONLY math programme that builds mathematical fitness through guided productive struggle with a dedicated coach.
+- Zone we own: Excellence Through Productive Struggle (white space — nobody else is here)
+- Competitors to contrast against: Kumon/Mathnasium (remediation), speed math (tricks), Russian School (pressure)
+
+## FIVE MESSAGING PILLARS
+1. Math Anxiety to MathFit — Anxiety comes from how math is taught, not from math itself
+2. Thinking Over Memorisation — We develop reasoning, not just procedures
+3. Thinkers, Not Calculators — In the AI age, human calculators are obsolete
+4. The Power of 1:1 — True personalisation builds MathFit
+5. MathFit Is Built, Not Born — Every child has the potential
 
 ## MATHFIT(TM) FRAMEWORK — CRITICAL
 MathFit(TM) = mathematical fitness. Two dimensions:
@@ -9863,6 +10311,8 @@ function buildUserMessage(brief) {
   let m = `Create 3 production-ready options for:\n**Market:** ${brief.market}\n**Platform:** ${brief.platform}\n**Format:** ${brief.format}`;
   if (brief.subFormat) m += `\n**Sub-Format:** ${brief.subFormat}`;
   m += `\n**ICP:** ${brief.icpType}\n**Segment:** ${brief.segment}\n**Funnel:** ${brief.funnel}`;
+  if (brief.grade) m += `\n**Grade Band:** ${brief.grade}`;
+  if (brief.loc && brief.loc !== 'General') m += `\n**Content Angle:** ${brief.loc} \u2014 ${LOC_DATA[brief.loc]?.angle || ''}`;
   if (brief.angle) m += `\n**Angle:** ${brief.angle}`;
   if (brief.offer) m += `\n**Offer:** ${brief.offer}`;
   m += '\n\n' + getFormatOutputTemplate(brief.format, brief.subFormat);
@@ -10130,6 +10580,52 @@ ${META_COPY_BLOCK}
 Authentic kid voice — NOT adult copy in a child's mouth. Include at least one MathFit outcome (understanding, not just grades).`;
       return `Select a sub-format (Parent Testimonial or Student Testimonial).`;
     })(),
+
+    'Email': `**OUTPUT AS NURTURE EMAIL.** Each variant:
+
+---
+**Variant X** — [angle label]
+
+- **Subject:** [≤50 chars, curiosity or value-driven] (XX chars)
+- **Preheader:** [≤90 chars, extends subject intrigue] (XX chars)
+
+Hi {ParentName},
+
+[Body: max 150 words. Lead with empathy → anchor to MathFit system → close on outcome. Personalize with {ChildName}.]
+
+→ **{CTA_BUTTON}** · {Link}
+
+[Sign-off: Team Cuemath · Making Kids MathFit™]
+
+---
+Journey stages: QL→Book Trial, Trial Confirmation, Pre-Trial Nurture, Trial Reminder, Drop-off/Reschedule, Post-Trial→Pay, Reactivation, Announcement.
+Tokens: {ParentName}, {ChildName}, {Date}, {Time}, {TutorName}, {Link}, {CTA_BUTTON}, {RescheduleLink}
+Vary CTA per stage. NRI = AI-era + founder credibility. Non-NRI = empathy + no-pressure. Always MathFit™ framing.`,
+
+    'SMS': `**OUTPUT AS SMS.** Each variant:
+
+---
+**Variant X** — [angle]
+[Message text, max 240 chars. Always start with "Cuemath:". End with link. No emojis. One clear CTA.]
+(XX chars)
+
+---
+Tokens: {ChildName}, {ParentName}, {Link}
+Stage adaptation: "Book" (new), "Reschedule" (drop-off), "Complete" (payment), "Download" (app).`,
+
+    'RCS': `**OUTPUT AS RCS MESSAGE.** Each variant:
+
+---
+**Variant X** — [angle]
+
+- **Asset:** [Image direction — 768x1028px, <2MB. Describe the visual concept.]
+- **Headline:** [Bold, 1 line — the hook]
+- **Body:** [2-3 lines max — value prop + personalization with {ChildName}]
+- **Button:** [CTA text — "Book {ChildName}'s Free Trial" or "Reschedule" variant]
+
+---
+Tokens: {ParentName}, {ChildName}, {Link}
+ICP guidance: NRI = Indian tutor trust. Non-NRI = empathy-first. Asian = competition outcomes.`,
   };
 
   return templates[format] || 'Create 3 production-ready options. Each must include creative copy + Meta Ad Copy (Headline, Primary Text, Description, CTA). Follow brand guidelines strictly.';
@@ -10195,7 +10691,7 @@ function showResult(content, brief) {
   // Track forge version history
   const _fvId = Date.now(); state.forgeVersions = [{id: _fvId, versions: [{content, timestamp: new Date().toISOString(), label: 'v1'}]}]; state._currentForgeId = _fvId; renderForgeVersions();
   // Show image section only if mode includes image
-  document.getElementById('imageGenSection').style.display = (state.outputMode === 'text') ? 'none' : '';
+  document.getElementById('imageGenSection').style.display = 'none';
   document.getElementById('imageOutput').classList.add('hidden');
   // Show feedback status bar
   document.getElementById('forgeStatusBar').classList.remove('hidden');
@@ -10630,7 +11126,7 @@ const TAG_DISPLAY = {
   'PB-GRADE':'Grades & school','PB-CONF':'Confidence building','PB-FOUND':'Deep understanding','PB-FUTURE':'Future readiness',
   'PB-TUTOR':'Tutor quality','PB-INDIAN':'Indian identity','PB-COMP':'Competition prep',
   // ICP
-  'NRI':'NRI Parents','Non-NRI':'Non-NRI Parents','Asian':'Asian Parents','Expat':'Expat Parents','Telugu Speaking':'Telugu Speaking','Tamil Speaking':'Tamil Speaking','Hindi Speaking':'Hindi Speaking','Gujarati Speaking':'Gujarati Speaking','Arabic Speaking':'Arabic Speaking','High School Parents':'High School Parents','Universal':'All Audiences',
+  'NRI':'NRI Parents','Non-NRI':'Non-NRI Parents','Asian':'Asian Parents','Expat':'Non-NRI Parents','Telugu Speaking':'Telugu Speaking','Tamil Speaking':'Tamil Speaking','Hindi Speaking':'Hindi Speaking','Gujarati Speaking':'Gujarati Speaking','Arabic Speaking':'Arabic Speaking','High School Parents':'High School Parents','Universal':'All Audiences',
 };
 function tagLabel(code) { return TAG_DISPLAY[code] || code; }
 function shortAdName(name) {
@@ -10655,11 +11151,12 @@ function shortAdName(name) {
 }
 
 const TAG_CATEGORIES = {
+  // NOTE: 'Parent testimonial' is actually a FORMAT/content type, not a hook. The hook within a testimonial varies (outcome reveal, recommendation, fear→relief, etc.). Kept here for backward compat with existing tagged data. Display layer adds "(content type)" suffix.
   hook_type: { label:'Hook', color:'purple', values:['Math anchor','Problem','Fear / urgency','Parent testimonial','Statistic','Question','Lifestyle / emotional','Competitive','Offer / price','Grade badge','Seasonal'] },
   format: { label:'Format', color:'blue', values:['Static image','Video','Influencer UGC','Testimonial video','Vernacular testimonial','Product video','Brand video'] },
   pain_benefit: { label:'Pain Point', color:'red', isArray:true, values:['Grades & school','Confidence & anxiety','Strong foundations','Future readiness','Tutor quality','Indian roots','Competition prep'] },
   emotional_tone: { label:'Tone', color:'pink', values:['Testimonial','Aspirational','Confident','Urgency','Comparison','Offer / promo','Seasonal'] },
-  icp_target: { label:'Audience', color:'orange', values:['NRI parents','Expat parents','Local parents','Gujarati speaking','Telugu speaking','Tamil speaking','High school parents'] },
+  icp_target: { label:'Audience', color:'orange', values:['NRI parents','Non-NRI parents','Local parents','Gujarati speaking','Telugu speaking','Tamil speaking','High school parents'] },
   setting: { label:'Setting', color:'teal', values:['Home','Studio','Outdoor','Screen recording','Animation'] },
   production_style: { label:'Production', color:'blue', values:['UGC','Studio shoot','Motion graphic','Screen record'] },
   // Legacy categories kept for backward compat with existing tags — not shown in new tagging
@@ -10712,7 +11209,7 @@ const TAG_COLORS = {
 const SENTINEL_THRESHOLDS = {
   US: {
     cpql:  { green: 10000, amber: 15000 },  // per 01-sentinel.md
-    cpnri: { green: 15000, amber: 20000 },  // was 25K — spec says 20K
+    cpnri: { green: 10000, amber: 15000 },  // CPTQL: green <10K, amber <15K, red 15K+
     cptd:  { green: 35000, amber: 50000 },  // was 50K/75K — spec says 35K/50K
     ql_td_pct: { green: 50, amber: 30 },    // was 25/15 — spec says 50/30
     ql_nri_pct: { green: 50, amber: 30 },
@@ -10870,7 +11367,7 @@ function computeSparklineData(metric, geo, days) {
 
   // Daily funnel from leadsData (Section 2) — uses crmGeoMatchRow for correct AUS/MEA handling
   const dailyQL = {}, dailyTD = {}, dailyPaid = {};
-  filterLeadsByMarket(leadsData, geo === 'all' ? null : geo).forEach(r => {
+  filterLeadsByMarket(leadsData, geo === 'all' ? 'all' : geo).forEach(r => {
     const qd = (r.lead_created_date || '').slice(0, 10);
     const td_d = (r.trial_done_date || '').slice(0, 10);
     const pd = (r.paid_date || '').slice(0, 10);
@@ -11389,8 +11886,9 @@ function runSentinelAnalysis(data, geo) {
   const videos = rows.filter(r => r.type === 'video');
 
   // Rank by composite score, min 5 TQLs + 1 TD for inclusion (D-07), split by format (D-06)
-  const rankableStatics = statics.filter(r => r.metrics.tql >= 5 && r.metrics.td >= 1).sort((a, b) => b.compositeScore - a.compositeScore);
-  const rankableVideos = videos.filter(r => r.metrics.tql >= 5 && r.metrics.td >= 1).sort((a, b) => b.compositeScore - a.compositeScore);
+  const _hasLetters = name => /[a-zA-Z]/.test(name);
+  const rankableStatics = statics.filter(r => r.metrics.tql >= 5 && r.metrics.td >= 1 && _hasLetters(r['Ad name']||r['ad name']||'')).sort((a, b) => b.compositeScore - a.compositeScore);
+  const rankableVideos = videos.filter(r => r.metrics.tql >= 5 && r.metrics.td >= 1 && _hasLetters(r['Ad name']||r['ad name']||'')).sort((a, b) => b.compositeScore - a.compositeScore);
 
   // Top: 5 statics + 4 videos (over-fetch so dedup still yields 5); fill from other format if short
   let topStatics = rankableStatics.slice(0, 5);
@@ -11533,7 +12031,7 @@ const TAG_MIGRATION = {
   'PB-GRADE': 'Grades & school', 'PB-CONF': 'Confidence & anxiety', 'PB-FOUND': 'Strong foundations',
   'PB-FUTURE': 'Future readiness', 'PB-TUTOR': 'Tutor quality', 'PB-INDIAN': 'Indian roots', 'PB-COMP': 'Competition prep',
   // Old audience → new
-  'NRI': 'NRI parents', 'Non-NRI': 'Expat parents', 'Asian': 'NRI parents', 'Expat': 'Expat parents',
+  'NRI': 'NRI parents', 'Non-NRI': 'Non-NRI parents', 'Asian': 'NRI parents', 'Expat': 'Non-NRI parents',
   'Telugu Speaking': 'Telugu speaking', 'Tamil Speaking': 'Tamil speaking', 'Gujarati Speaking': 'Gujarati speaking',
   'Hindi Speaking': 'Local parents', 'Arabic Speaking': 'Local parents', 'High School Parents': 'High school parents', 'Universal': 'NRI parents',
   // Old tone → new
@@ -11561,7 +12059,7 @@ const TAG_MIGRATION = {
   'Parent testimonial hook': 'Parent testimonial',
   'Influencer / UGC': 'Influencer UGC',
   'All Audiences': 'NRI parents', 'all audiences': 'NRI parents',
-  'Non-NRI Parents': 'Expat parents', 'Non NRI Parents': 'Expat parents',
+  'Non-NRI Parents': 'Non-NRI parents', 'Non NRI Parents': 'Non-NRI parents',
   'NRI Parents': 'NRI parents',
   'High School Parents': 'High school parents',
   'Telugu Speaking': 'Telugu speaking', 'Tamil Speaking': 'Tamil speaking',
@@ -11636,7 +12134,7 @@ const _immediateRestored = rehydrateTagsFromCache(state.taggerData);
 if (_immediateRestored > 0) saveTaggerData();
 
 // Merge CRM data with cached tagger data on load
-if (state.taggerData.length && state._crmLeads?.length) mergeCRMWithMeta();
+if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
 
 // Async: try loading from Supabase — if it has more/newer data, use it
 // GUARD: If localStorage has a recent fresh Meta API pull, trust it over Supabase.
@@ -11669,7 +12167,7 @@ state._supabaseLoadPending = true;
       // Rehydrate tags from cache for any Supabase rows missing tags
       const sbRestored = rehydrateTagsFromCache(state.taggerData);
       state.taggerData.forEach(c => { if (!c['_date']) extractDateFromAdName(c); });
-      if (state.taggerData.length && state._crmLeads?.length) mergeCRMWithMeta();
+      if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
       saveTaggerData();
       console.log(`Loaded ${sbData.length} creatives from Supabase (was ${_localTaggerCount} in localStorage)${sbRestored ? `, rehydrated ${sbRestored} tags` : ''}`);
       updateSyncBadge('synced');
@@ -11908,7 +12406,7 @@ async function tagCreatives(rawData) {
 
   const savings = cachedResults.length > 0 ? ` (${cachedResults.length} from cache, saved ${Math.ceil(cachedResults.length/batchSize)} API calls)` : '';
   showToast(`Tagged ${state.taggerData.length} creatives${savings}`);
-  if (state._crmLeads?.length) mergeCRMWithMeta();
+  if (leadsData.length) mergeCRMWithMeta();
   showTaggerResults();
   // AUTO-BACKUP: save tagged data to file after every tag session
   if (state.taggerData.length > 50) {
@@ -12029,7 +12527,7 @@ PAIN POINT (array, 1-2 values max): Grades & school | Confidence & anxiety | Str
 
 TONE (pick exactly 1): Testimonial | Aspirational | Confident | Urgency | Comparison | Offer / promo | Seasonal
 
-AUDIENCE (pick exactly 1): NRI parents | Expat parents | Local parents | Gujarati speaking | Telugu speaking | Tamil speaking | High school parents
+AUDIENCE (pick exactly 1): NRI parents | Non-NRI parents | Local parents | Gujarati speaking | Telugu speaking | Tamil speaking | High school parents
 
 OFFER PRESENT: true if specific promotion beyond standard free trial ("First month at ₹999", "50% off"). false if standard free trial CTA only.
 
@@ -12175,7 +12673,7 @@ function showTaggerResults() {
   // Show export/backup buttons + thumbnail status
   const _expBtn = document.getElementById('taggerExportBtn'); if (_expBtn) _expBtn.style.display = '';
   const _bkpBtn = document.getElementById('taggerBackupBtn'); if (_bkpBtn) _bkpBtn.style.display = '';
-  const _taggerSource = metaAdData.length > 0 ? getAdPerformance(null, null, null) : (state.taggerData || []);
+  const _taggerSource = metaAdData.length > 0 ? getAdPerformance(null, null, null) : sanitizeTaggerData(state.taggerData || []).filter(c => _isLPCampaign(c));
   const _tc = _taggerSource.filter(c => c['thumbnail_url'] || c['image_url']).length;
   const _te = document.getElementById('taggerThumbCount');
   if (_te) _te.textContent = _tc > 0 ? `${_tc} thumbnails` : 'No thumbnails';
@@ -12188,7 +12686,7 @@ function showTaggerResults() {
   renderTaggerInsights();
   renderActiveTaggerTab();
   // Auto-run Sentinel on new data — use clean data layer when available
-  const _sentinelData = metaAdData.length > 0 ? getAdPerformance(null, null, null) : state.taggerData;
+  const _sentinelData = metaAdData.length > 0 ? getAdPerformance(null, null, null) : sanitizeTaggerData(state.taggerData || []).filter(c => _isLPCampaign(c));
   if (_sentinelData.length) {
     state.sentinelOutput = runSentinelAnalysis(_sentinelData, 'US');
     saveState('sentinelOutput', state.sentinelOutput);
@@ -12224,8 +12722,7 @@ function computeTQL(ql, nri, market, board) {
   return Math.round(ql); // APAC, UK, others — all QLs qualify
 }
 
-// ── SHARED CRM GEO MATCHING — single source of truth for all CRM geo filtering ──
-// AUS leads have country_bucket='APAC' in CRM — use campaign prefix to identify sub-country
+// PHASE_DEPRECATED: crmGeoMatchRow — geo logic ported into filterLeadsByMarket(). Callers being migrated.
 function crmGeoMatchRow(row, geoFilter) {
   if (!geoFilter || geoFilter === 'all') return true;
   const cb = (row['country_bucket'] || row['region'] || '').trim().toLowerCase();
@@ -12317,10 +12814,9 @@ function getGlobalFilteredTaggerData(geoElId, formatFilter) {
   return data;
 }
 
-// CRM portfolio totals — direct count from CRM leads, filtered by date + geo. 100% of leads, no matching gaps.
-// dateOverride: { from, to } — pass explicit dates instead of reading from DOM (eliminates race condition)
+// PHASE_DEPRECATED: getCRMPortfolioTotals — use getMarketMetrics() instead (filterLeadsByMarket now has correct geo logic)
 function getCRMPortfolioTotals(geoFilter, dateOverride) {
-  const rows = state._crmLeads || [];
+  const rows = (typeof leadsData !== 'undefined' && leadsData.length) ? leadsData : [];
   if (!rows.length) return { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, asian: 0, revenue: 0, invalid: 0, ts: 0 };
   const { from, to } = dateOverride || getGlobalDateRange();
   // Uses shared crmGeoMatchRow() for consistent AUS/MEA handling
@@ -12370,6 +12866,21 @@ function getCRMPortfolioTotals(geoFilter, dateOverride) {
 // Creative layer — quality-filtered for Lens insights. ₹5K spend minimum, TD sanitization.
 const LENS_MIN_SPEND = 5000;  // ₹5K minimum — anything below is noise
 
+// ==================== LP vs INSTANT FORM CAMPAIGN GATE ====================
+// CRM can only capture UTMs from landing page (LP/Signup) campaigns.
+// Instant form campaigns (Leap/LeadGen/PLA) have no UTM attribution — CRM shows 0 QLs/TDs.
+// These MUST be excluded from all analysis (Insights, Tagger, Pause Now, Make More).
+function _isLPCampaign(c) {
+  const camp = ((c['Campaign name'] || c['campaign name'] || c.campaign || '') + ' ' + (c['Ad name'] || c['ad name'] || c.adName || '')).toLowerCase();
+  // CHECK NEGATIVE FIRST — instant form signals override LP signals
+  // (campaigns like "LEAP_BAU_Signup_LP" contain both "leap" AND "signup" — leap wins)
+  if (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('_pla_') || camp.includes('pla_') || camp.includes('instant') || camp.includes('on_facebook')) return false;
+  // Positive signals: campaign runs on a landing page
+  if (camp.includes('signup') || camp.includes('_lp_') || camp.includes('_lp-') || camp.includes('-lp_') || camp.includes('_fop') || camp.includes('lpfop')) return true;
+  // Default: no LP signal = assume instant form — exclude to avoid unmatchable CRM numbers
+  return false;
+}
+
 // ── GLOBAL DATA SANITIZER — single source of truth for bad-data detection ──
 // Apply this to ANY data before display or analysis. Zeroes TD on false CRM matches.
 function sanitizeTaggerData(data) {
@@ -12397,7 +12908,7 @@ const LENS_MIN_CPTD = 5000; // fallback
 // Format: [greenBelow, redAbove] — value < green = green, value > red = red, between = orange
 const KPI_THRESHOLDS = {
   cpql:  { US: [10000,15000], India: [500,800], AUS: [10000,15000], APAC: [10000,15000], MEA: [8000,10000], UK: [10000,15000], all: [10000,15000] },
-  cptql: { US: [15000,20000], India: [800,1200], AUS: [10000,15000], APAC: [10000,15000], MEA: [8000,10000], UK: [10000,15000], all: [10000,15000] },
+  cptql: { US: [10000,15000], India: [800,1200], AUS: [10000,15000], APAC: [10000,15000], MEA: [8000,10000], UK: [10000,15000], all: [10000,15000] },
   cptd:  { US: [35000,50000], India: [3000,5000], AUS: [30000,45000], APAC: [30000,45000], MEA: [25000,35000], UK: [35000,50000], all: [35000,50000] },
   cac:   { all: [150000,250000] },
   roas:  { all: [1, 0.5] }, // reversed: >1 green, >0.5 orange, else red
@@ -12465,11 +12976,12 @@ function syncDateLabels() {
     const el = document.getElementById(id); if (el) el.textContent = label;
   });
 }
-function getFilteredTaggerData(filterElId) {
+function getFilteredTaggerData(filterElId, minSpend) {
   const country = document.getElementById(filterElId || 'taggerFilterCountry')?.value || 'all';
   const { from, to } = getGlobalDateRange();
   const market = country === 'all' ? null : country;
-  return getAdPerformance(market, from || null, to || null).filter(c => parseNumber(c['Spent']||c['spent']||0) >= LENS_MIN_SPEND);
+  const threshold = minSpend !== undefined ? minSpend : LENS_MIN_SPEND;
+  return getAdPerformance(market, from || null, to || null).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
 }
 
 function onTaggerCountryChange() {
@@ -12689,9 +13201,9 @@ function renderCreativeReview() {
     const cmp = (val, bench, lower) => {
       if (!bench || !val) return '';
       const pct = ((val - bench) / bench * 100);
-      if (Math.abs(pct) < 5) return '<span class="text-gray-400 text-[9px]">≈ avg</span>';
-      if (lower) return pct < 0 ? `<span class="text-green-600 text-[9px]">▼${Math.abs(pct).toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]">▲${pct.toFixed(0)}%</span>`;
-      return pct > 0 ? `<span class="text-green-600 text-[9px]">▲${pct.toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]">▼${Math.abs(pct).toFixed(0)}%</span>`;
+      if (Math.abs(pct) < 5) return '<span class="text-gray-400 text-[9px]" title="vs portfolio avg">≈ avg</span>';
+      if (lower) return pct < 0 ? `<span class="text-green-600 text-[9px]" title="vs portfolio avg">▼${Math.abs(pct).toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]" title="vs portfolio avg">▲${pct.toFixed(0)}%</span>`;
+      return pct > 0 ? `<span class="text-green-600 text-[9px]" title="vs portfolio avg">▲${pct.toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]" title="vs portfolio avg">▼${Math.abs(pct).toFixed(0)}%</span>`;
     };
 
     return `<div class="border rounded-xl p-3 ${vColors[v.color]} transition hover:shadow-md">
@@ -12771,7 +13283,7 @@ function renderCreativeReview() {
     const winners = [...scale, ...working].slice(0, 6);
     html += `<div class="mb-6">
       <h3 class="text-base font-bold mb-1 text-green-800">✓ Scale These — Proven Winners</h3>
-      <p class="text-xs text-text-muted mb-3">These creatives are converting well. Make more like them or increase their budget.</p>
+      <p class="text-xs text-text-muted mb-3">These creatives are converting well. Make more like them or increase their budget. <span class="italic">Metric arrows compare against portfolio average.</span></p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         ${winners.map(x => creativeCard(x.c, x.v, true)).join('')}
       </div>
@@ -12783,7 +13295,7 @@ function renderCreativeReview() {
     const losers = [...pause, ...fatigued].slice(0, 6);
     html += `<div class="mb-6">
       <h3 class="text-base font-bold mb-1 text-red-800">✗ Pause or Refresh — Underperforming</h3>
-      <p class="text-xs text-text-muted mb-3">These creatives are burning budget without converting. Pause or create new variants.</p>
+      <p class="text-xs text-text-muted mb-3">These creatives are burning budget without converting. Pause or create new variants. <span class="italic">Metric arrows compare against portfolio average.</span></p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         ${losers.map(x => creativeCard(x.c, x.v, true)).join('')}
       </div>
@@ -13024,7 +13536,7 @@ function aggregateTaggerRows(rows) {
   const ctr = imp > 0 ? (clicks/imp)*100 : 0;
   const cpc = clicks > 0 ? spend/clicks : 0;
   const clickQL = clicks > 0 ? (ql/clicks)*100 : 0;
-  const cptd = td >= 3 ? spend/td : 0;
+  const cptd = td >= 1 ? spend/td : 0;
   return { spend, ql, td, imp, clicks, paid, ctr, cpc, clickQL, cptd, count: rows.length };
 }
 
@@ -13240,7 +13752,7 @@ function renderTaggerTable() {
 
 function renderTaggerHeatmap() {
   const container = document.getElementById('taggerHeatmap');
-  const filteredData = getFilteredTaggerData();
+  const filteredData = getFilteredTaggerData(undefined, 1000); // Lower threshold for heatmap (₹1K) — aggregates across tags
   if (!filteredData.length) { container.innerHTML = '<p class="text-sm text-text-muted">No data</p>'; return; }
 
   // Build heatmap: tag category x avg CPTD (primary), CPQL (secondary)
@@ -13900,7 +14412,8 @@ function extractAudience(c) {
     'expat':'Expats','expats':'Expats','nri':'NRI','indian':'Indian Interests','school':'School Targeting',
     'advantage':'Advantage+','high':'High NRI','interests':'Interests','conv':'Conversion',
     'broad':'Broad','lookalike':'Lookalike','custom':'Custom Audience','retargeting':'Retargeting',
-    'parents':'Parents','networking':'Networking','mobile':'Mobile Networks'
+    'parents':'Parents','networking':'Networking','mobile':'Mobile Networks',
+    'influencer':'Influencer Audience','influ':'Influencer Audience','desi':'Desi/NRI','telugu':'Telugu Speaking','gujarati':'Gujarati Speaking','tamil':'Tamil Speaking','hindi':'Hindi Speaking'
   };
   // Try positions starting at 4 (0-indexed) — the audience segment after GEO_FB_Leads_Conv_
   if (parts.length >= 5) {
@@ -13923,7 +14436,7 @@ function extractAudience(c) {
   }
   // Fallback: use tag-based audience (from Claude tagging)
   const tagAud = c.tags?.icp_target;
-  if (tagAud && tagAud !== 'Unknown' && tagAud !== 'N/A') return tagAud;
+  if (tagAud && tagAud !== 'Unknown' && tagAud !== 'N/A') return typeof tagLabel === 'function' ? tagLabel(tagAud) : tagAud;
   // Last resort: use ad set name audience hint
   const adSet = (c['Ad set name']||'').toLowerCase();
   if (adSet.includes('nri')) return 'NRI';
@@ -14101,12 +14614,12 @@ function generateCreativeBriefs() {
         <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${prioStyles[b.priority]}">${b.priority}</span>
         <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-accent-${GEO_BADGE[b.geo]||'purple'}-light text-accent-${GEO_BADGE[b.geo]||'purple'}">${b.geo}</span>
       </div>
-      <p class="text-sm font-bold mb-2">${b.hook} + ${b.pb}</p>
+      <p class="text-sm font-bold mb-2">${tagLabel(b.hook)} + ${tagLabel(b.pb)}</p>
       <div class="space-y-1 text-xs text-text-secondary mb-3">
-        <p>Hook: <strong class="text-text-primary">${b.hook}</strong> at ${formatCurrency(b.hookCPQL)} CPQL (${b.hookCount} ads)</p>
-        <p>Frame: <strong class="text-text-primary">${b.pb}</strong> at ${formatCurrency(b.pbCPQL)} CPQL</p>
-        <p>Format: <strong class="text-text-primary">${b.format}</strong> · ICP: <strong>${b.icp}</strong></p>
-        ${b.antiPattern ? `<p class="text-accent-red">Avoid: ${b.antiPattern} (${formatCurrency(b.antiCPQL)} CPQL)</p>` : ''}
+        <p>Hook: <strong class="text-text-primary">${tagLabel(b.hook)}</strong> at ${formatCurrency(b.hookCPQL)} CPQL (${b.hookCount} ads)</p>
+        <p>Frame: <strong class="text-text-primary">${tagLabel(b.pb)}</strong> at ${formatCurrency(b.pbCPQL)} CPQL</p>
+        <p>Format: <strong class="text-text-primary">${tagLabel(b.format)}</strong> · ICP: <strong>${tagLabel(b.icp)}</strong></p>
+        ${b.antiPattern ? `<p class="text-accent-red">Avoid: ${tagLabel(b.antiPattern)} (${formatCurrency(b.antiCPQL)} CPQL)</p>` : ''}
       </div>
       <button onclick='generateFromCIBrief(${JSON.stringify({geo:b.geo,hook:b.hook,pb:b.pb,format:b.format,icp:b.icp}).replace(/'/g,"\\'")})'
         class="w-full py-2 btn-primary rounded-lg text-xs font-semibold">Generate in Forge →</button>
@@ -14124,7 +14637,7 @@ function generateFromCIBrief(brief) {
   // Set ICP pill
   document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === brief.icp));
   // Set angle
-  document.getElementById('briefAngle').value = `Winning pattern: ${brief.hook} hook + ${brief.pb} frame. Data-proven for ${brief.geo}.`;
+  document.getElementById('briefAngle').value = `Winning pattern: ${tagLabel(brief.hook)} hook + ${tagLabel(brief.pb)} frame. Data-proven for ${brief.geo}.`;
   setTimeout(() => generateContent(), 200);
 }
 
@@ -14159,8 +14672,8 @@ function renderWinningByAudience() {
     const ql = ads.reduce((s, c) => s + parseNumber(c['QL']||c['ql']||0), 0);
     const td = ads.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
     const cpql = ql > 0 ? spend / ql : null;
-    const cptd = td >= 3 ? spend / td : null;
-    const qlTd = ql > 0 && td >= 3 ? Math.min((td / ql * 100), 100) : null;
+    const cptd = td >= 1 ? spend / td : null;
+    const qlTd = ql > 0 && td >= 1 ? Math.min((td / ql * 100), 100) : null;
 
     // Best hook for this audience
     const hookPerf = {};
@@ -14268,8 +14781,8 @@ function renderWinningByAudience() {
     const loseHook = hooksSorted[hooksSorted.length - 1];
     html += `<div class="flex items-start gap-2">
       <span class="text-accent-blue font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-      <div><strong>Creative pattern:</strong> <span class="text-accent-green font-semibold">${tagLabel(winHook[0])}</span> hooks cost ${formatCurrency(winHook[1].spend/winHook[1].td)} CPTD (${winHook[1].count} ads).
-        <span class="text-accent-red font-semibold">${tagLabel(loseHook[0])}</span> hooks cost ${formatCurrency(loseHook[1].spend/loseHook[1].td)} CPTD — ${Math.round(loseHook[1].spend/loseHook[1].td / (winHook[1].spend/winHook[1].td))}x more expensive.
+      <div><strong>Creative pattern:</strong> <span class="text-accent-green font-semibold">${tagLabel(winHook[0])}</span>${winHook[0] === 'Parent testimonial' ? ' <span class="text-[10px] text-text-muted">(content type — hook within varies)</span>' : ''} hooks cost ${formatCurrency(winHook[1].spend/winHook[1].td)} CPTD (${winHook[1].count} ads).
+        <span class="text-accent-red font-semibold">${tagLabel(loseHook[0])}</span>${loseHook[0] === 'Parent testimonial' ? ' <span class="text-[10px] text-text-muted">(content type — hook within varies)</span>' : ''} hooks cost ${formatCurrency(loseHook[1].spend/loseHook[1].td)} CPTD — ${Math.round(loseHook[1].spend/loseHook[1].td / (winHook[1].spend/winHook[1].td))}x more expensive.
         <span class="text-text-muted">Shift new creative production toward ${tagLabel(winHook[0])} hooks.</span></div>
     </div>`;
   }
@@ -14319,7 +14832,7 @@ function renderWinningByAudience() {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div class="bg-accent-green-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-green-700 uppercase mb-1">Best Hook</p>
-          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
+          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}${r.bestHook[0] === 'Parent testimonial' ? ' <span class="text-[9px] text-text-muted font-normal">(content type)</span>' : ''}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
         </div>
         <div class="bg-accent-blue-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-blue-700 uppercase mb-1">Best Format</p>
@@ -15571,7 +16084,7 @@ function _runSentinelViewInner() {
       // Use Section 2 spend (costData) + funnel (leadsData) — matches Dashboard KPI cards
       const _sentGeo = document.getElementById('sentinelGeo').value;
       const { from: _dFrom, to: _dTo } = getGlobalDateRange();
-      const _diagM2 = leadsData.length ? getMarketMetrics(_sentGeo === 'all' ? null : _sentGeo, _dFrom, _dTo) : null;
+      const _diagM2 = leadsData.length ? getMarketMetrics(_sentGeo || 'all', _dFrom, _dTo) : null;
       const _diagCPTD = _diagM2?.cptd || 0;
       const _diag = diagnoseCPTD(_diagData, _diagGeo, { overrideCPTD: _diagCPTD });
       if (_diag.factors.length) {
@@ -15736,7 +16249,7 @@ function renderSentinelNarrative() {
   const isFormatFiltered = formatFilter !== 'all';
   // Section 2: costData (spend) + leadsData (funnel) — consistent with KPI cards
   const { from: _nFrom, to: _nTo } = getGlobalDateRange();
-  const _narrativeM2 = leadsData.length ? getMarketMetrics(geoFilter === 'all' ? null : geoFilter, _nFrom, _nTo) : null;
+  const _narrativeM2 = leadsData.length ? getMarketMetrics(geoFilter || 'all', _nFrom, _nTo) : null;
   const totalSpend = isFormatFiltered
     ? getGlobalFilteredTaggerData('sentinelGeo', formatFilter).reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0)
     : (_narrativeM2?.spend || 0);
@@ -15918,7 +16431,7 @@ function renderSentinelTop5() {
       const { from, to } = getGlobalDateRange();
       const geoVal = document.getElementById('sentinelGeo')?.value || 'all';
       const market = geoVal === 'all' ? null : geoVal;
-      const perf = getAdPerformance(market, from, to).filter(r => r['TD'] > 0 && r['Spent'] > 0);
+      const perf = getAdPerformance(market, from, to).filter(r => r['TD'] > 0 && r['Spent'] > 0 && /[a-zA-Z]/.test(r['Ad name'] || ''));
       const withCPTD = perf.map(r => ({ ...r, _cptd: r['Spent'] / r['TD'] })).sort((a, b) => a._cptd - b._cptd);
       const top5 = withCPTD.slice(0, 5).map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
       const bottom5 = withCPTD.slice(-5).reverse().map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
@@ -15968,7 +16481,7 @@ function renderSentinelTable() {
       td += r.metrics.td; paid += r.metrics.paid; imp += (r.metrics.impressions||0); clicks += (r.metrics.clicks||0);
     });
     const ctr = imp > 0 ? (clicks/imp)*100 : 0;
-    return { spend, ql, nri, tql, td, paid, ctr, cpql: ql > 0 ? spend/ql : 0, cptql: tql > 0 ? spend/tql : 0, cptd: td >= 3 ? spend/td : 0, adCount: adRows.length };
+    return { spend, ql, nri, tql, td, paid, ctr, cpql: ql > 0 ? spend/ql : 0, cptql: tql > 0 ? spend/tql : 0, cptd: td >= 1 ? spend/td : 0, adCount: adRows.length };
   }
 
   // Compute campaign-level totals
@@ -16427,12 +16940,8 @@ function prefillForgeFromIntel() {
   });
   const best = Object.values(combos).filter(c => c.td >= 3 && c.count >= 2).sort((a,b) => (a.spend/a.td) - (b.spend/b.td))[0];
   if (!best) return;
-  // Pre-fill Key Angle
-  const angle = document.getElementById('briefAngle');
-  if (angle && !angle.value) {
-    angle.value = `${best.hook} angle targeting ${best.aud} — best CPTD combo (${formatCurrency(best.spend/best.td)} across ${best.count} ads)`;
-  }
-  // Show Winning Formula indicator
+  // Don't auto-fill Key Angle — user sets their own angle or leaves empty
+  // Show Winning Formula indicator as suggestion only
   const indicator = document.getElementById('formulaIndicator');
   const indicatorText = document.getElementById('formulaIndicatorText');
   if (indicator && indicatorText) {
@@ -16447,38 +16956,42 @@ function prefillForgeFromIntel() {
   });
 }
 
-async function sendFreeform() {
+function sendFreeform() {
   const input = document.getElementById('freeformInput');
   const msg = input.value.trim();
-  if (!msg || state.isGenerating) return;
-  input.value = '';
-  state.isGenerating = true;
+  if (!msg) return;
 
-  // Add user message to chat
+  // Add feedback to history for display
   state.freeformHistory.push({ role: 'user', content: msg });
   renderFreeformMessages();
 
-  // Show loading in output
-  document.getElementById('generateEmpty').classList.add('hidden');
-  document.getElementById('generateResult').classList.add('hidden');
-  document.getElementById('generateLoading').classList.remove('hidden');
+  // Use the current brief to regenerate with the feedback as the angle
+  const brief = state.currentBrief || {
+    market: document.getElementById('briefMarket')?.value || 'US',
+    platform: getActivePill('platformPills') || 'Meta',
+    format: getActivePill('formatPills') || 'Static Ad',
+    subFormat: getActivePill('subFormatPills') || null,
+    icpType: getActivePill('icpPills') || 'NRI',
+    segment: document.getElementById('briefSegment')?.value || 'Foundation Rebuilder',
+    funnel: document.getElementById('briefFunnel')?.value || 'TOFU',
+    grade: document.getElementById('briefGrade')?.value || '3-5',
+    loc: document.getElementById('briefLOC')?.value || 'General',
+    angle: msg,
+    offer: document.getElementById('briefOffer')?.value || ''
+  };
 
-  const sys = buildFreeformSystemPrompt();
-  try {
-    const result = await callClaude(state.freeformHistory, false, sys);
-    state.freeformHistory.push({ role: 'assistant', content: result });
-    renderFreeformMessages();
+  // Append feedback to existing angle (don't replace) so context is preserved
+  const existingAngle = brief.angle || '';
+  const newAngle = existingAngle ? `${existingAngle}. FEEDBACK: ${msg}` : msg;
+  brief.angle = newAngle;
+  state.currentBrief = brief;
+  document.getElementById('briefAngle').value = newAngle;
+  generateFromTemplate();
 
-    // Also show in the main output panel
-    const fakeBrief = { market: 'Auto', platform: 'Auto', segment: 'Auto', icpType: 'Auto' };
-    state.currentBrief = fakeBrief;
-    showResult(result, fakeBrief);
-  } catch(e) {
-    showToast('Error: ' + e.message);
-    document.getElementById('generateLoading').classList.add('hidden');
-    document.getElementById('generateEmpty').classList.remove('hidden');
-  }
-  state.isGenerating = false;
+  state.freeformHistory.push({ role: 'assistant', content: 'Regenerated with feedback appended to angle \u2713' });
+  renderFreeformMessages();
+  input.value = '';
+  showToast('Regenerated — feedback appended to angle');
 }
 
 function buildFreeformSystemPrompt() {
@@ -17864,8 +18377,8 @@ async function runDiagnostic() {
   else fail('Tagger Data', `Only ${td.length} creatives — expected 2000+`);
 
   // 2. CRM data
-  if (state._crmLeads?.length > 100) pass('CRM Fetch', `${state._crmLeads.length} Meta leads loaded`);
-  else if (state._crmLeads?.length > 0) warn('CRM Fetch', `Only ${state._crmLeads.length} rows — expected 8000+`);
+  if (leadsData?.length > 100) pass('CRM Fetch', `${leadsData.length} Meta leads loaded`);
+  else if (leadsData?.length > 0) warn('CRM Fetch', `Only ${leadsData.length} rows — expected 8000+`);
   else fail('CRM Fetch', 'No CRM data loaded');
 
   // 3. CRM merge — check if TD values exist
@@ -18109,11 +18622,17 @@ function renderRecommendedBriefs() {
   // Only show when no content has been generated yet (generateEmpty is visible)
   const resultEl = document.getElementById('generateResult');
   if (resultEl && !resultEl.classList.contains('hidden')) return;
-  const briefs = computeRecommendedBriefs();
-  if (!briefs.length) return;
   // Remove any previous injection to avoid duplicates
   const existing = document.getElementById('recommendedBriefsSection');
   if (existing) existing.remove();
+  // Guard: only show when creative data exists
+  const hasData = (state.taggerData && state.taggerData.length > 0) || (typeof metaAdData !== 'undefined' && metaAdData && metaAdData.length > 0);
+  if (!hasData) {
+    emptyEl.insertAdjacentHTML('beforeend', `<div id="recommendedBriefsSection" class="mt-8 text-center max-w-lg mx-auto"><p class="text-[11px] text-text-muted italic">Load creative data from Tagger or Meta API to see data-driven recommendations.</p></div>`);
+    return;
+  }
+  const briefs = computeRecommendedBriefs();
+  if (!briefs.length) return;
   let html = `<div id="recommendedBriefsSection" class="mt-8 text-left max-w-lg mx-auto">
     <p class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3 text-center">Recommended Briefs from Winning Patterns</p>
     <div class="space-y-3">`;
