@@ -4671,7 +4671,7 @@ function getTQL(market, startDate, endDate) {
     return String(r.qls) === '1';
   });
   // Market-specific TQL definitions
-  const isNRI = r => { const e = (r.ethnicity || '').toLowerCase(); return e.includes('nri') && !e.startsWith('non'); };
+  const isNRI = r => (r.ethnicity || '') === 'NRI';
   const isTQLBoard = r => ['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim());
   if (market === 'US') return rows.filter(isNRI).length;
   if (market === 'India') return rows.filter(isTQLBoard).length;
@@ -4748,8 +4748,7 @@ function getNRI(market, startDate, endDate) {
     if (startDate && d < startDate) return false;
     if (endDate && d > endDate) return false;
     if (String(r.qls) !== '1') return false;
-    const e = (r.ethnicity || '').toLowerCase();
-    return e.includes('nri') && !e.startsWith('non');
+    return (r.ethnicity || '') === 'NRI';
   }).length;
 }
 
@@ -4897,7 +4896,7 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const c = crmDaily[key];
     c.total++;
     if (String(r.qls) === '1') c.ql++;
-    { const _e = (r.ethnicity || '').toLowerCase(); if (_e.includes('nri') && !_e.startsWith('non')) c.nri++; }
+    if ((r.ethnicity || '') === 'NRI') c.nri++;
     if (String(r.trials_done) === '1') c.td++;
     if (String(r.paid) === '1') c.paid++;
     if (String(r.invalid) === '1') c.invalid++;
@@ -5148,7 +5147,7 @@ function getPortfolioMetrics(market, from, to) {
     const adName = (r.mx_utm_adcontent || '').trim();
     if (adName.length > 5) return; // has ad name → already counted in attributed
     if (String(r.qls) === '1') unQL++;
-    { const _e = (r.ethnicity || '').toLowerCase(); if (String(r.qls) === '1' && _e.includes('nri') && !_e.startsWith('non')) unNRI++; }
+    if (String(r.qls) === '1' && (r.ethnicity || '') === 'NRI') unNRI++;
     if (String(r.trials_done) === '1') unTD++;
     if (String(r.paid) === '1') unPaid++;
   });
@@ -5340,7 +5339,7 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
     if (String(r.trials_done) === '1') entry.td++;
     if (String(r.paid) === '1') entry.enrolled++;
     if (String(r.invalid) === '1') entry.invalid++;
-    { const _e = (r.ethnicity || '').toLowerCase(); if (_e.includes('nri') && !_e.startsWith('non')) entry.nri++; }
+    if ((r.ethnicity || '') === 'NRI') entry.nri++;
   });
 
   // Step 2: Spend per ad+campaign from metaAdData (ad-level, exact)
@@ -5588,8 +5587,7 @@ function mergeCRMWithMeta() {
         ts += parseNumber(r['trials_sch'] || 0);
         td += parseNumber(r['trials_done'] || 0);
         paid += parseNumber(r['paid'] || 0);
-        const eth = (r['ethnicity']||'').toLowerCase();
-        if (eth.includes('nri') && !eth.startsWith('non')) nri++;
+        if ((r['ethnicity'] || '') === 'NRI') nri++;
         if (r['ethnicity']) ethnicities[r['ethnicity']] = (ethnicities[r['ethnicity']]||0) + 1;
       });
 
@@ -5682,8 +5680,7 @@ function mergeCRMWithMeta() {
       a.rawCampaigns.add(rawCamp);
       a.leads.push(r);
       a.ql += parseNumber(r['qls'] || 0);
-      const eth = (r['ethnicity']||'').toLowerCase();
-      if (eth.includes('nri') && !eth.startsWith('non')) a.nri++;
+      if ((r['ethnicity'] || '') === 'NRI') a.nri++;
       a.ts += parseNumber(r['trials_sch'] || 0);
       a.td += parseNumber(r['trials_done'] || 0);
       a.paid += parseNumber(r['paid'] || 0);
@@ -6066,7 +6063,7 @@ function getCostsTrackerMetrics(geoFilter) {
       });
       if (!geoLeads.length) return;
       const crmQL = geoLeads.reduce((s,r) => s + parseFloat(r.qls||0), 0);
-      const crmNRI = geoLeads.filter(r => { const e = (r.ethnicity||'').toLowerCase(); return e.includes('nri') && !e.startsWith('non'); }).reduce((s,r) => s + parseFloat(r.qls||0), 0);
+      const crmNRI = geoLeads.filter(r => (r.ethnicity || '') === 'NRI').reduce((s,r) => s + parseFloat(r.qls||0), 0);
       const crmTS = geoLeads.reduce((s,r) => s + parseFloat(r.trials_sch||0), 0);
       const crmPaid = geoLeads.reduce((s,r) => s + parseFloat(r.paid||0), 0);
       // Use direct CRM counts (consistent with getOracleMetrics)
@@ -6106,7 +6103,7 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   // QL filtered by lead_created_date
   let qlFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.lead_created_date || ''));
   const ql = qlFiltered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
-  const nri = qlFiltered.filter(r => { const e = (r['ethnicity'] || '').toLowerCase(); return e.includes('nri') && !e.startsWith('non'); }).length;
+  const nri = qlFiltered.filter(r => (r['ethnicity'] || '') === 'NRI').length;
   const asian = qlFiltered.filter(r => (r['ethnicity'] || '').toLowerCase().startsWith('asian')).length;
   const invalid = qlFiltered.filter(r => parseNumber(r['invalid'] || 0) > 0).length;
   const ts = qlFiltered.filter(r => parseNumber(r['trials_sch'] || 0) > 0).length;
@@ -6121,7 +6118,7 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
       const cb = (r['country_bucket'] || '').trim();
       const eth = (r['ethnicity'] || '').toLowerCase();
       const board = r['board (ME)'] || r['board'] || '';
-      if (cb === 'US' || cb === 'Canada') return eth.includes('nri') && !eth.startsWith('non');
+      if (cb === 'US' || cb === 'Canada') return (r['ethnicity'] || '') === 'NRI';
       if (cb === 'India' || cb === 'IN') return INDIA_TQL_BOARDS.has(board);
       if (cb === 'ME' || cb === 'MEA') return MEA_TQL_BOARDS.has(board);
       return true; // APAC, UK — all qualify
@@ -12757,7 +12754,7 @@ function getCRMPortfolioTotals(geoFilter, dateOverride) {
   // QL filtered by lead_created_date
   let qlFiltered = rows.filter(r => geoMatch(r) && dateIn(r['lead_created_date'] || '', from, to));
   const ql = qlFiltered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
-  const nri = qlFiltered.filter(r => { const e = (r['ethnicity'] || '').toLowerCase(); return e.includes('nri') && !e.startsWith('non'); }).length;
+  const nri = qlFiltered.filter(r => (r['ethnicity'] || '') === 'NRI').length;
   // TQL: market-aware board filtering
   let tql;
   if (geoFilter === 'US' || geoFilter === 'Canada') { tql = nri; }
@@ -12768,7 +12765,7 @@ function getCRMPortfolioTotals(geoFilter, dateOverride) {
       const cb = (r['country_bucket'] || '').trim();
       const eth = (r['ethnicity'] || '').toLowerCase();
       const board = r['board (ME)'] || r['board'] || '';
-      if (cb === 'US' || cb === 'Canada') return eth.includes('nri') && !eth.startsWith('non');
+      if (cb === 'US' || cb === 'Canada') return (r['ethnicity'] || '') === 'NRI';
       if (cb === 'India' || cb === 'IN') return INDIA_TQL_BOARDS.has(board);
       if (cb === 'ME' || cb === 'MEA') return MEA_TQL_BOARDS.has(board);
       return true; // APAC, UK — all qualify
