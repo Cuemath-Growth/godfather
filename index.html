@@ -12066,26 +12066,53 @@ async function tagCreatives(rawData) {
   document.getElementById('taggerProgress').classList.remove('hidden');
   document.getElementById('taggerResults').classList.add('hidden');
 
+  // --- Phase 1: Check Supabase cache for already-tagged creatives ---
+  let supabaseCache = {};
+  try {
+    const cached = await supabaseGet('creative_tags', 'select=*');
+    if (Array.isArray(cached)) {
+      cached.forEach(row => { if (row.ad_name) supabaseCache[row.ad_name] = row; });
+      console.log(`Supabase cache: ${cached.length} rows loaded`);
+    }
+  } catch(e) {
+    console.warn('Supabase creative_tags read failed (table may not exist):', e.message);
+  }
+
+  // Also check localStorage cache as fallback
   const tagCache = getTagCache();
+
   const needsTagging = [];
   const cachedResults = [];
-  let migratedCount = 0;
 
-  // Split: cached vs needs tagging
   rawData.forEach(c => {
     const adName = c['Ad name'] || c['ad name'] || c['Ad Name'] || '';
-    const cached = tagCache[adName];
-    if (cached && cached.hook_type) {
-      // Check if old taxonomy — migrate locally instead of re-calling API
-      const tags = migrateTags(cached);
-      if (tags._migrated) migratedCount++;
-      cachedResults.push({ ...c, tags: validateTags(tags), id: Date.now() + cachedResults.length, _cached: true });
-    } else {
-      needsTagging.push(c);
+
+    // Check Supabase cache first
+    if (supabaseCache[adName] && supabaseCache[adName].talent_type) {
+      const row = supabaseCache[adName];
+      const tags = {
+        talent_name: row.talent_name, talent_type: row.talent_type,
+        setting: row.setting, production_style: row.production_style,
+        subject_in_frame: row.subject_in_frame, offer_present: row.offer_present,
+        cta_type: row.cta_type, language: row.language, creative_type: row.creative_type,
+        confidence: row.confidence
+      };
+      cachedResults.push({ ...c, tags, id: Date.now() + cachedResults.length, _cached: true });
+      return;
     }
+
+    // Check localStorage cache (old taxonomy — migrate)
+    const localCached = tagCache[adName];
+    if (localCached && localCached.hook_type) {
+      const tags = migrateTags(localCached);
+      cachedResults.push({ ...c, tags: validateTags(tags), id: Date.now() + cachedResults.length, _cached: true });
+      return;
+    }
+
+    needsTagging.push(c);
   });
 
-  // If all cached, skip tagging entirely — go straight to results
+  // If all cached, skip tagging entirely
   if (needsTagging.length === 0) {
     state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(cachedResults)));
     saveTaggerData();
@@ -12098,55 +12125,80 @@ async function tagCreatives(rawData) {
     return;
   }
 
-  document.getElementById('taggerProgressText').textContent = `${cachedResults.length} cached, ${needsTagging.length} need tagging...`;
+  document.getElementById('taggerProgressText').textContent = `${cachedResults.length} cached, ${needsTagging.length} need tagging via Haiku vision...`;
 
-  // Process uncached in batches
-  const batchSize = 15;
-  const batches = [];
-  for (let i = 0; i < needsTagging.length; i += batchSize) {
-    batches.push(needsTagging.slice(i, i + batchSize));
-  }
-
+  // --- Phase 2: Tag uncached creatives ONE at a time with vision ---
+  const TAGGER_SYSTEM_PROMPT = buildTaggerSystemPrompt();
   const newlyTagged = [];
   let processed = 0;
+  let apiCalls = 0;
+  let imagesFetched = 0;
 
-  for (let b = 0; b < batches.length; b++) {
-    const batch = batches[b];
-    const totalProgress = cachedResults.length + processed + batch.length;
+  for (let i = 0; i < needsTagging.length; i++) {
+    const creative = needsTagging[i];
+    const adName = creative['Ad name'] || creative['ad name'] || creative['Ad Name'] || '';
+    const totalProgress = cachedResults.length + processed + 1;
     const pct = Math.round((totalProgress / rawData.length) * 100);
-    document.getElementById('taggerProgressText').textContent = `Tagging batch ${b+1}/${batches.length} (${totalProgress}/${rawData.length} total, ${cachedResults.length} cached)...`;
+    document.getElementById('taggerProgressText').textContent = `Tagging ${processed+1}/${needsTagging.length} — "${(adName || 'unnamed').slice(0, 40)}..." (${totalProgress}/${rawData.length} total)`;
     document.getElementById('taggerProgressBar').style.width = pct + '%';
 
-    const prompt = buildTaggerPrompt(batch);
+    const message = await buildTaggerMessage(creative);
+    let imageFetched = message._imageFetched;
+    if (imageFetched) imagesFetched++;
+
     try {
-      const result = await callClaude([{role:'user',content:prompt}], true);
-      const jsonMatch = result.match(/\[[\s\S]*\]/);
-      let tags = JSON.parse(jsonMatch ? jsonMatch[0] : result);
-      if (!Array.isArray(tags)) tags = [tags]; // Claude returned object instead of array — wrap it
-      batch.forEach((creative, i) => {
-        const t = tags[i] || {};
-        const adName = creative['Ad name'] || creative['ad name'] || creative['Ad Name'] || '';
-        // Cache the tags
-        if (adName) tagCache[adName] = t;
-        newlyTagged.push({
-          ...creative,
-          tags: validateTags(t),
-          id: Date.now() + processed + i
-        });
-      });
+      const result = await callClaude(
+        [{ role: 'user', content: message.content }],
+        true,
+        TAGGER_SYSTEM_PROMPT,
+        'claude-haiku-4-5-20251001',
+        1024
+      );
+      apiCalls++;
+      let tags = {};
+      try {
+        const cleaned = result.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+        tags = JSON.parse(cleaned);
+      } catch(parseErr) {
+        const jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (jsonMatch) tags = JSON.parse(jsonMatch[0]);
+      }
+      tags.confidence = imageFetched ? 'confirmed' : 'inferred';
+
+      // Cache in localStorage
+      if (adName) tagCache[adName] = tags;
+
+      // Write to Supabase (fire-and-forget)
+      const supaRow = {
+        ad_name: adName,
+        tagged_at: new Date().toISOString(),
+        confidence: tags.confidence,
+        talent_name: tags.talent_name || null,
+        talent_type: tags.talent_type || null,
+        setting: tags.setting || null,
+        production_style: tags.production_style || null,
+        subject_in_frame: tags.subject_in_frame || null,
+        offer_present: tags.offer_present || null,
+        cta_type: tags.cta_type || null,
+        language: tags.language || null,
+        creative_type: tags.creative_type || null,
+        model_used: 'claude-haiku-4-5-20251001',
+        image_fetched: imageFetched
+      };
+      supabaseUpsert('creative_tags', [supaRow], 'ad_name').catch(e => console.warn('Supabase write failed:', e.message));
+
+      newlyTagged.push({ ...creative, tags, id: Date.now() + i });
     } catch(e) {
-      console.error('Tagger batch error:', e);
-      batch.forEach((creative, i) => {
-        newlyTagged.push({ ...creative, tags: {}, id: Date.now() + processed + i });
-      });
+      console.error('Tagger error for:', adName, e);
+      newlyTagged.push({ ...creative, tags: { confidence: 'failed' }, id: Date.now() + i });
     }
-    processed += batch.length;
+    processed++;
   }
 
-  // Save updated cache
+  // Save updated localStorage cache
   saveTagCache(tagCache);
 
-  // Merge cached + newly tagged
+  // --- Phase 3: Merge and finalize ---
   state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged])));
   saveTaggerData();
   document.getElementById('taggerProgress').classList.add('hidden');
@@ -12159,8 +12211,9 @@ async function tagCreatives(rawData) {
   const _tb = document.getElementById('taggerThumbBtn');
   if (_tb) _tb.classList.toggle('hidden', _tc > state.taggerData.length * 0.5);
 
-  const savings = cachedResults.length > 0 ? ` (${cachedResults.length} from cache, saved ${Math.ceil(cachedResults.length/batchSize)} API calls)` : '';
-  showToast(`Tagged ${state.taggerData.length} creatives${savings}`);
+  const savings = cachedResults.length > 0 ? ` (${cachedResults.length} from cache)` : '';
+  showToast(`Tagged ${state.taggerData.length} creatives — ${apiCalls} Haiku calls, ${imagesFetched} images${savings}`);
+  console.log(`Tagger complete: ${apiCalls} API calls (model: claude-haiku-4-5-20251001), ${imagesFetched} images fetched, ${cachedResults.length} cached`);
   if (leadsData.length) mergeCRMWithMeta();
   showTaggerResults();
   // AUTO-BACKUP: save tagged data to file after every tag session
@@ -12234,70 +12287,62 @@ async function visionScanCreators() {
   showToast(`Vision scan complete: ${scanned} thumbnails processed.`);
 }
 
+function buildTaggerSystemPrompt() {
+  return `You are Lens, Cuemath's creative tagging engine. You are given a Meta ad creative.
+
+Tag it with these fields ONLY. Return valid JSON, no other text.
+
+{
+  "talent_name": "Name of person in creative, or 'None'",
+  "talent_type": "Parent | Tutor | Child | Influencer | None",
+  "setting": "Home | Classroom | Studio | Graphic only",
+  "production_style": "UGC | Polished | Animated | Static graphic",
+  "subject_in_frame": "What the creative is primarily showing (1 sentence)",
+  "offer_present": "Yes | No",
+  "cta_type": "Plain English description of the CTA",
+  "language": "English | Hindi | Telugu | Tamil | Gujarati | Other",
+  "creative_type": "Static | Video"
+}
+
+If you cannot determine a field from the image, use your best judgment from the copy and ad name. Set confidence accordingly.`;
+}
+
+async function buildTaggerMessage(creative) {
+  const adName = creative['Ad name'] || creative['ad name'] || creative['Ad Name'] || '';
+  const headline = creative['ad_title'] || '';
+  const primaryText = creative['ad_body'] || '';
+  const description = creative['ad_description'] || '';
+  const imageUrl = creative['thumbnail_url'] || creative['image_url'] || '';
+
+  const content = [];
+  let imageFetched = false;
+
+  // Image FIRST (if available)
+  if (imageUrl) {
+    try {
+      const imgData = await fetchImageAsBase64(imageUrl);
+      if (imgData && imgData.base64) {
+        content.push({ type: 'image', source: { type: 'base64', media_type: imgData.mimeType, data: imgData.base64 } });
+        imageFetched = true;
+      }
+    } catch(e) {
+      console.warn('Image fetch failed for:', adName, e.message);
+    }
+  }
+
+  // Copy SECOND
+  const copyText = `Ad copy: ${headline || ''} ${primaryText || ''} ${description || ''}`.trim();
+  content.push({ type: 'text', text: copyText });
+
+  // Ad name LAST
+  content.push({ type: 'text', text: `Ad name (context only, do not anchor on this): ${adName}` });
+
+  return { content, _imageFetched: imageFetched };
+}
+
+// Legacy wrapper kept for any external callers
 function buildTaggerPrompt(batch) {
-  const creatives = batch.map((c, i) => {
-    const name = c['Ad name'] || c['ad name'] || c['Creative name'] || c['creative name'] || c['Ad Name'] || `Creative ${i+1}`;
-    const campaign = c['Campaign name'] || c['campaign name'] || c['Campaign Name'] || '';
-    const adSet = c['Ad set name'] || c['ad set name'] || c['Ad Set Name'] || '';
-    const type = c['Creative type'] || c['creative type'] || c['Creative Type'] || '';
-    const spend = c['Spent'] || c['spent'] || '';
-    const ql = c['QL'] || c['ql'] || '';
-    const cpql = c['CPQL'] || c['cpql'] || '';
-    const body = c['ad_body'] || '';
-    const title = c['ad_title'] || '';
-    const desc = c['ad_description'] || '';
-    const cta = c['ad_cta'] || '';
-    const freq = c['Frequency'] || '';
-    const titleLine = title ? ` | Headline: "${title.slice(0, 80)}"` : '';
-    const bodyLine = body ? ` | Primary text: "${body.slice(0, 150)}"` : '';
-    const descLine = desc ? ` | Description: "${desc.slice(0, 80)}"` : '';
-    const ctaLine = cta ? ` | CTA: ${cta.replace(/_/g, ' ')}` : '';
-    const freqLine = freq ? ` | Freq: ${freq}` : '';
-    return `${i+1}. Campaign: "${campaign}" | Ad Set: "${adSet}" | Ad: "${name}" | Type: ${type} | Spend: ${spend} | QL: ${ql} | CPQL: ${cpql}${titleLine}${bodyLine}${descLine}${ctaLine}${freqLine}`;
-  }).join('\n');
-
-  return `You are Lens, Cuemath's creative tagging engine. Tag each ad creative using ONLY the values listed below. Return valid JSON only — no preamble, no markdown, no explanation.
-
-IMPORTANT: You receive inputs in this order: 1) Image or video thumbnail (visual first) 2) Ad body copy 3) Headline 4) Ad name (LAST — do not anchor on this). Tag what you actually see and read. Do not infer tags from the ad name alone.
-
-CREATIVES:
-${creatives}
-
-FORMAT (pick exactly 1): Static image | Video | Influencer UGC | Testimonial video | Vernacular testimonial | Product video | Brand video
-
-HOOK TYPE (pick exactly 1):
-- Math anchor: opens with math problem, equation, or specific skill gap. NOT for general academic anxiety.
-- Problem: present-tense learning struggle or parent frustration. NOT for future risk (use Fear/urgency).
-- Fear / urgency: future risk, falling behind, or time pressure. NOT for present struggles (use Problem).
-- Parent testimonial: parent leads the hook, speaking or quoted opening the ad. NOT if parent appears mid-ad only.
-- Statistic: opens with a data point or proof number. NOT if stat appears mid-copy.
-- Question: direct question to the parent. NOT if fear-based (use Fear/urgency).
-- Lifestyle / emotional: aspiration, warmth, family moment, pride. NOT if a clear problem or fear is present.
-- Competitive: directly references another tutor, brand, or compares.
-- Offer / price: discount, free trial, or price point as the hook. NOT if free trial is just the CTA button.
-- Grade badge: specific grade or board call-out leads the ad.
-- Seasonal: season, holiday, or exam period is the hook.
-
-PAIN POINT (array, 1-2 values max): Grades & school | Confidence & anxiety | Strong foundations | Future readiness | Tutor quality | Indian roots | Competition prep
-
-TONE (pick exactly 1): Testimonial | Aspirational | Confident | Urgency | Comparison | Offer / promo | Seasonal
-
-AUDIENCE (pick exactly 1): NRI parents | Non-NRI parents | Local parents | Gujarati speaking | Telugu speaking | Tamil speaking | High school parents
-
-OFFER PRESENT: true if specific promotion beyond standard free trial ("First month at ₹999", "50% off"). false if standard free trial CTA only.
-
-TALENT NAME: detect from ad name or copy. Known names: Keerthi, Priyanshul, Shweta Negi, Mital, Swetha, Payal, Gunjan, Jharna, Damla, Kaira, Sarita, Rituja, Deepthi, Jia, Neha, Surveen, Jasleen, Chetan Patel, Kinjal Gandhi, Haiyan, Jasmine, Sameer, Nancy, Manan, Madhavi, Anushree, Priyanka, Shalini, Silvia, Rishva, Keerthana, Minal, Anandi, Stuti, Aditya, Joyita, Shruti, Kasi Madi, Edison, Gunjan, Varun, Sathish, Aaron, Bryan
-If detected: set talent_name to the name. Also set format = Influencer UGC if format would otherwise be Video or Unknown.
-
-SETTING (pick 1 or null): Home | Studio | Outdoor | Screen recording | Animation
-
-PRODUCTION STYLE (pick 1): UGC | Studio shoot | Motion graphic | Screen record
-
-CONFIDENCE: 0.0-1.0. Below 0.7 = set flag_for_review:true. Lower confidence when visual is unclear, copy is ambiguous, or multiple hooks are equally present.
-
-Return ONLY a JSON array with one object per creative:
-[{"format":"","hook_type":"","pain_benefit":[""],"emotional_tone":"","icp_target":"","offer_present":false,"offer_detail":null,"talent_name":null,"setting":null,"production_style":"","confidence":0.0,"flag_for_review":false,"flag_reason":null}]
-`;
+  return buildTaggerSystemPrompt();
 }
 
 function retagCreatives(force) {
