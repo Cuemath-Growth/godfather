@@ -4753,9 +4753,6 @@ function getEnrolled(market, startDate, endDate) {
   }).length;
 }
 
-// PHASE_DEPRECATED: getRevenue removed — revenue data removed from Godfather per D2
-function getRevenue() { return 0;
-}
 
 function getInvalid(market, startDate, endDate) {
   let rows = filterLeadsByMarket(leadsData, market);
@@ -5205,12 +5202,9 @@ function getPortfolioMetrics(market, from, to) {
     // AUS, UK, APAC — all QLs qualify
     totalTQL = totalQL;
   } else {
-    // All Geo — apply per-market logic to each lead
-    totalTQL = typeof getTQL === 'function' ? getTQL('all', _from, _to) : totalQL;
+    // All Geo — sum per-market TQLs from leadsData (ground truth)
+    totalTQL = ['US','AUS','MEA','UK','APAC'].reduce((sum, g) => sum + getTQL(g, _from, _to), 0);
   }
-
-  // Cap TQL at QL — TQL is a subset of QL, can never exceed it
-  if (totalTQL > totalQL) totalTQL = totalQL;
 
   return {
     spend: attrSpend, ql: totalQL, nri: totalNRI, tql: totalTQL,
@@ -5521,6 +5515,9 @@ function parseNumber(val) {
 }
 
 function mergeCRMWithMeta() {
+  // Idempotency: skip if already merged with same data version
+  const mergeKey = `${leadsData.length}|${state.taggerData.length}`;
+  if (mergeCRMWithMeta._lastKey === mergeKey) { console.log('CRM merge: skipped (already merged this data version)'); return; }
   // Single CRM data path: leadsData only (Google Sheets API leads!A:BG)
   let rows = (typeof leadsData !== 'undefined' && leadsData.length) ? leadsData : null;
   console.log(`CRM merge: ${rows?.length || 0} leads (leadsData), ${state.taggerData.length} creatives`);
@@ -5820,6 +5817,7 @@ function mergeCRMWithMeta() {
   } else {
     console.warn('CRM merge: 0 matches');
   }
+  mergeCRMWithMeta._lastKey = mergeKey;
 }
 
 async function refreshData() {
@@ -5834,7 +5832,7 @@ async function refreshData() {
   if (state.rawData.metaAds?.length > 0) metaOk = true;
 
   // Fetch ALL sheets (kept in memory — too large for localStorage)
-  // PHASE_DEPRECATED: state._crmLeads CSV fetch removed — all CRM data now via leadsData (leads!A:BG)
+
   if (state.sheetConfig.costsTrackerUrl) {
     try { const csv = await fetchSheetAsCsv(state.sheetConfig.costsTrackerUrl); state._costsTracker = parseCSV(csv); console.log('Costs Tracker fetched:', state._costsTracker.length, 'rows'); } catch(e) { console.error('Costs Tracker:', e); }
   }
@@ -5929,7 +5927,7 @@ async function refreshData() {
   if (metaOk || state.taggerData.length) { badge.className = 'status-badge connected'; badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-current"></span>Connected'; }
   else { badge.className = 'status-badge disconnected'; badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-current"></span>No data'; }
 
-  // PHASE_DEPRECATED: fetchPerfTrackerDaily and fetchCostsTrackerAllGeos removed — spend from costData only
+
 
   // Track sheet refresh timestamp for stale data detection
   localStorage.setItem('gf_sheetsLastRefresh', String(Date.now()));
@@ -5959,168 +5957,6 @@ async function refreshData() {
   setTimeout(() => { try { runDiagnostics(); } catch(e) { console.error('Diagnostics error:', e); } }, 500);
 }
 
-// PHASE_DEPRECATED: Costs tracker tabs removed — all spend from costData (cost!A:H)
-const COSTS_TRACKER_TABS = {
-  US:    { gid: '1269911854', metaRow: 39, tdCol: 29, cptdCol: 32, enrolledCol: 33 },
-  India: { gid: '2111876089', metaRow: 13, tdCol: 21, cptdCol: 24, enrolledCol: 25 },
-  ROW:   { gid: '825481270',  metaRow: 17, qlCol: 7, tdCol: 22, cptdCol: 26, enrolledCol: 27 },  // ROW has empty headers — must use position
-  MEA:   { gid: '330777251',  metaRow: 9,  tdCol: 21, cptdCol: 21, enrolledCol: 22 }
-};
-
-// PHASE_DEPRECATED: fetchCostsTrackerAllGeos — derived tabs no longer read
-async function fetchCostsTrackerAllGeos() {
-  const sheetId = '1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs';
-  const results = {};
-  for (const [geo, tab] of Object.entries(COSTS_TRACKER_TABS)) {
-    try {
-      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${tab.gid}`;
-      const resp = await fetch(url);
-      const text = await resp.text();
-      const rows = [];
-      // Parse CSV manually (handle quoted fields)
-      const lines = text.split('\n');
-      for (const line of lines) {
-        const cells = [];
-        let current = '', inQuote = false;
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i];
-          if (ch === '"') { inQuote = !inQuote; }
-          else if (ch === ',' && !inQuote) { cells.push(current.trim()); current = ''; }
-          else { current += ch; }
-        }
-        cells.push(current.trim());
-        rows.push(cells);
-      }
-      // Find Meta Total row
-      let metaData = null;
-      for (let i = 0; i < rows.length; i++) {
-        const rowText = rows[i].join(' ');
-        if (rowText.includes('Meta') && rowText.includes('Total') && !rowText.includes('Canada')) {
-          const r = rows[i];
-          const pn = v => parseFloat(String(v||'0').replace(/[,$%]/g,'')) || 0;
-          // Column positions: 6=Spend, 7=QL (or nearby)
-          // Find QL column - scan for a number between 50-2000 after spend
-          const spend = pn(r[6]);
-          let ql = 0, td = 0, cptd = 0, enrolled = 0, cpql = 0;
-          // Try header matching first (works for US, India, MEA — they have proper headers)
-          const header = rows[0];
-          for (let j = 0; j < header.length && j < r.length; j++) {
-            const h = (header[j]||'').toLowerCase().trim();
-            if (!h) continue; // skip empty headers
-            const val = pn(r[j]);
-            if (h === 'ql') ql = val;
-            if (h === 'cpql') cpql = val;
-            if (h.includes('trial done') && !h.includes('cost')) td = val;
-            if (h.includes('cost per trial')) cptd = val;
-            if (h === 'enrolled') enrolled = val;
-          }
-          // Fallback: use known column positions (critical for ROW which has empty headers)
-          if (!ql && tab.qlCol) ql = pn(r[tab.qlCol]);
-          if (!td) td = pn(r[tab.tdCol]);
-          if (!cptd) cptd = pn(r[tab.cptdCol]);
-          if (!enrolled) enrolled = pn(r[tab.enrolledCol]);
-          if (!cpql && ql > 0) cpql = spend / ql;
-
-          metaData = { geo, spend, ql, cpql, td, cptd, enrolled };
-          break;
-        }
-      }
-      // Also get Total row (row 1)
-      let totalData = null;
-      if (rows.length > 1) {
-        const r = rows[1];
-        const pn = v => parseFloat(String(v||'0').replace(/[,$%]/g,'')) || 0;
-        const header = rows[0];
-        let spend = pn(r[6]), ql = 0, td = 0, cptd = 0, enrolled = 0;
-        for (let j = 0; j < header.length && j < r.length; j++) {
-          const h = (header[j]||'').toLowerCase().trim();
-          if (h === 'ql') ql = pn(r[j]);
-          if (h.includes('trial done')) td = pn(r[j]);
-          if (h.includes('cost per trial')) cptd = pn(r[j]);
-          if (h === 'enrolled') enrolled = pn(r[j]);
-        }
-        if (!ql && r.length > 11) ql = pn(r[11]);
-        totalData = { geo, spend, ql, td, cptd, enrolled };
-      }
-      results[geo] = { meta: metaData, total: totalData };
-      if (geo === 'ROW') {
-        console.log('ROW headers:', rows[0]?.slice(0,25));
-        // Find Meta Total row and dump all values to identify column positions
-        for (let i = 0; i < rows.length; i++) {
-          const rt = rows[i].join(' ');
-          if (rt.includes('Meta') && rt.includes('Total') && !rt.includes('Canada')) {
-            console.log('ROW Meta Total row values:', rows[i].map((v,idx) => `[${idx}]=${v}`).join(', '));
-            break;
-          }
-        }
-      }
-      console.log(`Costs Tracker ${geo}: Meta Spend=${metaData?.spend}, QL=${metaData?.ql}, TD=${metaData?.td}, CPTD=${metaData?.cptd}, Enrolled=${metaData?.enrolled}`);
-    } catch(e) {
-      console.error(`Costs Tracker ${geo}:`, e);
-    }
-  }
-  state._costsTrackerByGeo = results;
-  return results;
-}
-
-// PHASE_DEPRECATED: getCostsTrackerMetrics — never called, derived tabs removed
-function getCostsTrackerMetrics(geoFilter) {
-  const ct = state._costsTrackerByGeo;
-  if (!ct || !Object.keys(ct).length) return null;
-
-  const geos = (geoFilter && geoFilter !== 'all') ? [geoFilter === 'APAC' ? 'ROW' : geoFilter] : ['US', 'India', 'ROW', 'MEA'];
-  let spend = 0, ql = 0, td = 0, enrolled = 0;
-
-  geos.forEach(geo => {
-    const m = ct[geo]?.meta;
-    if (!m) return;
-    spend += m.spend || 0;
-    ql += m.ql || 0;
-    td += m.td || 0;
-    enrolled += m.enrolled || 0;
-  });
-
-  // Fill funnel gaps from CRM ratios
-  let nri = 0, ts = 0, paid = enrolled;
-  if (leadsData?.length) {
-    // Compute CRM ratios per geo, apply to costs tracker absolutes
-    geos.forEach(geo => {
-      const m = ct[geo]?.meta;
-      if (!m || !m.ql) return;
-      // Filter CRM leads for this geo
-      const geoLeads = leadsData.filter(r => {
-        const bucket = (r.country_bucket || '').trim();
-        const region = (r.region || '').trim();
-        if (geo === 'US') return bucket === 'US';
-        if (geo === 'India') return bucket === 'India';
-        if (geo === 'ROW') return (bucket === 'APAC' && !region.toLowerCase().includes('aus')) || bucket === 'Others';
-        if (geo === 'MEA') return bucket === 'ME';
-        return false;
-      });
-      if (!geoLeads.length) return;
-      const crmQL = geoLeads.reduce((s,r) => s + parseFloat(r.qls||0), 0);
-      const crmNRI = geoLeads.filter(isNRIEthnicity).reduce((s,r) => s + parseFloat(r.qls||0), 0);
-      const crmTS = geoLeads.reduce((s,r) => s + parseFloat(r.trials_sch||0), 0);
-      const crmPaid = geoLeads.reduce((s,r) => s + parseFloat(r.paid||0), 0);
-      // Use direct CRM counts (consistent with getOracleMetrics)
-      // Not ratio-based — avoids NRI divergence between Oracle and Costs Tracker
-      if (crmQL > 0) {
-        nri += crmNRI;
-        ts += crmTS;
-      }
-    });
-  }
-
-  // TQL: for 'US' filter, TQL = NRI. For 'all' or other geos, TQL = QL (simplified)
-  const tql = (geoFilter === 'US') ? Math.round(nri) : ql;
-  const cpql = ql > 0 ? spend / ql : 0;
-  const cptql = tql > 0 ? spend / tql : 0;
-  const cptd = td > 0 ? spend / td : 0;
-  const cac = paid > 0 ? spend / paid : 0;
-  const tqlTd = tql > 0 ? Math.min((td / tql * 100), 100) : 0;
-
-  return { spend, ql, tql: Math.round(tql), nri: Math.round(nri), ts: Math.round(ts), td, paid, enrolled, cpql, cptql, cptd, cac, tqlTd, source: 'costs_tracker' };
-}
 
 // ==================== ORACLE AGGREGATION (date-filtered from sheets) ====================
 function getOracleMetrics(fromDate, toDate, geoFilter) {
@@ -6177,23 +6013,6 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   const tqlTd = tql > 0 ? Math.min((td / tql * 100), 100) : 0;
 
   return { spend, ql, tql, nri, asian, invalid, ts, td, paid, cpql, cptql, cptd, cac, qlTd, tqlTd };
-}
-
-// PHASE_DEPRECATED: fetchPerfTrackerDaily — derived tab no longer read
-async function fetchPerfTrackerDaily() {
-  const sheetId = '1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs';
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=827992753`;
-  try {
-    const resp = await fetch(url);
-    const text = await resp.text();
-    state._perfTrackerDaily = parseCSV(text);
-    console.log('Daily Perf Tracker fetched:', state._perfTrackerDaily.length, 'rows');
-    // Diagnostic: show unique geo values in perf tracker
-    const perfSegs = {}, perfRegs = {};
-    state._perfTrackerDaily.filter(r => r.medium?.toLowerCase() === 'meta').forEach(r => { perfSegs[(r.country_segment||'(empty)').trim()] = (perfSegs[(r.country_segment||'(empty)').trim()]||0)+1; perfRegs[(r.region||'(empty)').trim()] = (perfRegs[(r.region||'(empty)').trim()]||0)+1; });
-    console.log('Perf tracker country_segment values (meta):', perfSegs);
-    console.log('Perf tracker region values (meta):', perfRegs);
-  } catch(e) { console.error('Daily Perf Tracker:', e); }
 }
 
 // ==================== CSV UPLOAD ====================
@@ -8826,39 +8645,6 @@ function refreshFreshnessBadge() {
 }
 refreshFreshnessBadge(); // Init on boot
 setInterval(refreshFreshnessBadge, 30000);
-
-// PHASE_DEPRECATED: mergePerfIntoTagger — perf tracker daily removed
-function mergePerfIntoTagger() {
-  // Merge fresh perf tracker spend/QL data into tagger creatives by campaign+ad name matching
-  if (!state._perfTrackerDaily?.length || !state.taggerData.length) return;
-  // Build spend/QL totals by campaign from perf tracker
-  const perfByCampaign = {};
-  state._perfTrackerDaily.forEach(r => {
-    if ((r.medium||'').toLowerCase() !== 'meta') return;
-    const camp = (r.campaign||'').toLowerCase().trim();
-    if (!camp) return;
-    if (!perfByCampaign[camp]) perfByCampaign[camp] = { spend: 0, ql: 0 };
-    perfByCampaign[camp].spend += parseFloat(r.spend||0) || 0;
-    perfByCampaign[camp].ql += parseFloat(r.ql||r.tql||0) || 0;
-  });
-  // For each tagger creative, update spend if perf tracker has fresher campaign data
-  let updated = 0;
-  state.taggerData.forEach(c => {
-    const camp = (c['Campaign name']||'').toLowerCase().trim();
-    const perf = perfByCampaign[camp];
-    if (!perf) return;
-    // Only update if perf tracker shows different spend (fresher data)
-    const currentSpend = parseFloat(c['Spent']||c['spent']||0) || 0;
-    if (perf.spend > 0 && Math.abs(perf.spend - currentSpend) > currentSpend * 0.05) {
-      // Perf tracker has campaign-level totals — can't update individual ad spend
-      // But we can flag that data may be stale
-      c._perfTrackerCampaignSpend = perf.spend;
-      c._perfTrackerCampaignQL = perf.ql;
-      updated++;
-    }
-  });
-  if (updated > 0) console.log(`mergePerfIntoTagger: ${updated} creatives have campaign-level perf updates`);
-}
 
 function checkStaleData() {
   const lastPull = parseInt(localStorage.getItem('gf_metaLastPull') || '0');
@@ -12675,8 +12461,6 @@ function showTaggerResults() {
 // US: NRI only. India: IB+IGCSE board. MEA: IB+IGCSE+Cambridge+US+British boards. APAC/UK: all QLs.
 const MEA_TQL_BOARDS = new Set(['IB','IGCSE']); // Ground truth: board='IB' OR 'IGCSE' only (DATA_LOGIC_OVERRIDE Section 3)
 const INDIA_TQL_BOARDS = new Set(['IB','IGCSE']);
-// PHASE_DEPRECATED: parseRevenue removed — revenue data removed from Godfather per D2
-function parseRevenue(row) { return 0; }
 
 function computeTQL(ql, nri, market, board) {
   // Always return integer — people counts can't be fractional
@@ -12686,7 +12470,6 @@ function computeTQL(ql, nri, market, board) {
   return Math.round(ql); // APAC, UK, others — all QLs qualify
 }
 
-// PHASE_DEPRECATED: crmGeoMatchRow — geo logic ported into filterLeadsByMarket(). Callers being migrated.
 function crmGeoMatchRow(row, geoFilter) {
   if (!geoFilter || geoFilter === 'all') return true;
   const cb = (row['country_bucket'] || row['region'] || '').trim().toLowerCase();
@@ -12778,7 +12561,6 @@ function getGlobalFilteredTaggerData(geoElId, formatFilter) {
   return data;
 }
 
-// PHASE_DEPRECATED: getCRMPortfolioTotals — use getMarketMetrics() instead (filterLeadsByMarket now has correct geo logic)
 function getCRMPortfolioTotals(geoFilter, dateOverride) {
   const rows = (typeof leadsData !== 'undefined' && leadsData.length) ? leadsData : [];
   if (!rows.length) return { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, asian: 0, invalid: 0, ts: 0 };
