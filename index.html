@@ -4204,13 +4204,21 @@ async function fetchSheetData(sheetUrl, apiKey) {
     return med === 'meta';
   });
   console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
-  costData = parseSheetValues(costJson.values);
+  const allCost = parseSheetValues(costJson.values);
+  // Godfather is Meta-only. Filter costData at source — no Google/other spend anywhere downstream.
+  const _mediums = {};
+  allCost.forEach(r => { const m = (r.medium||'(empty)').trim().toLowerCase(); _mediums[m] = (_mediums[m]||0)+1; });
+  console.log('costData mediums before filter:', JSON.stringify(_mediums));
+  costData = allCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
+  console.log(`costData: ${allCost.length} total, ${costData.length} meta-only (filtered ${allCost.length - costData.length} non-meta)`);
   // DIAGNOSTIC: dump unique values for geo debugging
-  const _costSegs = {}, _costCols = costData[0] ? Object.keys(costData[0]) : [];
-  costData.forEach(r => { const s = (r.country_segment||'(empty)').trim(); _costSegs[s] = (_costSegs[s]||0)+1; });
+  const _costSegsAll = {}, _costSegsMeta = {}, _costCols = costData[0] ? Object.keys(costData[0]) : [];
+  costData.forEach(r => { const s = (r.country_segment||'(empty)').trim(); const m = (r.medium||'').trim().toLowerCase(); _costSegsAll[s] = (_costSegsAll[s]||0)+1; if (m === 'meta') _costSegsMeta[s] = (_costSegsMeta[s]||0)+1; });
   console.log('costData columns:', JSON.stringify(_costCols));
-  console.log('costData country_segment values:', JSON.stringify(_costSegs));
-  console.log('costData sample row:', JSON.stringify(costData[0]));
+  console.log('costData ALL segments:', JSON.stringify(_costSegsAll));
+  console.log('costData META-ONLY segments:', JSON.stringify(_costSegsMeta));
+  const metaSample = costData.find(r => (r.medium||'').toLowerCase() === 'meta');
+  console.log('costData meta sample:', JSON.stringify(metaSample));
   const _leadBuckets = {};
   leadsData.forEach(r => { const b = (r.country_bucket||'(empty)').trim(); _leadBuckets[b] = (_leadBuckets[b]||0)+1; });
   console.log('leadsData country_bucket values:', JSON.stringify(_leadBuckets));
@@ -4621,11 +4629,10 @@ function updateDataStatusLine() {
 }
 
 // ── NRI detection — single source of truth ──
-// CRM ethnicity values: "NRI", "NRI - Indian", "Non-NRI", "Asian", etc.
-// Match: starts with "NRI" (case-insensitive), exclude "Non-NRI"
+// CRM ethnicity has exactly two NRI values: "NRI" (2020 rows) and "NRI / Non Native English Speaker" (1845 rows)
 function isNRIEthnicity(row) {
   const e = (row.ethnicity || row['ethnicity'] || '').trim();
-  return e.length >= 3 && e.slice(0, 3).toUpperCase() === 'NRI';
+  return e === 'NRI' || e === 'NRI / Non Native English Speaker';
 }
 
 // ── Market filter helpers ──
@@ -4678,10 +4685,10 @@ function filterCostByMarket(data, market) {
 
 // ── Metric primitives — each filters the in-memory arrays directly ──
 
-function getSpend(market, startDate, endDate, medium = 'meta') {
+// costData is meta-only (filtered at source). No medium check needed.
+function getSpend(market, startDate, endDate) {
   let rows = filterCostByMarket(costData, market);
   rows = rows.filter(r => {
-    if (medium && (r.medium || '').trim().toLowerCase() !== medium) return false;
     const day = r.day || '';
     if (startDate && day < startDate) return false;
     if (endDate && day > endDate) return false;
@@ -4836,11 +4843,9 @@ let _adMap = null;       // { key: { thumbnail_url, image_url, campaign_name } }
 
 function buildLookupMaps() {
   invalidateAdPerfCache(); // clear cached getAdPerformance results
-  // CAMPAIGN MAP: aggregate meta spend per campaign from costData
+  // CAMPAIGN MAP: aggregate spend per campaign from costData (already meta-only)
   _campaignMap = {};
   costData.forEach(r => {
-    const med = (r.medium || '').trim().toLowerCase();
-    if (med !== 'meta') return;
     const key = normalizeAdName(r.campaign_name);
     if (!key) return;
     if (!_campaignMap[key]) _campaignMap[key] = { spend: 0, medium: 'meta', market: (r.country_segment || '').trim(), rows: 0 };
@@ -7275,8 +7280,7 @@ function renderOracleActions() {
 let _oracleActions = []; // loaded from Supabase on boot
 
 async function loadOracleActions() {
-  const rows = await supabaseGet('oracle_actions', 'select=*');
-  if (rows) _oracleActions = rows;
+  try { const rows = await supabaseGet('oracle_actions', 'select=*'); if (rows) _oracleActions = rows; } catch(_) { /* table may not exist yet */ }
 }
 
 function getOracleAction(itemId) {
