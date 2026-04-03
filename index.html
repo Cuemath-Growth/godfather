@@ -195,11 +195,10 @@
         <select id="dashboardCountryFilter" class="px-2.5 py-1 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-bold shrink-0 cursor-pointer" onchange="onGlobalFilterChange()">
           <option value="all">All Geo</option>
           <option value="US">US</option>
-          <option value="India">India</option>
           <option value="APAC">APAC</option>
-          <option value="UK">UK</option>
           <option value="AUS">AUS</option>
           <option value="MEA">MEA</option>
+          <option value="UK">UK</option>
         </select>
         <span id="dataDateRange" class="text-[9px] text-text-muted shrink-0" style="display:none"></span>
         <div class="ml-auto flex items-center gap-1 shrink-0">
@@ -473,9 +472,8 @@
                 <option value="US">US</option>
                 <option value="AUS">Australia</option>
                 <option value="APAC">APAC</option>
-                <option value="UK">UK</option>
-                <option value="India">India</option>
                 <option value="MEA">MEA</option>
+                <option value="UK">UK</option>
                 <option value="Global">Global</option>
               </select>
             </div>
@@ -841,7 +839,7 @@
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="grid" onclick="switchTaggerTab('grid')">Grid</button>
             </div>
             <select id="taggerFilterCountry" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
-              <option value="all">All Countries</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="India">India</option><option value="UK">UK</option><option value="APAC">APAC</option>
+              <option value="all">All Countries</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
             </select>
           </div>
 
@@ -1033,7 +1031,7 @@
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold hidden" data-ci-tab="matrix" onclick="switchCITab('matrix')" id="deepDiveTabBtn">Deep Dive</button>
             </div>
             <select id="ciFilterCountry" style="display:none" onchange="onCICountryChange()">
-              <option value="all">All Markets</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="India">India</option><option value="UK">UK</option><option value="APAC">APAC</option>
+              <option value="all">All Markets</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
             </select>
           </div>
 
@@ -1105,7 +1103,7 @@
           <div class="flex items-center gap-2">
           <select id="libraryFilter" style="display:none" onchange="renderLibrary()">
             <option value="all">All Geos</option>
-            <option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="APAC">APAC</option><option value="India">India</option><option value="UK">UK</option>
+            <option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="APAC">APAC</option><option value="UK">UK</option>
           </select>
           <input id="librarySearch" type="text" placeholder="Search creatives..." class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 w-48" oninput="renderLibrary()" />
           <select id="libraryTypeFilter" class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none" onchange="renderLibrary()">
@@ -1359,7 +1357,7 @@
               <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1.5 block">Default Market</label>
               <select id="settingsDefaultMarket" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary">
                 <option value="US">US</option><option value="AUS">Australia</option><option value="APAC">APAC</option>
-                <option value="UK">UK</option><option value="India">India</option><option value="MEA">MEA</option>
+                <option value="MEA">MEA</option><option value="UK">UK</option>
               </select>
             </div>
             <div>
@@ -1412,7 +1410,7 @@
             </div>
             <div class="flex items-center gap-2">
               <select id="sentinelGeo" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="runSentinelView()">
-                <option value="all">All Markets</option><option value="US">US</option><option value="India">India</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
+                <option value="all">All Markets</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
               </select>
               <select id="sentinelFormatFilterHeader" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="runSentinelView()">
                 <option value="all">All Formats</option>
@@ -1589,7 +1587,7 @@
                 <option value="static">Static</option>
               </select>
               <select id="influencerGeo" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="syncGeoFilter('influencerGeo'); renderInfluencerView()">
-                <option value="all">All Markets</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="India">India</option><option value="UK">UK</option><option value="APAC">APAC</option>
+                <option value="all">All Markets</option><option value="US">US</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
               </select>
               <span class="status-badge disconnected" id="influencerStatus">No data</span>
               <button onclick="renderInfluencerView()" class="btn-primary px-3 py-1.5 rounded-lg text-xs font-semibold">Refresh</button>
@@ -4206,25 +4204,8 @@ async function fetchSheetData(sheetUrl, apiKey) {
   console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
   const allCost = parseSheetValues(costJson.values);
   // Godfather is Meta-only. Filter costData at source — no Google/other spend anywhere downstream.
-  const _mediums = {};
-  allCost.forEach(r => { const m = (r.medium||'(empty)').trim().toLowerCase(); _mediums[m] = (_mediums[m]||0)+1; });
-  console.log('costData mediums before filter:', JSON.stringify(_mediums));
   costData = allCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
-  console.log(`costData: ${allCost.length} total, ${costData.length} meta-only (filtered ${allCost.length - costData.length} non-meta)`);
-  // DIAGNOSTIC: dump unique values for geo debugging
-  const _costSegsAll = {}, _costSegsMeta = {}, _costCols = costData[0] ? Object.keys(costData[0]) : [];
-  costData.forEach(r => { const s = (r.country_segment||'(empty)').trim(); const m = (r.medium||'').trim().toLowerCase(); _costSegsAll[s] = (_costSegsAll[s]||0)+1; if (m === 'meta') _costSegsMeta[s] = (_costSegsMeta[s]||0)+1; });
-  console.log('costData columns:', JSON.stringify(_costCols));
-  console.log('costData ALL segments:', JSON.stringify(_costSegsAll));
-  console.log('costData META-ONLY segments:', JSON.stringify(_costSegsMeta));
-  const metaSample = costData.find(r => (r.medium||'').toLowerCase() === 'meta');
-  console.log('costData meta sample:', JSON.stringify(metaSample));
-  const _leadBuckets = {};
-  leadsData.forEach(r => { const b = (r.country_bucket||'(empty)').trim(); _leadBuckets[b] = (_leadBuckets[b]||0)+1; });
-  console.log('leadsData country_bucket values:', JSON.stringify(_leadBuckets));
-  const _ethVals = {};
-  leadsData.filter(r => String(r.qls)==='1').forEach(r => { const e = (r.ethnicity||'(empty)').trim(); _ethVals[e] = (_ethVals[e]||0)+1; });
-  console.log('leadsData ethnicity values (QL=1 only):', JSON.stringify(_ethVals));
+  console.log(`costData: ${allCost.length} total, ${costData.length} meta-only`);
 
   // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
   const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term'];
