@@ -6705,6 +6705,9 @@ function crmMetricsForDate(c, fromDate, toDate) {
 }
 
 function renderOracleActions() {
+  // Guard: all required DOM elements must exist
+  const _requiredEls = ['oraclePauseList','oracleMakeMoreList','oracleDeployList','oracleInfluencerList','oracleMarketHealthList'];
+  if (_requiredEls.some(id => !document.getElementById(id))) return;
   // Skip Pause Now + Make More rendering — handled by renderOracleCardsV2 when Section 2 data is loaded
   const _s2Active = leadsData.length > 0;
   const data = getDashboardFilteredData();
