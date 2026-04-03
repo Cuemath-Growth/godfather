@@ -4733,10 +4733,11 @@ function getTD_cohort(market, startDate, endDate) {
   }).length;
 }
 
+// TS uses lead_created_date (cohort-based) — same population as QL, so TS ≤ QL
 function getTS(market, startDate, endDate) {
   let rows = filterLeadsByMarket(leadsData, market);
   return rows.filter(r => {
-    const d = r.trial_sch_date || '';
+    const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
     if (endDate && d > endDate) return false;
     return String(r.trials_sch) === '1';
@@ -5963,17 +5964,12 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   // Spend from costData (raw cost!A:H) — single source of truth for portfolio spend
   const spend = getSpend(geoFilter || 'all', fromDate, toDate);
 
-  // CRM funnel — uses shared crmGeoMatchRow() for consistent AUS/MEA handling
-  const crmGeoMatch = (r) => crmGeoMatchRow(r, geoFilter);
-  const inRange = (date) => {
-    if (!date) return false;
-    if (fromDate && date < fromDate) return false;
-    if (toDate && date > toDate) return false;
-    return true;
-  };
+  // CRM funnel — uses filterLeadsByMarket (single geo filter path)
+  const geoFiltered = filterLeadsByMarket(leadsData || [], geoFilter || 'all');
+  const inRange = (date, f, t) => date && (!f || date >= f) && (!t || date <= t);
 
   // QL filtered by lead_created_date
-  let qlFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.lead_created_date || ''));
+  let qlFiltered = geoFiltered.filter(r => inRange(r.lead_created_date || '', fromDate, toDate));
   const ql = qlFiltered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
   const nri = qlFiltered.filter(isNRIEthnicity).length;
   const asian = qlFiltered.filter(r => (r['ethnicity'] || '').toLowerCase().startsWith('asian')).length;
@@ -5998,11 +5994,11 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   } else { tql = ql; }
 
   // TD filtered by trial_done_date
-  let tdFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.trial_done_date || ''));
+  let tdFiltered = geoFiltered.filter(r => inRange(r.trial_done_date || '', fromDate, toDate));
   const td = tdFiltered.filter(r => parseNumber(r['trials_done'] || 0) > 0).length;
 
   // Paid filtered by paid_date
-  let paidFiltered = (leadsData || []).filter(r => crmGeoMatch(r) && inRange(r.paid_date || ''));
+  let paidFiltered = geoFiltered.filter(r => inRange(r.paid_date || '', fromDate, toDate));
   const paid = paidFiltered.filter(r => parseNumber(r['paid'] || 0) > 0).length;
 
   const cpql = ql > 0 ? spend / ql : 0;
@@ -11129,7 +11125,7 @@ function computeSparklineData(metric, geo, days) {
     dailySpend[d] += parseFloat(r.amount_spent || 0) || 0;
   });
 
-  // Daily funnel from leadsData (Section 2) — uses crmGeoMatchRow for correct AUS/MEA handling
+  // Daily funnel from leadsData (Section 2) — uses filterLeadsByMarket for geo handling
   const dailyQL = {}, dailyTD = {}, dailyPaid = {};
   filterLeadsByMarket(leadsData, geo === 'all' ? 'all' : geo).forEach(r => {
     const qd = (r.lead_created_date || '').slice(0, 10);
@@ -12470,22 +12466,6 @@ function computeTQL(ql, nri, market, board) {
   return Math.round(ql); // APAC, UK, others — all QLs qualify
 }
 
-function crmGeoMatchRow(row, geoFilter) {
-  if (!geoFilter || geoFilter === 'all') return true;
-  const cb = (row['country_bucket'] || row['region'] || '').trim().toLowerCase();
-  if (geoFilter === 'AUS') {
-    if (cb === 'aus' || cb === 'australia' || cb === 'anz') return true;
-    if (cb === 'apac' || cb === 'others') {
-      const camp = (row['mx_utm_campaign'] || '').toUpperCase();
-      return camp.startsWith('ANZ_') || camp.includes('_ANZ_') || /\bAUS\b/.test(camp) || camp.includes('NAPLAN') || camp.includes('SELECTIVE');
-    }
-    return false;
-  }
-  const CRM_GEO_TERMS = { 'US':['us','usa','united states'], 'India':['india','in'], 'MEA':['mea','middle east','uae','saudi','me'], 'UK':['uk','united kingdom'], 'ROW':['apac','others'], 'APAC':['apac','others'], 'Canada':['canada'] };
-  const terms = CRM_GEO_TERMS[geoFilter] || [geoFilter.toLowerCase()];
-  return terms.some(g => cb.includes(g));
-}
-
 // ── QA GROUND TRUTH VALIDATION — run from console or Settings to verify numbers ──
 function runGroundTruthQA() {
   const allTime = { from: '2000-01-01', to: '2099-12-31' };
@@ -12561,51 +12541,11 @@ function getGlobalFilteredTaggerData(geoElId, formatFilter) {
   return data;
 }
 
+// Thin wrapper over getMarketMetrics — keeps .paid field name for legacy callers (exports, QA tests)
 function getCRMPortfolioTotals(geoFilter, dateOverride) {
-  const rows = (typeof leadsData !== 'undefined' && leadsData.length) ? leadsData : [];
-  if (!rows.length) return { ql: 0, tql: 0, td: 0, paid: 0, nri: 0, asian: 0, invalid: 0, ts: 0 };
   const { from, to } = dateOverride || getGlobalDateRange();
-  // Uses shared crmGeoMatchRow() for consistent AUS/MEA handling
-  const geoMatch = (r) => crmGeoMatchRow(r, geoFilter);
-  const dateIn = (date, f, t) => {
-    if (!date) return false;
-    if (f && date < f) return false;
-    if (t && date > t) return false;
-    return true;
-  };
-
-  // QL filtered by lead_created_date
-  let qlFiltered = rows.filter(r => geoMatch(r) && dateIn(r['lead_created_date'] || '', from, to));
-  const ql = qlFiltered.filter(r => parseNumber(r['qls'] || r['ql'] || 0) > 0).length;
-  const nri = qlFiltered.filter(isNRIEthnicity).length;
-  // TQL: market-aware board filtering
-  let tql;
-  if (geoFilter === 'US' || geoFilter === 'Canada') { tql = nri; }
-  else if (geoFilter === 'India') { tql = qlFiltered.filter(r => INDIA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
-  else if (geoFilter === 'MEA' || geoFilter === 'ME') { tql = qlFiltered.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
-  else if (geoFilter === 'all') {
-    tql = qlFiltered.filter(r => {
-      const cb = (r['country_bucket'] || '').trim();
-      const eth = (r['ethnicity'] || '').toLowerCase();
-      const board = r['board (ME)'] || r['board'] || '';
-      if (cb === 'US' || cb === 'Canada') return isNRIEthnicity(r);
-      if (cb === 'India' || cb === 'IN') return INDIA_TQL_BOARDS.has(board);
-      if (cb === 'ME' || cb === 'MEA') return MEA_TQL_BOARDS.has(board);
-      return true; // APAC, UK — all qualify
-    }).length;
-  }
-  else { tql = ql; }
-  // TD filtered by trial_done_date
-  let tdFiltered = rows.filter(r => geoMatch(r) && dateIn(r['trial_done_date'] || '', from, to));
-  const td = tdFiltered.filter(r => parseNumber(r['trials_done'] || 0) > 0).length;
-  // Paid filtered by paid_date
-  let paidFiltered = rows.filter(r => geoMatch(r) && dateIn(r['paid_date'] || '', from, to));
-  const paid = paidFiltered.filter(r => parseNumber(r['paid'] || 0) > 0).length;
-  // Additional metrics
-  const invalid = qlFiltered.filter(r => parseNumber(r['invalid'] || 0) > 0).length;
-  const asian = qlFiltered.filter(r => (r['ethnicity'] || '').toLowerCase().startsWith('asian')).length;
-  const ts = qlFiltered.filter(r => parseNumber(r['trials_sch'] || 0) > 0).length;
-  return { ql, tql, nri, asian, td, paid, invalid, ts };
+  const m = getMarketMetrics(geoFilter || 'all', from, to);
+  return { ql: m.ql, tql: m.tql, nri: m.nri, asian: m.asian || 0, td: m.td, paid: m.enrolled, invalid: m.invalid, ts: m.ts };
 }
 
 // Creative layer — quality-filtered for Lens insights. ₹5K spend minimum, TD sanitization.
