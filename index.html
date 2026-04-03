@@ -1607,7 +1607,7 @@
             <svg class="w-8 h-8 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </div>
           <h3 class="text-base font-bold mb-2">No Influencer Data</h3>
-          <p class="text-sm text-text-secondary max-w-md mx-auto">Pull Meta Ads data first, then return here. Influencer ads are detected from campaign names containing "Influencer" or format tags (F-INFLU).</p>
+          <p class="text-sm text-text-secondary max-w-md mx-auto">Pull Meta Ads data first, then return here. Influencer ads are detected from campaign names containing "Influencer" or creative type tags.</p>
         </div>
         <!-- Tabs -->
         <div class="flex gap-1.5 mb-4 bg-surface-tertiary rounded-xl p-1">
@@ -2224,17 +2224,7 @@ function backfillUnknownTags(data) {
       else c.tags.icp_target = 'All Audiences';
     }
 
-    // Messaging Pillar: map from hook + benefit
-    if (!c.tags.messaging_pillar || c.tags.messaging_pillar === 'Unknown') {
-      if (pb === 'PB-TUTOR' || pb === 'PB-INDIAN') c.tags.messaging_pillar = 'Top tutors';
-      else if (hook === 'H-MATH' || pb === 'PB-FOUND') c.tags.messaging_pillar = 'Deep learning';
-      else if (pb === 'PB-CONF') c.tags.messaging_pillar = '360 skills';
-      else if (hook === 'H-TEST') c.tags.messaging_pillar = 'Parent experience';
-      else if (hook === 'H-COMP' || pb === 'PB-COMP') c.tags.messaging_pillar = 'Personalization';
-      else if (pb === 'PB-FUTURE') c.tags.messaging_pillar = 'Platform/Tech';
-      else if (pb === 'PB-GRADE') c.tags.messaging_pillar = 'Deep learning';
-      else c.tags.messaging_pillar = 'MathFit identity';
-    }
+    // messaging_pillar derivation removed — legacy taxonomy purged in Phase 3.2
   });
   return data;
 }
@@ -6357,7 +6347,7 @@ async function runAnalysis() {
       s.types[t] = (s.types[t]||0) + 1;
     });
     const tagSummary = {};
-    ['hook_type','pain_benefit','format','emotional_tone','messaging_pillar','language'].forEach(cat => {
+    ['hook_type','pain_benefit','format','emotional_tone','language'].forEach(cat => {
       const tp = {};
       analysisData.forEach(c => {
         const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown') return;
@@ -6857,9 +6847,9 @@ function renderOracleActions() {
           ${r.bestFmt ? `<div class="flex-1 bg-accent-blue-light/50 rounded-lg p-2"><p class="text-[9px] text-blue-700 font-bold">BEST FORMAT</p><p class="text-xs font-semibold">${tagLabel(r.bestFmt[0])}</p></div>` : ''}
         </div>
         ${r.bestHook ? `<div class="flex gap-2">
-          <button onclick='generateFromCIBrief(${JSON.stringify({geo:"US",hook:r.bestHook[0],pb:"PB-TUTOR",format:r.bestFmt?r.bestFmt[0]:"F-STATIC",icp:r.aud}).replace(/'/g,"\\\\'")})'
+          <button onclick='generateFromCIBrief(${JSON.stringify({geo:"US",hook:r.bestHook[0],pb:'',format:r.bestFmt?r.bestFmt[0]:'Static image',icp:r.aud}).replace(/'/g,"\\\\'")})'
           class="flex-1 py-2 btn-primary rounded-lg text-[10px] font-semibold">Generate ${tagLabel(r.bestHook[0])} + ${r.bestFmt ? tagLabel(r.bestFmt[0]) : 'Static'}</button>
-          <button onclick="generateDesignerBrief('${r.aud.replace(/'/g,"\\\\'")}','${r.bestHook[0]}','${r.bestFmt?r.bestFmt[0]:'F-STATIC'}','US')"
+          <button onclick="generateDesignerBrief('${r.aud.replace(/'/g,"\\\\'")}','${r.bestHook[0]}','${r.bestFmt?r.bestFmt[0]:'Static image'}','US')"
           class="py-2 px-3 btn-secondary rounded-lg text-[10px] font-semibold border border-gray-200 flex items-center gap-1" title="Brief for Designer"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Brief</button>
           <button onclick="markActionDone('Scale ${r.aud.replace(/'/g,"\\\\'")} + ${r.bestHook ? tagLabel(r.bestHook[0]).replace(/'/g,"\\\\'") : 'best hook'}','scale','${r.aud.replace(/'/g,"\\\\'")}')" class="py-2 px-2 rounded-lg text-[10px] font-semibold text-accent-green bg-accent-green-light hover:bg-green-200 transition-colors" title="Mark as done">Done &#10003;</button>
         </div>` : ''}
@@ -7896,18 +7886,8 @@ function renderOracleModules() {
       var deployedAdNames = [];
       state.taggerData.forEach(function(c) { deployedAdNames.push(normM4(c['Ad name']||c['ad name']||'')); });
 
-      var HOOK_KW = {
-        'testimonial':'H-TESTI','testi':'H-TESTI','review':'H-TESTI',
-        'pricing':'H-PRICE','price':'H-PRICE','offer':'H-PRICE',
-        'quiz':'H-QUIZ','question':'H-QUIZ','quirky':'H-QUIZ',
-        'urgency':'H-URG','urgent':'H-URG','deadline':'H-URG',
-        'exam':'H-EXAM','naplan':'H-EXAM','kangaroo':'H-EXAM','amc':'H-EXAM',
-        'persona':'H-PERSONA','contextual':'H-CONTEXT','nri':'H-CONTEXT',
-        'vernac':'H-VERN','telugu':'H-VERN','tamil':'H-VERN','gujarati':'H-VERN',
-        'influencer':'H-INFLU','offline':'H-COMPARE','online':'H-COMPARE',
-        'curriculum':'H-CURRIC','mathfit':'H-MATHFIT','k-2':'H-K2','k2':'H-K2'
-      };
-      var FMT_KW = { 'static':'F-STATIC','statics':'F-STATIC','video':'F-VIDEO','reel':'F-REEL','carousel':'F-CARO','native':'F-NATIVE','taboola':'F-NATIVE' };
+      // HOOK_KW / FMT_KW removed — old coded taxonomy purged in Phase 3.2
+      // Oracle now uses plain English hook/format from lib metadata
 
       var oracleRecs = [];
       libCreatives.forEach(function(lib) {
@@ -7919,21 +7899,8 @@ function renderOracleModules() {
         });
         if (isDeployed) return;
 
-        var nameLower = lib.name.toLowerCase();
         var infHook = lib.hookType || null;
-        if (!infHook) {
-          var hookKeys = Object.keys(HOOK_KW);
-          for (var i = 0; i < hookKeys.length; i++) {
-            if (nameLower.indexOf(hookKeys[i]) >= 0) { infHook = HOOK_KW[hookKeys[i]]; break; }
-          }
-        }
         var infFmt = lib.format || null;
-        if (!infFmt) {
-          var fmtKeys = Object.keys(FMT_KW);
-          for (var i = 0; i < fmtKeys.length; i++) {
-            if (nameLower.indexOf(fmtKeys[i]) >= 0) { infFmt = FMT_KW[fmtKeys[i]]; break; }
-          }
-        }
 
         Object.entries(audPatternsM4).forEach(function(audEntry) {
           var audName = audEntry[0], pat = audEntry[1];
@@ -10877,23 +10844,8 @@ function downloadImage(index) {
 }
 
 // ==================== CREATIVE TAGGER ====================
-// Human-readable display names for coded tags
-const TAG_DISPLAY = {
-  // Hooks (what grabs attention)
-  'H-MATH':'Math problem opener','H-FEAR':'Fear / urgency','H-PROBLEM':'Problem → solution','H-PAINPOINT':'Parent pain point',
-  'H-TEST':'Parent testimonial','H-STAT':'Surprising statistic','H-QUES':'Question hook','H-LIFE':'Aspirational / lifestyle','H-EVENT':'Seasonal / event',
-  'H-COMP':'Competition prep','H-OFFER':'Offer / price','H-GRADE':'Grade improvement',
-  // Hook types (LLM variants — map to readable names)
-  'H-FOUND':'Deep understanding','H-FUTURE':'Future readiness','H-TUTOR':'Tutor quality',
-  // Formats (what it looks like)
-  'F-STATIC':'Static image','F-VIDEO':'Video','F-INFLU':'Influencer / UGC','F-TESTI':'Testimonial video','F-ANIM':'Animation','F-CAROUSEL':'Carousel','F-VERN-TESTI':'Vernacular testimonial','F-PRODUCT':'Product demo','F-PLATFORM-DEMO':'Platform walkthrough','F-FOUNDER':'Founder story','F-BRAND':'Brand film','F-APP-PREVIEW':'App preview','F-CONTENT-UGC':'User content',
-  // Pain / Benefit (what problem we're solving)
-  'PB-GRADE':'Grades & school','PB-CONF':'Confidence building','PB-FOUND':'Deep understanding','PB-FUTURE':'Future readiness',
-  'PB-TUTOR':'Tutor quality','PB-INDIAN':'Indian identity','PB-COMP':'Competition prep',
-  // ICP
-  'NRI':'NRI Parents','Non-NRI':'Non-NRI Parents','Asian':'Asian Parents','Expat':'Non-NRI Parents','Telugu Speaking':'Telugu Speaking','Tamil Speaking':'Tamil Speaking','Hindi Speaking':'Hindi Speaking','Gujarati Speaking':'Gujarati Speaking','Arabic Speaking':'Arabic Speaking','High School Parents':'High School Parents','Universal':'All Audiences',
-};
-function tagLabel(code) { return TAG_DISPLAY[code] || code; }
+// TAG_DISPLAY removed — new taxonomy uses plain English values directly
+function tagLabel(code) { return code; }
 function shortAdName(name) {
   if (!name || name.length < 40) return name;
   // Strip date suffix (_DDMMYY or -DDMMYY at end)
@@ -10924,11 +10876,7 @@ const TAG_CATEGORIES = {
   icp_target: { label:'Audience', color:'orange', values:['NRI parents','Non-NRI parents','Local parents','Gujarati speaking','Telugu speaking','Tamil speaking','High school parents'] },
   setting: { label:'Setting', color:'teal', values:['Home','Studio','Outdoor','Screen recording','Animation'] },
   production_style: { label:'Production', color:'blue', values:['UGC','Studio shoot','Motion graphic','Screen record'] },
-  // Legacy categories kept for backward compat with existing tags — not shown in new tagging
-  feature: { label:'Feature', color:'blue', values:['1:1 tutoring','Top 1% tutors','Smart whiteboard','Gamification','Curriculum aligned','Adaptive platform','Talk-o-Meter','Cue dont tell','FUAR framework','MathFit identity','Math playground','Progress tracking','Personalized worksheets','Parent dashboard','Multi-device','Flexible scheduling','Money-back guarantee','Sibling discount'], _legacy:true },
-  messaging_pillar: { label:'Pillar', color:'teal', values:['Top tutors','Personalization','Deep learning','Platform/Tech','360 skills','Parent experience','MathFit identity','AI vs Thinking'], _legacy:true },
-  segment: { label:'Segment', color:'green', values:['Foundation Rebuilder','Personalization Seeker','Confidence Builder','Accelerator','Universal'], _legacy:true },
-  language: { label:'Language', color:'blue', values:['English','Hindi','Telugu','Tamil','Malayalam','Gujarati','Other'], _legacy:true },
+  language: { label:'Language', color:'blue', values:['English','Hindi','Telugu','Tamil','Malayalam','Gujarati','Other'] },
 };
 
 function validateTags(tags) {
@@ -11770,56 +11718,7 @@ function runSentinelAnalysis(data, geo) {
 
 // === BOOT DEPENDENCIES — must be defined before tagger data loads ===
 
-// Old taxonomy → new taxonomy migration map (used by migrateTags, called during rehydration)
-const TAG_MIGRATION = {
-  // Old shorthand hooks → new human-readable
-  'H-MATH': 'Math anchor', 'H-FEAR': 'Fear / urgency', 'H-PROBLEM': 'Problem', 'H-PAINPOINT': 'Problem',
-  'H-TEST': 'Parent testimonial', 'H-STAT': 'Statistic', 'H-QUES': 'Question',
-  'H-LIFE': 'Lifestyle / emotional', 'H-EVENT': 'Seasonal', 'H-COMP': 'Competitive',
-  'H-OFFER': 'Offer / price', 'H-GRADE': 'Grade badge',
-  // Old shorthand formats → new
-  'F-STATIC': 'Static image', 'F-VIDEO': 'Video', 'F-INFLU': 'Influencer UGC', 'F-CONTENT-UGC': 'Influencer UGC',
-  'F-TESTI': 'Testimonial video', 'F-VERN-TESTI': 'Vernacular testimonial',
-  'F-PRODUCT': 'Product video', 'F-PLATFORM-DEMO': 'Product video', 'F-APP-PREVIEW': 'Product video',
-  'F-BRAND': 'Brand video', 'F-FOUNDER': 'Brand video', 'F-ANIM': 'Video', 'F-CAROUSEL': 'Static image',
-  // Old shorthand pain/benefit → new
-  'PB-GRADE': 'Grades & school', 'PB-CONF': 'Confidence & anxiety', 'PB-FOUND': 'Strong foundations',
-  'PB-FUTURE': 'Future readiness', 'PB-TUTOR': 'Tutor quality', 'PB-INDIAN': 'Indian roots', 'PB-COMP': 'Competition prep',
-  // Old audience → new
-  'NRI': 'NRI parents', 'Non-NRI': 'Non-NRI parents', 'Asian': 'NRI parents', 'Expat': 'Non-NRI parents',
-  'Telugu Speaking': 'Telugu speaking', 'Tamil Speaking': 'Tamil speaking', 'Gujarati Speaking': 'Gujarati speaking',
-  'Hindi Speaking': 'Local parents', 'Arabic Speaking': 'Local parents', 'High School Parents': 'High school parents', 'Universal': 'NRI parents',
-  // Old tone → new
-  'Offer/Promo': 'Offer / promo', 'Empathetic': 'Aspirational', 'Warm': 'Aspirational',
-  // Very old taxonomy (pre-shorthand)
-  'Question': 'Question', 'Statistic': 'Statistic', 'Testimonial': 'Parent testimonial',
-  'Fear/Urgency': 'Fear / urgency', 'Aspirational': 'Aspirational', 'Problem-Solution': 'Problem',
-  'Curiosity Gap': 'Question', 'Social Proof': 'Parent testimonial', 'Direct Benefit': 'Math anchor',
-  'Math anxiety': 'Confidence & anxiety', 'Rote learning': 'Strong foundations', 'One-size-fits-all': 'Tutor quality',
-  'Lack of confidence': 'Confidence & anxiety', 'School struggle': 'Grades & school', 'Boring tutoring': 'Tutor quality',
-  'No conceptual understanding': 'Strong foundations', 'Exam pressure': 'Competition prep',
-  'Conceptual understanding': 'Strong foundations', 'Confidence': 'Confidence & anxiety',
-  'Personalized learning': 'Tutor quality', 'Future-ready': 'Future readiness',
-  'Better grades': 'Grades & school', 'Problem-solving skills': 'Strong foundations',
-  // Intermediate human-readable taxonomy (from mid-migration era)
-  'Parent pain point': 'Problem', 'Parent Pain Point': 'Problem',
-  'Grade improvement': 'Grades & school', 'Grade Improvement': 'Grades & school',
-  'Indian identity': 'Indian roots', 'Indian Identity': 'Indian roots',
-  'MathFit identity': 'Strong foundations', 'MathFit Identity': 'Strong foundations',
-  'Question hook': 'Question', 'Question Hook': 'Question',
-  'Math problem opener': 'Math anchor', 'Math Problem Opener': 'Math anchor',
-  'Seasonal / event': 'Seasonal', 'Seasonal/Event': 'Seasonal',
-  'Platform/Tech': 'Product video', 'Platform / Tech': 'Product video',
-  'Curriculum aligned': 'Strong foundations', 'Curriculum Aligned': 'Strong foundations',
-  'Parent testimonial hook': 'Parent testimonial',
-  'Influencer / UGC': 'Influencer UGC',
-  'All Audiences': 'NRI parents', 'all audiences': 'NRI parents',
-  'Non-NRI Parents': 'Non-NRI parents', 'Non NRI Parents': 'Non-NRI parents',
-  'NRI Parents': 'NRI parents',
-  'High School Parents': 'High school parents',
-  'Telugu Speaking': 'Telugu speaking', 'Tamil Speaking': 'Tamil speaking',
-  'Gujarati Speaking': 'Gujarati speaking',
-};
+// TAG_MIGRATION removed — old coded taxonomy purged in Phase 3.2
 
 // Tag cache: keyed by ad name, stores tags so we never re-tag the same creative
 let _tagCacheLoaded = false;
@@ -12026,40 +11925,9 @@ function useDashboardData() {
   }
 })();
 
-// TAG_MIGRATION moved to boot dependencies section above
-
-function migrateTags(tags) {
-  if (!tags || !tags.hook_type) return tags;
-  const migrated = { ...tags };
-  // Check if already new taxonomy (human-readable, not shorthand codes)
-  const isNewTax = TAG_CATEGORIES.hook_type.values.includes(tags.hook_type);
-  if (isNewTax) return tags;
-  // Migrate hook_type
-  if (TAG_MIGRATION[tags.hook_type]) migrated.hook_type = TAG_MIGRATION[tags.hook_type];
-  // Migrate format
-  if (tags.format && TAG_MIGRATION[tags.format]) migrated.format = TAG_MIGRATION[tags.format];
-  // Migrate pain_benefit (single string → array of new values)
-  const pb = tags.pain_benefit || tags.pain_point;
-  if (pb) {
-    if (Array.isArray(pb)) {
-      migrated.pain_benefit = pb.map(v => TAG_MIGRATION[v] || v);
-    } else {
-      migrated.pain_benefit = TAG_MIGRATION[pb] ? [TAG_MIGRATION[pb]] : [pb];
-    }
-  }
-  // Migrate old pain_point/benefit fields
-  if (tags.benefit && TAG_MIGRATION[tags.benefit]) {
-    if (!migrated.pain_benefit) migrated.pain_benefit = [];
-    migrated.pain_benefit.push(TAG_MIGRATION[tags.benefit]);
-  }
-  // Migrate audience
-  if (tags.icp_target && TAG_MIGRATION[tags.icp_target]) migrated.icp_target = TAG_MIGRATION[tags.icp_target];
-  // Migrate tone
-  if (tags.emotional_tone && TAG_MIGRATION[tags.emotional_tone]) migrated.emotional_tone = TAG_MIGRATION[tags.emotional_tone];
-  migrated.confidence = 0.5;
-  migrated._migrated = true;
-  return migrated;
-}
+// migrateTags removed — old coded taxonomy purged in Phase 3.2
+// Tags are now stored in plain English; no migration needed
+function migrateTags(tags) { return tags || {}; }
 
 async function tagCreatives(rawData) {
   document.getElementById('taggerUpload').style.display = 'none';
@@ -12770,12 +12638,12 @@ function renderTaggerInsights() {
 
   // Find best/worst performing tags per category (CPTD primary, CPQL fallback)
   const insights = [];
-  ['hook_type','format','pain_benefit','feature','emotional_tone','messaging_pillar','language'].forEach(cat => {
+  ['hook_type','format','pain_benefit','emotional_tone','language'].forEach(cat => {
     const catInfo = TAG_CATEGORIES[cat];
     const tagPerf = {};
     filteredData.forEach(c => {
       const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown') return;
-      if (!TAG_CATEGORIES[cat]?.values?.includes(tag) && !tag.startsWith('H-') && !tag.startsWith('F-') && !tag.startsWith('PB-')) return;
+      if (!TAG_CATEGORIES[cat]?.values?.includes(tag)) return;
       const spend = parseNumber(c['Spent']||c['spent']||0);
       const ql = parseNumber(c['QL']||c['ql']||0);
       const td = parseNumber(c['TD']||c['td']||0);
@@ -13488,7 +13356,7 @@ function renderTaggerHeatmap() {
   if (!filteredData.length) { container.innerHTML = '<p class="text-sm text-text-muted">No data</p>'; return; }
 
   // Build heatmap: tag category x avg CPTD (primary), CPQL (secondary)
-  const cats = ['hook_type','format','pain_benefit','feature','emotional_tone','messaging_pillar','cta_type','language','icp_target'];
+  const cats = ['hook_type','format','pain_benefit','emotional_tone','cta_type','language','icp_target'];
   // Pre-compute per-tag sparkline data (group by tag + date)
   const _hmSparkCache = {};
   const _hmBuildSparkData = (tag, cat) => {
@@ -13587,7 +13455,7 @@ function editTags(id) {
   if (!creative) { showToast('Creative not found (id: ' + id + ')'); return; }
   if (!creative.tags) creative.tags = {};
   // Build a form-based tag editor instead of raw JSON prompt
-  const cats = ['hook_type','format','pain_benefit','emotional_tone','icp_target','segment','feature','messaging_pillar','language'];
+  const cats = ['hook_type','format','pain_benefit','emotional_tone','icp_target','language'];
   const lines = cats.map(cat => {
     const catInfo = TAG_CATEGORIES[cat] || { label: cat, values: [] };
     const current = creative.tags[cat] || '';
@@ -13647,7 +13515,7 @@ function renderTagCombos() {
   const hasSignalData = sentTop5Names.size >= 3 && sentBottom5Names.size >= 3;
 
   // Build tag-to-creative mapping for signal detection
-  const allCats = ['hook_type','format','pain_benefit','feature','emotional_tone','messaging_pillar','cta_type','language','icp_target'];
+  const allCats = ['hook_type','format','pain_benefit','emotional_tone','cta_type','language','icp_target'];
   const tagSignals = []; // { tag, cat, topPct, bottomPct, signal: 'winning'|'losing'|null }
 
   if (hasSignalData) {
@@ -13677,8 +13545,8 @@ function renderTagCombos() {
   // Combo analysis with median CPTD (fallback CPQL)
   const pairCats = [
     ['hook_type','pain_benefit'], ['hook_type','emotional_tone'], ['hook_type','format'],
-    ['pain_benefit','feature'], ['pain_benefit','icp_target'], ['format','icp_target'],
-    ['messaging_pillar','icp_target'], ['hook_type','language'], ['format','messaging_pillar']
+    ['pain_benefit','icp_target'], ['format','icp_target'],
+    ['hook_type','language'], ['format','language']
   ];
 
   const combos = [];
@@ -13937,8 +13805,7 @@ function renderCreativeGrid() {
     const [catLabel, tagVal] = filter.split(': ');
     const catKey = Object.keys(TAG_CATEGORIES).find(k => TAG_CATEGORIES[k].label === catLabel);
     // Reverse-lookup: tagVal is display name, data stores raw code
-    const rawCode = Object.keys(TAG_DISPLAY).find(k => TAG_DISPLAY[k] === tagVal) || tagVal;
-    if (catKey) data = data.filter(c => c.tags?.[catKey] === rawCode || tagLabel(c.tags?.[catKey]) === tagVal);
+    if (catKey) data = data.filter(c => c.tags?.[catKey] === tagVal);
   }
 
   // Sort based on dropdown — minimum ₹1K spend to qualify for "best" sorts
@@ -13990,7 +13857,7 @@ function renderCreativeGrid() {
     const badgeBg = badgeMetric > 0 ? (badgeMetric < 30000 ? 'bg-accent-green-light border-green-200' : badgeMetric < 60000 ? 'bg-accent-orange-light border-orange-200' : 'bg-accent-red-light border-red-200') : 'bg-surface-tertiary border-gray-200';
 
     // Show top 6 most interesting tags (filter out Unknown)
-    const displayTags = ['hook_type','pain_benefit','emotional_tone','messaging_pillar','feature','icp_target']
+    const displayTags = ['hook_type','pain_benefit','emotional_tone','icp_target']
       .filter(cat => tags[cat] && tags[cat] !== 'Unknown')
       .slice(0, 5)
       .map(cat => {
@@ -14281,7 +14148,7 @@ function generateCreativeBriefs() {
         hookCount: bestHook[1].count,
         pb: bestPB ? bestPB[0] : null,
         pbCPQL: bestPB ? bestPB[1].spend / bestPB[1].ql : 0,
-        format: bestFormat ? bestFormat[0] : 'F-STATIC',
+        format: bestFormat ? bestFormat[0] : 'Static image',
         icp: bestICP ? bestICP[0] : 'NRI',
         antiPattern: worstHook ? worstHook[0] : null,
         antiCPQL: worstHook ? worstHook[1].spend / worstHook[1].ql : 0,
@@ -14363,8 +14230,8 @@ function generateFromCIBrief(brief) {
   navigateTo('generate');
   if (brief.geo) document.getElementById('briefMarket').value = brief.geo;
   // Set format pill
-  const fmtMap = { 'F-STATIC': 'Static Ad', 'F-VIDEO': 'Video - Reel', 'F-INFLU': 'Video - Reel', 'F-TESTI': 'Video - Reel', 'F-ANIM': 'Video - YouTube' };
-  const fmtValue = fmtMap[brief.format] || 'Static Ad';
+  const fmtLower = (brief.format || '').toLowerCase();
+  const fmtValue = fmtLower.includes('video') || fmtLower.includes('influencer') || fmtLower.includes('testimonial') ? 'Video - Reel' : 'Static Ad';
   document.querySelectorAll('#formatPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === fmtValue));
   // Set ICP pill
   document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === brief.icp));
@@ -14580,9 +14447,9 @@ function renderWinningByAudience() {
         <p class="text-xs text-text-secondary">Create 3 <strong>${tagLabel(r.bestFmt[0])}</strong> ads with <strong>${tagLabel(r.bestHook[0])}</strong> hook targeting <strong>${r.aud}</strong>.${r.worstHook && r.worstHook[0] !== r.bestHook[0] ? ' Avoid <strong>' + tagLabel(r.worstHook[0]) + '</strong> pattern.' : ''} Suggested format: 1:1 for Instagram, 9:16 for Stories.</p>
       </div>` : ''}
       ${r.bestHook ? `<div class="flex gap-2 mt-3">
-        <button onclick='generateFromCIBrief(${JSON.stringify({geo:countryFilter==="all"?"US":countryFilter,hook:r.bestHook[0],pb:"PB-TUTOR",format:r.bestFmt?r.bestFmt[0]:"F-STATIC",icp:r.aud}).replace(/'/g,"\\\\'")})'
+        <button onclick='generateFromCIBrief(${JSON.stringify({geo:countryFilter==="all"?"US":countryFilter,hook:r.bestHook[0],pb:'',format:r.bestFmt?r.bestFmt[0]:'Static image',icp:r.aud}).replace(/'/g,"\\\\'")})'
         class="flex-1 py-2 btn-primary rounded-lg text-xs font-semibold">Generate ${tagLabel(r.bestHook[0])} + ${r.bestFmt ? tagLabel(r.bestFmt[0]) : 'Static'} \u2192</button>
-        <button onclick="generateDesignerBrief('${r.aud.replace(/'/g,"\\\\'")}','${r.bestHook[0]}','${r.bestFmt?r.bestFmt[0]:'F-STATIC'}','${countryFilter==="all"?"US":countryFilter}')"
+        <button onclick="generateDesignerBrief('${r.aud.replace(/'/g,"\\\\'")}','${r.bestHook[0]}','${r.bestFmt?r.bestFmt[0]:'Static image'}','${countryFilter==="all"?"US":countryFilter}')"
         class="py-2 px-3 btn-secondary rounded-lg text-xs font-semibold border border-gray-200 flex items-center gap-1" title="Brief for Designer"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Brief</button>
       </div>` : ''}
     </div>`;
@@ -14711,7 +14578,7 @@ function computeWinningFormula(market, icp) {
   if (icp && icp !== 'all') filtered = filtered.filter(c => c.tags?.icp_target === icp);
   if (filtered.length < 2) return {};
 
-  const cats = ['hook_type','emotional_tone','feature','messaging_pillar','pain_benefit','cta_type'];
+  const cats = ['hook_type','emotional_tone','pain_benefit','cta_type'];
   const formula = {};
   cats.forEach(cat => {
     const tp = {};
@@ -14851,7 +14718,7 @@ function renderDecayTracker() {
   }).map(c => ({...c, _cpqlFlag: false, _freqFlag: true}));
 
   // Overused tag patterns — only check recognized taxonomy categories
-  const DECAY_CATS = ['hook_type','format','pain_benefit','emotional_tone','feature','cta_type','messaging_pillar','visual_style','video_attrs','talent','language'];
+  const DECAY_CATS = ['hook_type','format','pain_benefit','emotional_tone','cta_type','language'];
   const tagUsage = {};
   const decayData = countryFilter !== 'all' ? ciDecayData : state.taggerData;
   decayData.forEach(c => {
@@ -15017,7 +14884,7 @@ function renderAudienceMap() {
   const totalCreatives = data.length;
   const gaps = [];
   // Detect underserved formats per geo
-  const CORE_FORMATS = ['F-STATIC','F-VIDEO','F-INFLU','F-TESTI','F-CAROUSEL'];
+  const CORE_FORMATS = ['Static image','Video','Influencer UGC','Testimonial video','Brand video'];
   Object.entries(geoFormatMix).forEach(([geo, fmts]) => {
     const geoTotal = Object.values(fmts).reduce((s,v) => s+v, 0);
     CORE_FORMATS.forEach(fmt => {
@@ -16833,7 +16700,7 @@ function _cleanHandle(raw) {
 }
 
 // ---- INFLUENCER AD IDENTIFICATION ----
-// Gate: campaign name contains "Influencer"/"Influ", OR tagger tagged as F-INFLU/F-CONTENT-UGC
+// Gate: campaign name contains "Influencer"/"Influ", OR tagger tagged as Influencer UGC
 // Creator name: extracted from end of ad name before date suffix (DDMMYY)
 // Roster: used for metadata enrichment (handle, ethnicity) only
 
@@ -16841,9 +16708,9 @@ function _isInfluencerAd(c) {
   const campName = (c['Campaign name'] || c['campaign name'] || '').toLowerCase();
   // Primary: campaign name contains "influencer"
   if (campName.includes('influencer') || campName.includes('influ')) return true;
-  // Secondary: tagger format tag is influencer/UGC (catches India campaigns where campaign name doesn't say "Influencer")
-  const fmt = c.tags?.format || '';
-  if (fmt === 'F-INFLU' || fmt === 'F-CONTENT-UGC') return true;
+  // Secondary: tagger format/creative_type tag is influencer UGC
+  const fmt = (c.tags?.format || c.tags?.creative_type || '').toLowerCase();
+  if (fmt.includes('influencer') || fmt.includes('ugc')) return true;
   // Tertiary: ad name contains "influencer" or "postboost" (common in influencer ad names)
   const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
   if (adName.includes('influencer') || adName.includes('postboost')) return true;
@@ -16995,7 +16862,7 @@ function getInfluencerAds(geoFilter, formatFilter) {
   const creators = {};
 
   data.forEach(c => {
-    // Gate: campaign name contains "Influencer", OR tagger tagged F-INFLU, OR ad name contains "influencer"/"postboost"
+    // Gate: campaign name contains "Influencer", OR tagger tagged as influencer UGC, OR ad name contains "influencer"/"postboost"
     if (!_isInfluencerAd(c)) return;
 
     const adName = c['Ad name'] || c['ad name'] || '';
@@ -17152,7 +17019,7 @@ function renderInfluLeaderboard(filteredCreators) {
     const dist = {};
     let totalAds = 0;
     // Only analyze CREATIVE DECISIONS — exclude obvious demographic/structural tags
-    const CREATIVE_CATS = ['hook_type','emotional_tone','pain_benefit','segment','messaging_pillar','feature'];
+    const CREATIVE_CATS = ['hook_type','emotional_tone','pain_benefit'];
     creatorList.forEach(cr => {
       cr.ads.forEach(ad => {
         if (!ad.tags) return;
@@ -17173,7 +17040,7 @@ function renderInfluLeaderboard(filteredCreators) {
   const loseDist = getTagDistribution(dropCreators);
 
   // Find tags that are significantly MORE common in winners vs losers (and vice versa)
-  const catLabels = { hook_type: 'Hook', emotional_tone: 'Tone', pain_benefit: 'Angle', segment: 'Segment', messaging_pillar: 'Pillar', feature: 'Feature' };
+  const catLabels = { hook_type: 'Hook', emotional_tone: 'Tone', pain_benefit: 'Angle' };
   const winnerSignals = [], loserSignals = [];
   Object.entries(winDist.dist).forEach(([key, wd]) => {
     const ld = loseDist.dist[key];
@@ -17851,23 +17718,8 @@ function renderCrossRef() {
 }
 
 // ==================== DESIGNER BRIEF GENERATOR ====================
-const HOOK_COPY_GUIDANCE = {
-  'H-MATH': 'Math Anchor: Lead with a specific math concept, show the problem first, then the Cuemath solution. Use visuals of equations or puzzles.',
-  'H-FEAR': 'Fear / Urgency: Highlight what the child is missing out on. Time-bound language. Show consequences of inaction, then the Cuemath path.',
-  'H-PROBLEM': 'Problem Call-out: Open with a relatable parent frustration ("My child hates math"). Empathize first, solve second.',
-  'H-PAINPOINT': 'Parent Pain: Focus on parental anxiety — school struggles, tuition costs, comparison stress. Position Cuemath as the relief.',
-  'H-TEST': 'Social Proof: Lead with testimonials, ratings, student counts. "10,000+ parents trust Cuemath." Use real faces and quotes.',
-  'H-STAT': 'Statistic: Open with a compelling data point ("73% of kids fall behind in math by Grade 5"). Source the stat visually.',
-  'H-QUES': 'Question: Hook with a provocative question ("Is your child actually learning math — or just memorizing?"). Let the viewer self-select.',
-  'H-LIFE': 'Lifestyle / Emotional: Show transformation — a child going from frustrated to confident. Warm tones, family moments.',
-  'H-EVENT': 'Seasonal / Event: Tie creative to an upcoming event or season. Use event imagery, limited-time framing.',
-  'H-COMP': 'Competitive / Comparison: Position Cuemath against alternatives (tutors, apps, Kumon). Side-by-side or "unlike X, we..."',
-  'H-OFFER': 'Offer / Price: Lead with price, discount, or free trial. Bold typography for the number. Clear CTA.',
-  'H-GRADE': 'Grade Badge: Highlight grade-level improvement. "From C to A in 3 months." Use progress visuals or report cards.',
-  'H-FOUND': 'Foundations: Emphasize building strong math fundamentals early. "Get the basics right" messaging.',
-  'H-FUTURE': 'Future Readiness: Connect math to future success — STEM careers, college readiness. Aspirational imagery.',
-  'H-TUTOR': 'Tutor Quality: Spotlight Cuemath tutors — qualifications, teaching style, 1-on-1 attention.',
-};
+// HOOK_COPY_GUIDANCE removed — old coded taxonomy purged in Phase 3.2
+// Designer brief now uses the plain English hook name directly
 
 function generateDesignerBrief(audience, hook, format, geo) {
   const data = state.taggerData || [];
@@ -17952,11 +17804,12 @@ function generateDesignerBrief(audience, hook, format, geo) {
   const donts = sortedPatterns.slice(-3).reverse().map(p => tagLabel(p.tag));
 
   // Format info
-  const fmtLabel = tagLabel(format);
-  const aspectRatio = (format === 'F-STATIC' || format === 'F-CAROUSEL') ? '1:1 or 4:5' : format === 'F-VIDEO' || format === 'F-INFLU' || format === 'F-TESTI' ? '9:16 (Reel) or 1:1' : '16:9 or 1:1';
+  const fmtLabel = format || 'Static image';
+  const fmtLower = fmtLabel.toLowerCase();
+  const aspectRatio = (fmtLower.includes('static') || fmtLower.includes('carousel')) ? '1:1 or 4:5' : fmtLower.includes('video') || fmtLower.includes('influencer') || fmtLower.includes('testimonial') ? '9:16 (Reel) or 1:1' : '16:9 or 1:1';
 
-  // Copy direction
-  const copyDirection = HOOK_COPY_GUIDANCE[hook] || ('Use ' + tagLabel(hook) + ' approach for maximum impact with this audience.');
+  // Copy direction — use plain English hook name
+  const copyDirection = 'Use ' + (hook || 'best performing') + ' approach for maximum impact with this audience.';
 
   // Seasonal context
   const events = getUpcomingEvents(geo);
@@ -18362,7 +18215,7 @@ function renderRecommendedBriefs() {
     <p class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3 text-center">Recommended Briefs from Winning Patterns</p>
     <div class="space-y-3">`;
   briefs.forEach(b => {
-    const briefObj = {geo:'US', hook:b.hook, pb:'PB-TUTOR', format:'F-STATIC', icp:b.aud};
+    const briefObj = {geo:'US', hook:b.hook, pb:'', format:'Static image', icp:b.aud};
     const briefB64 = btoa(unescape(encodeURIComponent(JSON.stringify(briefObj))));
     html += `<div class="bg-white rounded-xl border border-purple-200 p-4 shadow-sm hover:shadow-md transition-shadow">
       <div class="flex items-center justify-between mb-2">
@@ -18393,8 +18246,8 @@ function generateFromRecommendedBrief(briefB64) {
     p.classList.toggle('active', p.dataset.value === brief.icp);
   });
   // Set format pill
-  const fmtMap = { 'F-STATIC': 'Static Ad', 'F-VIDEO': 'Video - Reel', 'F-INFLU': 'Video - Reel', 'F-TESTI': 'Video - Reel', 'F-ANIM': 'Video - YouTube' };
-  const fmtValue = fmtMap[brief.format] || 'Static Ad';
+  const fmtLower = (brief.format || '').toLowerCase();
+  const fmtValue = fmtLower.includes('video') || fmtLower.includes('influencer') || fmtLower.includes('testimonial') ? 'Video - Reel' : 'Static Ad';
   document.querySelectorAll('#formatPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === fmtValue));
   // Set angle text
   const angle = document.getElementById('briefAngle');
