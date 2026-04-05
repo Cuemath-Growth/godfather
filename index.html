@@ -102,9 +102,9 @@
 <!-- No setup needed — API key and sheets are pre-configured -->
 
 <!-- Main Layout -->
-<div class="flex h-screen overflow-hidden">
+<div>
   <!-- Sidebar Navigation -->
-  <nav class="w-[220px] bg-gradient-sidebar flex flex-col py-5 shrink-0 sticky top-0 h-screen overflow-y-auto">
+  <nav class="w-[220px] bg-gradient-sidebar flex flex-col py-5" style="position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:40">
     <!-- Logo -->
     <div class="px-5 mb-5">
       <div class="flex items-center gap-3">
@@ -178,10 +178,10 @@
     <span id="refreshIcon" style="display:none"></span>
 
     <!-- Views Container -->
-    <main class="flex-1 bg-[#F8F9FC] flex flex-col min-h-0">
+    <main class="bg-[#F8F9FC]" style="margin-left:220px;min-height:100vh">
 
       <!-- ========== GLOBAL FILTER BAR ========== -->
-      <div id="globalFilterBar" class="bg-white border-b border-gray-200/80 px-4 py-2 flex items-center gap-3 text-xs shrink-0 z-10" style="min-height:40px">
+      <div id="globalFilterBar" class="bg-white border-b border-gray-200/80 px-4 py-2 flex items-center gap-3 text-xs z-10" style="min-height:40px;position:sticky;top:0">
         <span id="filterBarTitle" class="text-xs font-bold text-text-primary shrink-0 hidden"></span>
         <div class="h-4 w-px bg-gray-200 hidden" id="filterBarTitleDivider"></div>
         <input type="date" id="dashboardDateFrom" class="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-semibold shrink-0" style="width:120px" onchange="onGlobalFilterChange()" />
@@ -217,7 +217,7 @@
       </div>
 
       <!-- Scrollable views container (below fixed filter bar) -->
-      <div class="flex-1 overflow-y-auto min-h-0">
+      <div id="scrollContainer" style="padding-bottom:2rem">
 
       <!-- ========== DASHBOARD VIEW ========== -->
       <div id="view-dashboard" class="view p-6">
@@ -3278,6 +3278,7 @@ window.renderHealthPanel = renderHealthPanel;
 
 // ==================== INIT ====================
 function init() {
+  // Scroll: body scrolls naturally, sidebar is position:fixed
   // Free localStorage space — evict recomputable keys + stale v1 cache on every boot
   EVICTABLE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
   ['gf_leadsData','gf_costData','gf_dataTimestamp','gf_rawData'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
