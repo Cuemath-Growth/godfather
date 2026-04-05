@@ -909,6 +909,10 @@
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                   Tag All New
                 </button>
+                <button onclick="retagCreatives(true)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100" title="Re-tag ALL creatives from scratch (ignores cache, uses API credits)">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  Re-tag All
+                </button>
               </div>
               <!-- Row 2: Dropdown filters -->
               <div class="flex items-center gap-2 flex-wrap">
@@ -12352,6 +12356,7 @@ _tagCacheLoaded = true;
 
 async function tagCreatives(rawData, opts = {}) {
   const pilotLimit = opts.pilotLimit || 0; // 0 = no limit
+  const forceRetag = opts.forceRetag || false; // true = skip cache, re-tag via API
   document.getElementById('taggerUpload').style.display = 'none';
   document.getElementById('taggerProgress').classList.remove('hidden');
   document.getElementById('taggerResults').classList.add('hidden');
@@ -12376,6 +12381,9 @@ async function tagCreatives(rawData, opts = {}) {
 
   rawData.forEach(c => {
     const adName = c['Ad name'] || c['ad name'] || c['Ad Name'] || '';
+
+    // forceRetag = skip ALL caches, send everything to API
+    if (forceRetag) { needsTagging.push(c); return; }
 
     // Check Supabase cache first — keyed by "ad_name||account" or "ad_name"
     const acctKey = adName + '||' + (c['_account'] || '');
@@ -12676,15 +12684,14 @@ async function retagCreatives(force, pilotLimit = 0) {
   if (!pinOk) return;
   if (force && !pilotLimit) {
     const count = state.taggerData.length;
-    if (!confirm(`This will re-tag all ${count} creatives through Claude API, using significant credits. Are you sure?\n\nTip: Use "Pilot 50" to test on a small batch first.`)) return;
-    showToast('All creatives will be re-tagged via API (ignoring Supabase cache)');
+    if (!confirm(`This will re-tag ALL ${count} creatives through Claude Haiku vision API.\n\nEstimated cost: ~${count} API calls.\n\nTip: Use "Pilot 50" to test first.`)) return;
   }
-  if (pilotLimit) showToast(`Pilot mode: tagging up to ${pilotLimit} untagged creatives`);
+  if (pilotLimit) showToast(`Pilot mode: tagging up to ${pilotLimit} creatives via API`);
   const rawData = state.taggerData.map(c => {
     const { tags, id, _cached, ...rest } = c;
     return rest;
   });
-  tagCreatives(rawData, { pilotLimit });
+  tagCreatives(rawData, { pilotLimit, forceRetag: force });
 }
 
 // Match tagged Meta ads to Library creative assets by name similarity
