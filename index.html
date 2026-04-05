@@ -7316,9 +7316,10 @@ function renderDayByDay() {
   // Limit to 200 rows for performance
   const display = rows.slice(0, 200);
 
-  // QL lookup: count leads per ad per day (normalized for CRM↔Meta name format differences)
+  // QL lookup: count leads per ad per day — respect dashboard geo filter
+  const _qlGeo = document.getElementById('dashboardCountryFilter')?.value || 'all';
   const qlLookup = {};
-  leadsData.forEach(r => {
+  filterLeadsByMarket(leadsData, _qlGeo).forEach(r => {
     const ad = normalizeAdName(r.mx_utm_adcontent);
     const day = r.lead_created_date || '';
     if (ad && day && String(r.qls) === '1') {
@@ -12773,9 +12774,10 @@ function renderLensAggregateMetrics() {
   if (!m || m.spend === 0) return;
   const srcLabel = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All time';
 
-  // Count direct vs proportional matches in current tagger data for transparency
-  const directCount = state.taggerData.filter(c => c._crmMatchType === 'ad_content').length;
-  const campaignCount = state.taggerData.filter(c => c._crmMatchType === 'campaign').length;
+  // Count direct vs proportional matches — respect geo/date filters
+  const _filteredForMatch = getDashboardFilteredData();
+  const directCount = _filteredForMatch.filter(c => c._crmMatchType === 'ad_content').length;
+  const campaignCount = _filteredForMatch.filter(c => c._crmMatchType === 'campaign').length;
   const matchInfo = directCount > 0 ? `${directCount} direct + ${campaignCount} campaign matched` : '';
 
   const metricCard = (label, value, sub) =>
