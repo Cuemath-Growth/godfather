@@ -2358,15 +2358,7 @@ function saveTaggerData() {
       }
     } catch(_) {}
   }
-  try {
-    localStorage.setItem('gf_taggerData', JSON.stringify(compressTaggerData(state.taggerData)));
-  } catch(e) {
-    if (e.name === 'QuotaExceededError') {
-      try { localStorage.removeItem('gf_rawData'); } catch(_){}
-      try { localStorage.removeItem('gf_analysis'); } catch(_){}
-      try { localStorage.setItem('gf_taggerData', JSON.stringify(compressTaggerData(state.taggerData))); } catch(e2) { console.warn('Storage full even after trim:', e2); }
-    }
-  }
+  // Tags go to Supabase — no localStorage for tagger data (too large, causes quota errors)
   // Async sync to Supabase (non-blocking)
   syncTaggerToSupabase(state.taggerData).catch(e => console.warn('Supabase tagger sync error:', e));
 }
@@ -4320,8 +4312,9 @@ async function fetchSheetData(sheetUrl, apiKey) {
     LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
     return s;
   });
-  _safeCacheSet('gf_v2_leadsData', JSON.stringify(slimLeads));
-  _safeCacheSet('gf_v2_costData', JSON.stringify(costData));
+  // Skip localStorage cache for large datasets — fetched fresh from Google Sheets each session
+  // _safeCacheSet('gf_v2_leadsData', JSON.stringify(slimLeads));
+  // _safeCacheSet('gf_v2_costData', JSON.stringify(costData));
   _safeCacheSet('gf_v2_timestamp', Date.now().toString());
   // Clean up old keys
   ['gf_leadsData','gf_costData','gf_dataTimestamp'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
@@ -4419,7 +4412,8 @@ async function fetchMetaCreatives(force = false) {
   console.log(`Meta creatives: ${all.length} ads from ${accounts.length} accounts`);
   // Cache slim version — only fields needed for thumbnails
   const slimCreatives = all.map(c => ({ id: c.id, name: c.name, thumbnail_url: c.thumbnail_url, image_url: c.image_url }));
-  _safeCacheSet('gf_v2_metaCreatives', JSON.stringify(slimCreatives));
+  // Skip localStorage for metaCreatives — re-fetched from Meta API each session
+  // _safeCacheSet('gf_v2_metaCreatives', JSON.stringify(slimCreatives));
   _safeCacheSet('gf_v2_creativesTs', Date.now().toString());
   // Re-render oracle cards with thumbnails
   if (state.currentView === 'dashboard') try { renderOracleCardsV2(); } catch(e) {}
@@ -4624,7 +4618,8 @@ async function fetchMetaAdInsights(force = false) {
     if (r.date > aggMap[key].date_max) aggMap[key].date_max = r.date;
   });
   const aggData = Object.values(aggMap).map(r => ({ ...r, date: r.date_min }));
-  _safeCacheSet('gf_v2_metaAdData', JSON.stringify(aggData));
+  // Skip localStorage for metaAdData — re-fetched from Meta API each session
+  // _safeCacheSet('gf_v2_metaAdData', JSON.stringify(aggData));
   _safeCacheSet('gf_v2_adDataTs', Date.now().toString());
   invalidateAdPerfCache();
   buildLookupMaps();
@@ -6003,7 +5998,8 @@ async function refreshData() {
   // Persist only Meta ads data to localStorage (other sheets fetched fresh each session)
   if (metaOk) {
     const saveData = { metaAds: state.rawData.metaAds };
-    try { localStorage.setItem('gf_rawData', JSON.stringify(saveData)); } catch(e) { console.warn('rawData too large, skipping save'); }
+    // Skip localStorage for rawData — re-fetched from Google Sheets each session
+    // try { localStorage.setItem('gf_rawData', JSON.stringify(saveData)); } catch(e) { console.warn('rawData too large, skipping save'); }
   }
 
   // Auto-tag from Meta sheet if tagger data is empty but sheet data exists
