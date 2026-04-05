@@ -12737,8 +12737,25 @@ async function retagCreatives(force, pilotLimit = 0) {
     const count = state.taggerData.length;
     if (!confirm(`This will re-tag ALL ${count} creatives through Claude Haiku vision API.\n\nEstimated cost: ~${count} API calls.\n\nTip: Use "Pilot 50" to test first.`)) return;
   }
-  if (pilotLimit) showToast(`Pilot mode: tagging up to ${pilotLimit} creatives via API`);
-  const rawData = state.taggerData.map(c => {
+  // Respect country filter for pilot — tag US-only, India-only, etc.
+  const _taggerGeo = document.getElementById('taggerFilterCountry')?.value || 'all';
+  let sourceData = state.taggerData;
+  if (_taggerGeo !== 'all' && pilotLimit) {
+    sourceData = sourceData.filter(c => {
+      const camp = (c['Campaign name'] || c['campaign name'] || '').toUpperCase();
+      const market = c._market || '';
+      if (_taggerGeo === 'US') return camp.startsWith('USA') || camp.startsWith('CAN') || market === 'US';
+      if (_taggerGeo === 'AUS') return camp.startsWith('ANZ') || camp.includes('NAPLAN') || market === 'AUS';
+      if (_taggerGeo === 'MEA') return camp.startsWith('MEA') || camp.startsWith('UAE') || camp.startsWith('AKT') || market === 'MEA';
+      if (_taggerGeo === 'UK') return camp.includes('ANZ-UK') || market === 'UK';
+      if (_taggerGeo === 'APAC') return camp.startsWith('ANZ') || market === 'APAC' || market === 'AUS';
+      return true;
+    });
+    showToast(`Pilot: ${sourceData.length} ${_taggerGeo} ads → tagging up to ${pilotLimit}`);
+  } else if (pilotLimit) {
+    showToast(`Pilot mode: tagging up to ${pilotLimit} creatives via API`);
+  }
+  const rawData = sourceData.map(c => {
     const { tags, id, _cached, ...rest } = c;
     return rest;
   });
