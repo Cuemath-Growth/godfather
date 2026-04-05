@@ -7559,10 +7559,10 @@ function renderTrendCharts() {
   const geoLabel = geo === 'all' ? 'All Markets' : geo;
 
   const CHARTS = [
-    { metric: 'spend', label: 'Daily Spend', lowerBetter: true, format: v => formatCurrency(v) },
-    { metric: 'td', label: 'Trial Dones', lowerBetter: false, format: v => Math.round(v).toString() },
-    { metric: 'cptd', label: 'CPTD (3-day avg)', lowerBetter: true, format: v => formatCurrency(v) },
-    { metric: 'ql_td_pct', label: 'QL→TD %', lowerBetter: false, format: v => v.toFixed(1) + '%' },
+    { metric: 'spend', label: 'Daily Spend', lowerBetter: true, format: v => formatCurrency(v), summary: 'last' },
+    { metric: 'td', label: 'Trial Dones', lowerBetter: false, format: v => Math.round(v).toString(), summary: '7d_sum' },
+    { metric: 'cptd', label: 'CPTD (3-day avg)', lowerBetter: true, format: v => formatCurrency(v), summary: 'last' },
+    { metric: 'ql_td_pct', label: 'QL→TD %', lowerBetter: false, format: v => v.toFixed(1) + '%', summary: 'last' },
   ];
 
   let html = `<details class="group" open>
@@ -7576,7 +7576,6 @@ function renderTrendCharts() {
 
   CHARTS.forEach(ch => {
     const data = computeSparklineData(ch.metric, geo, 30);
-    const lastVal = data.length > 0 ? data[data.length - 1].value : 0;
     if (!data || data.length < 3) {
       html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
         <p class="text-[10px] font-bold text-text-muted uppercase">${ch.label}</p>
@@ -7584,10 +7583,23 @@ function renderTrendCharts() {
       </div>`;
       return;
     }
+    // Summary value: 7-day sum for counts, last value for rates/costs
+    let summaryVal, summaryLabel;
+    if (ch.summary === '7d_sum') {
+      const last7 = data.slice(-7);
+      summaryVal = last7.reduce((s, d) => s + d.value, 0);
+      summaryLabel = 'last 7d';
+    } else {
+      summaryVal = data[data.length - 1].value;
+      summaryLabel = 'latest';
+    }
     html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
       <div class="flex items-baseline justify-between mb-1">
         <p class="text-[10px] font-bold text-text-muted uppercase">${ch.label}</p>
-        <p class="text-sm font-black">${ch.format(lastVal)}</p>
+        <div class="text-right">
+          <span class="text-sm font-black">${ch.format(summaryVal)}</span>
+          <span class="text-[8px] text-gray-400 ml-1">${summaryLabel}</span>
+        </div>
       </div>
       ${_buildTrendSVG(data, ch)}
     </div>`;
