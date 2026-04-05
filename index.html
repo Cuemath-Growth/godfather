@@ -8132,8 +8132,8 @@ function renderOracleModules() {
         <p class="text-sm font-medium mb-2">${brief.angle}</p>
         <div class="flex flex-wrap gap-1 mb-3">
           <span class="text-[10px] px-2 py-0.5 rounded-full ${gc.bg} ${gc.text} font-medium">${brief.format}</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icp_type}</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icp_segment}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icpType || ''}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icp_segment || brief.segment || ''}</span>
           ${brief.ethnicity ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.ethnicity}</span>` : ''}
           ${brief.hook ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple font-medium">${brief.hook}</span>` : ''}
           ${brief.benefit_frame ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-medium">${brief.benefit_frame}</span>` : ''}</div>
@@ -8878,7 +8878,7 @@ function generateFromBrief(brief) {
   document.querySelectorAll('#platformPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===brief.platform));
   const fm = {'Video':'Video - Reel','Static':'Static Ad'};
   document.querySelectorAll('#formatPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===(fm[brief.format]||brief.format)));
-  document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===(brief.icp_type||'NRI')));
+  document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===(brief.icpType||'NRI')));
   if (brief.icp_segment) { const s=document.getElementById('briefSegment'); for(let o of s.options) if(o.value===brief.icp_segment) { s.value=brief.icp_segment; break; }}
   if (brief.angle) document.getElementById('briefAngle').value = brief.angle;
   setTimeout(() => generateContent(), 100);
@@ -12650,6 +12650,7 @@ function renderTaggerInsights() {
   const insights = [];
   ['hook','content_format','pain_benefit','emotional_tone','language'].forEach(cat => {
     const catInfo = GODFATHER_TAXONOMY.fields[cat];
+    if (!catInfo) return;
     const tagPerf = {};
     filteredData.forEach(c => {
       const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown') return;
@@ -12698,7 +12699,7 @@ function renderTaggerInsights() {
 
   insights.sort((a,b) => b.improvement - a.improvement);
   insights.slice(0, 6).forEach(ins => {
-    const tc = TAG_COLORS[ins.color];
+    const tc = TAG_COLORS[ins.color] || TAG_COLORS.purple;
     const ratio = ins.worstMetric > 0 && ins.bestMetric > 0 ? ins.worstMetric / ins.bestMetric : 1;
     const savingsLabel = ratio >= 2 ? Math.round(ratio * 10) / 10 + 'x cheaper' : ins.improvement + '% cheaper';
     container.innerHTML += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 insight-card shadow-sm">
@@ -13399,6 +13400,7 @@ function renderTaggerHeatmap() {
   const allTagPerf = [];
   cats.forEach(cat => {
     const catInfo = GODFATHER_TAXONOMY.fields[cat];
+    if (!catInfo) return;
     const tagPerf = {};
     filteredData.forEach(c => {
       const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown' || tag === 'unknown' || tag === 'N/A') return;
@@ -13443,7 +13445,7 @@ function renderTaggerHeatmap() {
     const hasCPQL = tp.avgCPQL !== null;
     const pct = hasCPQL ? Math.min(100, (tp.avgCPQL / maxCPQL) * 100) : 100;
     const barColor = hasCPQL ? (pct < 33 ? '#10B981' : pct < 66 ? '#F59E0B' : '#EF4444') : '#9CA3AF';
-    const tc = TAG_COLORS[tp.color];
+    const tc = TAG_COLORS[tp.color] || TAG_COLORS.purple;
     html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/30">
       <td class="px-2 py-2"><span class="inline-flex items-center gap-1"><span class="${tc.bg} ${tc.text} text-[9px] px-1.5 py-0.5 rounded font-medium">${tp.catLabel}</span><span class="font-medium">${tagLabel(tp.tag)}</span></span></td>
       <td class="px-2 py-2 text-right text-text-muted">${tp.count}</td>
