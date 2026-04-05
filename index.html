@@ -287,8 +287,8 @@
             </div>
           </div>
 
-          <!-- Metric Definitions — always visible -->
-          <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[9px] text-gray-400">
+          <!-- Metric Definitions — sticky -->
+          <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[9px] text-gray-400 sticky top-0 bg-white/95 backdrop-blur-sm z-10 py-2 -mx-1 px-2 border-b border-gray-100">
             <span><strong class="text-gray-500">CPTD</strong> = Spend ÷ Trial Dones</span>
             <span><strong class="text-gray-500">CPQL</strong> = Spend ÷ Qualified Leads</span>
             <span><strong class="text-gray-500">TQL</strong> = True QLs (US: NRI only)</span>
@@ -1472,17 +1472,15 @@
               <div>
                 <h2 class="text-lg font-bold" style="display:none">Performance</h2>
                 <p class="text-xs text-text-muted" id="sentinelSubtitle">Funnel analysis with threshold scoring</p>
-                <details class="mt-1"><summary class="text-[10px] text-accent-purple cursor-pointer hover:underline">Metric glossary</summary>
-                <div class="text-[10px] text-text-muted mt-1 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-0.5">
-                  <span><strong>QL</strong> = Qualified Lead (signup)</span>
-                  <span><strong>TQL</strong> = True QL (US: NRI only)</span>
-                  <span><strong>TD</strong> = Trial Done</span>
-                  <span><strong>CPQL</strong> = Cost Per QL</span>
-                  <span><strong>CPTQL</strong> = Cost Per TQL</span>
-                  <span><strong>CPTD</strong> = Cost Per Trial Done</span>
-                  <span><strong>QL→TD%</strong> = Trial conversion rate</span>
-                  <span><strong>NRI</strong> = Non-Resident Indian lead</span>
-                </div></details>
+                <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[9px] text-gray-400">
+                  <span><strong class="text-gray-500">CPTD</strong> = Spend ÷ Trial Dones</span>
+                  <span><strong class="text-gray-500">CPQL</strong> = Spend ÷ QLs</span>
+                  <span><strong class="text-gray-500">TQL</strong> = True QLs (US: NRI only)</span>
+                  <span><strong class="text-gray-500">QL→TD%</strong> = Trial Done ÷ QL</span>
+                  <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> On track</span>
+                  <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span> Watch</span>
+                  <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span> Over threshold</span>
+                </div>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -1580,16 +1578,16 @@
                 <div class="flex items-center gap-3">
                   <div class="flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
                     <span class="text-[10px] text-text-muted font-semibold px-1.5">View:</span>
-                    <button data-level="campaign" onclick="setSentinelViewLevel('campaign')" class="sentinel-level-btn pill-btn px-2.5 py-1 rounded-md text-[10px] font-semibold active">Campaign</button>
-                    <button data-level="adset" onclick="setSentinelViewLevel('adset')" class="sentinel-level-btn pill-btn px-2.5 py-1 rounded-md text-[10px] font-semibold">Ad Set</button>
-                    <button data-level="ad" onclick="setSentinelViewLevel('ad')" class="sentinel-level-btn pill-btn px-2.5 py-1 rounded-md text-[10px] font-semibold">Ad</button>
+                    <button data-level="campaign" onclick="setSentinelViewLevel('campaign')" class="sentinel-level-btn pill-btn px-2.5 py-1 rounded-md text-[10px] font-semibold active" title="Aggregate all ads under each campaign">Campaign</button>
+                    <button data-level="adset" onclick="setSentinelViewLevel('adset')" class="sentinel-level-btn pill-btn px-2.5 py-1 rounded-md text-[10px] font-semibold" title="Group by ad set (targeting + audience)">Ad Set</button>
+                    <button data-level="ad" onclick="setSentinelViewLevel('ad')" class="sentinel-level-btn pill-btn px-2.5 py-1 rounded-md text-[10px] font-semibold" title="Show individual ads with full metrics">Ad</button>
                   </div>
                   <select id="sentinelFormatFilter" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="renderSentinelTable()">
                     <option value="all">All Formats</option>
                     <option value="static">Static Only</option>
                     <option value="video">Video Only</option>
                   </select>
-                  <select id="sentinelSort" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="renderSentinelTable()">
+                  <select id="sentinelSort" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="renderSentinelTable()" title="Composite = 40% CPTD + 30% CPQL + 20% QL→TD% + 10% Spend volume">
                     <option value="composite">Best Composite</option>
                     <option value="cpql_asc">Best CPQL</option>
                     <option value="cptd_asc">Best CPTD</option>
@@ -7148,7 +7146,7 @@ function renderOracleActions() {
         <div><p class="text-[9px] text-text-muted"${tooltipAttr('CPTD')}>CPTD</p><p class="text-xs font-bold">${m.cptd ? formatCurrency(m.cptd) : '\u2014'}</p></div>
         <div><p class="text-[9px] text-text-muted">QL\u2192TD%</p><p class="text-xs font-bold">${qlTdPct}</p></div>
       </div>
-      <div class="my-1.5 flex justify-center">${renderSparkline('cptd', geo, {width:100,height:20,days:14})}</div>
+      <div class="my-1.5 flex justify-center">${renderSparkline('cptd', geo, {width:140,height:28,days:14})}</div>
       <p class="text-[10px] text-text-muted">${formatCurrency(m.spend)} spend · ${Math.round(m.ql)} QLs · ${Math.round(m.td)} TDs · ${Math.round(m.enrolled||0)} enrolled</p>
       <p class="text-[10px] mt-1.5 font-medium ${status === 'Healthy' ? 'text-green-700' : status === 'Watch' ? 'text-amber-700' : status === 'Alert' ? 'text-red-700' : 'text-text-muted'}">${status === 'Healthy' ? 'Scale — increase budget or test new audiences' : status === 'Watch' ? 'Optimize — refresh creatives, test new hooks' : status === 'Alert' ? 'Investigate — pause worst performers, check funnel' : 'Need more data'}</p>
       ${(status === 'Alert' || status === 'Watch') ? `<details class="mt-1" data-diag-geo="${geo}"><summary class="text-[9px] font-bold text-accent-purple cursor-pointer hover:underline">Why?</summary><div class="diag-container"></div></details>` : ''}
@@ -13332,6 +13330,9 @@ function renderCreativeReview() {
     const tags = c.tags || {};
     const hookTag = tags.hook && tags.hook !== 'Unknown' ? tags.hook : '';
     const audTag = tags.campaign_audience && tags.campaign_audience !== 'Unknown' ? tags.campaign_audience : '';
+    const fmtTag = tags.content_format && tags.content_format !== 'Unknown' ? tags.content_format : '';
+    const prodTag = tags.production_style && tags.production_style !== 'Unknown' ? tags.production_style : '';
+    const hasAnyTag = hookTag || audTag || fmtTag || prodTag;
 
     const vColors = { green: 'border-green-300 bg-green-50', amber: 'border-amber-300 bg-amber-50', red: 'border-red-300 bg-red-50', gray: 'border-gray-200 bg-gray-50' };
     const vBadge = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700', gray: 'bg-gray-100 text-gray-500' };
@@ -13357,7 +13358,7 @@ function renderCreativeReview() {
           </div>
           <p class="text-[11px] font-semibold leading-tight mb-1 truncate" title="${name}">${shortAdName(name)}</p>
           <p class="text-[10px] text-text-secondary leading-snug mb-2">${v.reason}</p>
-          ${hookTag || audTag ? `<div class="flex gap-1 mb-2">${hookTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-medium">${tagLabel(hookTag)}</span>` : ''}${audTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-medium">${tagLabel(audTag)}</span>` : ''}</div>` : ''}
+          ${hasAnyTag ? `<div class="flex flex-wrap gap-1 mb-2">${hookTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-medium">${tagLabel(hookTag)}</span>` : ''}${fmtTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">${tagLabel(fmtTag)}</span>` : ''}${prodTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 font-medium">${tagLabel(prodTag)}</span>` : ''}${audTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-medium">${tagLabel(audTag)}</span>` : ''}</div>` : '<div class="mb-2"><span class="text-[9px] text-gray-400 italic">Needs tagging</span></div>'}
           <div class="grid grid-cols-4 gap-2 text-[10px]">
             <div><span class="text-text-muted block">CTR</span><span class="font-bold ${ctr > 1.5 ? 'text-green-700' : ctr > 0 ? '' : 'text-text-muted'}">${ctr > 0 ? ctr.toFixed(2)+'%' : '—'}</span>${showBenchmark ? ` ${cmp(ctr, b.avgCTR, false)}` : ''}</div>
             <div><span class="text-text-muted block">CPC</span><span class="font-bold">${cpc > 0 ? formatCurrency(cpc) : '—'}</span>${showBenchmark ? ` ${cmp(cpc, b.avgCPC, true)}` : ''}</div>
@@ -13718,20 +13719,32 @@ function renderTaggerAdRow(c, catFilter, indent) {
   const vStyles = { green: 'bg-green-50 text-green-700 border-green-200', amber: 'bg-amber-50 text-amber-700 border-amber-200', red: 'bg-red-50 text-red-700 border-red-200', gray: 'bg-gray-50 text-gray-500 border-gray-200' };
   const verdictBorder = v.color === 'green' ? 'border-l-green-500' : v.color === 'amber' ? 'border-l-amber-400' : v.color === 'red' ? 'border-l-red-500' : 'border-l-gray-200';
 
-  // Tags
+  // Tags — show top 5 fields + confidence badge
   let tagHtml = '';
   const isAllFilter = (catFilter || 'all') === 'all';
-  const catsToShow = isAllFilter ? ['hook','content_format','campaign_audience'] : [catFilter];
+  const catsToShow = isAllFilter ? ['hook','pain_benefit','content_format','production_style','campaign_audience'] : [catFilter];
   let tagCount = 0;
+  let totalTags = 0;
   catsToShow.forEach(cat => {
     const val = tags[cat];
     if (!val || val === 'null' || val === 'N/A' || val === 'Unknown') return;
+    totalTags++;
+    if (totalTags > 5) return;
     tagCount++;
-    if (tagCount > 3) return;
     const baseCat = cat.replace('_secondary','');
     const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(baseCat) || 'purple'];
-    tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5">${tagLabel(val)}</span>`;
+    tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5" title="${cat}">${tagLabel(val)}</span>`;
   });
+  // Count remaining valid tags beyond the 5 shown
+  if (isAllFilter) {
+    const allValidTags = GODFATHER_TAXONOMY.allFields.filter(f => tags[f] && tags[f] !== 'Unknown' && tags[f] !== 'null' && tags[f] !== 'N/A').length;
+    if (allValidTags > 5) tagHtml += `<span class="inline-block text-[8px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">+${allValidTags - 5}</span>`;
+  }
+  // Confidence badge
+  const conf = tags.confidence || '';
+  if (conf === 'confirmed') tagHtml += ' <span class="text-[7px] text-green-500" title="Tagged with vision (image analyzed)">&#9679;</span>';
+  else if (conf === 'inferred') tagHtml += ' <span class="text-[7px] text-amber-400" title="Tagged from text only (no image)">&#9679;</span>';
+  else if (!tagHtml || tagCount === 0) tagHtml = '<span class="text-[9px] text-gray-400 italic" title="Not yet tagged with new taxonomy. Use Pilot 50 or Re-tag All.">Needs tagging</span>';
 
   const thumb = c['image_url'] || c['thumbnail_url'] || '';
   const market = extractMarket(c);
@@ -16599,8 +16612,8 @@ function renderSentinelTop5() {
         <td class="px-2 py-2" style="max-width:180px"><div class="flex items-center gap-1.5">${sThumb ? `<img src="${sThumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : ''}<div><span class="font-medium text-[10px] truncate block" style="max-width:130px" title="${name}">${shortAdName(name)}</span>${topTags ? `<div class="flex gap-0.5 mt-0.5">${topTags}</div>` : ''}</div></div></td>
         <td class="px-2 py-2 text-right text-[11px] whitespace-nowrap">${formatCurrency(m.spend)}</td>
         <td class="px-2 py-2 text-right text-[11px]">${m.ctr ? m.ctr.toFixed(2)+'%' : '-'}</td>
-        <td class="px-2 py-2 text-right text-[11px] font-bold ${SCORE_STYLES[sc.cpql].text}">${((m.tql||0) === 0 && m.td > 0) ? '\u2014' : (m.cptql && m.cptql < 1000000 ? formatCurrency(m.cptql) : (m.cpql && m.cpql < 1000000 ? formatCurrency(m.cpql) : '-'))}</td>
-        <td class="px-2 py-2 text-right text-[11px] font-bold ${SCORE_STYLES[sc.cptd].text}">${m.cptd && m.cptd < 10000000 ? formatCurrency(m.cptd) : '-'}</td>
+        <td class="px-2 py-2 text-right text-[11px] font-bold ${SCORE_STYLES[sc.cpql].text}">${((m.tql||0) === 0 && m.td > 0) ? '<span class="text-gray-400 font-normal" title="No TQLs in this market">No TQLs</span>' : (m.cptql && m.cptql < 1000000 ? formatCurrency(m.cptql) : (m.cpql && m.cpql < 1000000 ? formatCurrency(m.cpql) : '<span class="text-gray-400 font-normal">No QLs</span>'))}</td>
+        <td class="px-2 py-2 text-right text-[11px] font-bold ${SCORE_STYLES[sc.cptd].text}">${m.cptd && m.cptd < 10000000 ? formatCurrency(m.cptd) : '<span class="text-gray-400 font-normal">' + ((m.td||0) === 0 ? 'No TDs' : '-') + '</span>'}</td>
         <td class="px-2 py-2 text-right text-[11px]">${Math.round(m.td||0)}</td>
         <td class="px-2 py-2 text-right text-[11px]">${m.ql_td_pct ? m.ql_td_pct.toFixed(1)+'%' : '-'}</td>
       </tr>`;
