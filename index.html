@@ -892,10 +892,10 @@
                 </select>
                 <select id="taggerFilterCategory" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
                   <option value="all">All Tags</option>
-                  <option value="hook_type">Hook</option>
-                  <option value="format">Format</option>
+                  <option value="hook">Hook</option>
+                  <option value="content_format">Format</option>
                   <option value="pain_benefit">Benefit</option>
-                  <option value="icp_target">Audience</option>
+                  <option value="campaign_audience">Audience</option>
                   <option value="segment">Segment</option>
                 </select>
                 <select id="taggerSortBy" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
@@ -1068,8 +1068,8 @@
               </select>
               <span class="text-xs text-text-muted">of</span>
               <select id="ciTagCat" class="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary font-medium" onchange="renderPerfMatrix()">
-                <option value="hook_type">Hook Type</option>
-                <option value="format">Format</option>
+                <option value="hook">Hook Type</option>
+                <option value="content_format">Format</option>
                 <option value="pain_benefit">Benefit Frame</option>
                 <option value="emotional_tone">Tone</option>
                 <option value="language">Language</option>
@@ -1078,7 +1078,7 @@
               <select id="ciDimension" class="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary font-medium" onchange="renderPerfMatrix()">
                 <option value="audience">Audience (Campaign)</option>
                 <option value="market">Market</option>
-                <option value="icp_target">ICP Type</option>
+                <option value="campaign_audience">ICP Type</option>
                 <option value="Creative type">Format</option>
               </select>
             </div>
@@ -1115,7 +1115,7 @@
           <select id="librarySort" class="px-3 py-2 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none" onchange="renderLibrary()">
             <option value="newest">Newest first</option>
             <option value="name">Name A-Z</option>
-            <option value="format">By format</option>
+            <option value="content_format">By format</option>
           </select>
           <button onclick="tagUnanalysedLibrary()" id="tagUnanalysedBtn" class="px-3 py-2 rounded-xl text-sm font-semibold bg-gradient-cool text-white hover:opacity-90 transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
@@ -1215,9 +1215,9 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-semibold text-red-700">Reset Tagger Data (if spend is inflated)</p>
-                <p class="text-[10px] text-text-muted">Clears localStorage + Supabase. Tags preserved in tag_cache. Re-pull from Meta API after reset.</p>
+                <p class="text-[10px] text-text-muted">Clears localStorage tagger data. Tags in creative_tags (Supabase) are preserved. Re-pull from Meta API after reset.</p>
               </div>
-              <button onclick="if(confirm('This clears ALL tagged creative data from localStorage AND Supabase. Tags are preserved in tag_cache. You will need to re-pull from Meta API. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];supabaseDeleteAll('tagged_creatives').then(ok=>{showToast(ok?'Tagger data cleared (localStorage + Supabase). Re-pull from Meta API.':'localStorage cleared but Supabase delete failed — check console.');runGroundTruthQA();});}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
+              <button onclick="if(confirm('This clears tagger performance data from localStorage. Tags in creative_tags (Supabase) are preserved. You will need to re-pull from Meta API. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];showToast('Tagger data cleared. Tags preserved in Supabase. Re-pull from Meta API.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
             </div>
           </div>
         </div>
@@ -1768,6 +1768,146 @@ async function supabaseDeleteAll(table) {
   }
 }
 
+// ==================== GODFATHER TAXONOMY (Single Source of Truth) ====================
+// Every tag field, allowed value, color, and label lives here.
+// Tagger prompt, Lens heatmap, Library badges, Combos, Grid — ALL read from this constant.
+// To add/remove/rename a field: change it HERE. Everything else updates automatically.
+const GODFATHER_TAXONOMY = {
+  fields: {
+    // ── Strategy tags (what the ad SAYS) ──
+    hook: {
+      label: 'Hook', type: 'ai', color: 'purple',
+      description: 'Opening message strategy — what grabs attention in the first line',
+      values: ['Outcome First', 'Problem/Pain', 'Question', 'Social Proof', 'Fear/Urgency', 'Curiosity', 'Recommendation', 'Offer/Price', 'Authority', 'Feature-Driven']
+    },
+    pain_benefit: {
+      label: 'Benefit', type: 'ai', color: 'red',
+      description: 'What parent need or pain point does it address',
+      values: ['Confidence', 'Grades & School', 'Tutor Quality', 'Personalization', 'Thinking vs Calculating', 'Fun & Engagement', 'Competition Prep', 'Foundation Building', 'Parent Peace of Mind']
+    },
+    emotional_tone: {
+      label: 'Tone', type: 'ai', color: 'pink', weight: 'low',
+      description: 'Emotional register — never use as primary grouping dimension',
+      values: ['Confident', 'Aspirational', 'Empathetic', 'Urgent', 'Warm', 'Playful', 'Authoritative', 'Inspirational']
+    },
+
+    // ── Creative tags (how it LOOKS/SOUNDS) ──
+    content_format: {
+      label: 'Format', type: 'ai', color: 'blue',
+      description: 'Narrative structure — NOT the hook. A testimonial can have any hook.',
+      values: ['Testimonial', 'Talking Head', 'Product Demo', 'Tutorial', 'Comparison', 'Skit/Story', 'Graphic Explainer', 'Slideshow']
+    },
+    talent_type: {
+      label: 'Talent', type: 'ai', color: 'teal',
+      description: 'Who appears in the creative',
+      values: ['Parent', 'Tutor', 'Child', 'Influencer', 'Voiceover Only', 'None']
+    },
+    talent_name: {
+      label: 'Creator', type: 'ai', color: 'teal', freeText: true,
+      description: 'Specific person name or "None"',
+      values: [] // free text — no constrained values
+    },
+    production_style: {
+      label: 'Production', type: 'ai', color: 'green',
+      description: 'How the creative was produced',
+      values: ['UGC', 'Studio', 'Animated', 'Static Graphic', 'Screen Recording']
+    },
+    creative_type: {
+      label: 'Type', type: 'ai', color: 'gray',
+      description: 'Technical format',
+      values: ['Static', 'Video']
+    },
+    language: {
+      label: 'Language', type: 'ai', color: 'blue',
+      description: 'Primary language spoken or written',
+      values: ['English', 'Hindi', 'Telugu', 'Tamil', 'Gujarati', 'Malayalam', 'Other']
+    },
+
+    // ── Tactical tags (what it OFFERS) ──
+    offer_present: {
+      label: 'Offer', type: 'ai', color: 'amber',
+      description: 'Is there a promotional offer',
+      values: ['Yes', 'No']
+    },
+    cta_type: {
+      label: 'CTA', type: 'ai', color: 'amber',
+      description: 'Call to action',
+      values: ['Book Free Trial', 'Learn More', 'Sign Up', 'Download App', 'Watch Video', 'Other']
+    },
+
+    // ── Vision tags (what is ON SCREEN — Segwise-level) ──
+    headline_theme: {
+      label: 'Headline', type: 'ai', color: 'indigo',
+      description: 'Main text overlay or headline theme',
+      values: ['Building Foundations', 'Expert Tutors', 'Personalized Learning', 'Math Competition', 'Promotional Offer', 'Student Outcomes', 'Social Proof', 'Fun & Engagement', 'Parent Peace of Mind', 'Other']
+    },
+    visual_style: {
+      label: 'Visual', type: 'ai', color: 'indigo',
+      description: 'Background and visual treatment',
+      values: ['Abstract/Geometric', 'Home/Study', 'Classroom', 'Photo Collage', 'Text-Heavy', 'Character/Illustration', 'Real Person', 'Whiteboard', 'Other']
+    },
+
+    // ── Parsed tag (from campaign name — NOT AI-tagged) ──
+    campaign_audience: {
+      label: 'Audience', type: 'parsed', color: 'orange',
+      description: 'Target audience derived from campaign naming convention',
+      values: ['NRI', 'Influencer', 'Vernacular', 'Retargeting', 'Broad/Advantage+', 'PLA', 'General'],
+      parse: function(campaignName) {
+        const camp = (campaignName || '').toLowerCase();
+        if (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('_pla_') || camp.includes('pla_') || camp.includes('instant') || camp.includes('on_facebook')) return 'PLA';
+        if (camp.includes('nri') || camp.includes('desi') || camp.includes('indianaudience')) return 'NRI';
+        if (camp.includes('influencer') || camp.includes('influ')) return 'Influencer';
+        if (camp.includes('vernac') || camp.includes('telugu') || camp.includes('tamil') || camp.includes('gujarati') || camp.includes('hindi')) return 'Vernacular';
+        if (camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt')) return 'Retargeting';
+        if (camp.includes('broad') || camp.includes('advantage')) return 'Broad/Advantage+';
+        return 'General';
+      }
+    }
+  },
+
+  // Default combo pairs for Lens Winning/Losing Patterns landing view
+  comboPairs: [
+    ['hook', 'pain_benefit'],
+    ['hook', 'campaign_audience'],
+    ['content_format', 'production_style']
+  ],
+
+  // Minimum sample sizes for combos — per market tier
+  minimums: {
+    tier1: { creatives: 3, tds: 5, spend: 50000 },  // US, India
+    tier2: { creatives: 2, tds: 3, spend: 25000 },  // AUS, APAC
+    tier3: { creatives: 2, tds: 2, spend: 15000 }   // MEA, UK
+  },
+  marketTier: {
+    US: 'tier1', India: 'tier1', Canada: 'tier1',
+    AUS: 'tier2', APAC: 'tier2', ROW: 'tier2',
+    MEA: 'tier3', UK: 'tier3', ME: 'tier3'
+  },
+
+  // Helpers — derived from fields above
+  get aiFields() { return Object.entries(this.fields).filter(([k, v]) => v.type === 'ai').map(([k]) => k); },
+  get allFields() { return Object.keys(this.fields); },
+  getLabel(field) { return this.fields[field]?.label || field; },
+  getColor(field) { return this.fields[field]?.color || 'gray'; },
+  getValues(field) { return this.fields[field]?.values || []; },
+  getMinimums(market) {
+    const tier = this.marketTier[market] || 'tier2';
+    return this.minimums[tier];
+  }
+};
+
+// ==================== TAXONOMY VERSION GATE ====================
+// Clears old tag caches on first load after taxonomy update.
+// Old caches use field names (hook, campaign_audience) that no longer exist.
+// Without this, rehydrateTagsFromCache() applies old-taxonomy tags on boot.
+const _TAXONOMY_VERSION = 2;
+if (localStorage.getItem('gf_taxonomy_v') !== String(_TAXONOMY_VERSION)) {
+  localStorage.removeItem('gf_tagCache');
+  localStorage.removeItem('gf_libraryTagCache');
+  localStorage.setItem('gf_taxonomy_v', String(_TAXONOMY_VERSION));
+  console.log('Taxonomy v' + _TAXONOMY_VERSION + ': old tag caches cleared');
+}
+
 // Map tagger row fields to Supabase column names
 function hashCode(s) { let h1 = 0, h2 = 5381; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 = ((h1 << 5) - h1 + c) | 0; h2 = ((h2 << 5) + h2 + c) | 0; } return Math.abs(h1 * 65536 + (h2 & 0xFFFF)); }
 function taggerRowToSupabase(c) {
@@ -1818,88 +1958,27 @@ function supabaseRowToTagger(r) {
   };
 }
 
-// Async sync tagger data to Supabase in batches of 500
+// DEPRECATED: syncTaggerToSupabase — old tagged_creatives table no longer used.
+// Tags now live in creative_tags table (written by tagCreatives() only).
+// Tagger performance data lives in localStorage + meta_ad_data Supabase.
 async function syncTaggerToSupabase(data) {
-  if (!data.length) return;
-  updateSyncBadge('syncing');
-  const rows = data.map(taggerRowToSupabase);
-  const batchSize = 500;
-  let success = true;
-  for (let i = 0; i < rows.length; i += batchSize) {
-    const batch = rows.slice(i, i + batchSize);
-    const ok = await supabaseUpsert('tagged_creatives', batch);
-    if (!ok) { success = false; break; }
-  }
-  if (success) {
-    console.log(`Synced ${rows.length} creatives to Supabase`);
-    updateSyncBadge('synced');
-  } else {
-    console.warn('Supabase sync failed — localStorage still has the data');
-    updateSyncBadge('offline');
-  }
+  // No-op: tagged_creatives table is deprecated. creative_tags is the sole tag source.
+  console.log('syncTaggerToSupabase: skipped (deprecated — tags live in creative_tags)');
+  updateSyncBadge('synced');
 }
 
-// Load tagger data from Supabase — paginated to handle >1000 rows
+// DEPRECATED: loadTaggerFromSupabase — old tagged_creatives table no longer used.
+// Tags now loaded from creative_tags in tagCreatives() pipeline.
 async function loadTaggerFromSupabase() {
-  const PAGE_SIZE = 1000;
-  let allRows = [];
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const rows = await supabaseGet('tagged_creatives', `select=*&order=updated_at.desc&limit=${PAGE_SIZE}&offset=${offset}`);
-    if (rows && rows.length) {
-      allRows = allRows.concat(rows);
-      offset += rows.length;
-      hasMore = rows.length === PAGE_SIZE;
-    } else {
-      hasMore = false;
-    }
-  }
-  if (allRows.length) {
-    updateSyncBadge('synced');
-    return allRows.map(supabaseRowToTagger);
-  }
+  // No-op: tagged_creatives is deprecated. Return null so callers use localStorage.
+  console.log('loadTaggerFromSupabase: skipped (deprecated — tags in creative_tags)');
   return null;
 }
 
-// Tag cache Supabase helpers
-async function syncTagCacheToSupabase(cache) {
-  const entries = Object.entries(cache);
-  if (!entries.length) return;
-  const rows = entries.map(([key, tags]) => ({
-    cache_key: key,
-    tags: tags,
-    updated_at: new Date().toISOString()
-  }));
-  const batchSize = 500;
-  for (let i = 0; i < rows.length; i += batchSize) {
-    await supabaseUpsert('tag_cache', rows.slice(i, i + batchSize));
-  }
-  console.log(`Synced ${entries.length} tag cache entries to Supabase`);
-}
-
-async function loadTagCacheFromSupabase() {
-  const PAGE_SIZE = 1000;
-  let allRows = [];
-  let offset = 0;
-  let hasMore = true;
-  while (hasMore) {
-    const rows = await supabaseGet('tag_cache', `select=*&limit=${PAGE_SIZE}&offset=${offset}`);
-    if (rows && rows.length) {
-      allRows = allRows.concat(rows);
-      offset += rows.length;
-      hasMore = rows.length === PAGE_SIZE;
-    } else {
-      hasMore = false;
-    }
-  }
-  if (allRows.length) {
-    const cache = {};
-    allRows.forEach(r => { cache[r.cache_key] = r.tags; });
-    return cache;
-  }
-  return null;
-}
+// DEPRECATED: syncTagCacheToSupabase / loadTagCacheFromSupabase
+// Old tag_cache table no longer used. Tags live in creative_tags only.
+async function syncTagCacheToSupabase(cache) { /* no-op */ }
+async function loadTagCacheFromSupabase() { return null; }
 
 // ==================== P0: LIBRARY FEEDBACK LOOP ====================
 
@@ -2186,48 +2265,9 @@ function deduplicateByAdName(data) {
   return deduped;
 }
 
-// Backfill Unknown CTA/Feature/Pillar tags locally — no API calls
-function backfillUnknownTags(data) {
-  data.forEach(c => {
-    if (!c.tags) return;
-    const name = (c['Ad name']||c['ad name']||'').toLowerCase();
-    const hook = c.tags.hook_type || '';
-    const pb = c.tags.pain_benefit || '';
-
-    // CTA: default to Free trial (Cuemath standard)
-    if (!c.tags.cta_type || c.tags.cta_type === 'Unknown') {
-      if (name.includes('demo')) c.tags.cta_type = 'Book demo';
-      else if (name.includes('whatsapp')) c.tags.cta_type = 'WhatsApp chat';
-      else if (name.includes('download') || name.includes('app')) c.tags.cta_type = 'Download app';
-      else if (name.includes('enroll') || name.includes('enrol')) c.tags.cta_type = 'Enroll today';
-      else if (name.includes('learn more') || name.includes('learnmore')) c.tags.cta_type = 'Learn more';
-      else c.tags.cta_type = 'Free trial';
-    }
-
-    // Feature: infer from ad name
-    if (!c.tags.feature || c.tags.feature === 'Unknown') {
-      if (name.includes('indian') && name.includes('tutor')) c.tags.feature = 'Top 1% tutors';
-      else if (name.includes('whiteboard')) c.tags.feature = 'Smart whiteboard';
-      else if (name.includes('platform') || name.includes('app')) c.tags.feature = 'Adaptive platform';
-      else if (name.includes('mathfit') || name.includes('fuar')) c.tags.feature = 'FUAR framework';
-      else if (name.includes('gamif')) c.tags.feature = 'Gamification';
-      else if (name.includes('curriculum') || name.includes('cbse') || name.includes('icse') || name.includes('naplan')) c.tags.feature = 'Curriculum aligned';
-      else if (name.includes('personali')) c.tags.feature = 'Personalized worksheets';
-      else c.tags.feature = '1:1 tutoring';
-    }
-
-    // India has no NRI/Non-NRI distinction — remap to language or Universal
-    const market = (c['_market'] || extractMarket(c) || '').toLowerCase();
-    if (market === 'india' && (c.tags.icp_target === 'NRI' || c.tags.icp_target === 'Non-NRI')) {
-      const lang = c.tags.language || '';
-      if (lang && lang !== 'English' && lang !== 'Unknown') c.tags.icp_target = lang + ' Speaking';
-      else c.tags.icp_target = 'All Audiences';
-    }
-
-    // messaging_pillar derivation removed — legacy taxonomy purged in Phase 3.2
-  });
-  return data;
-}
+// DEPRECATED: backfillUnknownTags — legacy heuristic backfill replaced by GODFATHER_TAXONOMY.
+// All fields now AI-tagged or parsed. Kept as pass-through for callers.
+function backfillUnknownTags(data) { return data; }
 
 function saveTaggerData() {
   // SAFEGUARD: Never overwrite a large dataset with empty/tiny data
@@ -3959,7 +3999,7 @@ async function connectMetaApi() {
     saveState('rawData', state.rawData);
 
     // PERMANENT FIX: Always REPLACE tagger data with fresh pull (never accumulate).
-    // Tags are preserved via tag_cache — rehydrated automatically.
+    // Tags are preserved in creative_tags Supabase table.
     // This prevents spend inflation from multiple pulls.
     state.taggerData = deduplicateByAdName(ensureDerivedMetrics(allAds));
     // Flag: localStorage has a fresh Meta API pull — Supabase must NOT override on next boot
@@ -3974,7 +4014,7 @@ async function connectMetaApi() {
     // Sync clean data to Supabase (replaces corrupted data)
     syncTaggerToSupabase(state.taggerData);
     // Find untagged ads (no tags even after cache rehydration)
-    const untagged = state.taggerData.filter(c => !c.tags || !c.tags.hook_type || c.tags.hook_type === 'Unknown');
+    const untagged = state.taggerData.filter(c => !c.tags || !c.tags.hook || c.tags.hook === 'Unknown');
     const tagged = state.taggerData.length - untagged.length;
     if (untagged.length > 0) {
       if (confirm(`${allAds.length} ads pulled. ${restored} tags restored from cache.\n\n${untagged.length} untagged ads found. Tag them now? (~$${(untagged.length * 0.01).toFixed(2)} Claude credits)\n\n${tagged} ads already tagged — not re-tagged.`)) {
@@ -6347,7 +6387,7 @@ async function runAnalysis() {
       s.types[t] = (s.types[t]||0) + 1;
     });
     const tagSummary = {};
-    ['hook_type','pain_benefit','format','emotional_tone','language'].forEach(cat => {
+    ['hook','pain_benefit','content_format','emotional_tone','language'].forEach(cat => {
       const tp = {};
       analysisData.forEach(c => {
         const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown') return;
@@ -6392,7 +6432,7 @@ async function runAnalysis() {
   if (state.taggerData.length) {
     const hookPerf = {};
     state.taggerData.forEach(c => {
-      const hook = c.tags?.hook_type;
+      const hook = c.tags?.hook;
       const spend = parseNumber(c['Spent']||c['spent']||0);
       const ql = parseNumber(c['QL']||c['ql']||0);
       if (hook && hook !== 'Unknown' && ql > 0) {
@@ -6435,7 +6475,7 @@ RULES:
 12. CORRELATION LANGUAGE: Use "associated with", "correlated with", "tends to perform" — NEVER say "causes", "drives", "leads to", or "results in". Correlation is not causation.
 
 Return ONLY valid JSON:
-{"headline":"[single most important thing in one sentence]","regional_insights":[{"geo":"","status":"strong|weak|opportunity","headline":"","detail":"","key_metric":""}],"country_breakdowns":[{"geo":"","status":"green|amber|red","top_creative":"","top_drain":"","cpql_trend":"improving|stable|worsening","cptd_trend":"improving|stable|worsening","ql_td_pct":"","seasonal_context":"","open_gaps":[""]}],"creative_insights":[{"finding":"","type":"Video|Static","impact":"high|medium","recommendation":""}],"tagging_advisory":[{"creative_name":"","recommended_audience":"","campaign_type":"","tags":[],"confidence":"high|medium|low"}],"recommended_briefs":[{"geo":"","platform":"Meta","format":"Video|Static|Carousel","icp_segment":"Foundation Rebuilder","icp_type":"NRI|Non-NRI|Asian","ethnicity":"","angle":"","rationale":"","priority":"high|medium|low","targeting":{"age_range":"","interests":"","lookalike_source":""},"hook_type":"","benefit_frame":""}],"funnel_alerts":[{"stage":"","geo":"","issue":"","action":""}],"summary":""}
+{"headline":"[single most important thing in one sentence]","regional_insights":[{"geo":"","status":"strong|weak|opportunity","headline":"","detail":"","key_metric":""}],"country_breakdowns":[{"geo":"","status":"green|amber|red","top_creative":"","top_drain":"","cpql_trend":"improving|stable|worsening","cptd_trend":"improving|stable|worsening","ql_td_pct":"","seasonal_context":"","open_gaps":[""]}],"creative_insights":[{"finding":"","type":"Video|Static","impact":"high|medium","recommendation":""}],"tagging_advisory":[{"creative_name":"","recommended_audience":"","campaign_type":"","tags":[],"confidence":"high|medium|low"}],"recommended_briefs":[{"geo":"","platform":"Meta","format":"Video|Static|Carousel","icp_segment":"Foundation Rebuilder","icp_type":"NRI|Non-NRI|Asian","ethnicity":"","angle":"","rationale":"","priority":"high|medium|low","targeting":{"age_range":"","interests":"","lookalike_source":""},"hook":"","benefit_frame":""}],"funnel_alerts":[{"stage":"","geo":"","issue":"","action":""}],"summary":""}
 
 Provide 3+ regional, country breakdowns for each active geo, 3+ creative insights, 5+ briefs (2+ high priority), funnel alerts. Be specific with numbers.`;
 
@@ -6535,7 +6575,7 @@ function renderOracleActions() {
     // 1. CPTD Change Diagnosis — compare by audience/hook/geo
     const audienceCPTD = {};
     data.forEach(c => {
-      const aud = c.tags?.icp_target || 'Unknown';
+      const aud = c.tags?.campaign_audience || 'Unknown';
       const s = parseNumber(c['Spent']||c['spent']||0);
       const td = parseNumber(c['TD']||c['td']||0);
       if (!audienceCPTD[aud]) audienceCPTD[aud] = { spend: 0, td: 0, count: 0 };
@@ -6807,7 +6847,7 @@ function renderOracleActions() {
     // Best hook
     const hookPerf = {};
     ads.forEach(ad => {
-      const h = ad.tags?.hook_type; if (!h || h === 'Unknown') return;
+      const h = ad.tags?.hook; if (!h || h === 'Unknown') return;
       if (!hookPerf[h]) hookPerf[h] = {s:0,q:0,t:0,n:0};
       hookPerf[h].s += spend(ad); hookPerf[h].q += ql(ad); hookPerf[h].t += td(ad); hookPerf[h].n++;
     });
@@ -6819,7 +6859,7 @@ function renderOracleActions() {
     // Best format
     const fmtPerf = {};
     ads.forEach(ad => {
-      const f = ad.tags?.format || ad['Creative type'] || 'Unknown'; if (f === 'Unknown') return;
+      const f = ad.tags?.content_format || ad['Creative type'] || 'Unknown'; if (f === 'Unknown') return;
       if (!fmtPerf[f]) fmtPerf[f] = {s:0,q:0,t:0,n:0};
       fmtPerf[f].s += spend(ad); fmtPerf[f].q += ql(ad); fmtPerf[f].t += td(ad); fmtPerf[f].n++;
     });
@@ -7594,7 +7634,7 @@ function renderOracleModules() {
     const cpqlVal = c => { const ql = parseNumber(c['QL']||c['ql']||0); return ql > 0 ? spend(c)/ql : null; };
     const scored = withQL.map(c => ({...c, _cptd: cptdVal(c), _cpql: cpqlVal(c), _score: (cptdVal(c) || cpqlVal(c)*3 || Infinity)}));
     scored.sort((a,b) => a._score - b._score);
-    const mapRow = c => ({...c, 'Ad name': c['Ad name']||c['ad name']||'', type: c['Creative type']||c.tags?.format||'', metrics: { cptd: c._cptd, cpql: c._cpql }});
+    const mapRow = c => ({...c, 'Ad name': c['Ad name']||c['ad name']||'', type: c['Creative type']||c.tags?.content_format||'', metrics: { cptd: c._cptd, cpql: c._cpql }});
     if (!s) { /* create temporary sentinel-like output */}
     const autoSentinel = { top5: scored.slice(0,5).map(mapRow), bottom5: scored.slice(-5).reverse().map(mapRow) };
     if (!s) Object.assign(state, { _autoSentinel: autoSentinel });
@@ -7641,7 +7681,7 @@ function renderOracleModules() {
         const market = extractMarket(r);
         const format = r.type || (r['Creative type']||'').toLowerCase();
         const cptdHtml = r.metrics?.cptd ? formatCurrency(r.metrics.cptd) : (r.metrics?.cpql ? `<span class="text-text-muted">${formatCurrency(r.metrics.cpql)}</span><br><span class="text-[8px] text-text-muted font-normal">(CPQL)</span>` : '—');
-        const audience = r.tags?.icp_target || r['icp_type'] || '-';
+        const audience = r.tags?.campaign_audience || r['icp_type'] || '-';
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
           <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
           <td class="py-1.5 px-2">${market}</td>
@@ -7670,7 +7710,7 @@ function renderOracleModules() {
         const market = extractMarket(r);
         const format = r.type || (r['Creative type']||'').toLowerCase();
         const cptdHtml = r.metrics?.cptd ? formatCurrency(r.metrics.cptd) : (r.metrics?.cpql ? `<span class="text-text-muted">${formatCurrency(r.metrics.cpql)}</span><br><span class="text-[8px] text-text-muted font-normal">(CPQL)</span>` : '—');
-        const audience = r.tags?.icp_target || r['icp_type'] || '-';
+        const audience = r.tags?.campaign_audience || r['icp_type'] || '-';
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
           <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
           <td class="py-1.5 px-2">${market}</td>
@@ -7846,7 +7886,7 @@ function renderOracleModules() {
 
         var hookPerfM4 = {};
         ads.forEach(function(ad) {
-          var hk = ad.tags ? ad.tags.hook_type : null;
+          var hk = ad.tags ? ad.tags.hook : null;
           if (!hk || hk === 'Unknown') return;
           if (!hookPerfM4[hk]) hookPerfM4[hk] = { spend: 0, ql: 0, td: 0, count: 0 };
           hookPerfM4[hk].spend += parseNumber(ad['Spent']||ad['spent']||0);
@@ -7863,7 +7903,7 @@ function renderOracleModules() {
 
         var fmtPerfM4 = {};
         ads.forEach(function(ad) {
-          var fm = (ad.tags ? ad.tags.format : null) || ad['Creative type'] || 'Unknown';
+          var fm = (ad.tags ? ad.tags.content_format : null) || ad['Creative type'] || 'Unknown';
           if (fm === 'Unknown') return;
           if (!fmtPerfM4[fm]) fmtPerfM4[fm] = { spend: 0, ql: 0, td: 0, count: 0 };
           fmtPerfM4[fm].spend += parseNumber(ad['Spent']||ad['spent']||0);
@@ -8095,7 +8135,7 @@ function renderOracleModules() {
           <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icp_type}</span>
           <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icp_segment}</span>
           ${brief.ethnicity ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.ethnicity}</span>` : ''}
-          ${brief.hook_type ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple font-medium">${brief.hook_type}</span>` : ''}
+          ${brief.hook ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple font-medium">${brief.hook}</span>` : ''}
           ${brief.benefit_frame ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-medium">${brief.benefit_frame}</span>` : ''}</div>
         <p class="text-xs text-text-muted mb-2">${brief.rationale}</p>
         ${brief.targeting ? `<p class="text-[10px] text-text-muted mb-3">${brief.targeting.age_range ? 'Age: '+brief.targeting.age_range+' | ' : ''}${brief.targeting.interests ? 'Interests: '+brief.targeting.interests+' | ' : ''}${brief.targeting.lookalike_source ? 'Lookalike: '+brief.targeting.lookalike_source : ''}</p>` : ''}
@@ -8742,7 +8782,7 @@ async function sendOracleChat() {
     cheap.forEach(c => { response += `- ${adName(c)} — CPTD ${formatCurrency(cptd(c))}, ${td(c)} TDs [${market(c)}]\n`; });
     // Tag patterns
     const tagSpend = {};
-    withTD.forEach(c => { if (!c.tags) return; const h = c.tags.hook_type||'Unknown'; if (!tagSpend[h]) tagSpend[h] = {spend:0,td:0}; tagSpend[h].spend += sp(c); tagSpend[h].td += td(c); });
+    withTD.forEach(c => { if (!c.tags) return; const h = c.tags.hook||'Unknown'; if (!tagSpend[h]) tagSpend[h] = {spend:0,td:0}; tagSpend[h].spend += sp(c); tagSpend[h].td += td(c); });
     const hookCPTD = Object.entries(tagSpend).filter(([,v]) => v.td > 0).map(([k,v]) => ({ hook:k, cptd: v.spend/v.td, td: v.td })).sort((a,b) => a.cptd-b.cptd);
     if (hookCPTD.length) {
       response += '\n**CPTD by Hook Type:**\n';
@@ -8754,8 +8794,8 @@ async function sendOracleChat() {
     const tagged = ads.filter(c => c.tags && sp(c) >= 5000);
     const byHook = {}, byAud = {}, byFmt = {};
     tagged.forEach(c => {
-      const h = c.tags.hook_type || 'Unknown';
-      const a = c.tags.icp_target || 'Unknown';
+      const h = c.tags.hook || 'Unknown';
+      const a = c.tags.campaign_audience || 'Unknown';
       const f = fmt(c);
       [[byHook,h],[byAud,a],[byFmt,f]].forEach(([map,key]) => { if (!map[key]) map[key] = {spend:0,ql:0,td:0}; map[key].spend+=sp(c); map[key].ql+=ql(c); map[key].td+=td(c); });
     });
@@ -8790,9 +8830,9 @@ async function sendOracleChat() {
   else if (lower.match(/test|next|recommend|suggest|gap|missing|try|idea/)) {
     const tagged = ads.filter(c => c.tags);
     const hooks = {}, auds = {};
-    tagged.forEach(c => { hooks[c.tags.hook_type||'Unknown'] = (hooks[c.tags.hook_type||'Unknown']||0)+1; auds[c.tags.icp_target||'Unknown'] = (auds[c.tags.icp_target||'Unknown']||0)+1; });
-    const allHooks = ['Math Anchor','Social Proof','Testimonial','Fear/Urgency','Offer/Price','Authority','Question Hook','Seasonal/Event','Problem-Solution','Curiosity'];
-    const allAuds = ['NRI Parents','All Audiences','Non-NRI Parents','Asian Parents','Tamil Speaking','Hindi Speaking'];
+    tagged.forEach(c => { hooks[c.tags.hook||'Unknown'] = (hooks[c.tags.hook||'Unknown']||0)+1; auds[c.tags.campaign_audience||'Unknown'] = (auds[c.tags.campaign_audience||'Unknown']||0)+1; });
+    const allHooks = GODFATHER_TAXONOMY.getValues('hook');
+    const allAuds = GODFATHER_TAXONOMY.getValues('campaign_audience');
     const missingHooks = allHooks.filter(h => !hooks[h] || hooks[h] < 3);
     const missingAuds = allAuds.filter(a => !auds[a] || auds[a] < 3);
     response = '### Creative Testing Recommendations\n\n';
@@ -8804,7 +8844,7 @@ async function sendOracleChat() {
     const topAds = [...qlMin].filter(c => c.tags && td(c) > 0).sort((a,b) => cptd(a)-cptd(b)).slice(0,3);
     if (topAds.length) {
       response += '\n**Replicate These Winners:**\n';
-      topAds.forEach(c => { response += `- ${adName(c)} [${c.tags.hook_type} + ${c.tags.icp_target} + ${fmt(c)}] — CPTD ${formatCurrency(cptd(c))}\n`; });
+      topAds.forEach(c => { response += `- ${adName(c)} [${c.tags.hook} + ${c.tags.campaign_audience} + ${fmt(c)}] — CPTD ${formatCurrency(cptd(c))}\n`; });
     }
     response += '\n*Action: Create 2-3 new creatives for each under-tested hook × audience combination.*';
   }
@@ -9716,7 +9756,7 @@ function buildSystemPrompt(brief) {
   if (state.activeWinningFormula && Object.keys(state.activeWinningFormula).length) {
     ciContext = '\n\n## CREATIVE INTELLIGENCE — WINNING FORMULA (DATA-PROVEN)\nBased on performance analysis of past creatives, these patterns drive the lowest CPQL for this market+ICP. YOU MUST incorporate these patterns:\n';
     Object.entries(state.activeWinningFormula).forEach(([cat,data]) => {
-      ciContext += `- **${TAG_CATEGORIES[cat]?.label||cat}**: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)} CPQL across ${data.count} creatives)\n`;
+      ciContext += `- **${GODFATHER_TAXONOMY.getLabel(cat)}**: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)} CPQL across ${data.count} creatives)\n`;
     });
     ciContext += '\nUse the winning hook type, tone, benefit, feature, and messaging pillar as your primary creative direction. Adapt the wording but KEEP the strategic pattern.\n';
   }
@@ -9729,10 +9769,10 @@ function buildSystemPrompt(brief) {
     const pbPerf = {};
     const formatPerf = {};
     state.taggerData.forEach(c => {
-      const hook = c.tags?.hook_type;
-      const hookSec = c.tags?.hook_type_secondary;
+      const hook = c.tags?.hook;
+      const hookSec = c.tags?.hook_secondary;
       const pb = c.tags?.pain_benefit || c.tags?.pain_point || c.tags?.benefit;
-      const fmt = c.tags?.format;
+      const fmt = c.tags?.content_format;
       const spend = parseNumber(c['Spent']||c['spent']||0);
       const ql = parseNumber(c['QL']||c['ql']||0);
       if (hook && hook !== 'Unknown' && ql > 0) {
@@ -10867,42 +10907,20 @@ function shortAdName(name) {
   return clean.length > 55 ? clean.substring(0, 55) + '...' : clean;
 }
 
-const TAG_CATEGORIES = {
-  // NOTE: 'Parent testimonial' is actually a FORMAT/content type, not a hook. The hook within a testimonial varies (outcome reveal, recommendation, fear→relief, etc.). Kept here for backward compat with existing tagged data. Display layer adds "(content type)" suffix.
-  hook_type: { label:'Hook', color:'purple', values:['Math anchor','Problem','Fear / urgency','Parent testimonial','Statistic','Question','Lifestyle / emotional','Competitive','Offer / price','Grade badge','Seasonal'] },
-  format: { label:'Format', color:'blue', values:['Static image','Video','Influencer UGC','Testimonial video','Vernacular testimonial','Product video','Brand video'] },
-  pain_benefit: { label:'Pain Point', color:'red', isArray:true, values:['Grades & school','Confidence & anxiety','Strong foundations','Future readiness','Tutor quality','Indian roots','Competition prep'] },
-  emotional_tone: { label:'Tone', color:'pink', values:['Testimonial','Aspirational','Confident','Urgency','Comparison','Offer / promo','Seasonal'] },
-  icp_target: { label:'Audience', color:'orange', values:['NRI parents','Non-NRI parents','Local parents','Gujarati speaking','Telugu speaking','Tamil speaking','High school parents'] },
-  setting: { label:'Setting', color:'teal', values:['Home','Studio','Outdoor','Screen recording','Animation'] },
-  production_style: { label:'Production', color:'blue', values:['UGC','Studio shoot','Motion graphic','Screen record'] },
-  language: { label:'Language', color:'blue', values:['English','Hindi','Telugu','Tamil','Malayalam','Gujarati','Other'] },
-};
+// TAG_CATEGORIES removed — all references now use GODFATHER_TAXONOMY directly.
 
 function validateTags(tags) {
   const validated = {...tags};
-  // Map new field names → internal field names (Claude prompt returns new names)
-  if (validated.pain_point && !validated.pain_benefit) { validated.pain_benefit = validated.pain_point; delete validated.pain_point; }
-  if (validated.tone && !validated.emotional_tone) { validated.emotional_tone = validated.tone; delete validated.tone; }
-  if (validated.audience && !validated.icp_target) { validated.icp_target = validated.audience; delete validated.audience; }
+  const fields = GODFATHER_TAXONOMY.fields;
+  // Validate each field against GODFATHER_TAXONOMY
   Object.entries(validated).forEach(([key, val]) => {
-    if (!val || key === 'confidence' || key === '_migrated' || key === 'telugu_flag' || key === 'offer_present' || key === 'offer_detail' || key === 'flag_for_review' || key === 'flag_reason' || key === 'talent_name') return;
-    const cat = TAG_CATEGORIES[key.replace('_secondary','')];
-    if (cat && cat.values && cat.values.length > 0) {
-      if (cat.isArray && Array.isArray(val)) {
-        // Validate each element in array
-        validated[key] = val.map(v => {
-          if (cat.values.includes(v)) return v;
-          const match = cat.values.find(cv => cv.toLowerCase() === (v||'').toLowerCase());
-          return match || 'Unknown';
-        }).filter(v => v !== 'Unknown');
-      } else if (!Array.isArray(val)) {
-        if (!cat.values.includes(val)) {
-          const match = cat.values.find(v => v.toLowerCase() === val.toLowerCase());
-          if (match) validated[key] = match;
-          else validated[key] = 'Unknown';
-        }
-      }
+    if (!val || key === 'confidence' || key === 'campaign_audience') return;
+    const field = fields[key];
+    if (!field || !field.values || field.values.length === 0 || field.freeText) return;
+    // Case-insensitive match against allowed values
+    if (!field.values.includes(val)) {
+      const match = field.values.find(v => v.toLowerCase() === (val||'').toLowerCase());
+      validated[key] = match || 'Unknown';
     }
   });
   return validated;
@@ -11167,9 +11185,9 @@ function diagnoseCPTD(data, geo, opts) {
   // Decompose by dimension — Audience only relevant for US (NRI vs non-NRI)
   const NRI_RELEVANT_GEOS = new Set(['US', 'all']);
   const dimensions = [
-    ...(NRI_RELEVANT_GEOS.has(geo) ? [{ key: 'icp_target', label: 'Audience', extract: c => c.tags?.icp_target || 'Unknown' }] : []),
-    { key: 'hook_type', label: 'Hook', extract: c => c.tags?.hook_type || 'Unknown' },
-    { key: 'format', label: 'Format', extract: c => c.tags?.format || c['Creative type'] || 'Unknown' },
+    ...(NRI_RELEVANT_GEOS.has(geo) ? [{ key: 'campaign_audience', label: 'Audience', extract: c => c.tags?.campaign_audience || 'Unknown' }] : []),
+    { key: 'hook', label: 'Hook', extract: c => c.tags?.hook || 'Unknown' },
+    { key: 'content_format', label: 'Format', extract: c => c.tags?.content_format || c['Creative type'] || 'Unknown' },
   ];
 
   dimensions.forEach(dim => {
@@ -11300,9 +11318,9 @@ function diagnoseTrend(data, geo) {
   const drivers = [];
 
   // Decompose: which dimension's shift explains the change?
-  ['icp_target', 'hook_type', 'format'].forEach(dim => {
-    const label = dim === 'icp_target' ? 'Audience' : dim === 'hook_type' ? 'Hook' : 'Format';
-    const extract = c => c.tags?.[dim] || (dim === 'format' ? c['Creative type'] : null) || 'Unknown';
+  ['campaign_audience', 'hook', 'content_format'].forEach(dim => {
+    const label = dim === 'campaign_audience' ? 'Audience' : dim === 'hook' ? 'Hook' : 'Format';
+    const extract = c => c.tags?.[dim] || (dim === 'content_format' ? c['Creative type'] : null) || 'Unknown';
 
     // Per-dimension CPTD in each period
     const priorByDim = {}, recentByDim = {};
@@ -11356,9 +11374,9 @@ function diagnoseTrend(data, geo) {
 function computeCrossCombo(data, geo) {
   const combos = {};
   data.forEach(c => {
-    const aud = c.tags?.icp_target || extractAudience(c) || ''; if (!aud || aud === 'Unknown' || aud === 'Other') return;
-    const hook = c.tags?.hook_type || ''; if (!hook || hook === 'Unknown') return;
-    const fmt = c.tags?.format || c['Creative type'] || ''; if (!fmt || fmt === 'Unknown' || fmt === '-') { return; }
+    const aud = c.tags?.campaign_audience || extractAudience(c) || ''; if (!aud || aud === 'Unknown' || aud === 'Other') return;
+    const hook = c.tags?.hook || ''; if (!hook || hook === 'Unknown') return;
+    const fmt = c.tags?.content_format || c['Creative type'] || ''; if (!fmt || fmt === 'Unknown' || fmt === '-') { return; }
     const key = `${aud}|${hook}|${fmt}`;
     if (!combos[key]) combos[key] = { audience: aud, hook, format: fmt, spend: 0, ql: 0, td: 0, nri: 0, count: 0 };
     combos[key].spend += parseNumber(c['Spent']||c['spent']||0);
@@ -11720,26 +11738,13 @@ function runSentinelAnalysis(data, geo) {
 
 // TAG_MIGRATION removed — old coded taxonomy purged in Phase 3.2
 
-// Tag cache: keyed by ad name, stores tags so we never re-tag the same creative
+// DEPRECATED: Old localStorage tag cache (gf_tagCache) replaced by creative_tags Supabase table.
+// These stubs prevent crashes from any remaining callers.
 let _tagCacheLoaded = false;
-let _tagCacheData = JSON.parse(localStorage.getItem('gf_tagCache') || '{}');
+let _tagCacheData = {}; // Empty — version gate already cleared gf_tagCache in localStorage
 
-function getTagCache() {
-  return _tagCacheData;
-}
-function saveTagCache(cache) {
-  _tagCacheData = cache;
-  try { localStorage.setItem('gf_tagCache', JSON.stringify(cache)); }
-  catch(e) { /* storage full — trim old entries */
-    const keys = Object.keys(cache);
-    if (keys.length > 500) {
-      keys.slice(0, keys.length - 500).forEach(k => delete cache[k]);
-      localStorage.setItem('gf_tagCache', JSON.stringify(cache));
-    }
-  }
-  // Async sync to Supabase
-  syncTagCacheToSupabase(cache).catch(e => console.warn('Tag cache Supabase sync error:', e));
-}
+function getTagCache() { return _tagCacheData; }
+function saveTagCache(cache) { /* no-op: tags saved to creative_tags Supabase only */ }
 
 // Load tagger data: localStorage immediately, then try Supabase async
 // One-time spend deflation: old dedup SUMMED spend across duplicates — divide by _dedupCount to fix
@@ -11754,6 +11759,8 @@ _rawLocal.forEach(c => {
     c._spendDeflated = true;
   }
 });
+// Migrate old field names in tags (hook→hook, format→content_format, campaign_audience→campaign_audience)
+_rawLocal.forEach(c => { if (c.tags) c.tags = migrateTags(c.tags); });
 state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(_rawLocal)));
 // Backfill _date from campaign names for existing data missing dates
 let _dateBackfilled = 0;
@@ -11762,85 +11769,58 @@ if (_dateBackfilled > 0) { console.log(`Backfilled _date on ${_dateBackfilled}/$
 const _localTaggerCount = state.taggerData.length;
 console.log(`Using localStorage fallback (${_localTaggerCount} creatives)`);
 
-// REHYDRATE TAGS: Apply tag_cache to any rows missing tags on boot
-function rehydrateTagsFromCache(data) {
-  const cache = getTagCache();
-  if (!Object.keys(cache).length) return 0;
-  let restored = 0;
-  data.forEach(c => {
-    if (c.tags && Object.keys(c.tags).length > 0) return; // already has tags
-    const adName = c['Ad name'] || c['ad name'] || c['Ad Name'] || '';
-    const cached = cache[adName];
-    if (cached && cached.hook_type) {
-      c.tags = validateTags(migrateTags(cached));
-      restored++;
-    }
-  });
-  if (restored > 0) {
-    console.log(`REHYDRATED ${restored}/${data.length} creatives from tag cache`);
-    backfillUnknownTags(data);
-  }
-  return restored;
-}
-
-// Immediate rehydration from localStorage tag cache
-const _immediateRestored = rehydrateTagsFromCache(state.taggerData);
-if (_immediateRestored > 0) saveTaggerData();
+// DEPRECATED: rehydrateTagsFromCache — old localStorage tag cache no longer used.
+// Tags are loaded from creative_tags Supabase table at render time, not rehydrated into taggerData.
+function rehydrateTagsFromCache(data) { return 0; }
 
 // Merge CRM data with cached tagger data on load
 if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
 
-// Async: try loading from Supabase — if it has more/newer data, use it
-// GUARD: If localStorage has a recent fresh Meta API pull, trust it over Supabase.
-// Supabase may contain old corrupted rows from pre-fix accumulation.
-const _freshPullTimestamp = parseInt(localStorage.getItem('gf_freshPull') || '0');
-const _localHasFreshPull = (Date.now() - _freshPullTimestamp < 7 * 24 * 60 * 60 * 1000); // within 7 days — blocks Supabase override even if localStorage was just cleared
+// Async: load creative_tags from Supabase (new tag system) + backup to localStorage
+// Tagger performance data stays in localStorage. Tags come from creative_tags ONLY.
 state._supabaseLoadPending = true;
+state._creativeTagsCache = []; // Will hold all creative_tags rows for tag lookups
 (async () => {
   try {
-    const sbData = await loadTaggerFromSupabase();
+    const tags = await supabaseGet('creative_tags', 'select=*');
     state._supabaseLoadPending = false;
-    if (_localHasFreshPull) {
-      console.log(`Supabase has ${sbData?.length || 0} rows but localStorage has ${_localTaggerCount} fresh-pull rows — keeping localStorage, syncing clean data UP to Supabase`);
-      updateSyncBadge('synced');
-      syncTaggerToSupabase(state.taggerData).catch(() => {});
-    } else if (sbData && sbData.length > _localTaggerCount) {
-      // One-time spend deflation: old dedup SUMMED spend across duplicates.
-      // If _dedupCount > 1, spend was inflated by that factor. Divide to restore.
-      sbData.forEach(c => {
-        const dc = c._dedupCount || 1;
-        if (dc > 1) {
-          ['Spent','spent','QL','ql','NRI','nri','TD','td','TS','ts','Paid','paid','Impressions','impressions','Clicks','clicks','net_booking'].forEach(f => {
-            if (c[f] !== undefined && parseNumber(c[f]) > 0) c[f] = Math.round(parseNumber(c[f]) / dc);
-          });
-          c._dedupCount = 1; // Reset after deflation
-          c._spendDeflated = true;
-        }
+    if (Array.isArray(tags) && tags.length > 0) {
+      state._creativeTagsCache = tags;
+      // Build tag lookup map: ad_name||account → tag row
+      state._tagLookup = {};
+      tags.forEach(t => {
+        state._tagLookup[(t.ad_name || '') + '||' + (t.account || '')] = t;
+        // Also index by ad_name alone for backward compat lookups
+        if (!state._tagLookup[t.ad_name]) state._tagLookup[t.ad_name] = t;
       });
-      state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(sbData)));
-      // Rehydrate tags from cache for any Supabase rows missing tags
-      const sbRestored = rehydrateTagsFromCache(state.taggerData);
-      state.taggerData.forEach(c => { if (!c['_date']) extractDateFromAdName(c); });
-      if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
-      saveTaggerData();
-      console.log(`Loaded ${sbData.length} creatives from Supabase (was ${_localTaggerCount} in localStorage)${sbRestored ? `, rehydrated ${sbRestored} tags` : ''}`);
+      console.log(`creative_tags: ${tags.length} rows loaded into tag lookup`);
+      // Backup to localStorage (read-only fallback if Supabase is down)
+      try {
+        localStorage.setItem('gf_creative_tags_backup', JSON.stringify(tags));
+        localStorage.setItem('gf_creative_tags_backup_ts', Date.now().toString());
+      } catch(e) { /* storage full — skip backup */ }
       updateSyncBadge('synced');
-      // Re-render the active view now that data is loaded
-      // Update sidebar label with correct count
-      const _metaLabel = document.getElementById('metaLabel');
-      if (_metaLabel) _metaLabel.textContent = `Meta Ads (${state.taggerData.length.toLocaleString()})`;
-      const _metaDot = document.getElementById('metaDot');
-      if (_metaDot) _metaDot.className = 'w-2 h-2 rounded-full bg-green-400';
-      const activeView = state.currentView || 'dashboard';
-      try { navigateTo(activeView); } catch(e) { console.warn('Post-Supabase render:', e); }
-    } else if (sbData) {
-      console.log(`Supabase has ${sbData.length} creatives, localStorage has ${_localTaggerCount} — keeping localStorage`);
+    } else {
+      console.log('creative_tags: 0 rows (table empty or new)');
       updateSyncBadge('synced');
-      if (_localTaggerCount > sbData.length) syncTaggerToSupabase(state.taggerData);
     }
   } catch(e) {
     state._supabaseLoadPending = false;
-    console.warn('Supabase load failed, using localStorage:', e.message);
+    console.warn('creative_tags load failed, trying localStorage backup:', e.message);
+    // Fallback: read-only localStorage backup (Crack #23 fix)
+    try {
+      const backup = JSON.parse(localStorage.getItem('gf_creative_tags_backup') || '[]');
+      if (backup.length > 0) {
+        state._creativeTagsCache = backup;
+        state._tagLookup = {};
+        backup.forEach(t => {
+          state._tagLookup[(t.ad_name || '') + '||' + (t.account || '')] = t;
+          if (!state._tagLookup[t.ad_name]) state._tagLookup[t.ad_name] = t;
+        });
+        const age = Math.round((Date.now() - parseInt(localStorage.getItem('gf_creative_tags_backup_ts') || '0')) / 3600000);
+        console.log(`Using backup creative_tags (${backup.length} rows, ${age}h old)`);
+      }
+    } catch(e2) { /* no backup available */ }
     updateSyncBadge('offline');
   }
 })();
@@ -11900,34 +11880,32 @@ function useDashboardData() {
   tagCreatives(raw);
 }
 
-// Async: try loading tag cache from Supabase on boot (getTagCache/saveTagCache defined above with tagger boot)
-(async () => {
-  try {
-    const sbCache = await loadTagCacheFromSupabase();
-    if (sbCache && Object.keys(sbCache).length > Object.keys(_tagCacheData).length) {
-      _tagCacheData = { ..._tagCacheData, ...sbCache };
-      localStorage.setItem('gf_tagCache', JSON.stringify(_tagCacheData));
-      console.log(`Loaded ${Object.keys(sbCache).length} tag cache entries from Supabase`);
-    } else if (Object.keys(_tagCacheData).length && (!sbCache || Object.keys(sbCache).length < Object.keys(_tagCacheData).length)) {
-      syncTagCacheToSupabase(_tagCacheData).catch(() => {});
-    }
-  } catch(e) { console.warn('Tag cache Supabase load failed:', e.message); }
-  _tagCacheLoaded = true;
-  // After Supabase cache loads, rehydrate any tagless creatives
-  if (state.taggerData.length) {
-    const sbRestored = rehydrateTagsFromCache(state.taggerData);
-    if (sbRestored > 0) {
-      saveTaggerData();
-      syncTaggerToSupabase(state.taggerData).catch(() => {});
-      try { navigateTo(state.currentView || 'dashboard'); } catch(e) {}
-      console.log(`Post-cache-load: rehydrated ${sbRestored} creatives from Supabase tag cache`);
-    }
-  }
-})();
+// DEPRECATED: Old tag_cache Supabase boot removed.
+// Tags now loaded via creative_tags in the async block above (state._creativeTagsCache).
+_tagCacheLoaded = true;
 
-// migrateTags removed — old coded taxonomy purged in Phase 3.2
-// Tags are now stored in plain English; no migration needed
-function migrateTags(tags) { return tags || {}; }
+// Normalize old field names → new GODFATHER_TAXONOMY names
+// Old field name → new name mapping for migrating localStorage tags
+const _TAG_FIELD_RENAMES = Object.freeze({
+  'hook_type': 'hook',
+  'format': 'content_format',
+  'icp_target': 'campaign_audience',
+  'setting': null,
+  'subject_in_frame': null
+});
+function migrateTags(tags) {
+  if (!tags) return {};
+  const out = {};
+  Object.entries(tags).forEach(([k, v]) => {
+    if (k in _TAG_FIELD_RENAMES) {
+      const newKey = _TAG_FIELD_RENAMES[k];
+      if (newKey && !tags[newKey]) out[newKey] = v; // rename, don't overwrite if new key exists
+    } else {
+      out[k] = v;
+    }
+  });
+  return out;
+}
 
 async function tagCreatives(rawData) {
   document.getElementById('taggerUpload').style.display = 'none';
@@ -11955,23 +11933,22 @@ async function tagCreatives(rawData) {
   rawData.forEach(c => {
     const adName = c['Ad name'] || c['ad name'] || c['Ad Name'] || '';
 
-    // Check Supabase cache first
-    if (supabaseCache[adName] && supabaseCache[adName].talent_type) {
-      const row = supabaseCache[adName];
-      const tags = {
-        talent_name: row.talent_name, talent_type: row.talent_type,
-        setting: row.setting, production_style: row.production_style,
-        subject_in_frame: row.subject_in_frame, offer_present: row.offer_present,
-        cta_type: row.cta_type, language: row.language, creative_type: row.creative_type,
-        confidence: row.confidence
-      };
+    // Check Supabase cache first — keyed by "ad_name||account" or "ad_name"
+    const acctKey = adName + '||' + (c['_account'] || '');
+    const cacheRow = supabaseCache[acctKey] || supabaseCache[adName];
+    if (cacheRow && (cacheRow.hook || cacheRow.talent_type)) {
+      const row = cacheRow;
+      const tags = {};
+      // Extract all taxonomy fields from cached row
+      GODFATHER_TAXONOMY.allFields.forEach(f => { if (row[f] != null) tags[f] = row[f]; });
+      tags.confidence = row.confidence || 'cached';
       cachedResults.push({ ...c, tags, id: Date.now() + cachedResults.length, _cached: true });
       return;
     }
 
-    // Check localStorage cache (old taxonomy — migrate)
+    // Check localStorage cache (old or new taxonomy — migrate if needed)
     const localCached = tagCache[adName];
-    if (localCached && localCached.hook_type) {
+    if (localCached && (localCached.hook || localCached['hook_type'])) {
       const tags = migrateTags(localCached);
       cachedResults.push({ ...c, tags: validateTags(tags), id: Date.now() + cachedResults.length, _cached: true });
       return;
@@ -11983,6 +11960,13 @@ async function tagCreatives(rawData) {
   // If all cached, skip tagging entirely
   if (needsTagging.length === 0) {
     state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(cachedResults)));
+    // Ensure campaign_audience is always parsed (cached rows may lack it)
+    state.taggerData.forEach(c => {
+      if (c.tags && !c.tags.campaign_audience) {
+        const camp = c['Campaign name'] || c['campaign name'] || '';
+        c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
+      }
+    });
     saveTaggerData();
     document.getElementById('taggerProgress').classList.add('hidden');
     document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
@@ -12036,24 +12020,35 @@ async function tagCreatives(rawData) {
       // Cache in localStorage
       if (adName) tagCache[adName] = tags;
 
-      // Write to Supabase (fire-and-forget)
+      // Parse campaign_audience from campaign name (not AI — rule-based)
+      const campaignName = creative['Campaign name'] || creative['campaign name'] || '';
+      tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(campaignName);
+
+      // Write to Supabase (fire-and-forget) — composite PK: (ad_name, account)
+      const acct = creative['_account'] || '';
       const supaRow = {
         ad_name: adName,
+        account: acct,
         tagged_at: new Date().toISOString(),
         confidence: tags.confidence,
-        talent_name: tags.talent_name || null,
+        hook: tags.hook || null,
+        pain_benefit: tags.pain_benefit || null,
+        emotional_tone: tags.emotional_tone || null,
+        content_format: tags.content_format || null,
         talent_type: tags.talent_type || null,
-        setting: tags.setting || null,
+        talent_name: tags.talent_name || null,
         production_style: tags.production_style || null,
-        subject_in_frame: tags.subject_in_frame || null,
+        creative_type: tags.creative_type || null,
+        language: tags.language || null,
         offer_present: tags.offer_present || null,
         cta_type: tags.cta_type || null,
-        language: tags.language || null,
-        creative_type: tags.creative_type || null,
+        headline_theme: tags.headline_theme || null,
+        visual_style: tags.visual_style || null,
+        campaign_audience: tags.campaign_audience || null,
         model_used: 'claude-haiku-4-5-20251001',
         image_fetched: imageFetched
       };
-      supabaseUpsert('creative_tags', [supaRow], 'ad_name').catch(e => console.warn('Supabase write failed:', e.message));
+      supabaseUpsert('creative_tags', [supaRow], 'ad_name,account').catch(e => console.warn('Supabase write failed:', e.message));
 
       newlyTagged.push({ ...creative, tags, id: Date.now() + i });
     } catch(e) {
@@ -12068,6 +12063,13 @@ async function tagCreatives(rawData) {
 
   // --- Phase 3: Merge and finalize ---
   state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged])));
+  // Ensure campaign_audience is always parsed (cached rows may lack it)
+  state.taggerData.forEach(c => {
+    if (c.tags && !c.tags.campaign_audience) {
+      const camp = c['Campaign name'] || c['campaign name'] || '';
+      c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
+    }
+  });
   saveTaggerData();
   document.getElementById('taggerProgress').classList.add('hidden');
   document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
@@ -12156,23 +12158,28 @@ async function visionScanCreators() {
 }
 
 function buildTaggerSystemPrompt() {
-  return `You are Lens, Cuemath's creative tagging engine. You are given a Meta ad creative.
+  // Auto-generate prompt from GODFATHER_TAXONOMY — single source of truth
+  const fields = GODFATHER_TAXONOMY.fields;
+  const schema = {};
+  GODFATHER_TAXONOMY.aiFields.forEach(key => {
+    const f = fields[key];
+    if (f.freeText) {
+      schema[key] = f.description;
+    } else {
+      schema[key] = f.values.join(' | ');
+    }
+  });
+  return `You are Lens, Cuemath's creative tagging engine. You are given a Meta ad creative (image/video + ad copy).
 
 Tag it with these fields ONLY. Return valid JSON, no other text.
 
-{
-  "talent_name": "Name of person in creative, or 'None'",
-  "talent_type": "Parent | Tutor | Child | Influencer | None",
-  "setting": "Home | Classroom | Studio | Graphic only",
-  "production_style": "UGC | Polished | Animated | Static graphic",
-  "subject_in_frame": "What the creative is primarily showing (1 sentence)",
-  "offer_present": "Yes | No",
-  "cta_type": "Plain English description of the CTA",
-  "language": "English | Hindi | Telugu | Tamil | Gujarati | Other",
-  "creative_type": "Static | Video"
-}
+${JSON.stringify(schema, null, 2)}
 
-If you cannot determine a field from the image, use your best judgment from the copy and ad name. Set confidence accordingly.`;
+Rules:
+- "content_format" is the narrative structure (testimonial, talking head, etc.), NOT the hook. A testimonial can use any hook.
+- "hook" is the opening attention-grabber in the first line of copy.
+- "talent_name" is free text — use the actual person's name or "None".
+- If you cannot determine a field from the image, use your best judgment from the copy and ad name.`;
 }
 
 async function buildTaggerMessage(creative) {
@@ -12218,8 +12225,7 @@ function retagCreatives(force) {
   if (force) {
     const count = state.taggerData.length;
     if (!confirm(`This will re-tag all ${count} creatives through Claude API, using significant credits. Are you sure?\n\nTip: Use "Refresh Data" on Oracle to pull new ads — only NEW ads get tagged. Existing tags are preserved.`)) return;
-    localStorage.removeItem('gf_tagCache');
-    showToast('Cache cleared — all creatives will be re-tagged via API');
+    showToast('All creatives will be re-tagged via API (ignoring Supabase cache)');
   }
   // Else: only untagged/new creatives go to API, rest served from cache
   const rawData = state.taggerData.map(c => {
@@ -12638,12 +12644,12 @@ function renderTaggerInsights() {
 
   // Find best/worst performing tags per category (CPTD primary, CPQL fallback)
   const insights = [];
-  ['hook_type','format','pain_benefit','emotional_tone','language'].forEach(cat => {
-    const catInfo = TAG_CATEGORIES[cat];
+  ['hook','content_format','pain_benefit','emotional_tone','language'].forEach(cat => {
+    const catInfo = GODFATHER_TAXONOMY.fields[cat];
     const tagPerf = {};
     filteredData.forEach(c => {
       const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown') return;
-      if (!TAG_CATEGORIES[cat]?.values?.includes(tag)) return;
+      if (!GODFATHER_TAXONOMY.getValues(cat).includes(tag)) return;
       const spend = parseNumber(c['Spent']||c['spent']||0);
       const ql = parseNumber(c['QL']||c['ql']||0);
       const td = parseNumber(c['TD']||c['td']||0);
@@ -12757,9 +12763,9 @@ function renderCreativeReview() {
   const newAds = verdicts.filter(x => x.v.key === 'new');
 
   // ── Tag performance aggregation ──
-  const tagPerf = {}; // { hook_type: { 'Parent testimonial': { spend, ql, td, clicks, imp, count } } }
-  const TAG_DIMS = ['hook_type', 'format', 'icp_target', 'segment', 'emotional_tone'];
-  const TAG_DIM_LABELS = { hook_type: 'Hook', format: 'Format', icp_target: 'Audience', segment: 'Segment', emotional_tone: 'Tone' };
+  const tagPerf = {}; // { hook: { 'Outcome First': { spend, ql, td, clicks, imp, count } } }
+  const TAG_DIMS = ['hook', 'content_format', 'campaign_audience', 'segment', 'emotional_tone'];
+  const TAG_DIM_LABELS = { hook: 'Hook', content_format: 'Format', campaign_audience: 'Audience', segment: 'Segment', emotional_tone: 'Tone' };
   data.forEach(c => {
     const tags = c.tags || {};
     TAG_DIMS.forEach(dim => {
@@ -12791,8 +12797,8 @@ function renderCreativeReview() {
     const thumb = c['image_url'] || c['thumbnail_url'] || '';
     const campaign = c['Campaign name'] || c['campaign name'] || '';
     const tags = c.tags || {};
-    const hookTag = tags.hook_type && tags.hook_type !== 'Unknown' ? tags.hook_type : '';
-    const audTag = tags.icp_target && tags.icp_target !== 'Unknown' ? tags.icp_target : '';
+    const hookTag = tags.hook && tags.hook !== 'Unknown' ? tags.hook : '';
+    const audTag = tags.campaign_audience && tags.campaign_audience !== 'Unknown' ? tags.campaign_audience : '';
 
     const vColors = { green: 'border-green-300 bg-green-50', amber: 'border-amber-300 bg-amber-50', red: 'border-red-300 bg-red-50', gray: 'border-gray-200 bg-gray-50' };
     const vBadge = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700', gray: 'bg-gray-100 text-gray-500' };
@@ -13181,7 +13187,7 @@ function renderTaggerAdRow(c, catFilter, indent) {
   // Tags
   let tagHtml = '';
   const isAllFilter = (catFilter || 'all') === 'all';
-  const catsToShow = isAllFilter ? ['hook_type','format','icp_target'] : [catFilter];
+  const catsToShow = isAllFilter ? ['hook','content_format','campaign_audience'] : [catFilter];
   let tagCount = 0;
   catsToShow.forEach(cat => {
     const val = tags[cat];
@@ -13189,7 +13195,7 @@ function renderTaggerAdRow(c, catFilter, indent) {
     tagCount++;
     if (tagCount > 3) return;
     const baseCat = cat.replace('_secondary','');
-    const tc = TAG_COLORS[TAG_CATEGORIES[baseCat]?.color || 'purple'];
+    const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(baseCat) || 'purple'];
     tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5">${tagLabel(val)}</span>`;
   });
 
@@ -13356,7 +13362,7 @@ function renderTaggerHeatmap() {
   if (!filteredData.length) { container.innerHTML = '<p class="text-sm text-text-muted">No data</p>'; return; }
 
   // Build heatmap: tag category x avg CPTD (primary), CPQL (secondary)
-  const cats = ['hook_type','format','pain_benefit','emotional_tone','cta_type','language','icp_target'];
+  const cats = ['hook','content_format','pain_benefit','emotional_tone','cta_type','language','campaign_audience'];
   // Pre-compute per-tag sparkline data (group by tag + date)
   const _hmSparkCache = {};
   const _hmBuildSparkData = (tag, cat) => {
@@ -13388,7 +13394,7 @@ function renderTaggerHeatmap() {
 
   const allTagPerf = [];
   cats.forEach(cat => {
-    const catInfo = TAG_CATEGORIES[cat];
+    const catInfo = GODFATHER_TAXONOMY.fields[cat];
     const tagPerf = {};
     filteredData.forEach(c => {
       const tag = c.tags?.[cat]; if (!tag || tag === 'Unknown' || tag === 'unknown' || tag === 'N/A') return;
@@ -13455,9 +13461,9 @@ function editTags(id) {
   if (!creative) { showToast('Creative not found (id: ' + id + ')'); return; }
   if (!creative.tags) creative.tags = {};
   // Build a form-based tag editor instead of raw JSON prompt
-  const cats = ['hook_type','format','pain_benefit','emotional_tone','icp_target','language'];
+  const cats = ['hook','content_format','pain_benefit','emotional_tone','campaign_audience','language'];
   const lines = cats.map(cat => {
-    const catInfo = TAG_CATEGORIES[cat] || { label: cat, values: [] };
+    const catInfo = GODFATHER_TAXONOMY.fields[cat] || { label: cat, values: [] };
     const current = creative.tags[cat] || '';
     const opts = (catInfo.values || []).map(v => `<option value="${v}"${v === current ? ' selected' : ''}>${tagLabel(v)}</option>`).join('');
     return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -13515,7 +13521,7 @@ function renderTagCombos() {
   const hasSignalData = sentTop5Names.size >= 3 && sentBottom5Names.size >= 3;
 
   // Build tag-to-creative mapping for signal detection
-  const allCats = ['hook_type','format','pain_benefit','emotional_tone','cta_type','language','icp_target'];
+  const allCats = ['hook','content_format','pain_benefit','emotional_tone','cta_type','language','campaign_audience'];
   const tagSignals = []; // { tag, cat, topPct, bottomPct, signal: 'winning'|'losing'|null }
 
   if (hasSignalData) {
@@ -13536,7 +13542,7 @@ function renderTagCombos() {
         if (topPct >= 60 && bottomPct <= 20) signal = 'winning';
         if (bottomPct >= 60 && topPct <= 20) signal = 'losing';
         if (signal) {
-          tagSignals.push({ tag, cat, catLabel: TAG_CATEGORIES[cat]?.label || cat, color: TAG_CATEGORIES[cat]?.color || 'purple', topPct, bottomPct, inTop: v.inTop, inBottom: v.inBottom, topTotal: sentTop5Names.size, bottomTotal: sentBottom5Names.size, signal });
+          tagSignals.push({ tag, cat, catLabel: GODFATHER_TAXONOMY.getLabel(cat), color: GODFATHER_TAXONOMY.getColor(cat)||'purple', topPct, bottomPct, inTop: v.inTop, inBottom: v.inBottom, topTotal: sentTop5Names.size, bottomTotal: sentBottom5Names.size, signal });
         }
       });
     });
@@ -13544,9 +13550,9 @@ function renderTagCombos() {
 
   // Combo analysis with median CPTD (fallback CPQL)
   const pairCats = [
-    ['hook_type','pain_benefit'], ['hook_type','emotional_tone'], ['hook_type','format'],
-    ['pain_benefit','icp_target'], ['format','icp_target'],
-    ['hook_type','language'], ['format','language']
+    ['hook','pain_benefit'], ['hook','emotional_tone'], ['hook','content_format'],
+    ['pain_benefit','campaign_audience'], ['content_format','campaign_audience'],
+    ['hook','language'], ['content_format','language']
   ];
 
   const combos = [];
@@ -13718,8 +13724,8 @@ function renderTagCombos() {
     // Top combos
     html += '<div><h4 class="text-xs font-bold text-accent-green uppercase tracking-wider mb-3">Winning Combos</h4><p class="text-[10px] text-text-muted mb-2">Tag pairs that produce the cheapest trials</p><div class="space-y-2">';
     top.forEach((c, i) => {
-      const tcA = TAG_COLORS[TAG_CATEGORIES[c.catA]?.color||'purple'];
-      const tcB = TAG_COLORS[TAG_CATEGORIES[c.catB]?.color||'blue'];
+      const tcA = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catA)||'purple'];
+      const tcB = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catB)||'blue'];
       const ex = findComboExample(c.catA, c.tagA, c.catB, c.tagB);
       html += `<div class="p-2.5 rounded-lg bg-accent-green-light/50 border border-green-100">
         <div class="flex items-center justify-between">
@@ -13743,8 +13749,8 @@ function renderTagCombos() {
     const bestMetric = top.length ? top[0].medianMetric : 1;
     html += '<div><h4 class="text-xs font-bold text-accent-red uppercase tracking-wider mb-3">Money Pits</h4><p class="text-[10px] text-text-muted mb-2">Tag pairs burning budget — consider pausing or reworking</p><div class="space-y-2">';
     bottom.forEach((c, i) => {
-      const tcA = TAG_COLORS[TAG_CATEGORIES[c.catA]?.color||'purple'];
-      const tcB = TAG_COLORS[TAG_CATEGORIES[c.catB]?.color||'blue'];
+      const tcA = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catA)||'purple'];
+      const tcB = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catB)||'blue'];
       const ratio = bestMetric > 0 ? c.medianMetric / bestMetric : 1;
       const ex = findComboExample(c.catA, c.tagA, c.catB, c.tagB);
       html += `<div class="p-2.5 rounded-lg bg-accent-red-light/50 border border-red-100">
@@ -13787,7 +13793,7 @@ function renderCreativeGrid() {
     const allTags = new Set();
     countryFiltered.forEach(c => {
       Object.entries(c.tags || {}).forEach(([cat, val]) => {
-        if (val && val !== 'Unknown') allTags.add(`${TAG_CATEGORIES[cat]?.label || cat}: ${tagLabel(val)}`);
+        if (val && val !== 'Unknown') allTags.add(`${GODFATHER_TAXONOMY.getLabel(cat)}: ${tagLabel(val)}`);
       });
     });
     [...allTags].sort().forEach(tag => {
@@ -13803,7 +13809,7 @@ function renderCreativeGrid() {
   // Apply filter
   if (filter !== 'all') {
     const [catLabel, tagVal] = filter.split(': ');
-    const catKey = Object.keys(TAG_CATEGORIES).find(k => TAG_CATEGORIES[k].label === catLabel);
+    const catKey = GODFATHER_TAXONOMY.allFields.find(k => GODFATHER_TAXONOMY.getLabel(k) === catLabel);
     // Reverse-lookup: tagVal is display name, data stores raw code
     if (catKey) data = data.filter(c => c.tags?.[catKey] === tagVal);
   }
@@ -13857,11 +13863,11 @@ function renderCreativeGrid() {
     const badgeBg = badgeMetric > 0 ? (badgeMetric < 30000 ? 'bg-accent-green-light border-green-200' : badgeMetric < 60000 ? 'bg-accent-orange-light border-orange-200' : 'bg-accent-red-light border-red-200') : 'bg-surface-tertiary border-gray-200';
 
     // Show top 6 most interesting tags (filter out Unknown)
-    const displayTags = ['hook_type','pain_benefit','emotional_tone','icp_target']
+    const displayTags = ['hook','pain_benefit','emotional_tone','campaign_audience']
       .filter(cat => tags[cat] && tags[cat] !== 'Unknown')
       .slice(0, 5)
       .map(cat => {
-        const tc = TAG_COLORS[TAG_CATEGORIES[cat]?.color||'purple'];
+        const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple'];
         return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(tags[cat])}</span>`;
       }).join('');
 
@@ -13897,7 +13903,7 @@ function renderCreativeGrid() {
 function backupTaggedData() {
   const backup = {
     taggerData: state.taggerData,
-    tagCache: JSON.parse(localStorage.getItem('gf_tagCache') || '{}'),
+    tagCache: {}, // Deprecated: tags now in creative_tags Supabase
     influencerTypes: state._influencerTypes || {},
     exportDate: new Date().toISOString(),
     creativeCount: state.taggerData.length
@@ -13919,9 +13925,8 @@ function restoreTaggedData() {
       const backup = JSON.parse(text);
       if (!backup.taggerData?.length) { showToast('Invalid backup file'); return; }
       if (!confirm(`Restore ${backup.creativeCount} creatives from ${backup.exportDate}? This will replace current data.`)) return;
-      state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(backup.taggerData)));
+      state.taggerData = deduplicateByAdName(ensureDerivedMetrics(backup.taggerData));
       saveTaggerData();
-      if (backup.tagCache) localStorage.setItem('gf_tagCache', JSON.stringify(backup.tagCache));
       if (backup.influencerTypes) { state._influencerTypes = backup.influencerTypes; localStorage.setItem('gf_influencerTypes', JSON.stringify(backup.influencerTypes)); }
       showToast(`Restored ${backup.creativeCount} creatives! Refresh page to see changes.`);
     } catch(err) { showToast('Restore failed: ' + err.message); }
@@ -13932,8 +13937,8 @@ function restoreTaggedData() {
 function exportTaggerCSV() {
   const exportData = getFilteredTaggerData();
   if (!exportData.length) return;
-  const cats = Object.keys(TAG_CATEGORIES);
-  const headers = ['Ad Name','Creative Type','Market','Spent','QL','CPTQL','CPNRI','CPTD',...cats.map(c => TAG_CATEGORIES[c].label)];
+  const cats = GODFATHER_TAXONOMY.allFields;
+  const headers = ['Ad Name','Creative Type','Market','Spent','QL','CPTQL','CPNRI','CPTD',...cats.map(c => GODFATHER_TAXONOMY.getLabel(c))];
   const rows = exportData.map(c => {
     const name = c['Ad name']||c['ad name']||c['Creative name']||c['Ad Name']||'';
     const type = c['Creative type']||c['creative type']||c['Creative Type']||'';
@@ -14034,7 +14039,7 @@ function extractAudience(c) {
     }
   }
   // Fallback: use tag-based audience (from Claude tagging)
-  const tagAud = c.tags?.icp_target;
+  const tagAud = c.tags?.campaign_audience;
   if (tagAud && tagAud !== 'Unknown' && tagAud !== 'N/A') return typeof tagLabel === 'function' ? tagLabel(tagAud) : tagAud;
   // Last resort: use ad set name audience hint
   const adSet = (c['Ad set name']||'').toLowerCase();
@@ -14100,7 +14105,7 @@ function generateCreativeBriefs() {
     const spend = parseNumber(c['Spent']||c['spent']||0);
     const ql = parseNumber(c['QL']||c['ql']||0);
 
-    ['hook_type','hook_type_secondary'].forEach(hk => {
+    ['hook','hook_secondary'].forEach(hk => {
       const h = c.tags?.[hk];
       if (h && h !== 'Unknown' && h !== 'null' && ql > 0) {
         if (!m.hooks[h]) m.hooks[h] = { spend: 0, ql: 0, count: 0 };
@@ -14114,13 +14119,13 @@ function generateCreativeBriefs() {
       m.pbs[pb].spend += spend; m.pbs[pb].ql += ql; m.pbs[pb].count++;
     }
 
-    const fmt = c.tags?.format;
+    const fmt = c.tags?.content_format;
     if (fmt && fmt !== 'Unknown' && ql > 0) {
       if (!m.formats[fmt]) m.formats[fmt] = { spend: 0, ql: 0, count: 0 };
       m.formats[fmt].spend += spend; m.formats[fmt].ql += ql; m.formats[fmt].count++;
     }
 
-    const icp = c.tags?.icp_target;
+    const icp = c.tags?.campaign_audience;
     if (icp && icp !== 'Unknown' && ql > 0) {
       if (!m.icps[icp]) m.icps[icp] = { spend: 0, ql: 0, count: 0 };
       m.icps[icp].spend += spend; m.icps[icp].ql += ql; m.icps[icp].count++;
@@ -14277,7 +14282,7 @@ function renderWinningByAudience() {
     // Best hook for this audience
     const hookPerf = {};
     ads.forEach(ad => {
-      const hook = ad.tags?.hook_type;
+      const hook = ad.tags?.hook;
       if (!hook || hook === 'Unknown') return;
       if (!hookPerf[hook]) hookPerf[hook] = { spend: 0, ql: 0, td: 0, count: 0 };
       hookPerf[hook].spend += parseNumber(ad['Spent']||ad['spent']||0);
@@ -14294,7 +14299,7 @@ function renderWinningByAudience() {
     // Best format
     const fmtPerf = {};
     ads.forEach(ad => {
-      const fmt = ad.tags?.format || ad['Creative type'] || 'Unknown';
+      const fmt = ad.tags?.content_format || ad['Creative type'] || 'Unknown';
       if (fmt === 'Unknown') return;
       if (!fmtPerf[fmt]) fmtPerf[fmt] = { spend: 0, ql: 0, td: 0, count: 0 };
       fmtPerf[fmt].spend += parseNumber(ad['Spent']||ad['spent']||0);
@@ -14372,7 +14377,7 @@ function renderWinningByAudience() {
 
   // 3. Creative pattern
   const allHooks = {};
-  data.forEach(c => { const h = c.tags?.hook_type; if (h && h !== 'Unknown') { if (!allHooks[h]) allHooks[h] = {spend:0,td:0,count:0}; allHooks[h].spend += parseNumber(c['Spent']||c['spent']||0); allHooks[h].td += parseNumber(c['TD']||c['td']||0); allHooks[h].count++; }});
+  data.forEach(c => { const h = c.tags?.hook; if (h && h !== 'Unknown') { if (!allHooks[h]) allHooks[h] = {spend:0,td:0,count:0}; allHooks[h].spend += parseNumber(c['Spent']||c['spent']||0); allHooks[h].td += parseNumber(c['TD']||c['td']||0); allHooks[h].count++; }});
   const hooksSorted = Object.entries(allHooks).filter(([,v]) => v.td >= 3).sort((a,b) => (a[1].spend/a[1].td) - (b[1].spend/b[1].td));
   if (hooksSorted.length >= 2) {
     _pbNum++;
@@ -14380,8 +14385,8 @@ function renderWinningByAudience() {
     const loseHook = hooksSorted[hooksSorted.length - 1];
     html += `<div class="flex items-start gap-2">
       <span class="text-accent-blue font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-      <div><strong>Creative pattern:</strong> <span class="text-accent-green font-semibold">${tagLabel(winHook[0])}</span>${winHook[0] === 'Parent testimonial' ? ' <span class="text-[10px] text-text-muted">(content type — hook within varies)</span>' : ''} hooks cost ${formatCurrency(winHook[1].spend/winHook[1].td)} CPTD (${winHook[1].count} ads).
-        <span class="text-accent-red font-semibold">${tagLabel(loseHook[0])}</span>${loseHook[0] === 'Parent testimonial' ? ' <span class="text-[10px] text-text-muted">(content type — hook within varies)</span>' : ''} hooks cost ${formatCurrency(loseHook[1].spend/loseHook[1].td)} CPTD — ${Math.round(loseHook[1].spend/loseHook[1].td / (winHook[1].spend/winHook[1].td))}x more expensive.
+      <div><strong>Creative pattern:</strong> <span class="text-accent-green font-semibold">${tagLabel(winHook[0])}</span> hooks cost ${formatCurrency(winHook[1].spend/winHook[1].td)} CPTD (${winHook[1].count} ads).
+        <span class="text-accent-red font-semibold">${tagLabel(loseHook[0])}</span> hooks cost ${formatCurrency(loseHook[1].spend/loseHook[1].td)} CPTD — ${Math.round(loseHook[1].spend/loseHook[1].td / (winHook[1].spend/winHook[1].td))}x more expensive.
         <span class="text-text-muted">Shift new creative production toward ${tagLabel(winHook[0])} hooks.</span></div>
     </div>`;
   }
@@ -14431,7 +14436,7 @@ function renderWinningByAudience() {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div class="bg-accent-green-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-green-700 uppercase mb-1">Best Hook</p>
-          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}${r.bestHook[0] === 'Parent testimonial' ? ' <span class="text-[9px] text-text-muted font-normal">(content type)</span>' : ''}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
+          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
         </div>
         <div class="bg-accent-blue-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-blue-700 uppercase mb-1">Best Format</p>
@@ -14519,8 +14524,8 @@ function renderPerfMatrix() {
   const invertHeat = metric === 'count' || metric === 'ql' || metric === 'spend';
 
   const metricLabel = metric === 'cptd' ? 'CPTD' : metric === 'cpql' ? 'CPTQL' : metric === 'spend' ? 'Spend' : metric === 'td' ? 'TDs' : metric === 'ql' ? 'QLs' : metric;
-  const dimLabel = dimension === 'market' ? 'Market' : dimension === 'audience' ? 'Audience' : TAG_CATEGORIES[dimension]?.label || dimension;
-  const tagLabel2 = TAG_CATEGORIES[tagCat]?.label || tagCat;
+  const dimLabel = dimension === 'market' ? 'Market' : dimension === 'audience' ? 'Audience' : GODFATHER_TAXONOMY.getLabel(dimension);
+  const tagLabel2 = GODFATHER_TAXONOMY.getLabel(tagCat);
 
   let html = `<p class="text-[11px] text-text-muted mb-3">Showing <strong>${metricLabel}</strong> for each <strong>${tagLabel2}</strong> × <strong>${dimLabel}</strong> combination. Only cells with 5+ ads shown. Green = best, Red = worst.</p>`;
   html += `<div class="overflow-x-auto"><table class="w-full text-[11px]"><thead><tr><th class="text-left px-3 py-2.5 font-bold text-text-muted sticky left-0 bg-white z-10" style="min-width:120px">${dimLabel}</th>`;
@@ -14575,10 +14580,10 @@ function renderPerfMatrix() {
 function computeWinningFormula(market, icp) {
   let filtered = sanitizeTaggerData([...(state.taggerData||[])]);
   if (market && market !== 'all') filtered = filtered.filter(c => extractMarket(c) === market);
-  if (icp && icp !== 'all') filtered = filtered.filter(c => c.tags?.icp_target === icp);
+  if (icp && icp !== 'all') filtered = filtered.filter(c => c.tags?.campaign_audience === icp);
   if (filtered.length < 2) return {};
 
-  const cats = ['hook_type','emotional_tone','pain_benefit','cta_type'];
+  const cats = ['hook','emotional_tone','pain_benefit','cta_type'];
   const formula = {};
   cats.forEach(cat => {
     const tp = {};
@@ -14611,7 +14616,7 @@ function renderWinningFormulas() {
   // Filter data for stats (sanitized to prevent ghost TDs)
   let filtered = sanitizeTaggerData([...state.taggerData]);
   if (market !== 'all') filtered = filtered.filter(c => extractMarket(c) === market);
-  if (icp !== 'all') filtered = filtered.filter(c => c.tags?.icp_target === icp);
+  if (icp !== 'all') filtered = filtered.filter(c => c.tags?.campaign_audience === icp);
   const totalSpend = filtered.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
   const totalQL = filtered.reduce((s,c) => s + parseNumber(c['QL']||c['ql']||0), 0);
   const overallCPQL = totalQL > 0 ? totalSpend/totalQL : 0;
@@ -14624,10 +14629,10 @@ function renderWinningFormulas() {
     <div class="flex flex-wrap items-center gap-2 mb-5">`;
 
   Object.entries(formula).forEach(([cat, data], i) => {
-    const tc = TAG_COLORS[TAG_CATEGORIES[cat]?.color||'purple'];
+    const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple'];
     html += `${i>0?'<span class="text-text-muted text-base font-light">+</span>':''}
       <div class="inline-flex flex-col items-center px-3 py-2 rounded-xl border ${tc.bg} border-opacity-50">
-        <span class="text-[9px] text-text-muted font-bold uppercase tracking-wider">${TAG_CATEGORIES[cat].label}</span>
+        <span class="text-[9px] text-text-muted font-bold uppercase tracking-wider">${GODFATHER_TAXONOMY.getLabel(cat)}</span>
         <span class="text-xs font-bold ${tc.text} mt-0.5">${tagLabel(data.tag)}</span>
         <span class="text-[9px] text-accent-green font-semibold mt-0.5">${formatCurrency(data.cpql)} CPQL</span>
       </div>`;
@@ -14648,8 +14653,8 @@ function renderWinningFormulas() {
   // Per-category breakdown
   html += '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden"><table class="w-full text-xs table-fixed"><thead><tr class="bg-surface-tertiary border-b border-gray-200"><th class="text-left px-4 py-3 font-bold text-text-muted" style="width:18%">Category</th><th class="text-left px-3 py-3 font-bold text-text-muted">Best Tag</th><th class="text-right px-3 py-3 font-bold text-text-muted">CPQL</th><th class="text-right px-3 py-3 font-bold text-text-muted">Ads</th><th class="text-right px-3 py-3 font-bold text-text-muted">Spend</th><th class="text-right px-3 py-3 font-bold text-text-muted">QLs</th></tr></thead><tbody>';
   Object.entries(formula).forEach(([cat,data]) => {
-    const tc = TAG_COLORS[TAG_CATEGORIES[cat]?.color||'purple'];
-    html += `<tr class="border-b border-gray-50"><td class="px-4 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full ${tc.bg} ${tc.text} font-semibold">${TAG_CATEGORIES[cat].label}</span></td><td class="px-3 py-2.5 font-semibold">${tagLabel(data.tag)}</td><td class="px-3 py-2.5 text-right font-bold text-accent-green">${formatCurrency(data.cpql)}</td><td class="px-3 py-2.5 text-right text-text-muted">${data.count}</td><td class="px-3 py-2.5 text-right text-text-muted">${formatCurrency(data.spend)}</td><td class="px-3 py-2.5 text-right text-text-muted">${data.ql}</td></tr>`;
+    const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple'];
+    html += `<tr class="border-b border-gray-50"><td class="px-4 py-2.5"><span class="text-[10px] px-2 py-0.5 rounded-full ${tc.bg} ${tc.text} font-semibold">${GODFATHER_TAXONOMY.getLabel(cat)}</span></td><td class="px-3 py-2.5 font-semibold">${tagLabel(data.tag)}</td><td class="px-3 py-2.5 text-right font-bold text-accent-green">${formatCurrency(data.cpql)}</td><td class="px-3 py-2.5 text-right text-text-muted">${data.count}</td><td class="px-3 py-2.5 text-right text-text-muted">${formatCurrency(data.spend)}</td><td class="px-3 py-2.5 text-right text-text-muted">${data.ql}</td></tr>`;
   });
   html += '</tbody></table></div>';
   container.innerHTML = html;
@@ -14662,7 +14667,7 @@ function applyWinningFormula(market, icp) {
   navigateTo('generate');
   if (market !== 'all') document.getElementById('briefMarket').value = market;
   if (icp !== 'all') document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===icp));
-  const angleText = Object.entries(formula).slice(0,4).map(([cat,data]) => `${TAG_CATEGORIES[cat].label}: ${tagLabel(data.tag)}`).join(' | ');
+  const angleText = Object.entries(formula).slice(0,4).map(([cat,data]) => `${GODFATHER_TAXONOMY.getLabel(cat)}: ${tagLabel(data.tag)}`).join(' | ');
   document.getElementById('briefAngle').value = angleText;
   updateFormulaIndicator();
   showToast('Winning formula loaded into Generate!');
@@ -14673,7 +14678,7 @@ function updateFormulaIndicator() {
   const f = state.activeWinningFormula;
   if (!f || !Object.keys(f).length) { indicator.classList.add('hidden'); return; }
   indicator.classList.remove('hidden');
-  const text = Object.entries(f).filter(([cat]) => TAG_CATEGORIES[cat]).map(([cat,data]) => `${TAG_CATEGORIES[cat].label}: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)})`).join(' + ');
+  const text = Object.entries(f).filter(([cat]) => GODFATHER_TAXONOMY.fields[cat]).map(([cat,data]) => `${GODFATHER_TAXONOMY.getLabel(cat)}: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)})`).join(' + ');
   document.getElementById('formulaIndicatorText').textContent = text;
 }
 
@@ -14718,7 +14723,7 @@ function renderDecayTracker() {
   }).map(c => ({...c, _cpqlFlag: false, _freqFlag: true}));
 
   // Overused tag patterns — only check recognized taxonomy categories
-  const DECAY_CATS = ['hook_type','format','pain_benefit','emotional_tone','cta_type','language'];
+  const DECAY_CATS = ['hook','content_format','pain_benefit','emotional_tone','cta_type','language'];
   const tagUsage = {};
   const decayData = countryFilter !== 'all' ? ciDecayData : state.taggerData;
   decayData.forEach(c => {
@@ -14762,7 +14767,7 @@ function renderDecayTracker() {
       }
       html += `<div class="bg-white border border-red-100 rounded-xl p-4 flex items-center justify-between">
         <div class="flex items-center gap-3">${fThumb ? `<img src="${fThumb}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px] shrink-0 border border-gray-200">Ad</div>'}<div><p class="text-xs font-semibold">${shortAdName(c.name)}</p>
-        <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => TAG_CATEGORIES[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[TAG_CATEGORIES[cat]?.color||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div></div>
+        <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => GODFATHER_TAXONOMY.fields[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div></div>
         <div class="text-right shrink-0 ml-4"><p class="text-xs font-bold text-accent-red">${formatCurrency(c.cpql)} CPQL</p><p class="text-[10px] text-text-muted">CPQL +${overAvg}% vs avg | ${formatCurrency(c.spend)} spent</p>${recBadge}</div></div>`;
     });
     html += '</div>';
@@ -14778,7 +14783,7 @@ function renderDecayTracker() {
       const freqRatio = c.ql > 0 ? Math.round(c.impressions/c.ql) : 0;
       html += `<div class="bg-white border border-amber-100 rounded-xl p-4 flex items-center justify-between">
         <div><p class="text-xs font-semibold">${c.name.length>50?c.name.substring(0,50)+'...':c.name}</p>
-        <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => TAG_CATEGORIES[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[TAG_CATEGORIES[cat]?.color||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div>
+        <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => GODFATHER_TAXONOMY.fields[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div>
         <div class="text-right shrink-0 ml-4"><p class="text-xs font-bold text-accent-orange">${freqRatio.toLocaleString()} imp/QL</p><p class="text-[10px] text-text-muted">${formatCurrency(c.cpql)} CPQL | ${formatCurrency(c.spend)} spent</p></div></div>`;
     });
     html += '</div>';
@@ -14791,8 +14796,8 @@ function renderDecayTracker() {
   if (overused.length) {
     html += '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden"><table class="w-full text-xs table-fixed"><thead><tr class="bg-surface-tertiary"><th class="text-left px-4 py-2.5 font-bold text-text-muted" style="width:22%">Tag</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">High-Spend CPQL</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Low-Spend CPQL</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Degradation</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Ads</th></tr></thead><tbody>';
     overused.slice(0,10).forEach(t => {
-      const tc = TAG_COLORS[TAG_CATEGORIES[t.cat]?.color||'purple'];
-      html += `<tr class="border-b border-gray-50"><td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${TAG_CATEGORIES[t.cat]?.label}</span> <span class="font-semibold">${tagLabel(t.val)}</span></td>
+      const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(t.cat)||'purple'];
+      html += `<tr class="border-b border-gray-50"><td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${GODFATHER_TAXONOMY.getLabel(t.cat)}</span> <span class="font-semibold">${tagLabel(t.val)}</span></td>
         <td class="px-3 py-2.5 text-right font-bold text-accent-red">${formatCurrency(t.topCPQL)}</td>
         <td class="px-3 py-2.5 text-right font-bold text-accent-green">${formatCurrency(t.bottomCPQL)}</td>
         <td class="px-3 py-2.5 text-right"><span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-bold">+${Math.round(t.degradation)}%</span></td>
@@ -14811,7 +14816,7 @@ function renderAudienceMap() {
 
   const audienceMap = {};
   data.forEach(c => {
-    const aud = c.tags?.icp_target;
+    const aud = c.tags?.campaign_audience;
     if (!aud || aud === 'Unknown' || aud === 'N/A') return;
     if (!audienceMap[aud]) audienceMap[aud] = [];
     audienceMap[aud].push(c);
@@ -14835,11 +14840,11 @@ function renderAudienceMap() {
     const crs = audienceMap[aud];
     const avgCPTD = computeMetric(crs, 'cptd');
     const avgCPQL = computeMetric(crs, 'cpql');
-    const bHook = bestTag(crs, 'hook_type', 'cptd');
-    const bFormat = bestTag(crs, 'format', 'cptd');
+    const bHook = bestTag(crs, 'hook', 'cptd');
+    const bFormat = bestTag(crs, 'content_format', 'cptd');
     const bBenefit = bestTag(crs, 'pain_benefit', 'cptd');
 
-    const bestTags = [['hook_type', bHook], ['format', bFormat], ['pain_benefit', bBenefit]].filter(([,v]) => v);
+    const bestTags = [['hook', bHook], ['content_format', bFormat], ['pain_benefit', bBenefit]].filter(([,v]) => v);
     const matching = data.filter(c => {
       let hits = 0;
       bestTags.forEach(([cat, val]) => { if (c.tags?.[cat] === val) hits++; });
@@ -14873,7 +14878,7 @@ function renderAudienceMap() {
   const formatMix = {};
   const geoFormatMix = {};
   data.forEach(c => {
-    const fmt = c.tags?.format;
+    const fmt = c.tags?.content_format;
     if (fmt && fmt !== 'Unknown') { formatMix[fmt] = (formatMix[fmt] || 0) + 1; }
     const geo = extractMarket(c);
     if (geo !== 'Unknown' && fmt && fmt !== 'Unknown') {
@@ -14888,11 +14893,11 @@ function renderAudienceMap() {
   Object.entries(geoFormatMix).forEach(([geo, fmts]) => {
     const geoTotal = Object.values(fmts).reduce((s,v) => s+v, 0);
     CORE_FORMATS.forEach(fmt => {
-      if (!fmts[fmt] || fmts[fmt] < 2) gaps.push({ geo, type: 'format', detail: `${tagLabel(fmt)} (${fmts[fmt]||0} creatives)`, severity: 'high' });
+      if (!fmts[fmt] || fmts[fmt] < 2) gaps.push({ geo, type: 'content_format', detail: `${tagLabel(fmt)} (${fmts[fmt]||0} creatives)`, severity: 'high' });
     });
     // Detect audiences with no creatives in this geo
     const geoCreatives = data.filter(c => extractMarket(c) === geo);
-    const geoAuds = new Set(geoCreatives.map(c => c.tags?.icp_target).filter(a => a && a !== 'Unknown'));
+    const geoAuds = new Set(geoCreatives.map(c => c.tags?.campaign_audience).filter(a => a && a !== 'Unknown'));
     if (!geoAuds.has('NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'No NRI-targeted creatives', severity: 'high' });
     if (!geoAuds.has('Non-NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'Non-NRI audience untapped', severity: 'medium' });
   });
@@ -15118,13 +15123,12 @@ async function tagUnanalysedLibrary() {
     if (!toTag.length) { tagged += batch.length; continue; }
 
     const nameList = toTag.map((c, i) => `${i+1}. "${c.name}" [${c.format || 'Unknown'}]`).join('\n');
+    // Auto-generate field specs from GODFATHER_TAXONOMY
+    const libTagFields = ['hook','pain_benefit','emotional_tone','campaign_audience','language'];
+    const fieldSpecs = libTagFields.map(f => `- ${f}: one of [${GODFATHER_TAXONOMY.getValues(f).join(', ')}]`).join('\n');
     const prompt = `Tag these ${toTag.length} marketing creatives for Cuemath (math tutoring). For each, return a JSON array with objects containing:
 - name: the creative name exactly as given
-- hook_type: one of [Math Anchor, Social Proof, Testimonial, Fear/Urgency, Offer/Price, Authority, Question Hook, Seasonal/Event, Problem-Solution, Curiosity]
-- pain_benefit: one of [Confidence, Grades & School, Tutor Quality, Personalization, Thinking vs Calculating, Fun & Engagement, Competition Prep, Foundation Building, Parent Peace of Mind]
-- emotional_tone: one of [Confident, Aspirational, Empathetic, Urgent, Playful, Authoritative, Warm, Inspirational]
-- icp_target: one of [NRI Parents, All Audiences, Non-NRI Parents, Asian Parents, Tamil Speaking, Hindi Speaking, Telugu Speaking, Gujarati Speaking]
-- language: the language used in the creative name (English, Tamil, Hindi, Telugu, Gujarati, etc.)
+${fieldSpecs}
 
 Creatives:
 ${nameList}
@@ -15139,7 +15143,7 @@ Return ONLY the JSON array, no markdown.`;
       if (jsonMatch) {
         const results = JSON.parse(jsonMatch[0]);
         results.forEach(r => {
-          if (r.name) tagCache[r.name] = { hook_type: r.hook_type, pain_benefit: r.pain_benefit, emotional_tone: r.emotional_tone, icp_target: r.icp_target, language: r.language };
+          if (r.name) tagCache[r.name] = { hook: r.hook, pain_benefit: r.pain_benefit, emotional_tone: r.emotional_tone, campaign_audience: r.campaign_audience, language: r.language };
         });
       }
     } catch(e) { console.error('Library tagging batch error:', e); }
@@ -15164,7 +15168,7 @@ function applyLibraryTagCache() {
     const name = (row['Particular'] || row['Particular  '] || row['Creative Name'] || row['Name'] || '').trim();
     const cached = cache[name];
     if (!cached) return;
-    if (!row['Hook Type'] && cached.hook_type) row['Hook Type'] = cached.hook_type;
+    if (!row['Hook Type'] && cached.hook) row['Hook Type'] = cached.hook;
     if (!row['Frame'] && cached.pain_benefit) row['Frame'] = cached.pain_benefit;
     if (!row['Language'] && cached.language) row['Language'] = cached.language;
     // Store extra tags in hidden fields for the card renderer
@@ -15334,13 +15338,7 @@ function saveLibraryNote(creativeName, noteText) {
 
 // ---- Library Tag Edit ----
 function editLibraryTag(creativeName, tagKey, currentValue) {
-  const TAG_OPTIONS = {
-    hook_type: ['Math Anchor', 'Social Proof', 'Testimonial', 'Fear/Urgency', 'Offer/Price', 'Authority', 'Question Hook', 'Seasonal/Event', 'Problem-Solution', 'Curiosity'],
-    pain_benefit: ['Confidence', 'Grades & School', 'Tutor Quality', 'Personalization', 'Thinking vs Calculating', 'Fun & Engagement', 'Competition Prep', 'Foundation Building', 'Parent Peace of Mind'],
-    emotional_tone: ['Confident', 'Aspirational', 'Empathetic', 'Urgent', 'Playful', 'Authoritative', 'Warm', 'Inspirational'],
-    icp_target: ['NRI Parents', 'All Audiences', 'Non-NRI Parents', 'Asian Parents', 'Tamil Speaking', 'Hindi Speaking', 'Telugu Speaking', 'Gujarati Speaking']
-  };
-  const options = TAG_OPTIONS[tagKey];
+  const options = GODFATHER_TAXONOMY.getValues(tagKey);
   if (!options) return;
   const newVal = prompt(`Edit ${tagKey.replace(/_/g, ' ')} for "${creativeName}":\n\nOptions: ${options.join(', ')}\n\nCurrent: ${currentValue || 'none'}`, currentValue || '');
   if (newVal === null) return;
@@ -15382,7 +15380,7 @@ function normalizeLibraryRow(row) {
     auStatus: get('Live Status AUS', 'Shared for  AUS', 'Shared for AUS', 'AU Status', 'AUS'),
     meaStatus: get('Live Status MEA', 'Shared for  MEA', 'Shared for MEA', 'MEA Status', 'MEA'),
     apacStatus: get('Live Status APAC', 'Shared for  APAC', 'Shared for APAC', 'APAC'),
-    hookType: get('Hook Type', 'hook_type', 'Hook'),
+    hookType: get('Hook Type', 'hook', 'Hook'),
     frame: get('Frame', 'frame', 'Benefit Frame', 'Pain/Benefit'),
     language: get('Language', 'language'),
     confidence: get('Confidence', 'confidence'),
@@ -15509,14 +15507,14 @@ function renderLibrary() {
       return null;
     };
     const tagPairs = [];
-    const hook = pickTag(c.hookType, 'hook_type', 'hook_type');
-    if (hook) tagPairs.push({ label: tagLabel(hook), color: 'purple', key: 'hook_type' });
+    const hook = pickTag(c.hookType, 'hook', 'hook');
+    if (hook) tagPairs.push({ label: tagLabel(hook), color: 'purple', key: 'hook' });
     const frame = pickTag(c.frame, 'pain_benefit', 'pain_benefit');
     if (frame) tagPairs.push({ label: tagLabel(frame), color: 'red', key: 'pain_benefit' });
     const tone = pickTag(null, 'emotional_tone', 'emotional_tone');
     if (tone) tagPairs.push({ label: tagLabel(tone), color: 'pink', key: 'emotional_tone' });
-    const audience = pickTag(null, 'icp_target', 'icp_target');
-    if (audience) tagPairs.push({ label: tagLabel(audience), color: 'orange', key: 'icp_target' });
+    const audience = pickTag(null, 'campaign_audience', 'campaign_audience');
+    if (audience) tagPairs.push({ label: tagLabel(audience), color: 'orange', key: 'campaign_audience' });
     const lang = pickTag(c.language, 'language', 'language');
     if (lang) tagPairs.push({ label: lang, color: 'blue', key: 'language' });
     // Clickable tags for editing
@@ -15524,7 +15522,7 @@ function renderLibrary() {
       `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-accent-${t.color}-light text-accent-${t.color} font-medium cursor-pointer hover:ring-1 hover:ring-accent-${t.color}/40" onclick="editLibraryTag('${safeName}','${t.key}','${(t.label||'').replace(/'/g,"\\'")}')" title="Click to edit ${t.key.replace(/_/g,' ')}">${t.label}</span>`
     ).join(' ');
     // If no tags, show "add tag" button
-    const noTagsHtml = tagPairs.length === 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted cursor-pointer hover:bg-gray-200" onclick="editLibraryTag('${safeName}','hook_type','')">+ Add tag</span>` : '';
+    const noTagsHtml = tagPairs.length === 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted cursor-pointer hover:bg-gray-200" onclick="editLibraryTag('${safeName}','hook','')">+ Add tag</span>` : '';
 
     // Market deployment pills
     const markets = [
@@ -16005,7 +16003,7 @@ function renderSentinelTop5() {
       const sc = r.scores;
       const sThumb = r['thumbnail_url'] || r['image_url'] || '';
       // Show top 2 tags for context (WHY is this ad top/bottom?)
-      const topTags = r.tags ? ['hook_type','pain_benefit','emotional_tone'].map(cat => r.tags[cat]).filter(v => v && v !== 'Unknown').slice(0,2).map(v => `<span class="text-[8px] px-1 py-0.5 rounded bg-surface-tertiary text-text-muted">${tagLabel(v)}</span>`).join(' ') : '';
+      const topTags = r.tags ? ['hook','pain_benefit','emotional_tone'].map(cat => r.tags[cat]).filter(v => v && v !== 'Unknown').slice(0,2).map(v => `<span class="text-[8px] px-1 py-0.5 rounded bg-surface-tertiary text-text-muted">${tagLabel(v)}</span>`).join(' ') : '';
       return `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
         <td class="px-2 py-2" style="max-width:180px"><div class="flex items-center gap-1.5">${sThumb ? `<img src="${sThumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : ''}<div><span class="font-medium text-[10px] truncate block" style="max-width:130px" title="${name}">${shortAdName(name)}</span>${topTags ? `<div class="flex gap-0.5 mt-0.5">${topTags}</div>` : ''}</div></div></td>
         <td class="px-2 py-2 text-right text-[11px] whitespace-nowrap">${formatCurrency(m.spend)}</td>
@@ -16029,8 +16027,8 @@ function renderSentinelTop5() {
       const market = geoVal === 'all' ? null : geoVal;
       const perf = getAdPerformance(market, from, to).filter(r => r['TD'] > 0 && r['Spent'] > 0 && /[a-zA-Z]/.test(r['Ad name'] || ''));
       const withCPTD = perf.map(r => ({ ...r, _cptd: r['Spent'] / r['TD'] })).sort((a, b) => a._cptd - b._cptd);
-      const top5 = withCPTD.slice(0, 5).map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
-      const bottom5 = withCPTD.slice(-5).reverse().map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
+      const top5 = withCPTD.slice(0, 5).map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.content_format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
+      const bottom5 = withCPTD.slice(-5).reverse().map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.content_format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
       renderRows(top5, 'sentinelTop5');
       renderRows(bottom5, 'sentinelBottom5');
     } catch (e) { console.error('Auto-populate top/bottom:', e); }
@@ -16371,10 +16369,10 @@ function exportIntelXLSX() {
     'CPQL': parseNumber(c['CPQL'] || 0),
     'TD': parseNumber(c['TD'] || 0),
     'CPTD': parseNumber(c['CPTD'] || 0),
-    'Hook': c.tags?.hook_type || '',
+    'Hook': c.tags?.hook || '',
     'Frame': c.tags?.frame || '',
     'Language': c.tags?.language || '',
-    'Format': c.tags?.format || ''
+    'Format': c.tags?.content_format || ''
   });
 
   // Tab 1: All creatives with tags
@@ -16521,8 +16519,8 @@ function prefillForgeFromIntel() {
   // Find best CPTD combo: hook + audience
   const combos = {};
   tagged.forEach(c => {
-    const hook = c.tags.hook_type || 'Unknown';
-    const aud = c.tags.icp_target || 'Unknown';
+    const hook = c.tags.hook || 'Unknown';
+    const aud = c.tags.campaign_audience || 'Unknown';
     const fmt = c['Creative type'] || 'Unknown';
     const key = `${hook}|${aud}|${fmt}`;
     if (!combos[key]) combos[key] = { hook, aud, fmt, spend: 0, td: 0, count: 0 };
@@ -16591,7 +16589,7 @@ function buildFreeformSystemPrompt() {
   if (state.activeWinningFormula && Object.keys(state.activeWinningFormula).length) {
     ciContext = '\n\n## CREATIVE INTELLIGENCE — WINNING FORMULAS AVAILABLE\n';
     Object.entries(state.activeWinningFormula).forEach(([cat,data]) => {
-      ciContext += `- ${TAG_CATEGORIES[cat]?.label||cat}: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)} CPQL, ${data.count} creatives)\n`;
+      ciContext += `- ${GODFATHER_TAXONOMY.getLabel(cat)}: "${tagLabel(data.tag)}" (${formatCurrency(data.cpql)} CPQL, ${data.count} creatives)\n`;
     });
   }
   // Lens signals for freeform mode
@@ -16599,7 +16597,7 @@ function buildFreeformSystemPrompt() {
   if (state.taggerData.length > 0) {
     const hookPerf = {};
     state.taggerData.forEach(c => {
-      const hook = c.tags?.hook_type;
+      const hook = c.tags?.hook;
       const spend = parseNumber(c['Spent']||c['spent']||0);
       const ql = parseNumber(c['QL']||c['ql']||0);
       if (hook && hook !== 'Unknown' && ql > 0) {
@@ -16709,7 +16707,7 @@ function _isInfluencerAd(c) {
   // Primary: campaign name contains "influencer"
   if (campName.includes('influencer') || campName.includes('influ')) return true;
   // Secondary: tagger format/creative_type tag is influencer UGC
-  const fmt = (c.tags?.format || c.tags?.creative_type || '').toLowerCase();
+  const fmt = (c.tags?.content_format || c.tags?.creative_type || '').toLowerCase();
   if (fmt.includes('influencer') || fmt.includes('ugc')) return true;
   // Tertiary: ad name contains "influencer" or "postboost" (common in influencer ad names)
   const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
@@ -16832,7 +16830,7 @@ function getInfluencerAds(geoFilter, formatFilter) {
       'Ad name': r['Ad name'], 'ad name': r['Ad name'],
       'Campaign name': r['Campaign name'], 'campaign name': r['Campaign name'],
       'Ad set name': r['Ad set name'],
-      'Creative type': r['Creative type'] || r.tags?.format || '',
+      'Creative type': r['Creative type'] || r.tags?.content_format || '',
       'Spent': r['Spent'], 'spent': r['Spent'],
       'QL': r['QL'], 'ql': r['QL'],
       'TD': r['TD'], 'td': r['TD'],
@@ -17019,7 +17017,7 @@ function renderInfluLeaderboard(filteredCreators) {
     const dist = {};
     let totalAds = 0;
     // Only analyze CREATIVE DECISIONS — exclude obvious demographic/structural tags
-    const CREATIVE_CATS = ['hook_type','emotional_tone','pain_benefit'];
+    const CREATIVE_CATS = ['hook','emotional_tone','pain_benefit'];
     creatorList.forEach(cr => {
       cr.ads.forEach(ad => {
         if (!ad.tags) return;
@@ -17040,7 +17038,7 @@ function renderInfluLeaderboard(filteredCreators) {
   const loseDist = getTagDistribution(dropCreators);
 
   // Find tags that are significantly MORE common in winners vs losers (and vice versa)
-  const catLabels = { hook_type: 'Hook', emotional_tone: 'Tone', pain_benefit: 'Angle' };
+  const catLabels = { hook: 'Hook', emotional_tone: 'Tone', pain_benefit: 'Angle' };
   const winnerSignals = [], loserSignals = [];
   Object.entries(winDist.dist).forEach(([key, wd]) => {
     const ld = loseDist.dist[key];
@@ -17171,7 +17169,7 @@ function renderInfluLeaderboard(filteredCreators) {
         <p class="text-[10px] font-bold text-accent-purple mb-1">Repeat This — ${bestCreator.displayName}'s best converting ad</p>
         <div class="flex flex-wrap gap-1.5 mt-1">
           ${bestAds[0].tags ? Object.entries(bestAds[0].tags).filter(([k,v]) => v && v !== 'Unknown' && v !== 'null' && v !== 'N/A' && !['confidence','telugu_flag','visual_style','video_attrs','color_dominant','talent','talent_face'].includes(k)).map(([k,v]) => {
-            const tc = TAG_COLORS[TAG_CATEGORIES[k.replace('_secondary','')]?.color || 'purple'];
+            const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(k.replace('_secondary','')) || 'purple'];
             return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(v)}</span>`;
           }).join('') : ''}
         </div>
@@ -17279,7 +17277,7 @@ function renderInfluContent(filteredCreators) {
     const ql = parseNumber(ad['QL']||ad['ql']||0);
     const td = parseNumber(ad['TD']||ad['td']||0);
     const addTo = (obj, key) => { if (!key || key === 'Unknown') return; if (!obj[key]) obj[key] = {spend:0,ql:0,td:0,n:0}; obj[key].spend+=spend; obj[key].ql+=ql; obj[key].td+=td; obj[key].n++; };
-    addTo(hookPerf, ad.tags.hook_type);
+    addTo(hookPerf, ad.tags.hook);
     addTo(tonePerf, ad.tags.emotional_tone);
     addTo(benefitPerf, ad.tags.pain_benefit);
     addTo(langPerf, ad.tags.language);
@@ -17356,7 +17354,7 @@ function renderInfluContent(filteredCreators) {
     // Group by hook type
     const byHook = {};
     cr.ads.forEach(ad => {
-      const hook = ad.tags?.hook_type || 'Unknown';
+      const hook = ad.tags?.hook || 'Unknown';
       if (!byHook[hook]) byHook[hook] = { spend: 0, ql: 0, td: 0, count: 0 };
       byHook[hook].spend += parseNumber(ad['Spent']||ad['spent']||0);
       byHook[hook].ql += parseNumber(ad['QL']||ad['ql']||0);
@@ -17385,7 +17383,7 @@ function renderInfluContent(filteredCreators) {
       const bestCPTD = formatCurrency(parseNumber(bestAd['Spent']||0) / parseNumber(bestAd['TD']||1));
       const bestTags = bestAd.tags ? Object.entries(bestAd.tags)
         .filter(([k,v]) => v && v !== 'Unknown' && v !== 'null' && v !== 'N/A' && !['confidence','telugu_flag','visual_style','video_attrs','color_dominant','talent','talent_face'].includes(k))
-        .map(([k,v]) => { const tc = TAG_COLORS[TAG_CATEGORIES[k.replace('_secondary','')]?.color||'purple']; return `<span class="text-[9px] px-1 py-0.5 rounded ${tc.bg} ${tc.text}">${tagLabel(v)}</span>`; }).join(' ') : '';
+        .map(([k,v]) => { const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(k.replace('_secondary',''))||'purple']; return `<span class="text-[9px] px-1 py-0.5 rounded ${tc.bg} ${tc.text}">${tagLabel(v)}</span>`; }).join(' ') : '';
 
       html += `<div class="mt-2 p-2.5 rounded-lg bg-green-50/50 border border-green-100">
         <p class="text-[9px] font-bold text-green-700 mb-1">BEST AD — ${bestCPTD} CPTD · ${Math.round(parseNumber(bestAd['TD']||0))} TDs</p>
@@ -17728,7 +17726,7 @@ function generateDesignerBrief(audience, hook, format, geo) {
   // Find ads matching this audience + hook combo
   const matchingAds = data.filter(c => {
     const aud = extractAudience(c);
-    const h = c.tags?.hook_type;
+    const h = c.tags?.hook;
     return aud === audience && h === hook;
   });
 
@@ -17787,7 +17785,7 @@ function generateDesignerBrief(audience, hook, format, geo) {
     const q = parseNumber(c['QL']||c['ql']||0);
     const t = parseNumber(c['TD']||c['td']||0);
     if (!c.tags) return;
-    ['hook_type','format','pain_benefit'].forEach(cat => {
+    ['hook','content_format','pain_benefit'].forEach(cat => {
       const tag = c.tags[cat];
       if (!tag || tag === 'Unknown') return;
       if (!tagPatterns[tag]) tagPatterns[tag] = { spend: 0, ql: 0, td: 0, n: 0 };
@@ -17980,7 +17978,7 @@ async function runDiagnostic() {
   else fail('CPTD Computed', 'No creatives have CPTD — ensureDerivedMetrics not running after CRM merge');
 
   // 6. Tags exist
-  const tagged = td.filter(c => c.tags && c.tags.hook_type && c.tags.hook_type !== 'Unknown');
+  const tagged = td.filter(c => c.tags && c.tags.hook && c.tags.hook !== 'Unknown');
   if (tagged.length > td.length * 0.5) pass('Tags', `${tagged.length}/${td.length} creatives have hook tags`);
   else if (tagged.length > 0) warn('Tags', `Only ${tagged.length}/${td.length} have tags — many Unknown`);
   else fail('Tags', 'No creatives tagged');
@@ -18174,11 +18172,11 @@ function computeRecommendedBriefs() {
   if (!state.taggerData || state.taggerData.length < 10) return [];
   const tagged = state.taggerData.filter(c => c.tags && parseNumber(c['Spent']||c['spent']||0) >= 5000);
   if (tagged.length < 5) return [];
-  // Group by audience + hook_type, rank by CPTD
+  // Group by audience + hook, rank by CPTD
   const combos = {};
   tagged.forEach(c => {
-    const aud = c.tags.icp_target || 'Unknown';
-    const hook = c.tags.hook_type || 'Unknown';
+    const aud = c.tags.campaign_audience || 'Unknown';
+    const hook = c.tags.hook || 'Unknown';
     if (aud === 'Unknown' || hook === 'Unknown') return;
     const key = aud + '|' + hook;
     if (!combos[key]) combos[key] = { aud, hook, spend: 0, td: 0, ql: 0, count: 0 };

@@ -4,6 +4,341 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Taxonomy Rebuild — GODFATHER_TAXONOMY (2026-04-05)
+
+### GODFATHER_TAXONOMY constant (single source of truth)
+- New constant at line ~1775 defines ALL tag fields, allowed values, colors, labels
+- 13 AI fields: hook, pain_benefit, emotional_tone, content_format, talent_type, talent_name, production_style, creative_type, language, offer_present, cta_type, headline_theme, visual_style
+- 1 parsed field: campaign_audience (derived from campaign name, not AI-tagged)
+- Helpers: getLabel(), getColor(), getValues(), aiFields, allFields
+- Combo pairs and market-tier minimums defined in same constant
+
+### Supabase schema rebuild
+- `creative_tags` table: 15 columns, composite PK (ad_name, account)
+- `godfather_config` table: PIN storage
+- Old 9-column creative_tags table dropped and rebuilt with new schema
+
+### Old tag systems killed
+- `tagged_creatives`, `tag_cache`, `gf_tagCache` reads all removed
+- `syncTaggerToSupabase`, `loadTaggerFromSupabase`, `syncTagCacheToSupabase`, `loadTagCacheFromSupabase` all stubbed as no-ops
+- `backfillUnknownTags` killed (40 lines → 1-line pass-through)
+- Version-gated localStorage migration clears old caches on taxonomy v2
+
+### Supabase fallback
+- creative_tags loads to `state._creativeTagsCache` + `state._tagLookup`
+- localStorage backup on successful Supabase load
+- Read-only fallback on Supabase failure
+
+### Tagger prompt rewrite
+- `buildTaggerSystemPrompt()` auto-generates from GODFATHER_TAXONOMY.aiFields
+- No hardcoded JSON schema — changes to taxonomy constant auto-propagate
+- Rules for content_format vs hook distinction included in prompt
+
+### validateTags rewrite
+- Now references GODFATHER_TAXONOMY.fields instead of old TAG_CATEGORIES
+- Handles freeText fields (talent_name)
+- 25 lines → 10 lines
+
+### supabaseUpsert rewrite
+- Writes all 13 AI fields + campaign_audience + account
+- Composite PK: (ad_name, account) — `on_conflict=ad_name,account`
+- Cache read dynamically extracts all GODFATHER_TAXONOMY.allFields
+
+### campaign_audience parsing
+- Applied in tagging loop (new creatives) AND both merge paths (cached + mixed)
+- Uses GODFATHER_TAXONOMY.fields.campaign_audience.parse() — rule-based, not AI
+
+### Field name rename (bulk)
+- `hook_type` → `hook` (100+ references)
+- `icp_target` → `campaign_audience` (40+ references)
+- `format` (as tag field) → `content_format` (40+ references)
+- `hook_type_secondary` → `hook_secondary`
+- `migrateTags()` function converts old localStorage data on load
+
+### TAG_CATEGORIES eliminated
+- Was: 10-line constant with hardcoded old-taxonomy fields
+- Temporarily aliased to GODFATHER_TAXONOMY.fields during migration
+- All 30+ UI references inlined to GODFATHER_TAXONOMY.getLabel/getColor/getValues/fields
+- Constant and alias fully deleted — zero references remain
+
+### Oracle/Library/Performance fixes
+- Oracle chat: allHooks/allAuds now from GODFATHER_TAXONOMY.getValues()
+- Library batch tagger prompt: auto-generates field specs from GODFATHER_TAXONOMY
+- Library editLibraryTag: TAG_OPTIONS replaced with GODFATHER_TAXONOMY.getValues()
+- "Parent testimonial" special-casing removed (new taxonomy separates format from hook)
+- TAG_DIM_LABELS updated to new field names
+
+### Syntax check: OK — all 4 script blocks validated
+
+---
+
+## Phase 3: Vision Tagger Pipeline (2026-04-03)
+
+### Tagger rewrite: Haiku vision, per-creative, Supabase cache
+- `tagCreatives(rawData)` fully rewritten — processes ONE creative at a time (not batches)
+- Each creative gets its own image via `fetchImageAsBase64()` sent as base64 to Claude
+- Model switched from `claude-sonnet-4-20250514` (text-only) to `claude-haiku-4-5-20251001` (vision)
+- New taxonomy: talent_name, talent_type, setting, production_style, subject_in_frame, offer_present, cta_type, language, creative_type (replaces old hook_type/pain_benefit/emotional_tone/icp_target)
+- Supabase `creative_tags` table used as persistent cache — checked BEFORE API call
+- localStorage tagCache kept as fallback for old-taxonomy creatives (migrated on read)
+- `confidence` field: 'confirmed' (image fetched) or 'inferred' (text-only)
+- `buildTaggerSystemPrompt()` + `buildTaggerMessage(creative)` replace old `buildTaggerPrompt(batch)`
+- Old `buildTaggerPrompt()` kept as legacy wrapper (returns system prompt) for any external callers
+- Progress bar updates per-creative with ad name preview
+- Syntax check: OK
+
+---
+
+## Create Tab, Heatmap & QA Fixes (2026-04-02 ~3AM)
+
+### Fix 11: Key Angle no longer auto-filled
+- `prefillForgeFromIntel()` was auto-filling briefAngle with raw tag formulas
+- Removed auto-fill. Winning formula still shows as indicator above the field, but angle is user-driven.
+
+### Fix 12: Google Ads template — grade band + AUS language
+- Google Ads template now includes grade band in title and Ad Group 2 headlines
+- AUS uses "Maths" (not "Math") throughout — `isAUS` flag switches all instances
+- Headline 7 now grade-specific: "Ages 7-11 Maths Coaching" instead of generic
+
+### Fix 13: Feedback appends to angle instead of replacing
+- `sendFreeform()` was replacing the angle field with feedback and rebuilding from scratch
+- Now appends: `"existing angle. FEEDBACK: your message"` — preserves original context
+- Still template-based (no API) so changes are limited to what the template uses from the angle field
+
+### Fix 14: QA now uses leadsData fallback
+- `getCRMPortfolioTotals()` only checked `state._crmLeads` (populated only on refresh)
+- Now falls back to `leadsData` (populated during boot from Google Sheets)
+- QA should show non-zero values without requiring manual refresh
+
+### Fix 15: Heatmap ₹5K threshold lowered to ₹1K
+- `getFilteredTaggerData()` now accepts optional `minSpend` parameter
+- Heatmap passes ₹1K (aggregates across tags, needs more data points)
+- Lens/Sentinel/Grid still use ₹5K (individual creative analysis needs significance)
+
+---
+
+## Layout, Insights & Oracle Fixes (2026-04-02 late night)
+
+### Fix 6: Make More geoTag visible — moved outside truncate
+- geoTag (`<span>US</span>`) was inside a `truncate` paragraph, clipped by CSS
+- Moved geoTag into a flex wrapper outside the truncated name element
+
+### Fix 7: Deploy These now shows data
+- `audRows` was computed inside `if (!_s2Active)` block — undefined when CRM data loaded
+- Replaced with inline audience computation (`_deployAuds`) that always runs from `data`
+- Deploy section now matches library assets to best-performing audience by CPTD
+
+### Fix 8: Header overlap fixed for ALL views
+- Changed layout: `main` is now `flex flex-col h-screen`, filter bar is `shrink-0`
+- Views wrapped in `flex-1 overflow-y-auto` scrollable container
+- Outer div changed from `overflow-y-auto` to `overflow-hidden`
+- Filter bar no longer overlaps content on any view (was sticky top-0 over 24px padding)
+
+### Fix 9: Recommended Next Creatives — human-readable labels
+- Brief cards showed raw tag codes (H-TEST, PB-GRADE, F-VERN-TESTI)
+- Added `tagLabel()` to: title, hook, frame, format, ICP, avoid pattern, and angle text
+- Now shows: "Parent testimonial + Grades & school" instead of "H-TEST + PB-GRADE"
+
+### Fix 10: Insights audience names — no more "Universal"
+- `extractAudience()` returned raw `icp_target` values (e.g. "Universal") from tagger tags
+- Now maps through `tagLabel()` — "Universal" → "All Audiences"
+- Added more KNOWN_AUDIENCES: influencer, influ, desi, telugu, gujarati, tamil, hindi
+- Audience cards now show meaningful names derived from campaign naming convention first
+
+---
+
+## Critical Boot & Data Fixes (2026-04-02 evening)
+
+### Fix 1: Blank page during boot — loading overlay added
+- Added `#bootLoader` overlay (spinner + "Loading Godfather" text) shown during async data fetch
+- Overlay shown in `init()` before boot promises, hidden in `Promise.all` callback after data ready
+- Previously: dashboardContent was unhidden immediately but empty until data loaded
+
+### Fix 2: Date range not visible on load
+- Pre-fill `dashboardDateFrom` and `dashboardDateTo` with `COST_DATA_START` → today on boot
+- Previously: inputs were empty even though `getGlobalDateRange()` silently defaulted to same range
+- User could not tell what date range was being used
+
+### Fix 3: NRI count inflated — 3 locations missing non-NRI exclusion
+- **Line ~4891 (CRM daily):** `ethnicity.includes('nri')` now also checks `!startsWith('non')` — was counting non-NRI as NRI
+- **Line ~5142 (getPortfolioMetrics unattributed):** Same fix + added `qls === '1'` guard — was counting non-QL leads in NRI total
+- **Line ~5334 (getAdCampaignBreakdown):** Same `!startsWith('non')` fix
+- Consistent with canonical `isNRI()` at line 4634 and all other NRI checks
+
+### Fix 5: Country filter not applied to Make More / Pause Now
+- `getAdPerformanceDaily()` had `if (market && adMarket && adMarket !== market) return` — when `adMarket` was empty string, the `adMarket &&` short-circuited, letting unknown-market ads through ALL country filters
+- Fixed both Meta rows (line ~4953) and CRM-only rows (line ~4982): removed the `adMarket &&` guard
+- Now: if a market filter is active and the ad's market is unknown (empty), it's excluded — no more cross-market leakage
+
+### Fix 4: Non-LP campaigns showing in Oracle
+- `_isLPCampaign()` default changed from `return true` to `return false`
+- Previously: campaigns without LP/non-LP signal were included, showing unmatchable CRM numbers
+- Now: only campaigns with explicit LP signals (signup, _lp_, fop) are included
+
+---
+
+## UX Clarity Fixes (2026-04-02)
+
+### Issue 1: Create tab recommended briefs guard
+- Recommended Briefs section now checks if `state.taggerData.length > 0` or `metaAdData.length > 0` before rendering
+- When no data loaded, shows message: "Load creative data from Tagger or Meta API to see data-driven recommendations."
+- Previous duplicate-removal logic moved above the guard for correctness
+
+### Issue 2: Tagger comparison arrows now have context
+- Added `title="vs portfolio avg"` tooltip to all comparison arrow spans in `cmp()` function (creativeCard)
+- Added inline note "Metric arrows compare against portfolio average." to Scale These and Pause sections
+- Users can now hover any arrow to see "vs portfolio avg"
+
+### Issue 3: Parent testimonial tagged as HOOK — display clarification
+- Added "(content type)" suffix when "Parent testimonial" appears as Best Hook in Insights audience cards
+- Added "(content type — hook within varies)" in Monday Playbook creative pattern when hook is Parent testimonial
+- Added code comment to TAG_CATEGORIES explaining Parent testimonial is a FORMAT, kept as hook for backward compat
+- Did NOT change tag taxonomy to avoid breaking existing tagged data
+
+### Issue 4: Asian/Non-NRI audiences in Insights (investigation)
+- Root cause: `extractAudience()` (line ~14356) extracts audience from campaign naming convention, not from tags
+- The `KNOWN_AUDIENCES` map has 'expat' but no 'asian' key — Asian audiences only show if tagged via `icp_target`
+- `icp_target` values list (line ~15691) does include 'Asian Parents', and TAG_OPTIONS includes it
+- Insights `audRows` filter requires `ads >= 3 && cpql !== null` — if fewer than 3 Asian-tagged ads exist, they won't show
+- Taxonomy gap: the tagger prompt audience options (line ~12479) list "NRI parents | Non-NRI parents | Local parents | ..." but NOT "Asian parents" — so Claude tagging never assigns "Asian"
+- Fix needed: add "Asian parents" to the tagger prompt's AUDIENCE line to enable tagging going forward
+
+### Issue 5: Library column mismatch (investigation)
+- Library expects columns: Particular, Creative Name, Format, Link/Notion Link, Designer, Month, Week, Live Status, Hook Type, etc.
+- Sheet has: Month, Week, Particular, No. of Sets, Link, Designed By, Shared for, Live Status
+- `normalizeLibraryRow()` maps 'Particular' → name, 'Link' → notionLink, 'Designed By' → designer, 'Month' → month, 'Week' → week
+- Missing mapping: "No. of Sets" is not mapped (expected "Sets" or similar), "Shared for" and "Live Status" need to match geo-specific patterns like "Live Status US"
+- The sheet columns ("Shared for", "Live Status") don't match expected patterns ("Live Status US", "Shared for  US")
+- Likely cause: user connected a summary/tracker sheet instead of the per-geo creative tracker sheet
+- No code change needed — user should connect the correct sheet or rename columns
+
+---
+
+## Dashboard + Performance Bug Fixes (2026-04-02)
+
+### Bug 1: Make More CPTQL colors were inverted
+- CPTQL values in Make More cards showed RED even for efficient ads (below avg)
+- Root cause: absolute thresholds (5K/10K) instead of relative to portfolio avg
+- Fix: color now compares against portfolioCPTQL; defaults to green (Make More = winners)
+
+### Bug 2: CPTD showing "—" when TD = 1 or 2
+- Display threshold was `td >= 3` in multiple places, hiding valid CPTD for low-TD ads
+- Fixed in: cross-combo cards, tagger aggregation, performance tab totals, insights audience rows
+- Threshold changed from `td >= 3` to `td >= 1`
+
+### Bug 3: "improving (0→3 QLs)" label was cryptic
+- Changed to "0→3 QLs (vs prior wk)" to clarify the comparison period
+
+### Bug 5: "Expat Parents" label renamed to "Non-NRI Parents"
+- ICP pill button text: "Expat Parents" → "Non-NRI Parents"
+- TAG_DISPLAY mapping: 'Expat' → 'Non-NRI Parents'
+- Legacy tag migration: 'Non-NRI' and 'Expat' both → 'Non-NRI parents'
+- Tagger prompt updated: "Expat parents" → "Non-NRI parents"
+- icp_target values list updated
+
+### Bug 6: Performance tab garbage row with numeric-only ad name
+- Added filter: ad name must contain at least one letter character
+- Applied in: auto-populate Top 5/Bottom 5, Sentinel rankable filter, Insights auto-compute
+- Prevents rows like "12023853648954027​8" with ₹0 spend from appearing
+
+### NOT bugs (already fixed):
+- Bug 4 (LEAP in Pause Now): getAdPerformance() already applies _isLPCampaign gate (line 5032)
+- Bug 7 (APAC geo mapping): matchMarketFromText() already handles ANZ-UK→UK, ANZ-NZ→APAC, ANZ-SG→APAC, ANZ→AUS
+
+---
+
+## LP Campaign Gate — Instant Form Exclusion (2026-04-02)
+
+### Root cause: CRM attribution gap polluting all analysis
+- CRM only captures UTMs from landing page (LP/Signup) campaigns
+- Instant form campaigns (Leap/LeadGen/PLA) have no UTM → CRM shows 0 QLs/TDs for these ads
+- These ads appeared as high-spend zero-conversion in Tagger, Insights, Pause Now, Make More
+- Made "Pause Now" recommend pausing ads that are actually performing (just can't be attributed)
+
+### Fix: _isLPCampaign() gate function
+- Checks campaign name + ad name for LP signals: "signup", "_lp_", "_fop", "lpfop"
+- Checks for instant form signals: "leap", "leadgen", "lead_gen", "_pla_", "instant", "on_facebook"
+- Default: include if no signal found (conservative — better to show than hide)
+
+### Applied in getAdPerformance() and getAdPerformanceDaily()
+- getAdPerformance(): filters out instant-form ads from aggregated results
+- getAdPerformanceDaily(): filters out instant-form CRM-only rows
+- Console log reports count of excluded instant-form ads
+- RULE: Instant form campaigns MUST NOT appear in Tagger, Insights, Pause Now, Make More, or Sentinel. Their CRM data is unreliable by design.
+
+---
+
+## Create Tab: Email/SMS/RCS + Influencer Fix + Image Removal + Feedback Mode (2026-04-02)
+
+### New formats: SMS and RCS
+- Added SMS and RCS to Platform pills
+- Template-based generation for both — SMS (240 char max), RCS (Asset + Headline + Body + Button)
+- Journey stage specified via Key Angle field
+- ICP-aware variants (NRI/Non-NRI/Asian tone shifts)
+- All token-personalized: {ParentName}, {ChildName}, {Link}
+
+### Email template enriched
+- 3 variants: MathFit philosophy lead, Social proof + outcomes, Trial experience preview
+- ICP-aware content (NRI = AI-era framing, Non-NRI = math anxiety empathy)
+- Journey stage adaptation guidance included in output
+
+### Influencer Script: two-bucket auto-switch
+- US/AUS/UK/Global → Partnership ads: Primary Text + Headline + Description + talking points + script suggestions
+- India/MEA → UGC scripts: full 30-40s scripted with timecodes + Meta ad copy
+- US patterns sourced from real ads (Ana, Ona, Damla, Heena, Shweta, Priyanshul)
+- RULE: US influencer output is ad copy, NOT a video script. Creator makes their own video.
+
+### Image creation removed
+- Output mode pills: only "Copy Only" remains, section hidden
+- Aspect ratio section hidden
+- Image generation always disabled in showResult()
+
+### Freeform → Feedback mode
+- Renamed "Freeform" to "Feedback"
+- No longer calls Claude API — pastes feedback into angle field and regenerates via template
+- Textarea replaces single-line input for pasting existing copy
+- Zero API credits
+
+---
+
+## Notion Brand Intelligence for Create Tab (2026-04-02)
+
+### New Brief Panel selectors
+- Added Grade Band dropdown (K-2 / 3-5 / 6-8 / 9-12) between Segment and Funnel Stage
+- Added Content Angle (LOC) dropdown with 12 angles: Pedagogy, USPs, Trial, Acceleration, Topicwise, Competition, HighSchool, OnlineVsOffline, GroupVs1on1, Quirky, ParentRelief
+- Both wired into brief object in generateContent() and generateFromTemplate()
+
+### New Notion intelligence constants (before BANNED_WORDS)
+- GRADE_TONE: tone/voice per grade band (Wonder Builder, Logical Explorer, Identity Seeker, Future Planner)
+- LOC_DATA: angle + hook per content angle (12 lines of copy from Notion)
+- HOOKS_BANK: grade-specific hooks (5-7 per grade band, sourced from Notion)
+- PROVEN_HEADLINES: market-specific proven headlines (static, google, openers) for US/India/AUS/MEA
+- VOCAB_OWN, VOCAB_CAREFUL, VOCAB_NEVER: vocabulary rules from brand guidelines
+- US_ARCHETYPES: Nurturer and Laidback Guide parent archetypes with entry frames and red lines
+
+### Expanded BANNED_WORDS
+- Added 20 new entries from Notion "Words We Never Use" list
+
+### Enriched Static Ad template
+- Now uses grade tone label and LOC hook in Option 1 (emotional lead)
+- Option 2 pulls from PROVEN_HEADLINES for the market
+- Option 3 uses HOOKS_BANK grade-specific hooks
+- Footer includes proven openers, grade tone summary, and vocabulary guidance
+- Visual direction varies by grade band
+
+### Enriched Influencer Script template
+- Option 1 Scene 7 now appends grade tone to MathFit broader benefit
+- Option 2 Scene 7 now appends "That's MathFit" tagline
+
+### Enriched buildUserMessage
+- Includes Grade Band and Content Angle in the brief message sent to API
+
+### Enriched buildSystemPrompt
+- Added Brand Personality (Guru-Coach archetype), Voice Rules, US Parent Archetypes
+- Added Vocabulary Rules (own/careful/never), Competitive Positioning, Five Messaging Pillars
+
+---
+
 ## Section 2: Data Layer Rebuild (2026-03-31)
 
 ### Settings simplification
