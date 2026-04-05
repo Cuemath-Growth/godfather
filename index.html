@@ -10933,7 +10933,10 @@ const TAG_COLORS = {
   blue: { bg:'bg-accent-blue-light', text:'text-accent-blue' },
   orange: { bg:'bg-accent-orange-light', text:'text-amber-700' },
   pink: { bg:'bg-accent-pink-light', text:'text-accent-pink' },
-  teal: { bg:'bg-accent-teal-light', text:'text-accent-teal' }
+  teal: { bg:'bg-accent-teal-light', text:'text-accent-teal' },
+  amber: { bg:'bg-accent-orange-light', text:'text-amber-700' },
+  gray: { bg:'bg-gray-100', text:'text-gray-600' },
+  indigo: { bg:'bg-indigo-100', text:'text-indigo-700' }
 };
 
 // ==================== SENTINEL — PERFORMANCE ANALYTICS ====================
@@ -11746,6 +11749,28 @@ let _tagCacheData = {}; // Empty — version gate already cleared gf_tagCache in
 function getTagCache() { return _tagCacheData; }
 function saveTagCache(cache) { /* no-op: tags saved to creative_tags Supabase only */ }
 
+// Normalize old field names → new GODFATHER_TAXONOMY names (must be before tagger data load)
+const _TAG_FIELD_RENAMES = Object.freeze({
+  'hook_type': 'hook',
+  'format': 'content_format',
+  'icp_target': 'campaign_audience',
+  'setting': null,
+  'subject_in_frame': null
+});
+function migrateTags(tags) {
+  if (!tags) return {};
+  const out = {};
+  Object.entries(tags).forEach(([k, v]) => {
+    if (k in _TAG_FIELD_RENAMES) {
+      const newKey = _TAG_FIELD_RENAMES[k];
+      if (newKey && !tags[newKey]) out[newKey] = v;
+    } else {
+      out[k] = v;
+    }
+  });
+  return out;
+}
+
 // Load tagger data: localStorage immediately, then try Supabase async
 // One-time spend deflation: old dedup SUMMED spend across duplicates — divide by _dedupCount to fix
 const _rawLocal = JSON.parse(localStorage.getItem('gf_taggerData') || '[]');
@@ -11884,28 +11909,7 @@ function useDashboardData() {
 // Tags now loaded via creative_tags in the async block above (state._creativeTagsCache).
 _tagCacheLoaded = true;
 
-// Normalize old field names → new GODFATHER_TAXONOMY names
-// Old field name → new name mapping for migrating localStorage tags
-const _TAG_FIELD_RENAMES = Object.freeze({
-  'hook_type': 'hook',
-  'format': 'content_format',
-  'icp_target': 'campaign_audience',
-  'setting': null,
-  'subject_in_frame': null
-});
-function migrateTags(tags) {
-  if (!tags) return {};
-  const out = {};
-  Object.entries(tags).forEach(([k, v]) => {
-    if (k in _TAG_FIELD_RENAMES) {
-      const newKey = _TAG_FIELD_RENAMES[k];
-      if (newKey && !tags[newKey]) out[newKey] = v; // rename, don't overwrite if new key exists
-    } else {
-      out[k] = v;
-    }
-  });
-  return out;
-}
+// migrateTags moved above tagger data loading (see pre-load section)
 
 async function tagCreatives(rawData) {
   document.getElementById('taggerUpload').style.display = 'none';
