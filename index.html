@@ -901,9 +901,13 @@
                 </div>
                 <div class="flex-1"></div>
                 <div id="taggerVerdictSummary" class="flex items-center gap-2 text-[10px]"></div>
-                <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-primary rounded-lg" title="Tags new/untagged creatives only">
+                <button onclick="retagCreatives(false, 50)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100" title="Tag up to 50 untagged creatives (pilot validation)">
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Pilot 50
+                </button>
+                <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-primary rounded-lg" title="Tags all new/untagged creatives">
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                  Tag New
+                  Tag All New
                 </button>
               </div>
               <!-- Row 2: Dropdown filters -->
@@ -12346,7 +12350,8 @@ _tagCacheLoaded = true;
 
 // migrateTags moved above tagger data loading (see pre-load section)
 
-async function tagCreatives(rawData) {
+async function tagCreatives(rawData, opts = {}) {
+  const pilotLimit = opts.pilotLimit || 0; // 0 = no limit
   document.getElementById('taggerUpload').style.display = 'none';
   document.getElementById('taggerProgress').classList.remove('hidden');
   document.getElementById('taggerResults').classList.add('hidden');
@@ -12416,7 +12421,12 @@ async function tagCreatives(rawData) {
     return;
   }
 
-  document.getElementById('taggerProgressText').textContent = `${cachedResults.length} cached, ${needsTagging.length} need tagging via Haiku vision...`;
+  // Pilot mode: cap needsTagging to pilotLimit
+  const actualTagging = pilotLimit > 0 ? needsTagging.slice(0, pilotLimit) : needsTagging;
+  const skippedByPilot = needsTagging.length - actualTagging.length;
+  if (skippedByPilot > 0) console.log(`Pilot mode: tagging ${actualTagging.length} of ${needsTagging.length} untagged (${skippedByPilot} deferred)`);
+
+  document.getElementById('taggerProgressText').textContent = `${cachedResults.length} cached, ${actualTagging.length} need tagging via Haiku vision...${skippedByPilot > 0 ? ` (pilot: ${pilotLimit} limit)` : ''}`;
 
   // --- Phase 2: Tag uncached creatives ONE at a time with vision ---
   const TAGGER_SYSTEM_PROMPT = buildTaggerSystemPrompt();
@@ -12425,12 +12435,12 @@ async function tagCreatives(rawData) {
   let apiCalls = 0;
   let imagesFetched = 0;
 
-  for (let i = 0; i < needsTagging.length; i++) {
-    const creative = needsTagging[i];
+  for (let i = 0; i < actualTagging.length; i++) {
+    const creative = actualTagging[i];
     const adName = creative['Ad name'] || creative['ad name'] || creative['Ad Name'] || '';
     const totalProgress = cachedResults.length + processed + 1;
-    const pct = Math.round((totalProgress / rawData.length) * 100);
-    document.getElementById('taggerProgressText').textContent = `Tagging ${processed+1}/${needsTagging.length} — "${(adName || 'unnamed').slice(0, 40)}..." (${totalProgress}/${rawData.length} total)`;
+    const pct = Math.round((totalProgress / (cachedResults.length + actualTagging.length)) * 100);
+    document.getElementById('taggerProgressText').textContent = `Tagging ${processed+1}/${actualTagging.length} — "${(adName || 'unnamed').slice(0, 40)}..."${pilotLimit ? ' [PILOT]' : ''}`;
     document.getElementById('taggerProgressBar').style.width = pct + '%';
 
     const message = await buildTaggerMessage(creative);
@@ -12521,7 +12531,8 @@ async function tagCreatives(rawData) {
   if (_tb) _tb.classList.toggle('hidden', _tc > state.taggerData.length * 0.5);
 
   const savings = cachedResults.length > 0 ? ` (${cachedResults.length} from cache)` : '';
-  showToast(`Tagged ${state.taggerData.length} creatives — ${apiCalls} Haiku calls, ${imagesFetched} images${savings}`);
+  const pilotNote = skippedByPilot > 0 ? ` [PILOT: ${skippedByPilot} untagged deferred]` : '';
+  showToast(`Tagged ${state.taggerData.length} creatives — ${apiCalls} Haiku calls, ${imagesFetched} images${savings}${pilotNote}`);
   console.log(`Tagger complete: ${apiCalls} API calls (model: claude-haiku-4-5-20251001), ${imagesFetched} images fetched, ${cachedResults.length} cached`);
   if (leadsData.length) mergeCRMWithMeta();
   showTaggerResults();
@@ -12659,21 +12670,21 @@ function buildTaggerPrompt(batch) {
   return buildTaggerSystemPrompt();
 }
 
-async function retagCreatives(force) {
+async function retagCreatives(force, pilotLimit = 0) {
   if (!state.taggerData.length) return;
   const pinOk = await checkTaggerPIN();
   if (!pinOk) return;
-  if (force) {
+  if (force && !pilotLimit) {
     const count = state.taggerData.length;
-    if (!confirm(`This will re-tag all ${count} creatives through Claude API, using significant credits. Are you sure?\n\nTip: Use "Refresh Data" on Oracle to pull new ads — only NEW ads get tagged. Existing tags are preserved.`)) return;
+    if (!confirm(`This will re-tag all ${count} creatives through Claude API, using significant credits. Are you sure?\n\nTip: Use "Pilot 50" to test on a small batch first.`)) return;
     showToast('All creatives will be re-tagged via API (ignoring Supabase cache)');
   }
-  // Else: only untagged/new creatives go to API, rest served from cache
+  if (pilotLimit) showToast(`Pilot mode: tagging up to ${pilotLimit} untagged creatives`);
   const rawData = state.taggerData.map(c => {
     const { tags, id, _cached, ...rest } = c;
     return rest;
   });
-  tagCreatives(rawData);
+  tagCreatives(rawData, { pilotLimit });
 }
 
 // Match tagged Meta ads to Library creative assets by name similarity

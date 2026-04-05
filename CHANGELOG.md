@@ -57,6 +57,23 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## E2E Audit Fixes (2026-04-06)
+
+### prospectid added to LEADS_CACHE_FIELDS (line 4279)
+- Was missing — dedup by prospectid only worked on fresh API pull, NOT cached loads
+- Cached loads silently skipped dedup, inflating TD counts
+- Now cached loads preserve prospectid and dedup works consistently
+
+### CRM dedup logging (line 5613)
+- Logs warning when rows lack prospectid (count + percentage)
+- These rows cannot be deduplicated — visibility into data quality
+
+### Redundant meta filter removed (computeSparklineData)
+- costData is already meta-filtered at source (line 4275)
+- Removed duplicate `r.medium !== 'meta'` check in sparkline engine
+
+---
+
 ## Time-Series Trend Charts (2026-04-06)
 
 ### `renderTrendCharts()` function
