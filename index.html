@@ -11750,7 +11750,7 @@ let _tagCacheData = {}; // Empty — version gate already cleared gf_tagCache in
 function getTagCache() { return _tagCacheData; }
 function saveTagCache(cache) { /* no-op: tags saved to creative_tags Supabase only */ }
 
-// Normalize old field names → new GODFATHER_TAXONOMY names (must be before tagger data load)
+// Normalize old field names AND values → new GODFATHER_TAXONOMY (must be before tagger data load)
 const _TAG_FIELD_RENAMES = Object.freeze({
   'hook_type': 'hook',
   'format': 'content_format',
@@ -11758,16 +11758,59 @@ const _TAG_FIELD_RENAMES = Object.freeze({
   'setting': null,
   'subject_in_frame': null
 });
+const _TAG_VALUE_RENAMES = Object.freeze({
+  // hook: old → new
+  'Math anchor': 'Outcome First', 'Math Anchor': 'Outcome First',
+  'Problem': 'Problem/Pain', 'Fear / urgency': 'Fear/Urgency', 'Fear/urgency': 'Fear/Urgency',
+  'Parent testimonial': 'Social Proof', 'Statistic': 'Social Proof',
+  'Question': 'Question', 'Lifestyle / emotional': 'Curiosity', 'Lifestyle/emotional': 'Curiosity',
+  'Competitive': 'Authority', 'Offer / price': 'Offer/Price', 'Offer/price': 'Offer/Price',
+  'Grade badge': 'Feature-Driven', 'Seasonal': 'Curiosity',
+  'Question Hook': 'Question', 'Problem-Solution': 'Problem/Pain',
+  // content_format: old → new
+  'Static image': 'Static', 'Video': 'Video',
+  'Influencer UGC': 'Talking Head', 'Testimonial video': 'Testimonial',
+  'Vernacular testimonial': 'Testimonial', 'Product video': 'Product Demo',
+  'Brand video': 'Graphic Explainer',
+  // pain_benefit: old → new (mostly case fixes)
+  'Grades & school': 'Grades & School', 'Confidence & anxiety': 'Confidence',
+  'Strong foundations': 'Foundation Building', 'Future readiness': 'Foundation Building',
+  'Tutor quality': 'Tutor Quality', 'Indian roots': 'Personalization',
+  'Competition prep': 'Competition Prep',
+  // emotional_tone: old → new
+  'Testimonial': 'Empathetic', 'Urgency': 'Urgent', 'Comparison': 'Authoritative',
+  'Offer / promo': 'Confident', 'Offer/promo': 'Confident', 'Seasonal': 'Aspirational',
+  // campaign_audience: old → new
+  'NRI parents': 'NRI', 'NRI Parents': 'NRI',
+  'Non-NRI parents': 'General', 'Non-NRI Parents': 'General',
+  'Local parents': 'General', 'All Audiences': 'General',
+  'Gujarati speaking': 'Vernacular', 'Gujarati Speaking': 'Vernacular',
+  'Telugu speaking': 'Vernacular', 'Telugu Speaking': 'Vernacular',
+  'Tamil speaking': 'Vernacular', 'Tamil Speaking': 'Vernacular',
+  'High school parents': 'General', 'Asian Parents': 'General',
+  'Hindi Speaking': 'Vernacular',
+  // production_style: old → new
+  'UGC': 'UGC', 'Studio shoot': 'Studio', 'Motion graphic': 'Animated',
+  'Screen record': 'Screen Recording', 'Polished': 'Studio',
+  'Static graphic': 'Static Graphic', 'Animated': 'Animated'
+});
 function migrateTags(tags) {
   if (!tags) return {};
   const out = {};
   Object.entries(tags).forEach(([k, v]) => {
+    let key = k, val = v;
+    // Rename field
     if (k in _TAG_FIELD_RENAMES) {
       const newKey = _TAG_FIELD_RENAMES[k];
-      if (newKey && !tags[newKey]) out[newKey] = v;
-    } else {
-      out[k] = v;
+      if (!newKey) return; // dropped field
+      if (tags[newKey]) return; // new key already exists
+      key = newKey;
     }
+    // Rename value
+    if (typeof val === 'string' && val in _TAG_VALUE_RENAMES) {
+      val = _TAG_VALUE_RENAMES[val];
+    }
+    out[key] = val;
   });
   return out;
 }
@@ -15727,7 +15770,7 @@ function renderSentinelKPIs() {
   const taggerData = getGlobalFilteredTaggerData('sentinelGeo', formatFilter);
   const { from: _kpiFrom, to: _kpiTo } = getGlobalDateRange();
   // Section 2: costData (spend) + leadsData (funnel) — single source of truth
-  const _s2market = geoFilter === 'all' ? null : geoFilter;
+  const _s2market = geoFilter === 'all' ? 'all' : geoFilter;
   const _m2 = leadsData.length ? getMarketMetrics(_s2market, _kpiFrom, _kpiTo) : null;
   // Spend: Section 2 when available, tagger fallback when format-filtered (relative only)
   const spend = isFormatFiltered ? taggerData.reduce((t, c) => t + parseNumber(c['Spent']||c['spent']||0), 0) : (_m2?.spend || 0);
@@ -16847,6 +16890,15 @@ function getInfluencerAds(geoFilter, formatFilter) {
       tags: r.tags || {},
       _market: r._market,
     }));
+    // Backfill tags from taggerData for ads that came from getAdPerformance without tags
+    const taggerLookup = {};
+    (state.taggerData || []).forEach(t => { if (t.tags && t.tags.hook) taggerLookup[t['Ad name']||t['ad name']||''] = t.tags; });
+    data.forEach(d => {
+      if (!d.tags || !d.tags.hook) {
+        const name = d['Ad name'] || d['ad name'] || '';
+        if (taggerLookup[name]) d.tags = taggerLookup[name];
+      }
+    });
   } else {
     data = [...(state.taggerData || [])];
     if (!data.length) return [];
