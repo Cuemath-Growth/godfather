@@ -4,6 +4,92 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 4 — UI Overhaul & Taxonomy Consistency (2026-04-05 night)
+
+### Create Tab Overhaul
+- Haiku AI generation (claude-haiku-4-5-20251001) replaces template engine
+- PIN-locked via Supabase `godfather_config` table (key: `create_pin`)
+- Cancel PIN = no generation (removed template fallback on cancel)
+- Model badge: "Haiku" in teal (was "Sonnet" in purple)
+- ICP TYPE pills removed → Audience pills (7 values: NRI, Broad/Advantage+, PLA, Influencer, Vernacular, Retargeting, General)
+- Behavioral segment dropdown removed → Targeting dropdown with actual Meta ad set targeting names from ALL markets (LAL Enrolled, LAL PayU, Indian Interests, Expats, HNI, Metro Tier 1, etc.)
+
+### Tagger PIN-locked
+- `retagCreatives()` and `tagUnanalysedLibrary()` both gated behind PIN
+- Prevents accidental credit spend
+
+### Lens/Insights Overhaul
+- Winning Combos section: 3 taxonomy pairs (hook × pain_benefit, hook × campaign_audience, content_format × production_style)
+- Adaptive minimums per market tier from GODFATHER_TAXONOMY (US/India: 3 creatives/5 TDs/₹50K; AUS: 2/3/₹25K; MEA/UK: 2/2/₹15K)
+- Audience cards: Best Hook + Best Format + Avoid — each with thumbnails and ad names
+- `extractAudience()` rewritten to use `GODFATHER_TAXONOMY.fields.campaign_audience.parse()`
+- emotional_tone and language REMOVED from Tagger insights (decision #4 — too subjective)
+- Format/Hook values validated against taxonomy (no cross-field contamination like "Empathetic" as format)
+
+### Oracle/Dashboard
+- WoW digest on open: "This week vs last week" summary (Spend, QLs, TDs, CPTD)
+- Untagged ads alert with re-render after Supabase tags load
+
+### Creators Tab
+- `talent_name` from tags as primary identifier
+- Campaign name heuristic (`_isInfluencerAd()`) as fallback only
+
+### Thumbnails Everywhere
+- Insights Best Hook + Avoid: top 3 ads with thumb + name + metric
+- Dashboard Best Recent: thumb + `shortAdName()`
+- Deep Dive Winning Combos + Money Pits: example ad with thumb
+- Action Log: `_oracleThumbnail()` + `shortAdName()`
+- (Oracle Pause/Scale, Tagger, Creators already had thumbnails)
+
+### Taxonomy Consistency Audit
+- H-codes → plain English migration map added (H-TEST→Social Proof, PB-CONF→Confidence, etc.)
+- `tagLabel()` fixed from pass-through to lookup via `_TAG_VALUE_RENAMES`
+- `extractAudience()` replaced with taxonomy parser (killed "High NRI", "Universal", "Non-NRI", "Indian Interests" as audience values)
+- "High School Parents"/"Universal"/"Other" added to rename map
+- Oracle AI prompt updated: `icp_type` → `audience`, `icp_segment` → `segment`
+- All user-facing "ICP" labels → "Audience"
+- Creative Review arrows now show "vs avg" inline (not just tooltip)
+- Non-NRI gap check → Broad/General gap check
+
+### Already Built (verified this session)
+- Brand safety: `validateBrand()` post-generation check
+- Library: asset-only (no performance data)
+
+---
+
+## Time-Series Trend Charts (2026-04-06)
+
+### `renderTrendCharts()` function
+- New collapsible "Trends" section between WoW digest and action sections
+- 2×2 grid of full-width SVG trend charts: Spend, TDs, CPTD, QL→TD%
+- Reuses `computeSparklineData()` — no new data fetching
+- Respects dashboard geo filter (market selector)
+- 30-day window by default
+- Features: gradient fill, trend-colored lines (green=good, red=bad), Y-axis labels, X-axis dates, hover tooltips on data points
+- `_buildTrendSVG()` renders responsive SVG with 3 Y-ticks, 3 X-labels, hover circles
+- DOM: `<div id="trendSection">` between wowSection and untaggedAlert
+- Render pipeline: called after `renderWoWDigest()`, before `renderUntaggedAlert()`
+
+---
+
+## Oracle WHY — CPTD Movement Decomposition (2026-04-06)
+
+### `_buildWoWWhy()` function (line ~7448)
+- Appended inside WoW digest card, below the 4-metric grid
+- Plain English bullet points explaining WHY metrics moved
+- 4 drivers analyzed:
+  1. **Market mix**: identifies markets where spend increased but TDs stayed flat
+  2. **Market TD drop**: flags markets with >30% TD decline
+  3. **NRI shift**: tracks NRI TD movement (highest-converting segment)
+  4. **Funnel leak**: QL→TD conversion rate change >20%
+  5. **Spend burn**: flags when >30% of spend goes to zero-TD markets
+- Uses existing `filterCostByMarket()`, `filterLeadsByMarket()`, `isNRIEthnicity()`
+- Max 4 reasons shown, capped at most impactful
+- Appears only when there's enough data to explain (>1000 spend in either week)
+- Styled as purple divider below metrics, matching WoW card gradient
+
+---
+
 ## Taxonomy Rebuild — GODFATHER_TAXONOMY (2026-04-05)
 
 ### GODFATHER_TAXONOMY constant (single source of truth)

@@ -295,6 +295,8 @@
 
           <!-- Week-over-Week Digest -->
           <div class="mb-6" id="wowSection"></div>
+          <!-- Trend Charts -->
+          <div class="mb-6" id="trendSection"></div>
           <!-- Untagged Ads Alert -->
           <div class="mb-4 hidden" id="untaggedAlert"></div>
 
@@ -2645,9 +2647,8 @@ const FORMAT_CONFIG = {
 };
 
 function getModelForFormat(format) {
-  const config = FORMAT_CONFIG[format];
-  if (!config) return 'claude-sonnet-4-20250514';
-  return config.model === 'opus' ? 'claude-opus-4-20250514' : 'claude-sonnet-4-20250514';
+  // Decision #13: Create tab always uses Haiku, PIN-locked
+  return 'claude-haiku-4-5-20251001';
 }
 
 function getMaxTokensForFormat(format) {
@@ -2675,11 +2676,10 @@ function onFormatChange(format) {
   if (aspectSection) {
     aspectSection.style.display = (format === 'Google Ads') ? 'none' : '';
   }
-  // Model badge
+  // Model badge — always Haiku per decision #13
   if (badge) {
-    const isOpus = config?.model === 'opus';
-    badge.textContent = isOpus ? 'Opus' : 'Sonnet';
-    badge.className = `text-[9px] px-2.5 py-1.5 rounded-lg font-bold whitespace-nowrap ${isOpus ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple'}`;
+    badge.textContent = 'Haiku';
+    badge.className = 'text-[9px] px-2.5 py-1.5 rounded-lg font-bold whitespace-nowrap bg-accent-teal-light text-accent-teal';
   }
 }
 
@@ -6316,6 +6316,7 @@ function onDashboardFilterChange() {
   try { renderOracleActions(); } catch(e) { console.error('renderOracleActions:', e); }
   try { renderOracleCardsV2(); } catch(e) { console.error('renderOracleCardsV2:', e); }
   try { renderWoWDigest(); } catch(e) { console.error('renderWoWDigest:', e); }
+  try { renderTrendCharts(); } catch(e) { console.error('renderTrendCharts:', e); }
   try { renderUntaggedAlert(); } catch(e) { console.error('renderUntaggedAlert:', e); }
   // Show data source info and available date ranges
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
@@ -7441,7 +7442,187 @@ function renderWoWDigest() {
         <p class="text-[10px] font-semibold ${color(cptdPct, true)}">${twCPTD > 0 && lwCPTD > 0 ? arrow(-cptdPct) + ' ' + Math.abs(cptdPct).toFixed(0) + '% vs ' + formatCurrency(lwCPTD) : '—'}</p>
       </div>
     </div>
+    ${_buildWoWWhy(tw, lw, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD, twQL, lwQL, twCPTD, lwCPTD)}
   </div>`;
+}
+
+// ── Oracle WHY — plain English decomposition of WoW movement ──
+function _buildWoWWhy(twCost, lwCost, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD, twQL, lwQL, twCPTD, lwCPTD) {
+  const reasons = [];
+  const MARKETS = ['US', 'India', 'AUS', 'MEA', 'UK'];
+
+  // Driver 1: Market mix — which markets drove spend/TD delta?
+  const mktSpend = (costRows, mkt) => {
+    const filtered = filterCostByMarket(costRows, mkt);
+    return filtered.reduce((s, r) => s + (parseFloat(r.amount_spent) || parseFloat(r.spend) || 0), 0);
+  };
+  const mktTD = (crmRows, mkt) => filterLeadsByMarket(crmRows, mkt).filter(r => parseFloat(r.trials_done) > 0).length;
+
+  const mktDeltas = MARKETS.map(m => ({
+    m,
+    twS: mktSpend(twCost, m), lwS: mktSpend(lwCost, m),
+    twT: mktTD(twCRM, m), lwT: mktTD(lwCRM, m),
+  })).filter(d => d.twS > 1000 || d.lwS > 1000);
+
+  // Find biggest spend increase with no TD gain
+  const spendUpNoTD = mktDeltas.filter(d => d.twS > d.lwS * 1.2 && d.twT <= d.lwT && d.twS > 5000);
+  if (spendUpNoTD.length > 0) {
+    const top = spendUpNoTD.sort((a, b) => (b.twS - b.lwS) - (a.twS - a.lwS))[0];
+    const delta = top.twS - top.lwS;
+    reasons.push(`<strong>${top.m}</strong> spend up ${formatCurrency(delta)} but TDs flat (${top.lwT}→${top.twT}) — new budget not converting yet`);
+  }
+
+  // Find market TD drop
+  const tdDrops = mktDeltas.filter(d => d.lwT > 0 && d.twT < d.lwT * 0.7 && d.lwT >= 2);
+  if (tdDrops.length > 0) {
+    const top = tdDrops.sort((a, b) => (b.lwT - b.twT) - (a.lwT - a.twT))[0];
+    reasons.push(`<strong>${top.m}</strong> TDs dropped ${top.lwT}→${top.twT} (${Math.round((1 - top.twT / top.lwT) * 100)}% decline)`);
+  }
+
+  // Driver 2: NRI vs non-NRI shift (US-specific — NRI is what converts)
+  const twNRI_TD = twCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
+  const lwNRI_TD = lwCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
+  const twNonNRI_TD = twTD - twNRI_TD;
+  const lwNonNRI_TD = lwTD - lwNRI_TD;
+  if (lwNRI_TD > 0 && twNRI_TD < lwNRI_TD * 0.7 && lwNRI_TD >= 2) {
+    reasons.push(`NRI TDs dropped ${lwNRI_TD}→${twNRI_TD} — your highest-converting segment is slowing`);
+  } else if (twNRI_TD > lwNRI_TD * 1.3 && twNRI_TD >= 2) {
+    reasons.push(`NRI TDs up ${lwNRI_TD}→${twNRI_TD} — core segment accelerating`);
+  }
+
+  // Driver 3: Funnel leak — QL→TD conversion rate change
+  const twConv = twQL > 0 ? twTD / twQL : 0;
+  const lwConv = lwQL > 0 ? lwTD / lwQL : 0;
+  if (lwConv > 0 && twConv > 0) {
+    const convDelta = (twConv - lwConv) / lwConv * 100;
+    if (Math.abs(convDelta) > 20) {
+      const dir = convDelta > 0 ? 'improved' : 'deteriorated';
+      reasons.push(`QL→TD conversion ${dir}: ${(lwConv * 100).toFixed(0)}%→${(twConv * 100).toFixed(0)}% — ${convDelta > 0 ? 'funnel tightening' : 'leads not converting to trials'}`);
+    }
+  } else if (twQL > 5 && twTD === 0 && lwTD > 0) {
+    reasons.push(`${twQL} QLs this week with 0 TDs — complete funnel stall`);
+  }
+
+  // Driver 4: Spend concentration in zero-TD segments
+  const twZeroTD_spend = mktDeltas.filter(d => d.twT === 0 && d.twS > 5000).reduce((s, d) => s + d.twS, 0);
+  if (twZeroTD_spend > twSpend * 0.3 && twZeroTD_spend > 10000) {
+    reasons.push(`${formatCurrency(twZeroTD_spend)} (${Math.round(twZeroTD_spend / twSpend * 100)}% of spend) going to markets with 0 TDs this week`);
+  }
+
+  if (reasons.length === 0) return '';
+
+  return `<div class="mt-3 pt-3 border-t border-purple-200/50">
+    <p class="text-[9px] font-bold text-purple-700 uppercase tracking-wider mb-2">Why?</p>
+    <div class="space-y-1.5">
+      ${reasons.slice(0, 4).map(r => `<div class="flex items-start gap-2">
+        <span class="text-purple-400 mt-0.5 shrink-0">&#8226;</span>
+        <p class="text-[11px] text-gray-700 leading-snug">${r}</p>
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// ── Trend Charts — full-width SVG time-series for key metrics ──
+function renderTrendCharts() {
+  const el = document.getElementById('trendSection');
+  if (!el) return;
+  if (!costData || !costData.length) { el.innerHTML = ''; return; }
+
+  const geo = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const geoLabel = geo === 'all' ? 'All Markets' : geo;
+
+  const CHARTS = [
+    { metric: 'spend', label: 'Daily Spend', lowerBetter: true, format: v => formatCurrency(v) },
+    { metric: 'td', label: 'Trial Dones', lowerBetter: false, format: v => Math.round(v).toString() },
+    { metric: 'cptd', label: 'CPTD (3-day avg)', lowerBetter: true, format: v => formatCurrency(v) },
+    { metric: 'ql_td_pct', label: 'QL→TD %', lowerBetter: false, format: v => v.toFixed(1) + '%' },
+  ];
+
+  let html = `<details class="group" open>
+    <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+      <svg class="w-4 h-4 text-text-muted chevron shrink-0 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      <div class="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg></div>
+      <span class="text-sm font-bold">Trends</span>
+      <span class="text-[9px] text-text-muted ml-1">${geoLabel} · 30 days</span>
+    </summary>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">`;
+
+  CHARTS.forEach(ch => {
+    const data = computeSparklineData(ch.metric, geo === 'all' ? null : geo, 30);
+    if (!data || data.length < 3) {
+      html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
+        <p class="text-[10px] font-bold text-text-muted uppercase">${ch.label}</p>
+        <p class="text-xs text-text-muted mt-2">Not enough data</p>
+      </div>`;
+      return;
+    }
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
+      <p class="text-[10px] font-bold text-text-muted uppercase mb-2">${ch.label}</p>
+      ${_buildTrendSVG(data, ch)}
+    </div>`;
+  });
+
+  html += '</div></details>';
+  el.innerHTML = html;
+}
+
+function _buildTrendSVG(data, chart) {
+  const W = 320, H = 100, PAD = { top: 8, right: 8, bottom: 20, left: 50 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+  const id = 'tc_' + chart.metric + '_' + Math.random().toString(36).slice(2, 6);
+
+  const vals = data.map(d => d.value);
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+
+  // Compute points
+  const pts = data.map((d, i) => ({
+    x: (PAD.left + (i / (data.length - 1)) * plotW).toFixed(1),
+    y: (PAD.top + (1 - (d.value - minV) / range) * plotH).toFixed(1),
+    date: d.date,
+    value: d.value,
+  }));
+  const polyline = pts.map(p => `${p.x},${p.y}`).join(' ');
+  const polygon = `${pts[0].x},${PAD.top + plotH} ${polyline} ${pts[pts.length - 1].x},${PAD.top + plotH}`;
+
+  // Trend color
+  const last = vals.slice(-5);
+  const first5 = vals.slice(0, 5);
+  const avgLast = last.reduce((s, v) => s + v, 0) / last.length;
+  const avgFirst = first5.reduce((s, v) => s + v, 0) / first5.length;
+  const trending = avgLast - avgFirst;
+  let lineColor = '#9CA3AF';
+  if (chart.lowerBetter) lineColor = trending < -range * 0.05 ? '#10B981' : trending > range * 0.05 ? '#EF4444' : '#9CA3AF';
+  else lineColor = trending > range * 0.05 ? '#10B981' : trending < -range * 0.05 ? '#EF4444' : '#9CA3AF';
+
+  // Y-axis labels (3 ticks)
+  const yTicks = [minV, minV + range / 2, maxV];
+  const yLabels = yTicks.map(v => ({
+    y: (PAD.top + (1 - (v - minV) / range) * plotH).toFixed(1),
+    label: chart.format(v),
+  }));
+
+  // X-axis labels (first, mid, last)
+  const xIdxs = [0, Math.floor(data.length / 2), data.length - 1];
+  const xLabels = xIdxs.map(i => ({
+    x: pts[i].x,
+    label: data[i].date.slice(5), // MM-DD
+  }));
+
+  // Hover circles (every ~5th point for cleanliness)
+  const step = Math.max(1, Math.floor(data.length / 8));
+  const hoverPts = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:120px">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${lineColor}" stop-opacity="0.12"/><stop offset="100%" stop-color="${lineColor}" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${polygon}" fill="url(#${id})"/>
+    <polyline points="${polyline}" fill="none" stroke="${lineColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${yLabels.map(yl => `<text x="${PAD.left - 4}" y="${yl.y}" text-anchor="end" font-size="7" fill="#9CA3AF" dominant-baseline="middle">${yl.label}</text><line x1="${PAD.left}" y1="${yl.y}" x2="${W - PAD.right}" y2="${yl.y}" stroke="#E5E7EB" stroke-width="0.5" stroke-dasharray="2"/>`).join('')}
+    ${xLabels.map(xl => `<text x="${xl.x}" y="${H - 4}" text-anchor="middle" font-size="7" fill="#9CA3AF">${xl.label}</text>`).join('')}
+    ${hoverPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="${lineColor}" opacity="0.7"><title>${p.date}: ${chart.format(p.value)}</title></circle>`).join('')}
+    <circle cx="${pts[pts.length - 1].x}" cy="${pts[pts.length - 1].y}" r="3" fill="${lineColor}"><title>${data[data.length - 1].date}: ${chart.format(data[data.length - 1].value)}</title></circle>
+  </svg>`;
 }
 
 // ── Untagged Ads Alert — warn when new ads need tagging ──
@@ -10624,8 +10805,9 @@ function showResult(content, brief) {
 
   // Model used indicator
   const modelUsed = getModelForFormat(brief.format);
-  const modelLabel = modelUsed.includes('opus') ? 'Opus' : 'Sonnet';
-  const modelInfo = `<div class="mb-3 flex items-center gap-2"><span class="text-[9px] px-2 py-0.5 rounded-full ${modelUsed.includes('opus') ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple'} font-bold">${modelLabel}</span><span class="text-[9px] text-text-muted">${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}</span></div>`;
+  const modelLabel = modelUsed.includes('haiku') ? 'Haiku' : modelUsed.includes('opus') ? 'Opus' : 'Sonnet';
+  const modelClass = modelUsed.includes('haiku') ? 'bg-accent-teal-light text-accent-teal' : modelUsed.includes('opus') ? 'bg-gradient-cool text-white' : 'bg-accent-purple-light text-accent-purple';
+  const modelInfo = `<div class="mb-3 flex items-center gap-2"><span class="text-[9px] px-2 py-0.5 rounded-full ${modelClass} font-bold">${modelLabel}</span><span class="text-[9px] text-text-muted">${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}</span></div>`;
 
   document.getElementById('resultContent').innerHTML = modelInfo + validationHtml + markdownToHtml(content) + optionWarning + whyWarning + accelBanner;
   // Character count for ad copy limits
@@ -16753,8 +16935,8 @@ function exportInfluencerXLSX() {
 async function callClaude(messages, jsonMode=false, systemPrompt=null, model=null, maxTokens=null) {
   let system = systemPrompt || '';
   if (jsonMode) system = system + '\nRespond with ONLY valid JSON. No markdown fences.';
-  const selectedModel = model || 'claude-sonnet-4-20250514';
-  const tokens = maxTokens || (selectedModel.includes('opus') ? 8192 : 4096);
+  const selectedModel = model || 'claude-haiku-4-5-20251001';
+  const tokens = maxTokens || 4096;
   const data = await callClaudeAPI(selectedModel, system, messages, tokens);
   return data.content[0].text;
 }
