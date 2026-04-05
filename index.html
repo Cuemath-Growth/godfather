@@ -293,8 +293,10 @@
             <div id="funnelTable" class="mt-4"></div>
           </div>
 
-          <!-- Week-over-Week removed — not requested -->
-          <div class="mb-6 hidden" id="wowSection"></div>
+          <!-- Week-over-Week Digest -->
+          <div class="mb-6" id="wowSection"></div>
+          <!-- Untagged Ads Alert -->
+          <div class="mb-4 hidden" id="untaggedAlert"></div>
 
           <!-- Section 1: PAUSE NOW (accordion) -->
           <details class="mb-6 oracle-accordion" id="oraclePause">
@@ -517,26 +519,61 @@
               <div class="flex flex-wrap gap-1.5" id="subFormatPills"></div>
             </div>
 
-            <!-- ICP Type -->
+            <!-- Audience (from campaign_audience taxonomy) -->
             <div class="mb-4">
-              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">ICP Type</label>
-              <div class="flex flex-wrap gap-1.5" id="icpPills">
-                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="NRI">NRI Parents</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Non-NRI">Non-NRI Parents</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Universal">All Audiences</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="HighSchool">High School</button>
+              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Audience</label>
+              <div class="flex flex-wrap gap-1.5" id="audiencePills">
+                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="NRI">NRI</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Broad/Advantage+">Broad</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="PLA">PLA</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Influencer">Influencer</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Vernacular">Vernacular</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="Retargeting">Retargeting</button>
+                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="General">General</button>
               </div>
             </div>
 
-            <!-- Segment -->
+            <!-- Targeting (actual Meta ad set targeting from campaign names — all markets) -->
             <div class="mb-4">
-              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Segment</label>
-              <select id="briefSegment" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 focus:border-accent-purple">
-                <option value="Foundation Rebuilder">Foundation Rebuilder (Primary)</option>
-                <option value="Personalization Seeker">Personalization Seeker (Co-Primary)</option>
-                <option value="Confidence Builder">Confidence Builder (Supporting)</option>
-                <option value="Accelerator">Accelerator (Tertiary)</option>
-                <option value="Universal">All Audiences</option>
+              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Targeting</label>
+              <select id="briefTargeting" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 focus:border-accent-purple">
+                <option value="Auto" selected>Auto (from Audience)</option>
+                <optgroup label="Lookalike">
+                  <option value="LAL_Enrolled">LAL — Enrolled</option>
+                  <option value="LAL_PayU">LAL — PayU</option>
+                  <option value="LAL_QL">LAL — QL 0-2%</option>
+                  <option value="PayU_Lookalike">PayU Lookalike</option>
+                </optgroup>
+                <optgroup label="Interest-Based">
+                  <option value="Indian_Interests">Indian Interests</option>
+                  <option value="Int_Parenting">Interest — Parenting</option>
+                  <option value="Int_4C">Interest — 4C</option>
+                  <option value="Engaged_Shoppers">Engaged Shoppers</option>
+                  <option value="Job_Titles">Job Titles</option>
+                  <option value="Premium_Parents">Premium Parents + Income</option>
+                </optgroup>
+                <optgroup label="Audience">
+                  <option value="Expats">Expats</option>
+                  <option value="India_Expats">India Expats</option>
+                  <option value="HNI">HNI (High Net Income)</option>
+                  <option value="Parents_All">Parents — All</option>
+                  <option value="Bollywood">Bollywood / Cultural</option>
+                  <option value="TV_Channels">TV Channels</option>
+                  <option value="School_Targeting">School Targeting</option>
+                </optgroup>
+                <optgroup label="Geo-Based (India)">
+                  <option value="Metro_Tier1">Metro Tier 1</option>
+                  <option value="South_Cities">South Cities</option>
+                  <option value="Pincodes_IB_IGCSE">Pincodes — IB/IGCSE</option>
+                  <option value="City_Targeting">City Targeting (BLR/HYD)</option>
+                  <option value="Locations">Locations</option>
+                </optgroup>
+                <optgroup label="Broad & Retargeting">
+                  <option value="Advantage+">Advantage+</option>
+                  <option value="Broad">Broad</option>
+                  <option value="Remarketing">Remarketing</option>
+                  <option value="Vernacular">Vernacular</option>
+                </optgroup>
               </select>
             </div>
 
@@ -634,7 +671,7 @@
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                   <span id="generateBtnLabel">Generate</span>
                 </button>
-                <span id="modelBadge" class="text-[9px] px-2.5 py-1.5 rounded-lg bg-accent-purple-light text-accent-purple font-bold whitespace-nowrap">Sonnet</span>
+                <span id="modelBadge" class="text-[9px] px-2.5 py-1.5 rounded-lg bg-accent-teal-light text-accent-teal font-bold whitespace-nowrap">Haiku</span>
               </div>
               <label class="flex items-center gap-2 text-[10px] text-text-muted cursor-pointer px-1">
                 <input type="checkbox" id="briefOnlyToggle" class="accent-purple-600 w-3.5 h-3.5 rounded" onchange="updateGenerateMode()" />
@@ -661,7 +698,7 @@
                     <div class="flex items-center gap-2">
                       <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-purple-light text-accent-purple" id="resultPlatform"></span>
                       <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-blue-light text-accent-blue" id="resultMarket"></span>
-                      <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-teal-light text-accent-teal" id="resultSegment"></span>
+                      <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-teal-light text-accent-teal" id="resultTargeting"></span>
                     </div>
                     <div class="flex items-center gap-1">
                       <button onclick="copyOutput()" class="p-2 rounded-lg hover:bg-surface-tertiary transition" title="Copy all">
@@ -1078,7 +1115,7 @@
               <select id="ciDimension" class="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary font-medium" onchange="renderPerfMatrix()">
                 <option value="audience">Audience (Campaign)</option>
                 <option value="market">Market</option>
-                <option value="campaign_audience">ICP Type</option>
+                <option value="campaign_audience">Audience</option>
                 <option value="Creative type">Format</option>
               </select>
             </div>
@@ -2863,7 +2900,7 @@ function getPatternContext(brief) {
 
 function getSopRules(brief) {
   const rules = SOP_RULES[brief.format] || '';
-  const vernac = (brief.market === 'India' || (brief.icpType || '').includes('NRI')) ? '\n' + VERNACULAR_GUIDELINES : '';
+  const vernac = (brief.market === 'India' || (brief.audience || '').includes('NRI')) ? '\n' + VERNACULAR_GUIDELINES : '';
   return rules + vernac;
 }
 
@@ -3293,7 +3330,7 @@ function init() {
   });
   setupPillGroup('platformPills');
   setupPillGroup('formatPills');
-  setupPillGroup('icpPills');
+  setupPillGroup('audiencePills');
   // Format change handler — sub-formats + model badge
   document.getElementById('formatPills').addEventListener('click', () => {
     setTimeout(() => { onFormatChange(getActivePill('formatPills')); }, 50);
@@ -3301,15 +3338,15 @@ function init() {
   // Auto-recompute winning formula when market or ICP changes
   document.getElementById('briefMarket').addEventListener('change', () => {
     if (state.taggerData.length) {
-      state.activeWinningFormula = computeWinningFormula(document.getElementById('briefMarket').value, getActivePill('icpPills'));
+      state.activeWinningFormula = computeWinningFormula(document.getElementById('briefMarket').value, getActivePill('audiencePills'));
       updateFormulaIndicator();
     }
   });
   // ICP pill change — hook into pill click
-  document.getElementById('icpPills').addEventListener('click', () => {
+  document.getElementById('audiencePills').addEventListener('click', () => {
     setTimeout(() => {
       if (state.taggerData.length && state.currentView === 'generate') {
-        state.activeWinningFormula = computeWinningFormula(document.getElementById('briefMarket').value, getActivePill('icpPills'));
+        state.activeWinningFormula = computeWinningFormula(document.getElementById('briefMarket').value, getActivePill('audiencePills'));
         updateFormulaIndicator();
       }
     }, 50);
@@ -3466,7 +3503,7 @@ function navigateTo(view) {
   // Auto-compute winning formula when switching to generate
   if (view === 'generate' && state.taggerData.length) {
     state.activeWinningFormula = computeWinningFormula(
-      document.getElementById('briefMarket').value, getActivePill('icpPills'));
+      document.getElementById('briefMarket').value, getActivePill('audiencePills'));
     updateFormulaIndicator();
     prefillForgeFromIntel();
     renderRecommendedBriefs();
@@ -6278,6 +6315,8 @@ function onDashboardFilterChange() {
   try { renderOracleModules(); } catch(e) { console.error('renderOracleModules:', e); }
   try { renderOracleActions(); } catch(e) { console.error('renderOracleActions:', e); }
   try { renderOracleCardsV2(); } catch(e) { console.error('renderOracleCardsV2:', e); }
+  try { renderWoWDigest(); } catch(e) { console.error('renderWoWDigest:', e); }
+  try { renderUntaggedAlert(); } catch(e) { console.error('renderUntaggedAlert:', e); }
   // Show data source info and available date ranges
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
@@ -6476,7 +6515,7 @@ RULES:
 12. CORRELATION LANGUAGE: Use "associated with", "correlated with", "tends to perform" — NEVER say "causes", "drives", "leads to", or "results in". Correlation is not causation.
 
 Return ONLY valid JSON:
-{"headline":"[single most important thing in one sentence]","regional_insights":[{"geo":"","status":"strong|weak|opportunity","headline":"","detail":"","key_metric":""}],"country_breakdowns":[{"geo":"","status":"green|amber|red","top_creative":"","top_drain":"","cpql_trend":"improving|stable|worsening","cptd_trend":"improving|stable|worsening","ql_td_pct":"","seasonal_context":"","open_gaps":[""]}],"creative_insights":[{"finding":"","type":"Video|Static","impact":"high|medium","recommendation":""}],"tagging_advisory":[{"creative_name":"","recommended_audience":"","campaign_type":"","tags":[],"confidence":"high|medium|low"}],"recommended_briefs":[{"geo":"","platform":"Meta","format":"Video|Static|Carousel","icp_segment":"Foundation Rebuilder","icp_type":"NRI|Non-NRI|Asian","ethnicity":"","angle":"","rationale":"","priority":"high|medium|low","targeting":{"age_range":"","interests":"","lookalike_source":""},"hook":"","benefit_frame":""}],"funnel_alerts":[{"stage":"","geo":"","issue":"","action":""}],"summary":""}
+{"headline":"[single most important thing in one sentence]","regional_insights":[{"geo":"","status":"strong|weak|opportunity","headline":"","detail":"","key_metric":""}],"country_breakdowns":[{"geo":"","status":"green|amber|red","top_creative":"","top_drain":"","cpql_trend":"improving|stable|worsening","cptd_trend":"improving|stable|worsening","ql_td_pct":"","seasonal_context":"","open_gaps":[""]}],"creative_insights":[{"finding":"","type":"Video|Static","impact":"high|medium","recommendation":""}],"tagging_advisory":[{"creative_name":"","recommended_audience":"","campaign_type":"","tags":[],"confidence":"high|medium|low"}],"recommended_briefs":[{"geo":"","platform":"Meta","format":"Video|Static|Carousel","segment":"Foundation Rebuilder","audience":"NRI|Broad|PLA|Influencer|Vernacular|Retargeting|General","ethnicity":"","angle":"","rationale":"","priority":"high|medium|low","targeting":{"age_range":"","interests":"","lookalike_source":""},"hook":"","benefit_frame":""}],"funnel_alerts":[{"stage":"","geo":"","issue":"","action":""}],"summary":""}
 
 Provide 3+ regional, country breakdowns for each active geo, 3+ creative insights, 5+ briefs (2+ high priority), funnel alerts. Be specific with numbers.`;
 
@@ -6720,10 +6759,13 @@ function renderOracleActions() {
             <span class="text-xs text-text-muted ml-1">ads this week</span>
             ${lastWeekAds > 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full ${parseInt(velocityTrend) > 0 ? 'bg-accent-green-light text-green-700' : parseInt(velocityTrend) < 0 ? 'bg-accent-red-light text-red-700' : 'bg-surface-tertiary text-text-muted'} font-bold ml-1">${parseInt(velocityTrend) > 0 ? '↑' : parseInt(velocityTrend) < 0 ? '↓' : '→'}${Math.abs(parseInt(velocityTrend)||0)>999?(Math.abs(parseInt(velocityTrend)/100).toFixed(0)+'x'):(Math.abs(parseInt(velocityTrend)||0)+'%')} vs last week (${lastWeekAds})</span>` : ''}
           </div>
-          ${bestRecent ? `<div class="border-l border-gray-200 pl-4">
-            <span class="text-[9px] text-accent-green font-bold uppercase">Best in last 7 days:</span>
-            <span class="text-xs font-semibold ml-1">${(bestRecent['Ad name']||bestRecent['ad name']||'').slice(0,40)}</span>
-            <span class="text-xs text-accent-green font-bold ml-1">${formatCurrency(parseNumber(bestRecent['Spent']||bestRecent['spent']||0) / parseNumber(bestRecent['TD']||bestRecent['td']||1))} CPTD</span>
+          ${bestRecent ? `<div class="border-l border-gray-200 pl-4 flex items-center gap-2">
+            ${bestRecent.thumbnail_url || bestRecent.image_url ? `<img src="${bestRecent.thumbnail_url || bestRecent.image_url}" class="w-8 h-8 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}
+            <div>
+              <span class="text-[9px] text-accent-green font-bold uppercase">Best in last 7 days:</span>
+              <span class="text-xs font-semibold ml-1">${shortAdName(bestRecent['Ad name']||bestRecent['ad name']||'')}</span>
+              <span class="text-xs text-accent-green font-bold ml-1">${formatCurrency(parseNumber(bestRecent['Spent']||bestRecent['spent']||0) / parseNumber(bestRecent['TD']||bestRecent['td']||1))} CPTD</span>
+            </div>
           </div>` : ''}
         </div>
       </div>`;
@@ -7315,6 +7357,111 @@ function renderDayByDay() {
   container.innerHTML = html;
 }
 
+// ── WoW Digest — this week vs last week at portfolio level ──
+function renderWoWDigest() {
+  const el = document.getElementById('wowSection');
+  if (!el) return;
+  if (!costData || !costData.length) { el.innerHTML = ''; return; }
+
+  const today = new Date();
+  const twStart = new Date(today); twStart.setDate(today.getDate() - 7);
+  const lwStart = new Date(today); lwStart.setDate(today.getDate() - 14);
+  const twStr = twStart.toISOString().slice(0, 10);
+  const lwStr = lwStart.toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // costData is already meta-filtered at load time
+  const dailyMeta = costData;
+  const tw = dailyMeta.filter(r => r.day >= twStr && r.day <= todayStr);
+  const lw = dailyMeta.filter(r => r.day >= lwStr && r.day < twStr);
+
+  const sum = (arr, key) => arr.reduce((s, r) => s + (parseFloat(r[key]) || 0), 0);
+  const twSpend = sum(tw, 'amount_spent') || sum(tw, 'spend');
+  const lwSpend = sum(lw, 'amount_spent') || sum(lw, 'spend');
+
+  // Get TDs/QLs from CRM data if available
+  const crmData = leadsData || [];
+  const twCRM = crmData.filter(r => {
+    const d = r.trial_done_date || r.lead_created_date || '';
+    return d >= twStr && d <= todayStr;
+  });
+  const lwCRM = crmData.filter(r => {
+    const d = r.trial_done_date || r.lead_created_date || '';
+    return d >= lwStr && d < twStr;
+  });
+  const twTD = twCRM.filter(r => parseFloat(r.trials_done) > 0).length;
+  const lwTD = lwCRM.filter(r => parseFloat(r.trials_done) > 0).length;
+  const twQL = twCRM.filter(r => parseFloat(r.qls) > 0).length;
+  const lwQL = lwCRM.filter(r => parseFloat(r.qls) > 0).length;
+
+  if (twSpend < 1000 && lwSpend < 1000) { el.innerHTML = ''; return; }
+
+  const pct = (tw, lw) => lw > 0 ? ((tw - lw) / lw * 100) : (tw > 0 ? 100 : 0);
+  const arrow = (v) => v > 5 ? '↑' : v < -5 ? '↓' : '→';
+  const color = (v, invert) => {
+    const good = invert ? v < -5 : v > 5;
+    const bad = invert ? v > 5 : v < -5;
+    return good ? 'text-accent-green' : bad ? 'text-accent-red' : 'text-text-muted';
+  };
+
+  const spendPct = pct(twSpend, lwSpend);
+  const qlPct = pct(twQL, lwQL);
+  const tdPct = pct(twTD, lwTD);
+  const twCPTD = twTD > 0 ? twSpend / twTD : 0;
+  const lwCPTD = lwTD > 0 ? lwSpend / lwTD : 0;
+  const cptdPct = pct(twCPTD, lwCPTD);
+
+  el.innerHTML = `<div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100 p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-bold flex items-center gap-2">
+        <svg class="w-4 h-4 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        This Week vs Last Week
+      </h3>
+      <span class="text-[9px] text-text-muted">${twStr} → ${todayStr}</span>
+    </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div>
+        <p class="text-[9px] text-text-muted uppercase font-bold">Spend</p>
+        <p class="text-lg font-black">${formatCurrency(twSpend)}</p>
+        <p class="text-[10px] font-semibold ${color(spendPct, false)}">${arrow(spendPct)} ${Math.abs(spendPct).toFixed(0)}% vs ${formatCurrency(lwSpend)}</p>
+      </div>
+      <div>
+        <p class="text-[9px] text-text-muted uppercase font-bold">QLs</p>
+        <p class="text-lg font-black">${twQL}</p>
+        <p class="text-[10px] font-semibold ${color(qlPct, false)}">${arrow(qlPct)} ${Math.abs(qlPct).toFixed(0)}% vs ${lwQL}</p>
+      </div>
+      <div>
+        <p class="text-[9px] text-text-muted uppercase font-bold">TDs</p>
+        <p class="text-lg font-black">${twTD}</p>
+        <p class="text-[10px] font-semibold ${color(tdPct, false)}">${arrow(tdPct)} ${Math.abs(tdPct).toFixed(0)}% vs ${lwTD}</p>
+      </div>
+      <div>
+        <p class="text-[9px] text-text-muted uppercase font-bold">CPTD</p>
+        <p class="text-lg font-black">${twCPTD > 0 ? formatCurrency(twCPTD) : '—'}</p>
+        <p class="text-[10px] font-semibold ${color(cptdPct, true)}">${twCPTD > 0 && lwCPTD > 0 ? arrow(-cptdPct) + ' ' + Math.abs(cptdPct).toFixed(0) + '% vs ' + formatCurrency(lwCPTD) : '—'}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Untagged Ads Alert — warn when new ads need tagging ──
+function renderUntaggedAlert() {
+  const el = document.getElementById('untaggedAlert');
+  if (!el) return;
+  if (!state.taggerData.length) { el.classList.add('hidden'); return; }
+  const untagged = state.taggerData.filter(c => !c.tags || !c.tags.hook || c.tags.hook === 'Unknown');
+  if (untagged.length === 0) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML = `<div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+    <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+    <div class="flex-1">
+      <p class="text-sm font-bold text-amber-800">${untagged.length} untagged ad${untagged.length > 1 ? 's' : ''}</p>
+      <p class="text-[10px] text-amber-600">New creatives need tagging for Lens intelligence to work. Go to Tagger → Tag New.</p>
+    </div>
+    <button onclick="navigateTo('tagger')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-200 text-amber-800 hover:bg-amber-300 shrink-0">Tag Now</button>
+  </div>`;
+}
+
 function renderOracleCardsV2() {
   if (!leadsData.length) {
     const hasCredentials = (localStorage.getItem('gf_sheetUrl') || state.sheetConfig.crmLeadsUrl) && GOOGLE_API_KEY;
@@ -7682,7 +7829,7 @@ function renderOracleModules() {
         const market = extractMarket(r);
         const format = r.type || (r['Creative type']||'').toLowerCase();
         const cptdHtml = r.metrics?.cptd ? formatCurrency(r.metrics.cptd) : (r.metrics?.cpql ? `<span class="text-text-muted">${formatCurrency(r.metrics.cpql)}</span><br><span class="text-[8px] text-text-muted font-normal">(CPQL)</span>` : '—');
-        const audience = r.tags?.campaign_audience || r['icp_type'] || '-';
+        const audience = r.tags?.campaign_audience || '-';
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
           <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
           <td class="py-1.5 px-2">${market}</td>
@@ -7711,7 +7858,7 @@ function renderOracleModules() {
         const market = extractMarket(r);
         const format = r.type || (r['Creative type']||'').toLowerCase();
         const cptdHtml = r.metrics?.cptd ? formatCurrency(r.metrics.cptd) : (r.metrics?.cpql ? `<span class="text-text-muted">${formatCurrency(r.metrics.cpql)}</span><br><span class="text-[8px] text-text-muted font-normal">(CPQL)</span>` : '—');
-        const audience = r.tags?.campaign_audience || r['icp_type'] || '-';
+        const audience = r.tags?.campaign_audience || '-';
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
           <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
           <td class="py-1.5 px-2">${market}</td>
@@ -8133,13 +8280,13 @@ function renderOracleModules() {
         <p class="text-sm font-medium mb-2">${brief.angle}</p>
         <div class="flex flex-wrap gap-1 mb-3">
           <span class="text-[10px] px-2 py-0.5 rounded-full ${gc.bg} ${gc.text} font-medium">${brief.format}</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icpType || ''}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.audience || ''}</span>
           <span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.icp_segment || brief.segment || ''}</span>
           ${brief.ethnicity ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-medium">${brief.ethnicity}</span>` : ''}
           ${brief.hook ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple font-medium">${brief.hook}</span>` : ''}
           ${brief.benefit_frame ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-medium">${brief.benefit_frame}</span>` : ''}</div>
         <p class="text-xs text-text-muted mb-2">${brief.rationale}</p>
-        ${brief.targeting ? `<p class="text-[10px] text-text-muted mb-3">${brief.targeting.age_range ? 'Age: '+brief.targeting.age_range+' | ' : ''}${brief.targeting.interests ? 'Interests: '+brief.targeting.interests+' | ' : ''}${brief.targeting.lookalike_source ? 'Lookalike: '+brief.targeting.lookalike_source : ''}</p>` : ''}
+        ${brief.targeting ? `<p class="text-[10px] text-text-muted mb-3">${typeof brief.targeting === 'string' ? brief.targeting : ((brief.targeting.age_range ? 'Age: '+brief.targeting.age_range+' | ' : '')+(brief.targeting.interests ? 'Interests: '+brief.targeting.interests+' | ' : '')+(brief.targeting.lookalike_source ? 'Lookalike: '+brief.targeting.lookalike_source : ''))}</p>` : ''}
         <button onclick='generateFromBrief(${JSON.stringify(brief).replace(/'/g,"\\'")})'
           class="w-full py-2.5 btn-primary rounded-lg text-xs font-semibold">Generate Now</button></div>`;
     });
@@ -8879,8 +9026,10 @@ function generateFromBrief(brief) {
   document.querySelectorAll('#platformPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===brief.platform));
   const fm = {'Video':'Video - Reel','Static':'Static Ad'};
   document.querySelectorAll('#formatPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===(fm[brief.format]||brief.format)));
-  document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===(brief.icpType||'NRI')));
-  if (brief.icp_segment) { const s=document.getElementById('briefSegment'); for(let o of s.options) if(o.value===brief.icp_segment) { s.value=brief.icp_segment; break; }}
+  document.querySelectorAll('#audiencePills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===(brief.audience||brief.icp||'NRI')));
+  // Set targeting dropdown if available
+  const tgtEl = document.getElementById('briefTargeting');
+  if (tgtEl && brief.targeting && typeof brief.targeting === 'string') tgtEl.value = brief.targeting;
   if (brief.angle) document.getElementById('briefAngle').value = brief.angle;
   setTimeout(() => generateContent(), 100);
 }
@@ -8892,8 +9041,9 @@ function generateFromTemplate() {
     platform: getActivePill('platformPills') || 'Meta',
     format: getActivePill('formatPills') || 'Static Ad',
     subFormat: getActivePill('subFormatPills') || null,
-    icpType: getActivePill('icpPills') || 'NRI',
-    segment: document.getElementById('briefSegment')?.value || 'Foundation Rebuilder',
+    audience: getActivePill('audiencePills') || 'NRI',
+    targeting: document.getElementById('briefTargeting')?.value || 'Auto',
+    segment: 'Foundation Rebuilder',
     funnel: document.getElementById('briefFunnel')?.value || 'TOFU',
     angle: document.getElementById('briefAngle')?.value || '',
     offer: document.getElementById('briefOffer')?.value || '',
@@ -8943,7 +9093,7 @@ function generateFromTemplate() {
   if (fmt === 'Static Ad') {
     const locHook = loc.hook || pickHook();
     const locAngle = loc.angle ? `\n*Content Angle: ${loc.angle}*` : '';
-    content = `## 3 Static Ad Options \u2014 ${brief.market} | ${brief.segment} | ${grade.label} (${brief.grade})
+    content = `## 3 Static Ad Options \u2014 ${brief.market} | ${brief.targeting} | ${grade.label} (${brief.grade})
 ${angleLine}${locAngle}
 
 ---
@@ -8987,7 +9137,7 @@ ${META_COPY("Can Your Child Explain Math?", "What if your child could explain WH
 **Grade Tone (${grade.label}):** ${grade.tone}
 **Vocabulary:** Use "${VOCAB_OWN.slice(0, 3).join('", "')}" \u2014 Avoid "${VOCAB_NEVER.slice(0, 3).join('", "')}"
 
-*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.grade} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Video - Reel' || fmt === 'YouTube Video') {
     content = `## 3 Video Script Options \u2014 ${brief.market} | ${brief.segment}
@@ -9035,7 +9185,7 @@ ${META_COPY('AI Calculates. Can Your Child Think?', `${atom3}\n\nCuemath\u2019s 
 ${META_COPY('"I Was Wrong About My Child\u2019s Math"', `${seg.transform}\n\nCuemath\u2019s MathFit\u2122 system turned everything around. 1:1 with top 1% tutors who build understanding, not memorization.${offerLine}\n\n${seg.cta}.`, 'Real Stories | Real Confidence')}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Carousel') {
     content = `## 3 Carousel Options \u2014 ${brief.market} | ${brief.segment}
@@ -9077,7 +9227,7 @@ ${META_COPY('5 Math Myths Holding Your Child Back', `Myth: "Math is about memori
 ${META_COPY('What Changed for This Family?', `Before: ${seg.pain}.\nAfter: ${seg.transform}\n\n${seg.cta}. The first class is free.${offerLine}`, 'Real transformation | Free trial')}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Google Ads') {
     const sf = brief.subFormat || 'Brand Search';
@@ -9086,7 +9236,7 @@ ${META_COPY('What Changed for This Family?', `Before: ${seg.pain}.\nAfter: ${seg
     const mathLower = isAUS ? 'maths' : 'math';
     if (sf === 'Brand Search' || sf === 'Keyword Search') {
       const isBrand = sf === 'Brand Search';
-      content = `## Google ${sf} Ads \u2014 ${brief.market} | ${brief.segment} | ${grade.label} (${brief.grade})
+      content = `## Google ${sf} Ads \u2014 ${brief.market} | ${brief.targeting} | ${grade.label} (${brief.grade})
 ${angleLine}
 ---
 **Ad Group 1** \u2014 ${isBrand ? 'Brand + Value Prop' : 'Math Tutoring Intent'}
@@ -9144,7 +9294,7 @@ ${isBrand ? '**Sitelinks:** About MathFit\u2122 | Meet Our Tutors | Parent Revie
 ${META_COPY(isBrand ? 'Cuemath - MathFit\u2122 Tutoring' : 'Online Math Tutoring for Kids', `${seg.pain.charAt(0).toUpperCase() + seg.pain.slice(1)}.\n\nCuemath\u2019s top 1% tutors build real understanding. ${mkt.proof} trust us.${offerLine}\n\n${seg.cta}.`, isBrand ? 'Making Kids MathFit\u2122' : '1:1 Expert Math Tutoring')}
 
 ---
-*${brief.market} | ${brief.segment} | ${sf} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${sf} | Tone: ${mkt.tone}*`;
     } else {
       content = `## Google ${sf} Assets \u2014 ${brief.market} | ${brief.segment}
 ${angleLine}
@@ -9158,7 +9308,7 @@ ${angleLine}
 ${META_COPY('Build Real Math Understanding', `${atom1}\n\nCuemath\u2019s MathFit\u2122 system: top 1% tutors + personalized plans + smart platform.${offerLine}\n\n${seg.cta}.`, 'Making Kids MathFit\u2122')}
 
 ---
-*${brief.market} | ${brief.segment} | ${sf} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${sf} | Tone: ${mkt.tone}*`;
     }
 
   } else if (fmt === 'Influencer Script') {
@@ -9179,7 +9329,7 @@ ${META_COPY('Build Real Math Understanding', `${atom1}\n\nCuemath\u2019s MathFit
       let p3 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
       while (p3.creator === p1.creator || p3.creator === p2.creator) p3 = realPatterns[Math.floor(Math.random() * realPatterns.length)];
 
-      content = `## 3 Influencer Ad Copy Variants — ${brief.market} | ${brief.segment} | Partnership Ads
+      content = `## 3 Influencer Ad Copy Variants — ${brief.market} | ${brief.targeting} | Partnership Ads
 *US Bucket: Content team provides ad copy ONLY. Creator makes their own video in their organic style.*
 ${angleLine}
 
@@ -9236,11 +9386,11 @@ ${seg.cta} — the free class will show you the difference.
 - Result: “${seg.transform}”
 - CTA: “Link in my bio. The first class is free. Trust me.”
 
-*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: authentic, organic, friend recommending*`;
+*${brief.market} | ${brief.targeting} | ${brief.grade} | ${brief.audience} | Tone: authentic, organic, friend recommending*`;
 
     } else {
       // INDIA BUCKET: UGC scripted ads — full script + ad copy
-      content = `## 3 Influencer UGC Scripts — ${brief.market} | ${brief.segment} | Scripted UGC
+      content = `## 3 Influencer UGC Scripts — ${brief.market} | ${brief.targeting} | Scripted UGC
 *India Bucket: Full script + ad copy. Runs from Cuemath’s ad handle.*
 ${angleLine}
 
@@ -9298,7 +9448,7 @@ ${angleLine}
 - **CTA:** Book a Free Class
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: organic, performance-heavy*`;
+*${brief.market} | ${brief.targeting} | ${brief.grade} | ${brief.audience} | Tone: organic, performance-heavy*`;
     }
 
   } else if (fmt === 'UGC Ad') {
@@ -9342,7 +9492,7 @@ ${META_COPY('Homework Meltdowns? We Fixed That', `Every night was a battle. Then
 ${META_COPY('This Surprised Me About Cuemath', `I expected formula drilling. I got something way better.\n\n${seg.transform}${offerLine}\n\n${seg.cta}.`, 'Not your average tutoring')}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Testimonial Script') {
     const isParent = (brief.subFormat || 'Parent Testimonial').includes('Parent');
@@ -9368,7 +9518,7 @@ ${angleLine}
 ${META_COPY(isParent ? '"I Saw the Difference in One Class"' : '"Math Doesn\u2019t Scare Me Anymore"', `${isParent ? seg.transform : 'I used to dread math. Now I explain it to my friends.'}\n\nMathFit\u2122 by Cuemath.${offerLine}\n\n${seg.cta}.`, isParent ? 'Real parent story' : 'Real student story')}
 
 ---
-*${brief.market} | ${brief.segment} | ${isParent ? 'Parent' : 'Student'} Testimonial | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${isParent ? 'Parent' : 'Student'} Testimonial | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'AI Video') {
     content = `## 3 AI Video Concepts \u2014 ${brief.market} | ${brief.segment}
@@ -9416,7 +9566,7 @@ ${META_COPY('Same Problem. Two Different Minds.', `${atom2}\n\nCuemath\u2019s Ma
 ${META_COPY('AI Calculates. Can Your Child Think?', `${atom3}\n\nCuemath\u2019s MathFit\u2122 builds the thinking skills AI can\u2019t replace.${offerLine}\n\n${seg.cta}.`, 'Future-proof math skills')}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Product Video') {
     content = `## 3 Product Video Scripts \u2014 ${brief.market} | ${brief.segment}
@@ -9436,11 +9586,11 @@ ${angleLine}
 ${META_COPY('See Why ${mkt.proof} Chose This', `Most tutoring = worksheets. Cuemath = a thinking system.\n\nTop 1% tutors + smart platform + personalized plans.${offerLine}\n\n${seg.cta}.`, 'Not just tutoring | MathFit\u2122')}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'Email') {
     const stage = brief.angle || 'QL \u2192 Book Trial';
-    content = `## 3 Email Variants \u2014 ${brief.market} | ${brief.segment} | ${grade.label}
+    content = `## 3 Email Variants \u2014 ${brief.market} | ${brief.targeting} | ${grade.label}
 *Journey Stage: ${stage}*
 ${angleLine}
 
@@ -9448,15 +9598,15 @@ ${angleLine}
 **Variant 1** \u2014 MathFit\u2122 Philosophy Lead
 
 **Subject:** ${brief.market === 'India' ? `${seg.trigger.charAt(0).toUpperCase() + seg.trigger.slice(1)}? There\u2019s a better way.` : `In an AI world, math isn\u2019t about calculations anymore.`}
-**Preheader:** ${brief.icpType === 'NRI' ? 'A free guide by Cuemath\'s Founder \u2014 worth 15 minutes.' : 'Here\'s what\'s actually behind it.'}
+**Preheader:** ${brief.audience === 'NRI' ? 'A free guide by Cuemath\'s Founder \u2014 worth 15 minutes.' : 'Here\'s what\'s actually behind it.'}
 
 Hi {ParentName},
 
-${brief.icpType === 'Non-NRI' ? `If {ChildName} dreads math homework, shuts down when a problem gets hard, or says \u201cI\u2019m just not a math person\u201d \u2014 that\u2019s not a personality trait. It\u2019s a response to how math has been taught.` : `AI can already solve equations faster than any human. What it can\u2019t do is problem-solve, think logically under uncertainty, or break a complex situation into steps.`}
+${brief.audience !== 'NRI' ? `If {ChildName} dreads math homework, shuts down when a problem gets hard, or says \u201cI\u2019m just not a math person\u201d \u2014 that\u2019s not a personality trait. It\u2019s a response to how math has been taught.` : `AI can already solve equations faster than any human. What it can\u2019t do is problem-solve, think logically under uncertainty, or break a complex situation into steps.`}
 
 ${atom1}
 
-${brief.icpType === 'Non-NRI' ? `That shift is what every Cuemath class is built around. Whenever you\u2019re ready, {ChildName}\u2019s free 1:1 trial class is still open.` : `The ability to think through problems clearly, not just calculate answers, is what it means to be MathFit\u2122. It\u2019s the most important skill a child can build in this era.`}
+${brief.audience !== 'NRI' ? `That shift is what every Cuemath class is built around. Whenever you\u2019re ready, {ChildName}\u2019s free 1:1 trial class is still open.` : `The ability to think through problems clearly, not just calculate answers, is what it means to be MathFit\u2122. It\u2019s the most important skill a child can build in this era.`}
 
 \u2192 **{CTA_BUTTON}** \u00b7 {Link}
 
@@ -9513,7 +9663,7 @@ Team Cuemath \u00b7 Making Kids MathFit\u2122
 **Journey note:** Adapt CTA_BUTTON per stage \u2014 \u201cBook Free Trial\u201d (QL\u2192TS), \u201cView Trial Details\u201d (TS\u2192TD), \u201cReschedule\u201d (drop-off), \u201cComplete Payment\u201d (post-trial)
 **ICP guidance:** NRI = AI-era framing + founder credibility. Non-NRI = math anxiety empathy + no-pressure. Asian = competition outcomes + named achievements.
 
-*${brief.market} | ${brief.segment} | ${brief.grade} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.grade} | ${brief.audience} | Tone: ${mkt.tone}*`;
 
   } else if (fmt === 'SMS') {
     content = `## 3 SMS Variants \u2014 ${brief.market} | ${brief.segment}
@@ -9522,8 +9672,8 @@ ${angleLine}
 
 ---
 **Variant 1** \u2014 Direct + Social Proof
-Cuemath: ${mkt.proof} chose us for a reason. {ChildName}\u2019s free 1:1 math trial is ready \u2014 ${brief.icpType === 'NRI' ? 'top Indian tutors, real understanding' : 'real understanding, not memorization'}. Book now: {Link}
-*(${('Cuemath: ' + mkt.proof + ' chose us for a reason. {ChildName}\'s free 1:1 math trial is ready \u2014 ' + (brief.icpType === 'NRI' ? 'top Indian tutors, real understanding' : 'real understanding, not memorization') + '. Book now: {Link}').length} chars + link)*
+Cuemath: ${mkt.proof} chose us for a reason. {ChildName}\u2019s free 1:1 math trial is ready \u2014 ${brief.audience === 'NRI' ? 'top Indian tutors, real understanding' : 'real understanding, not memorization'}. Book now: {Link}
+*(${('Cuemath: ' + mkt.proof + ' chose us for a reason. {ChildName}\'s free 1:1 math trial is ready \u2014 ' + (brief.audience === 'NRI' ? 'top Indian tutors, real understanding' : 'real understanding, not memorization') + '. Book now: {Link}').length} chars + link)*
 
 ---
 **Variant 2** \u2014 Urgency + Value
@@ -9540,7 +9690,7 @@ Cuemath: \u201cMy child went from memorizing to actually understanding.\u201d \u
 **Rules:** Always start with \u201cCuemath:\u201d. Max 240 chars. No emojis. Link at end. One clear CTA.
 **Stage adaptation:** Change CTA verb \u2014 \u201cBook\u201d (new), \u201cReschedule\u201d (drop-off), \u201cComplete\u201d (payment), \u201cDownload\u201d (app)
 
-*${brief.market} | ${brief.segment} | ${brief.icpType}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience}*`;
 
   } else if (fmt === 'RCS') {
     content = `## 3 RCS Variants \u2014 ${brief.market} | ${brief.segment}
@@ -9550,15 +9700,15 @@ ${angleLine}
 ---
 **Variant 1** \u2014 MathFit\u2122 Philosophy
 
-**Asset:** Clean, warm visual \u2014 ${brief.icpType === 'NRI' ? 'NRI family, child on Leap platform with tutor' : brief.icpType === 'Non-NRI' ? 'US-presenting parent and child together, relaxed, not stock' : 'Child engaged on Leap platform, warm tones'}. Overlay: \u201cFrom math fear to math confidence.\u201d
-**Headline:** ${brief.icpType === 'Non-NRI' ? 'Many parents thought their child couldn\'t love math.' : 'In an AI world, math isn\'t about calculations \u2014 it\'s about thinking.'}
-**Body:** ${brief.icpType === 'Non-NRI' ? `If you\u2019re tired of watching your child dread homework and lose confidence, this one class will change everything.` : `That\u2019s what we call MathFit \u2014 raising confident problem-solvers. Curious how to build this in {ChildName}?`}
+**Asset:** Clean, warm visual \u2014 ${brief.audience === 'NRI' ? 'NRI family, child on Leap platform with tutor' : 'US-presenting parent and child together, relaxed, not stock'}. Overlay: \u201cFrom math fear to math confidence.\u201d
+**Headline:** ${brief.audience !== 'NRI' ? 'Many parents thought their child couldn\'t love math.' : 'In an AI world, math isn\'t about calculations \u2014 it\'s about thinking.'}
+**Body:** ${brief.audience !== 'NRI' ? `If you\u2019re tired of watching your child dread homework and lose confidence, this one class will change everything.` : `That\u2019s what we call MathFit \u2014 raising confident problem-solvers. Curious how to build this in {ChildName}?`}
 **Button:** ${brief.angle?.includes('Reschedule') ? 'Reschedule {ChildName}\'s Free Trial' : 'Book {ChildName}\'s Free Trial'}
 
 ---
 **Variant 2** \u2014 Social Proof + Trial Preview
 
-**Asset:** Real in-session photograph \u2014 ${brief.icpType === 'NRI' ? 'NRI' : brief.icpType === 'Non-NRI' ? 'US-presenting' : 'Asian'} child visibly engaged, tutor present. Warm, unscripted. Overlay: ${mkt.badge} | ${mkt.proof}
+**Asset:** Real in-session photograph \u2014 ${brief.audience === 'NRI' ? 'NRI' : 'US-presenting'} child visibly engaged, tutor present. Warm, unscripted. Overlay: ${mkt.badge} | ${mkt.proof}
 **Headline:** This is what a Cuemath class feels like.
 **Body:** This 1:1 trial is built around {ChildName}\u2019s needs and pace. From fun math puzzles to a dedicated tutor who gets them, it\u2019s the kind of class that makes kids say, \u201ccan we do another one?\u201d
 **Button:** ${brief.angle?.includes('Reschedule') ? 'Reschedule {ChildName}\'s Free Trial' : 'Book {ChildName}\'s Free Trial'}
@@ -9576,7 +9726,7 @@ ${angleLine}
 **Tokens:** {ParentName}, {ChildName}, {Link}
 **ICP guidance:** NRI = Indian tutor trust signal. Non-NRI = empathy-first, no-pressure. Asian = competition outcomes + named achievements.
 
-*${brief.market} | ${brief.segment} | ${brief.icpType}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience}*`;
 
   } else {
     // Fallback for any unhandled format
@@ -9611,7 +9761,7 @@ ${offerLine}
 ${offerLine}
 
 ---
-*${brief.market} | ${brief.segment} | ${brief.icpType} | Tone: ${mkt.tone}*`;
+*${brief.market} | ${brief.targeting} | ${brief.audience} | Tone: ${mkt.tone}*`;
   }
 
   // Show result using the standard showResult flow
@@ -9622,7 +9772,7 @@ ${offerLine}
   document.getElementById('generateResult')?.classList.remove('hidden');
   document.getElementById('resultPlatform').textContent = brief.platform;
   document.getElementById('resultMarket').textContent = brief.market;
-  document.getElementById('resultSegment').textContent = brief.segment;
+  document.getElementById('resultTargeting').textContent = brief.targeting || brief.audience;
   document.getElementById('resultContent').innerHTML = markdownToHtml(content);
   document.getElementById('refinementBar').style.display = '';
   document.getElementById('imageGenSection').style.display = 'none';
@@ -9644,14 +9794,46 @@ function updateGenerateMode() {
   if (label) label.textContent = briefOnly ? 'Build Brief' : 'Generate';
 }
 
+// PIN gate — session-level unlock for Create tab (PIN stored in Supabase godfather_config)
+// PIN gate — session-level unlock. Keys: create_pin, tagger_pin (stored in Supabase godfather_config)
+const _pinUnlocked = {};
+async function checkPIN(purpose, configKey, promptText, failMsg) {
+  if (_pinUnlocked[configKey]) return true;
+  const entered = prompt(promptText || `Enter ${purpose} PIN:`);
+  if (!entered) return false;
+  try {
+    const rows = await supabaseGet('godfather_config', `select=value&key=eq.${configKey}`);
+    const storedPin = rows?.[0]?.value;
+    if (storedPin && entered === storedPin) {
+      _pinUnlocked[configKey] = true;
+      showToast(`${purpose} PIN accepted`);
+      return true;
+    }
+  } catch(e) { console.warn(`${purpose} PIN check failed, trying localStorage`, e); }
+  const localPin = localStorage.getItem('gf_' + configKey);
+  if (localPin && entered === localPin) {
+    _pinUnlocked[configKey] = true;
+    showToast(`${purpose} PIN accepted (offline)`);
+    return true;
+  }
+  showToast(failMsg || 'Incorrect PIN', 'error');
+  return false;
+}
+function checkCreatePIN() {
+  return checkPIN('Create', 'create_pin', 'Enter Create PIN to use AI generation:', 'Incorrect PIN — using template generation');
+}
+function checkTaggerPIN() {
+  return checkPIN('Tagger', 'tagger_pin', 'Enter Tagger PIN to use API credits:', 'Incorrect PIN — tagging blocked');
+}
+
 async function generateContent() {
   const briefOnly = document.getElementById('briefOnlyToggle')?.checked;
-  const useApi = false; // All generation is template-based — no API credits
   const brief = {
     market: document.getElementById('briefMarket').value,
     platform: getActivePill('platformPills'), format: getActivePill('formatPills'),
     subFormat: getActivePill('subFormatPills') || null,
-    icpType: getActivePill('icpPills'), segment: document.getElementById('briefSegment').value,
+    audience: getActivePill('audiencePills'), targeting: document.getElementById('briefTargeting')?.value || 'Auto',
+    segment: 'Foundation Rebuilder',
     funnel: document.getElementById('briefFunnel').value,
     angle: document.getElementById('briefAngle').value, offer: document.getElementById('briefOffer').value,
     grade: document.getElementById('briefGrade')?.value || '3-5',
@@ -9660,37 +9842,42 @@ async function generateContent() {
   state.currentBrief = brief;
   localStorage.setItem('gf_currentBrief', JSON.stringify(brief));
 
-  // API MODE: generate via Claude API (uses credits)
-  if (useApi) {
-    state.isGenerating = true;
-    const btn = document.getElementById('generateBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<div class="flex gap-1"><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.15s"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.3s"></div></div>';
-    document.getElementById('generateEmpty').classList.add('hidden');
-    document.getElementById('generateResult').classList.add('hidden');
-    document.getElementById('generateLoading').classList.remove('hidden');
-    const model = getModelForFormat(brief.format);
-    const maxTokens = getMaxTokensForFormat(brief.format);
-    try {
-      const sys = buildSystemPrompt(brief);
-      const msg = buildUserMessage(brief);
-      state.conversationHistory = [{role:'user',content:msg}];
-      const result = await callClaude([{role:'user',content:msg}], false, sys, model, maxTokens);
-      showResult(result, brief);
-      document.getElementById('imageGenSection').style.display = 'none';
-    } catch(e) {
-      document.getElementById('generateLoading').classList.add('hidden');
-      document.getElementById('generateEmpty').classList.remove('hidden');
-      showToast('Error: '+e.message);
-    }
-    state.isGenerating = false;
-    btn.disabled = false;
-    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> <span id="generateBtnLabel">Generate</span>';
+  // Brief-only mode: template, no API
+  if (briefOnly) {
+    generateFromTemplate();
     return;
   }
 
-  // TEMPLATE GENERATION: instant, zero API credits
-  generateFromTemplate();
+  // PIN check — no PIN = no generation at all
+  const pinOk = await checkCreatePIN();
+  if (!pinOk) return;
+
+  // HAIKU AI GENERATION (PIN-unlocked)
+  state.isGenerating = true;
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="flex gap-1"><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.15s"></div><div class="w-1.5 h-1.5 bg-white rounded-full dot-bounce" style="animation-delay:0.3s"></div></div>';
+  document.getElementById('generateEmpty').classList.add('hidden');
+  document.getElementById('generateResult').classList.add('hidden');
+  document.getElementById('generateLoading').classList.remove('hidden');
+  const model = 'claude-haiku-4-5-20251001';
+  const maxTokens = getMaxTokensForFormat(brief.format);
+  try {
+    const sys = buildSystemPrompt(brief);
+    const msg = buildUserMessage(brief);
+    state.conversationHistory = [{role:'user',content:msg}];
+    const result = await callClaude([{role:'user',content:msg}], false, sys, model, maxTokens);
+    showResult(result, brief);
+    document.getElementById('imageGenSection').style.display = 'none';
+  } catch(e) {
+    document.getElementById('generateLoading').classList.add('hidden');
+    showToast('Haiku error — falling back to template: ' + e.message);
+    generateFromTemplate();
+  }
+  state.isGenerating = false;
+  btn.disabled = false;
+  btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> <span id="generateBtnLabel">Generate</span>';
+  return;
   return;
 }
 
@@ -10083,7 +10270,7 @@ ${getPatternContext(brief)}
 function buildUserMessage(brief) {
   let m = `Create 3 production-ready options for:\n**Market:** ${brief.market}\n**Platform:** ${brief.platform}\n**Format:** ${brief.format}`;
   if (brief.subFormat) m += `\n**Sub-Format:** ${brief.subFormat}`;
-  m += `\n**ICP:** ${brief.icpType}\n**Segment:** ${brief.segment}\n**Funnel:** ${brief.funnel}`;
+  m += `\n**Audience:** ${brief.audience}\n**Targeting:** ${brief.targeting || 'Auto'}\n**Funnel:** ${brief.funnel}`;
   if (brief.grade) m += `\n**Grade Band:** ${brief.grade}`;
   if (brief.loc && brief.loc !== 'General') m += `\n**Content Angle:** ${brief.loc} \u2014 ${LOC_DATA[brief.loc]?.angle || ''}`;
   if (brief.angle) m += `\n**Angle:** ${brief.angle}`;
@@ -10409,7 +10596,7 @@ function showResult(content, brief) {
   document.getElementById('refinementBar').style.display = '';
   document.getElementById('resultPlatform').textContent = brief.platform;
   document.getElementById('resultMarket').textContent = brief.market;
-  document.getElementById('resultSegment').textContent = brief.segment;
+  document.getElementById('resultTargeting').textContent = brief.targeting || brief.audience;
 
   // Run brand validation on the generated content
   const violations = validateBrand(content);
@@ -10474,7 +10661,7 @@ function showResult(content, brief) {
 function exportAsTxt() {
   if (!state.lastGeneratedContent) { showToast('Nothing to export'); return; }
   const b = state.currentBrief;
-  const header = `=== FORGE OUTPUT ===\nGenerated: ${new Date().toLocaleString()}\nMarket: ${b.market||'-'} | Platform: ${b.platform||'-'} | ICP: ${b.icpType||'-'} | Segment: ${b.segment||'-'}\n${'='.repeat(40)}\n\n`;
+  const header = `=== FORGE OUTPUT ===\nGenerated: ${new Date().toLocaleString()}\nMarket: ${b.market||'-'} | Platform: ${b.platform||'-'} | Audience: ${b.audience||'-'} | Segment: ${b.segment||'-'}\n${'='.repeat(40)}\n\n`;
   const blob = new Blob([header + state.lastGeneratedContent], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -10504,7 +10691,7 @@ function setForgeStatus(status) {
       sub_format: brief.subFormat || '',
       market: brief.market || '',
       platform: brief.platform || '',
-      icp_type: brief.icpType || '',
+      audience: brief.audience || '',
       segment: brief.segment || '',
       angle: brief.angle || '',
       status: status,
@@ -10771,7 +10958,7 @@ BRAND STYLE:
 VISUAL SCENE:
 ${visualDirection || 'A warm, authentic scene showing a confident child engaged in math learning. Natural lighting, premium feel.'}
 - Platform: ${brief.platform || 'Meta'} ad
-- Target audience: ${brief.icpType || 'NRI'} parents of kids aged 6-14
+- Target audience: ${brief.audience || 'NRI'} parents of kids aged 6-14
 - Tone: ${brief.funnel === 'TOFU' ? 'Aspirational' : brief.funnel === 'MOFU' ? 'Trust-building with proof' : 'Action-oriented with urgency'}
 
 ${getTopCreativeRefs()}
@@ -10886,7 +11073,7 @@ function downloadImage(index) {
 
 // ==================== CREATIVE TAGGER ====================
 // TAG_DISPLAY removed — new taxonomy uses plain English values directly
-function tagLabel(code) { return code; }
+function tagLabel(code) { return _TAG_VALUE_RENAMES[code] || code; }
 function shortAdName(name) {
   if (!name || name.length < 40) return name;
   // Strip date suffix (_DDMMYY or -DDMMYY at end)
@@ -11759,7 +11946,23 @@ const _TAG_FIELD_RENAMES = Object.freeze({
   'subject_in_frame': null
 });
 const _TAG_VALUE_RENAMES = Object.freeze({
-  // hook: old → new
+  // ── H-codes → plain English (hook) ──
+  'H-MATH': 'Outcome First', 'H-FEAR': 'Fear/Urgency', 'H-PROBLEM': 'Problem/Pain',
+  'H-PAINPOINT': 'Problem/Pain', 'H-TEST': 'Social Proof', 'H-STAT': 'Social Proof',
+  'H-QUES': 'Question', 'H-LIFE': 'Curiosity', 'H-EVENT': 'Curiosity',
+  'H-COMP': 'Authority', 'H-OFFER': 'Offer/Price', 'H-GRADE': 'Feature-Driven',
+  // ── F-codes → plain English (content_format) ──
+  'F-STATIC': 'Static', 'F-VIDEO': 'Video', 'F-INFLU': 'Talking Head',
+  'F-TESTI': 'Testimonial', 'F-ANIM': 'Animated', 'F-CAROUSEL': 'Slideshow',
+  'F-VERN-TESTI': 'Testimonial', 'F-PRODUCT': 'Product Demo',
+  'F-PLATFORM-DEMO': 'Product Demo', 'F-FOUNDER': 'Talking Head',
+  'F-BRAND': 'Graphic Explainer', 'F-APP-PREVIEW': 'Product Demo',
+  'F-CONTENT-UGC': 'Talking Head',
+  // ── PB-codes → plain English (pain_benefit) ──
+  'PB-GRADE': 'Grades & School', 'PB-CONF': 'Confidence', 'PB-FOUND': 'Foundation Building',
+  'PB-FUTURE': 'Foundation Building', 'PB-TUTOR': 'Tutor Quality',
+  'PB-INDIAN': 'Personalization', 'PB-COMP': 'Competition Prep',
+  // ── Old text labels → new taxonomy values (hook) ──
   'Math anchor': 'Outcome First', 'Math Anchor': 'Outcome First',
   'Problem': 'Problem/Pain', 'Fear / urgency': 'Fear/Urgency', 'Fear/urgency': 'Fear/Urgency',
   'Parent testimonial': 'Social Proof', 'Statistic': 'Social Proof',
@@ -11767,29 +11970,31 @@ const _TAG_VALUE_RENAMES = Object.freeze({
   'Competitive': 'Authority', 'Offer / price': 'Offer/Price', 'Offer/price': 'Offer/Price',
   'Grade badge': 'Feature-Driven', 'Seasonal': 'Curiosity',
   'Question Hook': 'Question', 'Problem-Solution': 'Problem/Pain',
-  // content_format: old → new
+  // ── Old text labels → new taxonomy values (content_format) ──
   'Static image': 'Static', 'Video': 'Video',
   'Influencer UGC': 'Talking Head', 'Testimonial video': 'Testimonial',
   'Vernacular testimonial': 'Testimonial', 'Product video': 'Product Demo',
   'Brand video': 'Graphic Explainer',
-  // pain_benefit: old → new (mostly case fixes)
+  // ── Old text labels → new taxonomy values (pain_benefit) ──
   'Grades & school': 'Grades & School', 'Confidence & anxiety': 'Confidence',
   'Strong foundations': 'Foundation Building', 'Future readiness': 'Foundation Building',
   'Tutor quality': 'Tutor Quality', 'Indian roots': 'Personalization',
   'Competition prep': 'Competition Prep',
-  // emotional_tone: old → new
+  // ── Old text labels → new taxonomy values (emotional_tone) ──
   'Testimonial': 'Empathetic', 'Urgency': 'Urgent', 'Comparison': 'Authoritative',
-  'Offer / promo': 'Confident', 'Offer/promo': 'Confident', 'Seasonal': 'Aspirational',
-  // campaign_audience: old → new
+  'Offer / promo': 'Confident', 'Offer/promo': 'Confident',
+  // ── Old text labels → new taxonomy values (campaign_audience) ──
   'NRI parents': 'NRI', 'NRI Parents': 'NRI',
   'Non-NRI parents': 'General', 'Non-NRI Parents': 'General',
   'Local parents': 'General', 'All Audiences': 'General',
   'Gujarati speaking': 'Vernacular', 'Gujarati Speaking': 'Vernacular',
   'Telugu speaking': 'Vernacular', 'Telugu Speaking': 'Vernacular',
   'Tamil speaking': 'Vernacular', 'Tamil Speaking': 'Vernacular',
-  'High school parents': 'General', 'Asian Parents': 'General',
+  'High school parents': 'General', 'High School Parents': 'General', 'High School': 'General',
+  'Asian Parents': 'General', 'Asian parents': 'General',
+  'Universal': 'General', 'Other': 'General',
   'Hindi Speaking': 'Vernacular',
-  // production_style: old → new
+  // ── Old text labels → new taxonomy values (production_style) ──
   'UGC': 'UGC', 'Studio shoot': 'Studio', 'Motion graphic': 'Animated',
   'Screen record': 'Screen Recording', 'Polished': 'Studio',
   'Static graphic': 'Static Graphic', 'Animated': 'Animated'
@@ -11869,9 +12074,12 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
         localStorage.setItem('gf_creative_tags_backup_ts', Date.now().toString());
       } catch(e) { /* storage full — skip backup */ }
       updateSyncBadge('synced');
+      // Re-render untagged alert now that tags are loaded
+      try { renderUntaggedAlert(); } catch(e) {}
     } else {
       console.log('creative_tags: 0 rows (table empty or new)');
       updateSyncBadge('synced');
+      try { renderUntaggedAlert(); } catch(e) {}
     }
   } catch(e) {
     state._supabaseLoadPending = false;
@@ -12268,8 +12476,10 @@ function buildTaggerPrompt(batch) {
   return buildTaggerSystemPrompt();
 }
 
-function retagCreatives(force) {
+async function retagCreatives(force) {
   if (!state.taggerData.length) return;
+  const pinOk = await checkTaggerPIN();
+  if (!pinOk) return;
   if (force) {
     const count = state.taggerData.length;
     if (!confirm(`This will re-tag all ${count} creatives through Claude API, using significant credits. Are you sure?\n\nTip: Use "Refresh Data" on Oracle to pull new ads — only NEW ads get tagged. Existing tags are preserved.`)) return;
@@ -12692,7 +12902,9 @@ function renderTaggerInsights() {
 
   // Find best/worst performing tags per category (CPTD primary, CPQL fallback)
   const insights = [];
-  ['hook','content_format','pain_benefit','emotional_tone','language'].forEach(cat => {
+  // emotional_tone excluded (decision #4: too subjective, never primary grouping)
+  // language excluded (audience-specific — "avoid Gujarati" without context is misleading)
+  ['hook','content_format','pain_benefit'].forEach(cat => {
     const catInfo = GODFATHER_TAXONOMY.fields[cat];
     if (!catInfo) return;
     const tagPerf = {};
@@ -12852,13 +13064,14 @@ function renderCreativeReview() {
     const vColors = { green: 'border-green-300 bg-green-50', amber: 'border-amber-300 bg-amber-50', red: 'border-red-300 bg-red-50', gray: 'border-gray-200 bg-gray-50' };
     const vBadge = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700', gray: 'bg-gray-100 text-gray-500' };
 
-    // Comparison arrows vs benchmark
+    // Comparison arrows vs portfolio average — label visible, not just tooltip
     const cmp = (val, bench, lower) => {
       if (!bench || !val) return '';
       const pct = ((val - bench) / bench * 100);
-      if (Math.abs(pct) < 5) return '<span class="text-gray-400 text-[9px]" title="vs portfolio avg">≈ avg</span>';
-      if (lower) return pct < 0 ? `<span class="text-green-600 text-[9px]" title="vs portfolio avg">▼${Math.abs(pct).toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]" title="vs portfolio avg">▲${pct.toFixed(0)}%</span>`;
-      return pct > 0 ? `<span class="text-green-600 text-[9px]" title="vs portfolio avg">▲${pct.toFixed(0)}%</span>` : `<span class="text-red-500 text-[9px]" title="vs portfolio avg">▼${Math.abs(pct).toFixed(0)}%</span>`;
+      const vs = 'vs avg';
+      if (Math.abs(pct) < 5) return `<span class="text-gray-400 text-[8px]">≈ ${vs}</span>`;
+      if (lower) return pct < 0 ? `<span class="text-green-600 text-[8px]">▼${Math.abs(pct).toFixed(0)}% ${vs}</span>` : `<span class="text-red-500 text-[8px]">▲${pct.toFixed(0)}% ${vs}</span>`;
+      return pct > 0 ? `<span class="text-green-600 text-[8px]">▲${pct.toFixed(0)}% ${vs}</span>` : `<span class="text-red-500 text-[8px]">▼${Math.abs(pct).toFixed(0)}% ${vs}</span>`;
     };
 
     return `<div class="border rounded-xl p-3 ${vColors[v.color]} transition hover:shadow-md">
@@ -13768,7 +13981,10 @@ function renderTagCombos() {
           if (tdA > 0 && tdB > 0) return (parseNumber(a['Spent']||0)/tdA) - (parseNumber(b['Spent']||0)/tdB);
           return parseNumber(b['QL']||0) - parseNumber(a['QL']||0);
         })[0];
-      return match ? shortAdName(match['Ad name']||match['ad name']||'') : '';
+      if (!match) return null;
+      const name = shortAdName(match['Ad name']||match['ad name']||'');
+      const thumb = match.thumbnail_url || match.image_url || '';
+      return { name, thumb };
     }
 
     // Top combos
@@ -13790,7 +14006,7 @@ function renderTagCombos() {
             <span class="text-[9px] text-text-muted ml-1">${c.metricLabel} · ${c.count} ads</span>
           </div>
         </div>
-        ${ex ? `<p class="text-[8px] text-text-muted mt-1 truncate" title="${ex}">Best: ${ex}</p>` : ''}
+        ${ex ? `<div class="flex items-center gap-1.5 mt-1.5">${ex.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-text-muted truncate" title="${ex.name}">Best: ${ex.name}</p></div>` : ''}
       </div>`;
     });
     html += '</div></div>';
@@ -13816,7 +14032,7 @@ function renderTagCombos() {
             <span class="text-[9px] text-text-muted ml-1">${c.metricLabel} · ${c.count} ads</span>
           </div>
         </div>
-        <div class="mt-1.5 text-[10px] text-text-muted">${ratio >= 2 ? Math.round(ratio) + 'x more expensive than #1 winner' : Math.round((ratio - 1) * 100) + '% more expensive than #1 winner'}${ex ? ` · e.g. ${ex}` : ''}</div>
+        <div class="flex items-center gap-1.5 mt-1.5">${ex?.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<span class="text-[10px] text-text-muted">${ratio >= 2 ? Math.round(ratio) + 'x more expensive than #1 winner' : Math.round((ratio - 1) * 100) + '% more expensive than #1 winner'}${ex ? ` · e.g. ${ex.name}` : ''}</span></div>
       </div>`;
     });
     html += '</div></div></div>';
@@ -14058,48 +14274,16 @@ function matchMarketFromText(text) {
 // Extract audience targeting from campaign name (segment 5 in naming convention)
 // Pattern: GEO_FB_Leads_Conv_AUDIENCE_AGE_Objective_Version_LP_...
 function extractAudience(c) {
-  const campaign = c['Campaign name'] || c['campaign name'] || c['Campaign Name'] || '';
-  const parts = campaign.split(/[_-]/);
-  const NOISE_WORDS = new Set(['int','and','the','for','with','new','old','all','top','conv','leads','lead','ads','campaign','advantage','manual','lal','exp']);
-  // Known audience values
-  const KNOWN_AUDIENCES = {
-    'expat':'Expats','expats':'Expats','nri':'NRI','indian':'Indian Interests','school':'School Targeting',
-    'advantage':'Advantage+','high':'High NRI','interests':'Interests','conv':'Conversion',
-    'broad':'Broad','lookalike':'Lookalike','custom':'Custom Audience','retargeting':'Retargeting',
-    'parents':'Parents','networking':'Networking','mobile':'Mobile Networks',
-    'influencer':'Influencer Audience','influ':'Influencer Audience','desi':'Desi/NRI','telugu':'Telugu Speaking','gujarati':'Gujarati Speaking','tamil':'Tamil Speaking','hindi':'Hindi Speaking'
-  };
-  // Try positions starting at 4 (0-indexed) — the audience segment after GEO_FB_Leads_Conv_
-  if (parts.length >= 5) {
-    for (let i = 4; i < parts.length; i++) {
-      const candidate = parts[i];
-      const lower = candidate.toLowerCase();
-      // Skip noise words
-      if (NOISE_WORDS.has(lower)) continue;
-      if (KNOWN_AUDIENCES[lower]) return KNOWN_AUDIENCES[lower];
-      // Check combined segments (e.g., "Indian_Interests" = parts[i]+"_"+parts[i+1])
-      if (i + 1 < parts.length) {
-        const combined = (parts[i] + '_' + parts[i + 1]).toLowerCase();
-        if (combined === 'indian_interests') return 'Indian Interests';
-        if (combined === 'school_targeting') return 'School Targeting';
-        if (combined === 'high_nri') return 'High NRI';
-        if (combined === 'advantage_audience') return 'Advantage+';
-      }
-      // Skip generic fragments — only return if it's a meaningful audience term
-    }
-  }
-  // Fallback: use tag-based audience (from Claude tagging)
+  // Priority 1: campaign_audience tag (already in taxonomy vocabulary)
   const tagAud = c.tags?.campaign_audience;
-  if (tagAud && tagAud !== 'Unknown' && tagAud !== 'N/A') return typeof tagLabel === 'function' ? tagLabel(tagAud) : tagAud;
-  // Last resort: use ad set name audience hint
-  const adSet = (c['Ad set name']||'').toLowerCase();
-  if (adSet.includes('nri')) return 'NRI';
-  if (adSet.includes('expat')) return 'Expats';
-  if (adSet.includes('interest')) return 'Interests';
-  if (adSet.includes('lookalike') || adSet.includes('lal')) return 'Lookalike';
-  if (adSet.includes('retarget')) return 'Retargeting';
-  if (adSet.includes('broad')) return 'Broad';
-  return 'Other';
+  if (tagAud && tagAud !== 'Unknown' && tagAud !== 'N/A') return tagLabel(tagAud);
+  // Priority 2: parse from campaign name using GODFATHER_TAXONOMY
+  const campaign = c['Campaign name'] || c['campaign name'] || c['Campaign Name'] || '';
+  if (campaign) return GODFATHER_TAXONOMY.fields.campaign_audience.parse(campaign);
+  // Priority 3: parse from ad set name
+  const adSet = c['Ad set name'] || c['ad set name'] || '';
+  if (adSet) return GODFATHER_TAXONOMY.fields.campaign_audience.parse(adSet);
+  return 'General';
 }
 
 function computeMetric(creatives, metric) {
@@ -14227,7 +14411,7 @@ function generateCreativeBriefs() {
   });
   const mixTracker = document.getElementById('icpMixTracker');
   if (segTotal >= 5) {
-    let mixHtml = '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-4 mb-4"><h4 class="text-sm font-bold mb-2 flex items-center gap-2"><svg class="w-4 h-4 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>ICP Content Mix</h4>';
+    let mixHtml = '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-4 mb-4"><h4 class="text-sm font-bold mb-2 flex items-center gap-2"><svg class="w-4 h-4 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Audience Content Mix</h4>';
     mixHtml += '<p class="text-[10px] text-text-muted mb-3">Ideal: 40% Foundation Rebuilder, 30% Personalisation Seeker, 20% Confidence Builder, 10% Universal</p>';
     mixHtml += '<div class="space-y-2">';
     Object.entries(IDEAL_MIX).forEach(([seg, ideal]) => {
@@ -14272,7 +14456,7 @@ function generateCreativeBriefs() {
       <div class="space-y-1 text-xs text-text-secondary mb-3">
         <p>Hook: <strong class="text-text-primary">${tagLabel(b.hook)}</strong> at ${formatCurrency(b.hookCPQL)} CPQL (${b.hookCount} ads)</p>
         <p>Frame: <strong class="text-text-primary">${tagLabel(b.pb)}</strong> at ${formatCurrency(b.pbCPQL)} CPQL</p>
-        <p>Format: <strong class="text-text-primary">${tagLabel(b.format)}</strong> · ICP: <strong>${tagLabel(b.icp)}</strong></p>
+        <p>Format: <strong class="text-text-primary">${tagLabel(b.format)}</strong> · Audience: <strong>${tagLabel(b.icp)}</strong></p>
         ${b.antiPattern ? `<p class="text-accent-red">Avoid: ${tagLabel(b.antiPattern)} (${formatCurrency(b.antiCPQL)} CPQL)</p>` : ''}
       </div>
       <button onclick='generateFromCIBrief(${JSON.stringify({geo:b.geo,hook:b.hook,pb:b.pb,format:b.format,icp:b.icp}).replace(/'/g,"\\'")})'
@@ -14289,7 +14473,7 @@ function generateFromCIBrief(brief) {
   const fmtValue = fmtLower.includes('video') || fmtLower.includes('influencer') || fmtLower.includes('testimonial') ? 'Video - Reel' : 'Static Ad';
   document.querySelectorAll('#formatPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === fmtValue));
   // Set ICP pill
-  document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === brief.icp));
+  document.querySelectorAll('#audiencePills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value === brief.icp));
   // Set angle
   document.getElementById('briefAngle').value = `Winning pattern: ${tagLabel(brief.hook)} hook + ${tagLabel(brief.pb)} frame. Data-proven for ${brief.geo}.`;
   setTimeout(() => generateContent(), 200);
@@ -14321,6 +14505,10 @@ function renderWinningByAudience() {
   });
 
   // For each audience, compute metrics and find winning hook+format
+  // Use adaptive minimums from taxonomy based on market tier
+  const geo = countryFilter !== 'all' ? countryFilter : 'US';
+  const mins = GODFATHER_TAXONOMY.getMinimums(geo);
+
   const audRows = Object.entries(audiences).map(([aud, ads]) => {
     const spend = ads.reduce((s, c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
     const ql = ads.reduce((s, c) => s + parseNumber(c['QL']||c['ql']||0), 0);
@@ -14329,49 +14517,74 @@ function renderWinningByAudience() {
     const cptd = td >= 1 ? spend / td : null;
     const qlTd = ql > 0 && td >= 1 ? Math.min((td / ql * 100), 100) : null;
 
-    // Best hook for this audience
+    // Best hook for this audience (using adaptive minimums, validated against taxonomy)
+    const validHooks = new Set(GODFATHER_TAXONOMY.getValues('hook'));
     const hookPerf = {};
     ads.forEach(ad => {
-      const hook = ad.tags?.hook;
-      if (!hook || hook === 'Unknown') return;
+      let hook = tagLabel(ad.tags?.hook);
+      if (!hook || hook === 'Unknown' || !validHooks.has(hook)) return;
       if (!hookPerf[hook]) hookPerf[hook] = { spend: 0, ql: 0, td: 0, count: 0 };
       hookPerf[hook].spend += parseNumber(ad['Spent']||ad['spent']||0);
       hookPerf[hook].ql += parseNumber(ad['QL']||ad['ql']||0);
       hookPerf[hook].td += parseNumber(ad['TD']||ad['td']||0);
       hookPerf[hook].count++;
     });
-    const bestHook = Object.entries(hookPerf).filter(([,v]) => v.count >= 2).sort((a,b) => {
+    const bestHook = Object.entries(hookPerf).filter(([,v]) => v.count >= mins.creatives).sort((a,b) => {
       const aCptd = a[1].td >= 3 ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
       const bCptd = b[1].td >= 3 ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
       return aCptd - bCptd;
     })[0];
 
-    // Best format
+    // Best format — validate against taxonomy values to avoid cross-field contamination
+    const validFormats = new Set(GODFATHER_TAXONOMY.getValues('content_format'));
     const fmtPerf = {};
     ads.forEach(ad => {
-      const fmt = ad.tags?.content_format || ad['Creative type'] || 'Unknown';
-      if (fmt === 'Unknown') return;
+      let fmt = ad.tags?.content_format || ad['Creative type'] || 'Unknown';
+      fmt = tagLabel(fmt); // migrate any codes
+      if (fmt === 'Unknown' || !validFormats.has(fmt)) return;
       if (!fmtPerf[fmt]) fmtPerf[fmt] = { spend: 0, ql: 0, td: 0, count: 0 };
       fmtPerf[fmt].spend += parseNumber(ad['Spent']||ad['spent']||0);
       fmtPerf[fmt].ql += parseNumber(ad['QL']||ad['ql']||0);
       fmtPerf[fmt].td += parseNumber(ad['TD']||ad['td']||0);
       fmtPerf[fmt].count++;
     });
-    const bestFmt = Object.entries(fmtPerf).filter(([,v]) => v.count >= 2).sort((a,b) => {
-      const aCptd = a[1].td >= 3 ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
-      const bCptd = b[1].td >= 3 ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
+    const bestFmt = Object.entries(fmtPerf).filter(([,v]) => v.count >= mins.creatives).sort((a,b) => {
+      const aCptd = a[1].td >= mins.tds ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
+      const bCptd = b[1].td >= mins.tds ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
       return aCptd - bCptd;
     })[0];
 
-    // Worst hook (to avoid)
-    const worstHook = Object.entries(hookPerf).filter(([,v]) => v.count >= 2).sort((a,b) => {
-      const aCptd = a[1].td >= 3 ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
-      const bCptd = b[1].td >= 3 ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
+    // Worst hook (to avoid) + collect ad names using this hook
+    const worstHook = Object.entries(hookPerf).filter(([,v]) => v.count >= mins.creatives).sort((a,b) => {
+      const aCptd = a[1].td >= mins.tds ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
+      const bCptd = b[1].td >= mins.tds ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
       return bCptd - aCptd;
     })[0];
+    // Get top 3 ads for best hook (by lowest CPTD/CPQL) and worst hook (by highest spend)
+    const _adCard = (ad) => ({
+      name: shortAdName(ad['Ad name'] || ad['ad name'] || ''),
+      thumb: ad.thumbnail_url || ad.image_url || '',
+      spend: parseNumber(ad['Spent']||ad['spent']||0),
+      cptd: parseNumber(ad['TD']||ad['td']||0) > 0 ? parseNumber(ad['Spent']||ad['spent']||0) / parseNumber(ad['TD']||ad['td']||0) : null
+    });
+    let bestAds = [];
+    if (bestHook) {
+      bestAds = ads.filter(ad => ad.tags?.hook === bestHook[0] && parseNumber(ad['Spent']||ad['spent']||0) > 5000)
+        .sort((a,b) => {
+          const aTd = parseNumber(a['TD']||a['td']||0), bTd = parseNumber(b['TD']||b['td']||0);
+          if (aTd > 0 && bTd > 0) return (parseNumber(a['Spent']||a['spent']||0)/aTd) - (parseNumber(b['Spent']||b['spent']||0)/bTd);
+          return parseNumber(b['QL']||b['ql']||0) - parseNumber(a['QL']||a['ql']||0);
+        }).slice(0, 3).map(_adCard);
+    }
+    let worstAds = [];
+    if (worstHook) {
+      worstAds = ads.filter(ad => ad.tags?.hook === worstHook[0])
+        .sort((a,b) => parseNumber(b['Spent']||b['spent']||0) - parseNumber(a['Spent']||a['spent']||0))
+        .slice(0, 3).map(_adCard);
+    }
 
-    return { aud, ads: ads.length, spend, ql, td, cpql, cptd, qlTd, bestHook, bestFmt, worstHook };
-  }).filter(r => r.ads >= 3 && r.cpql !== null).map(r => { r._lowSample = r.ads < 5; return r; }).sort((a, b) => {
+    return { aud, ads: ads.length, spend, ql, td, cpql, cptd, qlTd, bestHook, bestFmt, worstHook, bestAds, worstAds };
+  }).filter(r => r.ads >= mins.creatives && r.cpql !== null).map(r => { r._lowSample = r.ads < mins.creatives + 2; return r; }).sort((a, b) => {
     // Prioritize audiences with TDs over those without
     const aHasTD = a.td > 0 ? 0 : 1;
     const bHasTD = b.td > 0 ? 0 : 1;
@@ -14465,6 +14678,60 @@ function renderWinningByAudience() {
 
   html += `</div></div>`;
 
+  // ── Winning Combos — the 3 default pairs from taxonomy ──
+  const comboPairs = GODFATHER_TAXONOMY.comboPairs;
+  html += `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
+    <h3 class="text-base font-bold mb-1">Winning Combos</h3>
+    <p class="text-[10px] text-text-muted mb-4">Top-performing tag combinations. Minimum ${mins.creatives} creatives, ${mins.tds} TDs, ${formatCurrency(mins.spend)} spend.</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">`;
+  comboPairs.forEach(([dimA, dimB]) => {
+    const comboPerf = {};
+    data.forEach(c => {
+      const a = c.tags?.[dimA], b = c.tags?.[dimB];
+      if (!a || a === 'Unknown' || !b || b === 'Unknown') return;
+      const key = a + ' × ' + b;
+      if (!comboPerf[key]) comboPerf[key] = { spend: 0, ql: 0, td: 0, count: 0, a, b };
+      comboPerf[key].spend += parseNumber(c['Spent']||c['spent']||0);
+      comboPerf[key].ql += parseNumber(c['QL']||c['ql']||0);
+      comboPerf[key].td += parseNumber(c['TD']||c['td']||0);
+      comboPerf[key].count++;
+    });
+    const sorted = Object.entries(comboPerf)
+      .filter(([,v]) => v.count >= mins.creatives && v.td >= mins.tds && v.spend >= mins.spend)
+      .sort((a,b) => (a[1].spend/a[1].td) - (b[1].spend/b[1].td));
+    const labelA = GODFATHER_TAXONOMY.getLabel(dimA), labelB = GODFATHER_TAXONOMY.getLabel(dimB);
+    html += `<div class="border border-gray-100 rounded-xl p-4">
+      <p class="text-[10px] font-bold text-text-muted uppercase mb-3">${labelA} × ${labelB}</p>`;
+    if (sorted.length === 0) {
+      html += `<p class="text-[10px] text-text-muted">Not enough data for this combo (need ${mins.creatives}+ ads, ${mins.tds}+ TDs)</p>`;
+    } else {
+      const top3 = sorted.slice(0, 3);
+      const bottom = sorted.length > 3 ? sorted.slice(-1) : [];
+      top3.forEach(([combo, v], i) => {
+        const cptd = v.td > 0 ? formatCurrency(v.spend / v.td) : '—';
+        html += `<div class="flex items-center justify-between py-1.5 ${i > 0 ? 'border-t border-gray-50' : ''}">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-black ${i === 0 ? 'text-accent-green' : 'text-text-primary'}">#${i+1}</span>
+            <span class="text-xs font-medium">${combo}</span>
+          </div>
+          <span class="text-xs font-bold ${i === 0 ? 'text-accent-green' : ''}">${cptd} <span class="text-[9px] font-normal text-text-muted">(${v.count})</span></span>
+        </div>`;
+      });
+      bottom.forEach(([combo, v]) => {
+        const cptd = v.td > 0 ? formatCurrency(v.spend / v.td) : '—';
+        html += `<div class="flex items-center justify-between py-1.5 border-t border-red-100 mt-1">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] font-black text-accent-red">✗</span>
+            <span class="text-xs font-medium text-text-secondary">${combo}</span>
+          </div>
+          <span class="text-xs font-bold text-accent-red">${cptd} <span class="text-[9px] font-normal">(${v.count})</span></span>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+
   // Audience cards
   html += '<div class="space-y-4">';
   audRows.forEach(r => {
@@ -14486,7 +14753,7 @@ function renderWinningByAudience() {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div class="bg-accent-green-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-green-700 uppercase mb-1">Best Hook</p>
-          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
+          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>${r.bestAds?.length ? `<div class="flex gap-1.5 mt-2">${r.bestAds.map(a => `<div class="flex-1 min-w-0">${a.thumb ? `<img src="${a.thumb}" class="w-full h-12 object-cover rounded mb-1" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-green-800 truncate" title="${a.name}">${a.name}</p>${a.cptd ? `<p class="text-[8px] text-green-600 font-bold">${formatCurrency(a.cptd)}</p>` : ''}</div>`).join('')}</div>` : ''}` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
         </div>
         <div class="bg-accent-blue-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-blue-700 uppercase mb-1">Best Format</p>
@@ -14494,7 +14761,7 @@ function renderWinningByAudience() {
         </div>
         <div class="bg-accent-red-light/50 rounded-lg p-3">
           <p class="text-[10px] font-bold text-red-700 uppercase mb-1">Avoid</p>
-          ${r.worstHook && r.worstHook[0] !== r.bestHook?.[0] ? `<p class="text-xs font-semibold">${tagLabel(r.worstHook[0])}</p><p class="text-[10px] text-text-muted">${r.worstHook[1].count} ads · ${r.worstHook[1].td > 0 ? formatCurrency(r.worstHook[1].spend/r.worstHook[1].td) + ' CPTD' : r.worstHook[1].ql > 0 ? formatCurrency(r.worstHook[1].spend/r.worstHook[1].ql) + ' CPQL' : 'no QLs'}</p><p class="text-[10px] text-orange-600 mt-1 font-medium">${r.worstHook[1].td > 0 ? 'Refresh visual, keep the hook' : 'Pause ads with this pattern'}</p>` : '<p class="text-[10px] text-text-muted">No clear loser</p>'}
+          ${r.worstHook && r.worstHook[0] !== r.bestHook?.[0] ? `<p class="text-xs font-semibold">${tagLabel(r.worstHook[0])}</p><p class="text-[10px] text-text-muted">${r.worstHook[1].count} ads · ${r.worstHook[1].td > 0 ? formatCurrency(r.worstHook[1].spend/r.worstHook[1].td) + ' CPTD' : r.worstHook[1].ql > 0 ? formatCurrency(r.worstHook[1].spend/r.worstHook[1].ql) + ' CPQL' : 'no QLs'}</p>${r.worstAds?.length ? `<div class="flex gap-1.5 mt-2">${r.worstAds.map(a => `<div class="flex-1 min-w-0">${a.thumb ? `<img src="${a.thumb}" class="w-full h-12 object-cover rounded mb-1" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-red-800 truncate" title="${a.name}">${a.name}</p><p class="text-[8px] text-red-600 font-bold">${formatCurrency(a.spend)} spent</p></div>`).join('')}</div>` : ''}<p class="text-[10px] text-orange-600 mt-1 font-medium">${r.worstHook[1].td > 0 ? 'Refresh visual, keep the hook' : 'Pause these ads'}</p>` : '<p class="text-[10px] text-text-muted">No clear loser</p>'}
         </div>
       </div>
       ${r.bestHook && r.bestFmt ? `<div class="bg-surface-secondary rounded-lg p-3 mt-3">
@@ -14674,7 +14941,7 @@ function renderWinningFormulas() {
   let html = `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6 mb-6">
     <div class="flex items-center gap-2 mb-5">
       <div class="w-8 h-8 rounded-lg bg-gradient-brand flex items-center justify-center"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg></div>
-      <h3 class="text-sm font-bold">Winning Formula: ${market==='all'?'All Markets':market} ${icp==='all'?'/ All ICPs':'/ '+icp}</h3>
+      <h3 class="text-sm font-bold">Winning Formula: ${market==='all'?'All Markets':market} ${icp==='all'?'/ All Audiences':'/ '+icp}</h3>
     </div>
     <div class="flex flex-wrap items-center gap-2 mb-5">`;
 
@@ -14716,7 +14983,7 @@ function applyWinningFormula(market, icp) {
   state.activeWinningFormula = formula;
   navigateTo('generate');
   if (market !== 'all') document.getElementById('briefMarket').value = market;
-  if (icp !== 'all') document.querySelectorAll('#icpPills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===icp));
+  if (icp !== 'all') document.querySelectorAll('#audiencePills .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.value===icp));
   const angleText = Object.entries(formula).slice(0,4).map(([cat,data]) => `${GODFATHER_TAXONOMY.getLabel(cat)}: ${tagLabel(data.tag)}`).join(' | ');
   document.getElementById('briefAngle').value = angleText;
   updateFormulaIndicator();
@@ -14949,7 +15216,7 @@ function renderAudienceMap() {
     const geoCreatives = data.filter(c => extractMarket(c) === geo);
     const geoAuds = new Set(geoCreatives.map(c => c.tags?.campaign_audience).filter(a => a && a !== 'Unknown'));
     if (!geoAuds.has('NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'No NRI-targeted creatives', severity: 'high' });
-    if (!geoAuds.has('Non-NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'Non-NRI audience untapped', severity: 'medium' });
+    if (!geoAuds.has('Broad/Advantage+') && !geoAuds.has('General') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'Broad/General audience untapped', severity: 'medium' });
   });
   // Forge undeployed creatives
   const forgeUndeployed = (state.generationHistory || []).filter(g => !g.status || g.status === 'draft').length;
@@ -15150,6 +15417,8 @@ function submitUploadDrawer() {
 
 // ---- Tag unanalysed Library creatives via Claude API ----
 async function tagUnanalysedLibrary() {
+  const pinOk = await checkTaggerPIN();
+  if (!pinOk) return;
   if (!API_KEY) { showToast('Add Claude API key in Settings first.'); return; }
   const allCards = (state._librarySheet || []).map(normalizeLibraryRow).filter(c => c.name);
   const unanalysed = allCards.filter(c => !c.hookType && !c._raw?._cachedTags);
@@ -15650,7 +15919,7 @@ function loadFromLibrary(id) {
   showToast('Loaded from library');
 }
 function deleteFromLibrary(id) { state.library=state.library.filter(i=>i.id!==id); localStorage.setItem('gf_library',JSON.stringify(state.library)); renderLibrary(); }
-function regenFromLibrary(id) { const i=state.library.find(x=>x.id===id); if(i) generateFromBrief({geo:i.brief.market,platform:i.brief.platform,format:i.brief.format,icp_type:i.brief.icpType,icp_segment:i.brief.segment,angle:i.brief.angle||''}); }
+function regenFromLibrary(id) { const i=state.library.find(x=>x.id===id); if(i) generateFromBrief({geo:i.brief.market,platform:i.brief.platform,format:i.brief.format,icp:i.brief.audience,targeting:i.brief.targeting,angle:i.brief.angle||''}); }
 
 function generateAllHighPriority() {
   if (!state.analysis?.recommended_briefs) { showToast('Run analysis first'); return; }
@@ -16517,7 +16786,7 @@ function resetForge() {
   const angle = document.getElementById('briefAngle'); if (angle) angle.value = '';
   const offer = document.getElementById('briefOffer'); if (offer) offer.value = '';
   const mkt = document.getElementById('briefMarket'); if (mkt) mkt.value = 'US';
-  const seg = document.getElementById('briefSegment'); if (seg) seg.value = 'Foundation Rebuilder';
+  const tgt = document.getElementById('briefTargeting'); if (tgt) tgt.value = 'Auto';
   const funnel = document.getElementById('briefFunnel'); if (funnel) funnel.value = 'TOFU';
   document.querySelectorAll('#briefPanel .pill-btn').forEach(btn => {
     const isFirst = btn === btn.parentElement?.querySelector('.pill-btn');
@@ -16589,8 +16858,8 @@ function prefillForgeFromIntel() {
     indicator.classList.remove('hidden');
   }
   // Set ICP pill if matching
-  const icpPills = document.querySelectorAll('#icpPills .pill-btn');
-  icpPills.forEach(p => {
+  const audiencePills = document.querySelectorAll('#audiencePills .pill-btn');
+  audiencePills.forEach(p => {
     const isMatch = best.aud.toLowerCase().includes(p.dataset.value?.toLowerCase() || '');
     if (isMatch) { p.click(); }
   });
@@ -16611,8 +16880,9 @@ function sendFreeform() {
     platform: getActivePill('platformPills') || 'Meta',
     format: getActivePill('formatPills') || 'Static Ad',
     subFormat: getActivePill('subFormatPills') || null,
-    icpType: getActivePill('icpPills') || 'NRI',
-    segment: document.getElementById('briefSegment')?.value || 'Foundation Rebuilder',
+    audience: getActivePill('audiencePills') || 'NRI',
+    targeting: document.getElementById('briefTargeting')?.value || 'Auto',
+    segment: 'Foundation Rebuilder',
     funnel: document.getElementById('briefFunnel')?.value || 'TOFU',
     grade: document.getElementById('briefGrade')?.value || '3-5',
     loc: document.getElementById('briefLOC')?.value || 'General',
@@ -16753,13 +17023,16 @@ function _cleanHandle(raw) {
 // Roster: used for metadata enrichment (handle, ethnicity) only
 
 function _isInfluencerAd(c) {
+  // Priority 1: talent_name tag from AI tagger (decision #23)
+  const talentName = c.tags?.talent_name;
+  if (talentName && talentName !== 'None' && talentName !== 'Unknown' && talentName !== '') return true;
+  // Priority 2: talent_type tag is Influencer
+  const talentType = (c.tags?.talent_type || '').toLowerCase();
+  if (talentType === 'influencer') return true;
+  // Fallback: campaign name heuristic
   const campName = (c['Campaign name'] || c['campaign name'] || '').toLowerCase();
-  // Primary: campaign name contains "influencer"
   if (campName.includes('influencer') || campName.includes('influ')) return true;
-  // Secondary: tagger format/creative_type tag is influencer UGC
-  const fmt = (c.tags?.content_format || c.tags?.creative_type || '').toLowerCase();
-  if (fmt.includes('influencer') || fmt.includes('ugc')) return true;
-  // Tertiary: ad name contains "influencer" or "postboost" (common in influencer ad names)
+  // Fallback: ad name heuristic
   const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
   if (adName.includes('influencer') || adName.includes('postboost')) return true;
   return false;
@@ -16923,10 +17196,11 @@ function getInfluencerAds(geoFilter, formatFilter) {
     if (!_isInfluencerAd(c)) return;
 
     const adName = c['Ad name'] || c['ad name'] || '';
-    const creatorLabel = _extractCreatorFromAdName(adName);
+    // Priority: talent_name tag from AI tagger, fallback to ad name parsing
+    const talentTag = c.tags?.talent_name;
+    const creatorLabel = (talentTag && talentTag !== 'None' && talentTag !== 'Unknown') ? talentTag : _extractCreatorFromAdName(adName);
     if (creatorLabel === 'Unknown') return;
 
-    // Normalize: "Priyanshul-2" and "Priyanshul-IG" are variants → group under base name? No — keep as-is per ground truth
     const key = creatorLabel;
     if (!creators[key]) {
       const roster = _enrichCreatorFromRoster(creatorLabel, rosterLookup);
@@ -18214,10 +18488,12 @@ function renderActionLog() {
     if (currentSpend !== null) metrics += ' &middot; Now: ' + formatCurrency(currentSpend) + ' spend';
     if (currentTD !== null) metrics += ', ' + Math.round(currentTD) + ' TDs';
     const doneBtn = !isDone ? ` <button onclick="markExistingActionDone(${i})" class="shrink-0 text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done &#10003;</button>` : '';
+    const _thumb = !isDone ? _oracleThumbnail(a.adName) : '';
     return `<div class="flex items-center gap-3 p-2.5 rounded-lg border ${borderCls}">
-      <span class="text-[9px] px-2 py-0.5 rounded-full font-bold bg-accent-${actionColor}-light text-${colorText}-700 uppercase">${isDone ? 'done' : a.action}</span>
+      ${_thumb}
+      <span class="text-[9px] px-2 py-0.5 rounded-full font-bold bg-accent-${actionColor}-light text-${colorText}-700 uppercase shrink-0">${isDone ? 'done' : a.action}</span>
       <div class="flex-1 min-w-0">
-        <p class="text-[11px] font-semibold truncate${nameCls}" title="${a.adName}">${a.adName.substring(0,50)}</p>
+        <p class="text-[11px] font-semibold truncate${nameCls}" title="${a.adName}">${shortAdName(a.adName)}</p>
         <p class="text-[9px] text-text-muted">${agoStr}${metrics}</p>
       </div>${doneBtn}
     </div>`;
@@ -18299,7 +18575,7 @@ function generateFromRecommendedBrief(briefB64) {
   // Pre-fill the form fields
   if (brief.geo) document.getElementById('briefMarket').value = brief.geo;
   // Set ICP pill
-  document.querySelectorAll('#icpPills .pill-btn').forEach(p => {
+  document.querySelectorAll('#audiencePills .pill-btn').forEach(p => {
     p.classList.toggle('active', p.dataset.value === brief.icp);
   });
   // Set format pill
