@@ -287,6 +287,18 @@
             </div>
           </div>
 
+          <!-- Metric Definitions — always visible -->
+          <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[9px] text-gray-400">
+            <span><strong class="text-gray-500">CPTD</strong> = Spend ÷ Trial Dones</span>
+            <span><strong class="text-gray-500">CPQL</strong> = Spend ÷ Qualified Leads</span>
+            <span><strong class="text-gray-500">TQL</strong> = True QLs (US: NRI only)</span>
+            <span><strong class="text-gray-500">QL→TD%</strong> = Trial Done ÷ QL</span>
+            <span><strong class="text-gray-500">CAC</strong> = Spend ÷ Enrolled</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> On track</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> Watch</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span> Over threshold</span>
+          </div>
+
           <!-- Performance Snapshot -->
           <div class="mb-6" id="tickerSection">
             <div id="metricTicker"></div>
@@ -6148,13 +6160,16 @@ function renderRegionalCards() {
       { label: 'TQLs', value: gm.tql },
       { label: 'TDs', value: gm.td },
     ].filter(m => m.value !== '—' && m.value !== 0);
+    const _cptdColor = typeof getThresholdColor === 'function' && gm.cptd > 0 ? getThresholdColor('cptd', gm.cptd, geo) : '';
+    const _statusLabel = _cptdColor === 'green' ? 'Healthy' : _cptdColor === 'orange' ? 'Watch' : _cptdColor === 'red' ? 'Over' : 'Live';
+    const _statusClass = _cptdColor === 'green' ? 'bg-green-100 text-green-700' : _cptdColor === 'orange' ? 'bg-amber-100 text-amber-700' : _cptdColor === 'red' ? 'bg-red-100 text-red-700' : colors.bg + ' ' + colors.text;
     card.innerHTML = `
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
           <div class="w-2.5 h-2.5 rounded-full ${colors.dot}"></div>
           <span class="font-bold text-sm">${geo}</span>
         </div>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${colors.bg} ${colors.text}">Live</span>
+        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${_statusClass}">${_statusLabel}</span>
       </div>
       <div class="space-y-2">
         ${metrics.map(m => `<div class="flex justify-between text-xs"><span class="text-text-muted">${m.label}</span><span class="font-semibold">${m.value}</span></div>`).join('')}
@@ -7334,14 +7349,14 @@ function renderDayByDay() {
       <tr>
         <th class="${thClass}">Date</th>
         <th class="${thClass}">Ad Name</th>
-        <th class="${thClass} text-right">Spend</th>
+        <th class="${thClass} text-right" title="Daily Meta spend (INR)">Spend</th>
         <th class="${thClass} text-right">Impr</th>
         <th class="${thClass} text-right">CPM</th>
         <th class="${thClass} text-right">Clicks</th>
-        <th class="${thClass} text-right">CTR</th>
-        <th class="${thClass} text-right">CPC</th>
-        <th class="${thClass} text-right">Freq</th>
-        <th class="${thClass} text-right">QL</th>
+        <th class="${thClass} text-right" title="Click-through rate. Green >1.5%, Red <0.5%">CTR</th>
+        <th class="${thClass} text-right" title="Cost per click (INR)">CPC</th>
+        <th class="${thClass} text-right" title="Avg times each person saw this ad. Amber >1.5x, Red >2x = ad fatigue">Freq</th>
+        <th class="${thClass} text-right" title="Qualified Leads from CRM">QL</th>
       </tr>
     </thead><tbody>`;
 
@@ -7359,7 +7374,7 @@ function renderDayByDay() {
       <td class="px-2 py-1.5 text-right">${r.clicks}</td>
       <td class="px-2 py-1.5 text-right ${r.ctr > 1.5 ? 'text-accent-green' : r.ctr < 0.5 ? 'text-accent-red' : ''}">${r.ctr.toFixed(2)}%</td>
       <td class="px-2 py-1.5 text-right text-text-muted">${r.cpc > 0 ? '₹' + Math.round(r.cpc) : '—'}</td>
-      <td class="px-2 py-1.5 text-right font-semibold ${freq > 2.0 ? 'text-accent-red' : freq >= 1.5 ? 'text-amber-600' : ''}">${freq > 0 ? freq.toFixed(1) : '—'}</td>
+      <td class="px-2 py-1.5 text-right font-semibold ${freq > 2.0 ? 'text-accent-red' : freq >= 1.5 ? 'text-amber-600' : ''}" title="Frequency: avg times each person saw this ad. >2x = fatigue risk">${freq > 0 ? freq.toFixed(1) + 'x' : '—'}</td>
       <td class="px-2 py-1.5 text-right ${ql > 0 ? 'font-semibold' : 'text-text-muted'}">${ql || '—'}</td>
     </tr>`;
   });
