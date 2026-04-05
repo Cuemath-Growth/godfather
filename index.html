@@ -7381,8 +7381,9 @@ function renderWoWDigest() {
   const lwStr = lwStart.toISOString().slice(0, 10);
   const todayStr = today.toISOString().slice(0, 10);
 
-  // costData is already meta-filtered at load time
-  const dailyMeta = costData;
+  // Respect dashboard geo filter
+  const geo = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const dailyMeta = filterCostByMarket(costData, geo);
   const tw = dailyMeta.filter(r => r.day >= twStr && r.day <= todayStr);
   const lw = dailyMeta.filter(r => r.day >= lwStr && r.day < twStr);
 
@@ -7390,8 +7391,8 @@ function renderWoWDigest() {
   const twSpend = sum(tw, 'amount_spent') || sum(tw, 'spend');
   const lwSpend = sum(lw, 'amount_spent') || sum(lw, 'spend');
 
-  // Get TDs/QLs from CRM data if available
-  const crmData = leadsData || [];
+  // Get TDs/QLs from CRM data — respect geo filter
+  const crmData = filterLeadsByMarket(leadsData || [], geo);
   const twCRM = crmData.filter(r => {
     const d = r.trial_done_date || r.lead_created_date || '';
     return d >= twStr && d <= todayStr;
@@ -7428,7 +7429,7 @@ function renderWoWDigest() {
         <svg class="w-4 h-4 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
         This Week vs Last Week
       </h3>
-      <span class="text-[9px] text-text-muted">${twStr} → ${todayStr}</span>
+      <span class="text-[9px] text-text-muted">${geo === 'all' ? 'All Markets' : geo} · ${twStr} → ${todayStr}</span>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div>
@@ -7558,7 +7559,8 @@ function renderTrendCharts() {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">`;
 
   CHARTS.forEach(ch => {
-    const data = computeSparklineData(ch.metric, geo === 'all' ? null : geo, 30);
+    const data = computeSparklineData(ch.metric, geo, 30);
+    const lastVal = data.length > 0 ? data[data.length - 1].value : 0;
     if (!data || data.length < 3) {
       html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
         <p class="text-[10px] font-bold text-text-muted uppercase">${ch.label}</p>
@@ -7567,7 +7569,10 @@ function renderTrendCharts() {
       return;
     }
     html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
-      <p class="text-[10px] font-bold text-text-muted uppercase mb-2">${ch.label}</p>
+      <div class="flex items-baseline justify-between mb-1">
+        <p class="text-[10px] font-bold text-text-muted uppercase">${ch.label}</p>
+        <p class="text-sm font-black">${ch.format(lastVal)}</p>
+      </div>
       ${_buildTrendSVG(data, ch)}
     </div>`;
   });
@@ -7577,7 +7582,7 @@ function renderTrendCharts() {
 }
 
 function _buildTrendSVG(data, chart) {
-  const W = 320, H = 100, PAD = { top: 8, right: 8, bottom: 20, left: 50 };
+  const W = 400, H = 150, PAD = { top: 10, right: 12, bottom: 24, left: 55 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
   const id = 'tc_' + chart.metric + '_' + Math.random().toString(36).slice(2, 6);
@@ -7624,14 +7629,14 @@ function _buildTrendSVG(data, chart) {
   const step = Math.max(1, Math.floor(data.length / 8));
   const hoverPts = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
 
-  return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:120px">
+  return `<svg viewBox="0 0 ${W} ${H}" class="w-full" style="max-height:180px">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${lineColor}" stop-opacity="0.12"/><stop offset="100%" stop-color="${lineColor}" stop-opacity="0"/></linearGradient></defs>
     <polygon points="${polygon}" fill="url(#${id})"/>
-    <polyline points="${polyline}" fill="none" stroke="${lineColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    ${yLabels.map(yl => `<text x="${PAD.left - 4}" y="${yl.y}" text-anchor="end" font-size="7" fill="#9CA3AF" dominant-baseline="middle">${yl.label}</text><line x1="${PAD.left}" y1="${yl.y}" x2="${W - PAD.right}" y2="${yl.y}" stroke="#E5E7EB" stroke-width="0.5" stroke-dasharray="2"/>`).join('')}
-    ${xLabels.map(xl => `<text x="${xl.x}" y="${H - 4}" text-anchor="middle" font-size="7" fill="#9CA3AF">${xl.label}</text>`).join('')}
-    ${hoverPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="${lineColor}" opacity="0.7"><title>${p.date}: ${chart.format(p.value)}</title></circle>`).join('')}
-    <circle cx="${pts[pts.length - 1].x}" cy="${pts[pts.length - 1].y}" r="3" fill="${lineColor}"><title>${data[data.length - 1].date}: ${chart.format(data[data.length - 1].value)}</title></circle>
+    <polyline points="${polyline}" fill="none" stroke="${lineColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${yLabels.map(yl => `<text x="${PAD.left - 6}" y="${yl.y}" text-anchor="end" font-size="9" font-weight="500" fill="#6B7280" dominant-baseline="middle">${yl.label}</text><line x1="${PAD.left}" y1="${yl.y}" x2="${W - PAD.right}" y2="${yl.y}" stroke="#E5E7EB" stroke-width="0.5"/>`).join('')}
+    ${xLabels.map(xl => `<text x="${xl.x}" y="${H - 5}" text-anchor="middle" font-size="9" font-weight="500" fill="#6B7280">${xl.label}</text>`).join('')}
+    ${hoverPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${lineColor}" opacity="0.8"><title>${p.date}: ${chart.format(p.value)}</title></circle>`).join('')}
+    <circle cx="${pts[pts.length - 1].x}" cy="${pts[pts.length - 1].y}" r="4" fill="${lineColor}" stroke="white" stroke-width="1.5"><title>${data[data.length - 1].date}: ${chart.format(data[data.length - 1].value)}</title></circle>
   </svg>`;
 }
 
@@ -11469,7 +11474,7 @@ function computeSparklineData(metric, geo, days) {
 
   // Daily spend from costData (already meta-filtered at source)
   const dailySpend = {};
-  filterCostByMarket(costData, geo === 'all' ? null : geo).forEach(r => {
+  filterCostByMarket(costData, geo || 'all').forEach(r => {
     const d = r.day || '';
     if (!d || d < cutoffStr) return;
     if (!dailySpend[d]) dailySpend[d] = 0;
@@ -11478,7 +11483,7 @@ function computeSparklineData(metric, geo, days) {
 
   // Daily funnel from leadsData (Section 2) — uses filterLeadsByMarket for geo handling
   const dailyQL = {}, dailyTD = {}, dailyPaid = {};
-  filterLeadsByMarket(leadsData, geo === 'all' ? 'all' : geo).forEach(r => {
+  filterLeadsByMarket(leadsData, geo || 'all').forEach(r => {
     const qd = (r.lead_created_date || '').slice(0, 10);
     const td_d = (r.trial_done_date || '').slice(0, 10);
     const pd = (r.paid_date || '').slice(0, 10);
