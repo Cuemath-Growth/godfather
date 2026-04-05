@@ -6156,7 +6156,7 @@ function renderRegionalCards() {
     card.onclick = () => { document.getElementById('briefMarket').value = geo; navigateTo('generate'); };
     const metrics = [
       { label: 'Spend', value: formatCurrency(gm.spend) },
-      { label: 'CPTD', value: gm.cptd ? formatCurrency(gm.cptd) : '—' },
+      { label: 'CPTD', value: gm.td >= 3 && gm.cptd ? formatCurrency(gm.cptd) : gm.td > 0 ? 'Too few TDs' : '—' },
       { label: 'TQLs', value: gm.tql },
       { label: 'TDs', value: gm.td },
     ].filter(m => m.value !== '—' && m.value !== 0);
@@ -6769,7 +6769,7 @@ function renderOracleActions() {
     const velocityTrend = lastWeekAds > 0 ? ((thisWeekAds - lastWeekAds) / lastWeekAds * 100).toFixed(0) : '—';
 
     // 4. Recency signal — best recent creative
-    const recentAds = data.filter(c => (c._date || '') >= sevenDaysAgo && parseNumber(c['TD']||c['td']||0) > 0);
+    const recentAds = data.filter(c => (c._date || '') >= sevenDaysAgo && parseNumber(c['TD']||c['td']||0) >= 2);
     const bestRecent = recentAds.sort((a,b) => {
       const aCptd = parseNumber(a['TD']||a['td']||0) > 0 ? parseNumber(a['Spent']||a['spent']||0) / parseNumber(a['TD']||a['td']||0) : Infinity;
       const bCptd = parseNumber(b['TD']||b['td']||0) > 0 ? parseNumber(b['Spent']||b['spent']||0) / parseNumber(b['TD']||b['td']||0) : Infinity;
@@ -7769,7 +7769,7 @@ function renderOracleCardsV2() {
 
   // ── SIGNAL 2: CPTQL too high — 2x+ market average ──
   const cptqlLeaks = adCampData
-    .filter(a => a.spend !== null && a.tql >= 3 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
+    .filter(a => a.spend !== null && a.tql >= 5 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
     .sort((a, b) => b.spend - a.spend) // sort by spend (biggest waste first, not worst CPTQL)
     .slice(0, 5)
     .map(a => {
@@ -7781,7 +7781,7 @@ function renderOracleCardsV2() {
 
   // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
   const wrongAudience = adCampData
-    .filter(a => a.market === 'US' && a.spend >= 20000 && a.ql >= 5 && a.nriPct < 0.30 && !isPaused(a.adName))
+    .filter(a => a.market === 'US' && a.spend >= 20000 && a.ql >= 15 && a.nriPct < 0.30 && !isPaused(a.adName))
     .sort((a, b) => a.nriPct - b.nriPct)
     .slice(0, 3)
     .map(a => ({ ...a, name: a.adName, _type: 'audience', _priority: 2,
@@ -7789,7 +7789,7 @@ function renderOracleCardsV2() {
 
   // ── SIGNAL 4: Dead funnel — QLs but zero TDs (QL >= 8, spend > ₹20K) ──
   const deadFunnel = adCampData
-    .filter(a => a.spend >= 20000 && a.ql >= 8 && a.td === 0 && !isPaused(a.adName))
+    .filter(a => a.spend >= 20000 && a.ql >= 15 && a.td === 0 && !isPaused(a.adName))
     .sort((a, b) => b.ql - a.ql)
     .slice(0, 3)
     .map(a => ({ ...a, name: a.adName, _type: 'funnel', _priority: 2,
@@ -7797,7 +7797,7 @@ function renderOracleCardsV2() {
 
   // ── SIGNAL 5: Spam magnet — high invalid rate (> 25%, QL >= 5) ──
   const spamAds = adCampData
-    .filter(a => a.spend >= 10000 && a.totalLeads >= 10 && a.invalidPct > 0.25 && !isPaused(a.adName))
+    .filter(a => a.spend >= 10000 && a.totalLeads >= 20 && a.invalidPct > 0.25 && !isPaused(a.adName))
     .sort((a, b) => b.invalidPct - a.invalidPct)
     .slice(0, 3)
     .map(a => ({ ...a, name: a.adName, _type: 'spam', _priority: 2,
@@ -8682,7 +8682,7 @@ function renderMetricTicker() {
     if (dashCountry === 'all') {
       ['US','India','AUS','MEA','UK'].forEach(g => {
         const gm = _usePortfolio ? getPortfolioMetrics(g, from, to) : getMarketMetrics(g, from || undefined, to || undefined);
-        if ((gm.td || 0) > 2 && gm.spend > 0) {
+        if ((gm.td || 0) >= 5 && gm.spend > 0) {
           const gc = gm.spend / gm.td;
           if (gc < bestCptd) { bestCptd = gc; bestGeo = g; }
           if (gc > worstCptd) { worstCptd = gc; worstGeo = g; }
@@ -8746,7 +8746,7 @@ function renderMetricTicker() {
         fmtStats[fmt].td += parseNumber(c['TD']||c['td']||0);
       });
       const fmtCptd = Object.entries(fmtStats)
-        .filter(([,s]) => s.td >= 3)
+        .filter(([,s]) => s.td >= 5)
         .map(([fmt, s]) => ({ fmt, cptd: s.spend / s.td }))
         .sort((a, b) => a.cptd - b.cptd)
         .slice(0, 3);
@@ -16579,7 +16579,7 @@ function renderSentinelTop5() {
       const { from, to } = getGlobalDateRange();
       const geoVal = document.getElementById('sentinelGeo')?.value || 'all';
       const market = geoVal === 'all' ? null : geoVal;
-      const perf = getAdPerformance(market, from, to).filter(r => r['TD'] > 0 && r['Spent'] > 0 && /[a-zA-Z]/.test(r['Ad name'] || ''));
+      const perf = getAdPerformance(market, from, to).filter(r => parseFloat(r['TD']||0) >= 3 && parseFloat(r['Spent']||0) > 0 && /[a-zA-Z]/.test(r['Ad name'] || ''));
       const withCPTD = perf.map(r => ({ ...r, _cptd: r['Spent'] / r['TD'] })).sort((a, b) => a._cptd - b._cptd);
       const top5 = withCPTD.slice(0, 5).map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.content_format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
       const bottom5 = withCPTD.slice(-5).reverse().map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.content_format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
@@ -17533,7 +17533,7 @@ function renderInfluLeaderboard(filteredCreators) {
       qlTd: effectiveTql > 0 && cr.td > 0 ? Math.min((cr.td / effectiveTql * 100), 100) : null,
       displayName,
       primaryMarket, marketBadge, adSetList,
-      bestAd: cr.ads.filter(a => parseNumber(a['Spent']||0) > 1000).reduce((best, ad) => {
+      bestAd: cr.ads.filter(a => parseNumber(a['Spent']||0) > 1000 && parseNumber(a['TD']||a['td']||0) >= 2).reduce((best, ad) => {
         const adTd = parseNumber(ad['TD']||ad['td']||0);
         const adSpend = parseNumber(ad['Spent']||ad['spent']||0);
         const adCptd = adTd > 0 ? adSpend / adTd : Infinity;
@@ -17551,7 +17551,7 @@ function renderInfluLeaderboard(filteredCreators) {
 
   // ROI Verdict tiers
   const avgCPTD = totalTD > 0 ? totalSpend / totalTD : Infinity;
-  const scaleCreators = rows.filter(r => r.cptd !== null && r.cptd < avgCPTD && r.td >= 3);
+  const scaleCreators = rows.filter(r => r.cptd !== null && r.cptd < avgCPTD && r.td >= 5);
   const watchCreators = rows.filter(r => r.td > 0 && (r.cptd === null || r.cptd >= avgCPTD));
   const dropCreators = rows.filter(r => r.td === 0 && r.spend >= 5000);
 
