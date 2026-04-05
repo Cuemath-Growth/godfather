@@ -4276,7 +4276,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
   console.log(`costData: ${allCost.length} total, ${costData.length} meta-only`);
 
   // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
-  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term'];
+  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term','prospectid'];
   const slimLeads = leadsData.map(r => {
     const s = {};
     LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
@@ -5605,11 +5605,13 @@ function mergeCRMWithMeta() {
   const preDedup = rows.length;
   rows = rows.filter(r => {
     const pid = r['prospectid'] || r['ProspectId'] || '';
-    if (!pid) return true; // keep rows without prospectid
+    if (!pid) return true; // keep rows without prospectid (rare — logged below)
     if (seenProspects.has(pid)) return false;
     seenProspects.add(pid);
     return true;
   });
+  const noPidCount = rows.filter(r => !(r['prospectid'] || r['ProspectId'])).length;
+  if (noPidCount > 0) console.warn(`CRM dedup: ${noPidCount} rows lack prospectid (${(noPidCount/rows.length*100).toFixed(1)}%) — cannot deduplicate these`);
   if (preDedup !== rows.length) console.log(`CRM dedup: ${preDedup} → ${rows.length} (removed ${preDedup - rows.length} duplicate prospect IDs)`);
 
   // ── NORMALIZATION HELPERS ──
@@ -11457,10 +11459,9 @@ function computeSparklineData(metric, geo, days) {
   const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  // Daily spend from costData (Section 2)
+  // Daily spend from costData (already meta-filtered at source)
   const dailySpend = {};
   filterCostByMarket(costData, geo === 'all' ? null : geo).forEach(r => {
-    if ((r.medium || '').toLowerCase() !== 'meta') return;
     const d = r.day || '';
     if (!d || d < cutoffStr) return;
     if (!dailySpend[d]) dailySpend[d] = 0;
