@@ -4,6 +4,19 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## PLA Data Integration — Second CRM + Cost Layer (2026-04-08)
+
+### New data source: PLA Google Sheet (1lGAv3K_RFEwcKthjzPiy4x3zlOA010lH_73f46lJ5A8)
+- **pla_dump tab**: ~716 lead-level CRM rows (prospectid, utm_campaign, utm_content, trial_done, paid, ethnicity)
+- **cost tab**: ~1,038 daily spend rows (campaign_name, amount_spent, impressions, clicks)
+- Fetched via `fetchPLAData()` chained after `fetchSheetData()` at boot and on save
+- **Normalization**: utm_source→medium (dc_fb_m=meta), ip_region→country_bucket (US-CANADA→US), qualified_bucket→qls (excluding UNQUALIFIED-*), campaign hyphens→underscores
+- **Dedup**: leads by prospectid, cost by campaign_name+day — no double-counting
+- **Non-meta leads filtered out**: only dc_fb_m and Instagram sources pass through
+- **Zero downstream changes**: appends to leadsData[] and costData[] — all existing functions (buildLookupMaps, mergeCRMWithMeta, getAdPerformance, filterLeadsByMarket) work unchanged
+
+---
+
 ## Tag Map Fix — Tags invisible after Pilot 50 / Load Data (2026-04-07)
 
 ### Bug: All UI views showed "No tags" / "Needs tagging" despite 50 pilot tags saved to Supabase

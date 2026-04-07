@@ -3404,7 +3404,10 @@ function init() {
     loadOracleActions().catch(e => { console.error('Boot oracle:', e); }),
     // Google Sheets: CRM leads + cost data (only if credentials exist)
     (_bootSheetUrl && _bootApiKey)
-      ? fetchSheetData(_bootSheetUrl, _bootApiKey).then(c => { console.log(`Boot: ${c.leads} leads, ${c.cost} cost`); return c; }).catch(e => { console.error('Boot sheets:', e); return null; })
+      ? fetchSheetData(_bootSheetUrl, _bootApiKey)
+          .then(c => { console.log(`Boot: ${c.leads} leads, ${c.cost} cost`); return c; })
+          .then(c => fetchPLAData(_bootApiKey).then(p => { console.log(`Boot PLA: +${p.leads} leads, +${p.cost} cost`); return c; }))
+          .catch(e => { console.error('Boot sheets:', e); return null; })
       : Promise.resolve(null),
   ];
 
@@ -4176,10 +4179,12 @@ function saveDataSource() {
   localStorage.setItem('gf_sheetUrl', sheetUrl);
   if (!apiKey.includes('...')) localStorage.setItem('gf_googleKey', apiKey);
   showToast('Saved! Loading data...');
-  fetchSheetData(sheetUrl, GOOGLE_API_KEY).then(counts => {
-    showToast(`Loaded ${counts.leads} leads + ${counts.cost} cost rows`);
-    updateDataStatusLine();
-  }).catch(e => showToast('Load failed: ' + e.message));
+  fetchSheetData(sheetUrl, GOOGLE_API_KEY)
+    .then(counts => fetchPLAData(GOOGLE_API_KEY).then(p => ({ leads: counts.leads + p.leads, cost: counts.cost + p.cost })))
+    .then(counts => {
+      showToast(`Loaded ${counts.leads} leads + ${counts.cost} cost rows`);
+      updateDataStatusLine();
+    }).catch(e => showToast('Load failed: ' + e.message));
 }
 
 async function testDataSource() {
@@ -4329,6 +4334,95 @@ async function fetchSheetData(sheetUrl, apiKey) {
   ['gf_leadsData','gf_costData','gf_dataTimestamp'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
 
   return { leads: leadsData.length, cost: costData.length };
+}
+
+// ── PLA Data Layer: supplementary CRM + cost from PLA-specific sheet ──
+const PLA_SHEET_ID = '1lGAv3K_RFEwcKthjzPiy4x3zlOA010lH_73f46lJ5A8';
+
+function normalizePLALead(r) {
+  // utm_source tells us the real medium: dc_fb_m = meta, dc_sem_m = google
+  const src = (r.utm_source || '').toLowerCase();
+  const isMeta = src.includes('fb') || src === 'instagram';
+  if (!isMeta) return null; // Godfather is Meta-only
+
+  // qualified_bucket: non-empty AND not UNQUALIFIED = QL
+  const qb = (r.qualified_bucket || '').trim();
+  const isQL = qb && !qb.toUpperCase().startsWith('UNQUALIFIED');
+
+  // ip_region mapping: US-CANADA→US, IND-SUB→India, INDIA-MIDDLE-EAST→MEA, APAC-AUS-NZ→AUS, EUROPE-UK→UK
+  const regionMap = { 'US-CANADA': 'US', 'IND-SUB': 'India', 'INDIA-MIDDLE-EAST': 'MEA', 'APAC-AUS-NZ': 'AUS', 'EUROPE-UK': 'UK' };
+  const country = regionMap[(r.ip_region || '').trim()] || (r.ip_region || '').trim();
+
+  return {
+    lead_created_date: r.created_on || '',
+    trial_done_date: r.trial_done === '1' ? (r.trial_start_time_ist || r.created_on || '') : '',
+    trial_sch_date: r.trial_scheduled === '1' ? (r.created_on || '') : '',
+    paid_date: r.paid_on || '',
+    country_bucket: country,
+    ethnicity: r.Auto_ethnicity || r.mx_backend_auto_ethnicity || '',
+    qls: isQL ? '1' : '0',
+    trials_done: r.trial_done === '1' ? '1' : '0',
+    trials_sch: r.trial_scheduled === '1' ? '1' : '0',
+    paid: (parseFloat(r.payments) > 0 || (r.paid_on && r.paid_on.length > 0)) ? '1' : '0',
+    invalid: '0',
+    'board (ME)': '',
+    board: '',
+    mx_utm_campaign: (r.utm_campaign || '').replace(/-/g, '_'),
+    mx_utm_adcontent: (r.utm_content || '').replace(/-/g, '_'),
+    mx_utm_term: r.utm_term || '',
+    mx_utm_medium: 'meta',
+    utm_medium: 'meta',
+    prospectid: r.prospectid || '',
+    net_booking: r.net_booking || '',
+    _source: 'pla'
+  };
+}
+
+async function fetchPLAData(apiKey) {
+  const base = `https://sheets.googleapis.com/v4/spreadsheets/${PLA_SHEET_ID}/values`;
+  const [leadsRes, costRes] = await Promise.all([
+    fetch(`${base}/pla_dump?key=${apiKey}`),
+    fetch(`${base}/cost?key=${apiKey}`)
+  ]);
+  if (!leadsRes.ok || !costRes.ok) {
+    console.warn('PLA fetch failed:', !leadsRes.ok ? leadsRes.status : costRes.status);
+    return { leads: 0, cost: 0 };
+  }
+
+  const leadsJson = await leadsRes.json();
+  const costJson = await costRes.json();
+
+  // --- PLA Leads: normalize, filter meta-only, deduplicate ---
+  const rawPLA = parseSheetValues(leadsJson.values).filter(r => r.created_on && r.created_on.length > 0);
+  const existingPids = new Set(leadsData.map(r => r.prospectid).filter(Boolean));
+  let added = 0, skippedDup = 0, skippedNonMeta = 0;
+  rawPLA.forEach(r => {
+    const normalized = normalizePLALead(r);
+    if (!normalized) { skippedNonMeta++; return; }
+    const pid = normalized.prospectid;
+    if (pid && existingPids.has(pid)) { skippedDup++; return; }
+    if (pid) existingPids.add(pid);
+    leadsData.push(normalized);
+    added++;
+  });
+  console.log(`PLA leads: ${rawPLA.length} raw → ${added} added, ${skippedDup} duplicate, ${skippedNonMeta} non-meta`);
+
+  // --- PLA Cost: normalize, filter meta-only, deduplicate by campaign+day ---
+  const rawCost = parseSheetValues(costJson.values);
+  const metaCost = rawCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
+  const existingCostKeys = new Set(costData.map(r => (r.campaign_name || '').toLowerCase().replace(/-/g, '_') + '|' + (r.day || '')));
+  let costAdded = 0, costSkipped = 0;
+  metaCost.forEach(r => {
+    const normCamp = (r.campaign_name || '').replace(/-/g, '_');
+    const key = normCamp.toLowerCase() + '|' + (r.day || '');
+    if (existingCostKeys.has(key)) { costSkipped++; return; }
+    existingCostKeys.add(key);
+    costData.push({ ...r, campaign_name: normCamp, _source: 'pla' });
+    costAdded++;
+  });
+  console.log(`PLA cost: ${rawCost.length} raw → ${metaCost.length} meta → ${costAdded} added, ${costSkipped} duplicate`);
+
+  return { leads: added, cost: costAdded };
 }
 
 function loadCachedData() {

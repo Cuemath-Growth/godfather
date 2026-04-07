@@ -201,6 +201,44 @@ Examples:
 
 ---
 
+## Sheet 9: PLA Campaign Data (Supplementary CRM + Cost)
+**Source:** `1lGAv3K_RFEwcKthjzPiy4x3zlOA010lH_73f46lJ5A8`
+**Added:** 2026-04-08
+
+### pla_dump tab (gid=452403394)
+**Structure:** Lead-level CRM data for PLA campaigns, ~716 active rows (50K grid but mostly empty)
+**Filter:** `Ethnicity_Check === '1'` or `created_on` non-empty
+**Key columns:**
+| Column | Maps to | Notes |
+|--------|---------|-------|
+| created_on | lead_created_date | |
+| utm_source | (derives medium) | dc_fb_m=meta, dc_sem_m=google |
+| utm_medium | (actually ad set name) | NOT the real medium — Cuemath UTM quirk |
+| utm_campaign | mx_utm_campaign | Hyphens normalized to underscores |
+| utm_content | mx_utm_adcontent | Ad-level attribution (81% filled) |
+| ip_region | country_bucket | US-CANADA→US, IND-SUB→India, INDIA-MIDDLE-EAST→MEA, APAC-AUS-NZ→AUS, EUROPE-UK→UK |
+| prospectid | prospectid | Dedup key |
+| qualified_bucket | qls | Non-empty + not UNQUALIFIED-* = QL |
+| trial_done | trials_done | '1' or '0' |
+| paid_on | paid_date | Date |
+| payments | paid | >0 = paid |
+| Auto_ethnicity | ethnicity | "NRI / Non Native English Speaker" = NRI (exact match with isNRIEthnicity) |
+
+### cost tab (gid=33117864)
+**Structure:** Daily spend rows, 1,038 rows
+**Key columns:** month, day, region, country_segment, landing_type, campaign_name, medium, amount_spent, impressions, link_clicks
+**Mediums:** meta (819), google (219) — only meta rows pass Godfather filter
+**Landing types:** PLA (892), Eval (146)
+**Date range:** 2025-12-04 to 2026-04-06
+**Dedup:** By normalized campaign_name + day against existing costData
+
+### Integration
+- Fetched via `fetchPLAData(apiKey)` after `fetchSheetData()` at boot
+- Appends to global `leadsData[]` and `costData[]` with deduplication
+- All downstream functions work unchanged
+
+---
+
 ## NEEDS VERIFICATION (Tomorrow)
 1. Perf Tracker Daily (gid=827992753) — actual column names and structure
 2. CRM column G = utm_medium assumption
