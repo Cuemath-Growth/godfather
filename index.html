@@ -13432,6 +13432,88 @@ function renderTaggerInsights() {
 // Designed for: graphic designers, video editors, copy writers, content heads, performance team, HOD
 // Answers: what went live, how is it doing, what's working as a pattern, what to make next
 
+// ── #3: Action outcome tracking — compare before vs after action date ──
+function _computeActionOutcome(action) {
+  if (!action.actioned_at || action.status === 'snoozed') return null;
+  const actionDate = new Date(action.actioned_at).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  if (actionDate >= today) return null; // actioned today, no "after" data yet
+
+  // Extract ad name from item_id: tagger:verdict:normalized_name
+  const parts = action.item_id.split(':');
+  if (parts.length < 3) return null;
+  const normName = parts.slice(2).join(':'); // handle colons in name
+
+  // Get all daily rows for this ad
+  const allDaily = getAdPerformanceDaily(null, COST_DATA_START, today);
+  const before = [], after = [];
+  allDaily.forEach(r => {
+    if (normalizeAdName(r.ad_name) !== normName) return;
+    if (r.date < actionDate) before.push(r);
+    else after.push(r);
+  });
+
+  if (before.length === 0 && after.length === 0) return null;
+
+  const sum = (rows) => {
+    let spend = 0, td = 0, ql = 0;
+    rows.forEach(r => { spend += r.spend || 0; td += r.td || 0; ql += r.ql || 0; });
+    return { spend, td, ql, cptd: td > 0 ? spend / td : null, days: rows.length };
+  };
+  const b = sum(before), a = sum(after);
+
+  // Build outcome summary
+  const parts2 = [];
+  if (a.days === 0) {
+    return { html: '<span class="text-text-muted text-[9px]">No data since action</span>', before: b, after: a };
+  }
+  // Spend change
+  if (b.spend > 0 && a.spend > 0) {
+    const pct = ((a.spend - b.spend) / b.spend * 100);
+    parts2.push(`Spend ${pct > 0 ? '+' : ''}${Math.round(pct)}%`);
+  } else if (a.spend > 0) {
+    parts2.push(`Spend ${formatCurrency(a.spend)}`);
+  }
+  // TD change
+  parts2.push(`${a.td} TD${a.td !== 1 ? 's' : ''} (was ${b.td})`);
+  // CPTD comparison
+  if (b.cptd && a.cptd) {
+    const better = a.cptd < b.cptd;
+    parts2.push(`CPTD ${better ? '↓' : '↑'}${formatCurrency(a.cptd)}`);
+  } else if (a.cptd) {
+    parts2.push(`CPTD ${formatCurrency(a.cptd)}`);
+  }
+
+  // Color: green if outcome matches action intent
+  const isScale = action.card_type === 'tagger_scale';
+  const goodOutcome = isScale ? (a.td > b.td || (a.cptd && b.cptd && a.cptd <= b.cptd)) : (a.spend < b.spend || a.td === 0);
+  const color = goodOutcome ? 'text-green-700' : 'text-red-600';
+
+  return {
+    html: `<span class="${color} text-[9px] font-medium">${parts2.join(' · ')}</span>`,
+    before: b, after: a, goodOutcome
+  };
+}
+
+// ── #2: Wrong verdict feedback — marks action as wrong, surfaces in recommendations ──
+function _markWrongVerdict(itemId) {
+  const action = _oracleActions.find(a => a.item_id === itemId);
+  if (!action) return;
+  action.status = 'wrong';
+  action.actioned_at = new Date().toISOString();
+  supabaseUpsert('oracle_actions', [action]);
+  showToast('Marked as wrong verdict — will adjust future recommendations');
+  renderCreativeReview();
+}
+
+// ── #1: Check if a recommendation tag has been dismissed enough to suppress ──
+function _isRecommendationSuppressed(tag) {
+  const dismissCount = _oracleActions.filter(a =>
+    (a.item_id === 'rec_do:' + tag || a.item_id === 'rec_avoid:' + tag) && a.status === 'dismissed'
+  ).length;
+  return dismissCount >= 2; // Suppressed after 2 dismissals
+}
+
 function _taggerItemId(adName, verdict) {
   return 'tagger:' + verdict + ':' + normalizeAdName(adName);
 }
@@ -13707,8 +13789,8 @@ function renderCreativeReview() {
   });
 
   // Tags that appear in winners but not losers = strong signals
-  const strongWins = Object.entries(winnerTags).filter(([t, c]) => c >= 2 && (!loserTags[t] || winnerTags[t] > loserTags[t] * 2)).sort((a,b) => b[1] - a[1]).slice(0, 5);
-  const strongLosses = Object.entries(loserTags).filter(([t, c]) => c >= 2 && (!winnerTags[t] || loserTags[t] > winnerTags[t] * 2)).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  const strongWins = Object.entries(winnerTags).filter(([t, c]) => c >= 2 && (!loserTags[t] || winnerTags[t] > loserTags[t] * 2) && !_isRecommendationSuppressed(t)).sort((a,b) => b[1] - a[1]).slice(0, 5);
+  const strongLosses = Object.entries(loserTags).filter(([t, c]) => c >= 2 && (!winnerTags[t] || loserTags[t] > winnerTags[t] * 2) && !_isRecommendationSuppressed(t)).sort((a,b) => b[1] - a[1]).slice(0, 5);
 
   if (strongWins.length) {
     html += `<div class="bg-green-50 rounded-xl border border-green-200 p-4">
@@ -13747,25 +13829,41 @@ function renderCreativeReview() {
     .slice(0, 10);
   if (recentActions.length) {
     html += `<div class="mb-6">
-      <h3 class="text-base font-bold mb-1">Action Log</h3>
-      <p class="text-xs text-text-muted mb-3">Your recent decisions on creatives. Notes are shared context for the team.</p>
+      <h3 class="text-base font-bold mb-1">Action Log — Outcomes</h3>
+      <p class="text-xs text-text-muted mb-3">Your decisions + what happened since. Did the action work?</p>
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table class="w-full text-[11px]">
           <thead><tr class="bg-surface-secondary border-b border-gray-200 text-text-muted">
             <th class="text-left py-1.5 px-3 font-semibold">Creative</th>
             <th class="text-left py-1.5 px-3 font-semibold">Action</th>
             <th class="text-left py-1.5 px-3 font-semibold">When</th>
+            <th class="text-left py-1.5 px-3 font-semibold">Since Then</th>
             <th class="text-left py-1.5 px-3 font-semibold">Note</th>
+            <th class="text-center py-1.5 px-3 font-semibold">Verdict</th>
           </tr></thead><tbody>`;
     recentActions.forEach(a => {
       const actionLabel = a.status === 'done' ? (a.card_type === 'tagger_scale' ? '✓ Scaled' : '✓ Paused') : a.status === 'snoozed' ? '⏸ Snoozed' : a.status;
       const actionColor = a.status === 'done' ? 'text-green-700' : 'text-amber-600';
       const when = a.actioned_at ? new Date(a.actioned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+
+      // Outcome tracking: compare before vs after actioned_at
+      const outcome = _computeActionOutcome(a);
+      const outcomeHtml = outcome ? outcome.html : '<span class="text-text-muted">—</span>';
+
+      // Wrong verdict button
+      const esc = s => (s||'').replace(/'/g, "\\'");
+      const wasWrong = a.status === 'wrong';
+      const verdictHtml = wasWrong
+        ? '<span class="text-red-600 font-bold text-[9px]">✗ Wrong</span>'
+        : `<button onclick="_markWrongVerdict('${esc(a.item_id)}')" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 hover:bg-red-100 hover:text-red-600" title="Tag was wrong — helps improve future verdicts">Wrong?</button>`;
+
       html += `<tr class="border-b border-gray-50">
-        <td class="py-1.5 px-3 font-medium truncate" style="max-width:200px" title="${a.item_name||''}">${a.item_name || a.item_id.split(':').pop()}</td>
+        <td class="py-1.5 px-3 font-medium truncate" style="max-width:180px" title="${a.item_name||''}">${a.item_name || a.item_id.split(':').pop()}</td>
         <td class="py-1.5 px-3 ${actionColor} font-bold">${actionLabel}</td>
         <td class="py-1.5 px-3 text-text-muted">${when}</td>
+        <td class="py-1.5 px-3">${outcomeHtml}</td>
         <td class="py-1.5 px-3 text-text-secondary italic">${a.note || '—'}</td>
+        <td class="py-1.5 px-3 text-center">${verdictHtml}</td>
       </tr>`;
     });
     html += `</tbody></table></div></div>`;
@@ -13805,9 +13903,16 @@ function getCreativeVerdict(c) {
   // Not enough data
   if (spend < 3000) return { label: 'New', key: 'new', color: 'gray', reason: 'Spend < ₹3K — not enough data yet' };
 
-  // SCALE: green CPTD with volume
-  if (td >= 3 && cptd <= th.cptd.green)
+  // Check for wrong verdict feedback — demote if previously marked wrong
+  const adName = c['Ad name'] || c['ad name'] || '';
+  const wrongScale = _oracleActions.find(a => a.item_id === _taggerItemId(adName, 'scale') && a.status === 'wrong');
+  const wrongPause = _oracleActions.find(a => a.item_id === _taggerItemId(adName, 'pause') && a.status === 'wrong');
+
+  // SCALE: green CPTD with volume (demoted to Working if previously marked wrong)
+  if (td >= 3 && cptd <= th.cptd.green) {
+    if (wrongScale) return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} — previously overrated, watch closely.` };
     return { label: 'Scale', key: 'scale', color: 'green', reason: `CPTD ${formatCurrency(cptd)} is below ${formatCurrency(th.cptd.green)} target. ${td} TDs — proven performer.` };
+  }
 
   // WORKING: decent CPTD or strong CTR with conversions
   if (td >= 1 && cptd <= th.cptd.amber)
@@ -13821,11 +13926,15 @@ function getCreativeVerdict(c) {
   if (td >= 1 && cptd > th.cptd.amber)
     return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `CPTD ${formatCurrency(cptd)} above ${formatCurrency(th.cptd.amber)} limit. Was converting but getting expensive.` };
 
-  // PAUSE: clear budget leak
-  if (spend > 30000 && td === 0 && ql <= 2)
+  // PAUSE: clear budget leak (promoted to Watch if previously marked wrong)
+  if (spend > 30000 && td === 0 && ql <= 2) {
+    if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive.` };
     return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials and ${ql} QLs — budget leak.` };
-  if (spend > 50000 && td === 0)
+  }
+  if (spend > 50000 && td === 0) {
+    if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive.` };
     return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials — stop immediately.` };
+  }
 
   // WATCH: some signal but not conclusive
   if (ql >= 1 || td >= 1)

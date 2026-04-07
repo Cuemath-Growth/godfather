@@ -4,6 +4,31 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Learning System — Outcomes, Wrong Verdicts, Suppression (2026-04-08)
+
+### #3: Action outcome tracking
+- `_computeActionOutcome(action)` compares ad metrics before vs after `actioned_at` date
+- Action Log table shows: Spend %, TDs before→after, CPTD direction
+- Green = outcome matches intent (scaled→more TDs, paused→less spend), Red = opposite
+
+### #2: Wrong verdict feedback
+- "Wrong?" button on each Action Log row, sets status='wrong' in Supabase
+- `getCreativeVerdict()` checks for wrong-verdict history:
+  - Scale marked wrong → demoted to Working ("previously overrated, watch closely")
+  - Pause marked wrong → promoted to Watch ("previously misjudged, keeping alive")
+
+### #1: Recommendation suppression
+- `_isRecommendationSuppressed(tag)` checks if a tag has been dismissed ≥2 times
+- "DO MORE OF" and "AVOID" tag recommendations skip suppressed tags
+- Prevents the same stale suggestions from showing forever
+
+### Performance tab actions
+- Top 5 Performers: Scale button per row
+- Top 5 Budget Drains: Pause button per row
+- Both persisted via oracleAction to Supabase
+
+---
+
 ## PLA Data Integration — Second CRM + Cost Layer (2026-04-08)
 
 ### New data source: PLA Google Sheet (1lGAv3K_RFEwcKthjzPiy4x3zlOA010lH_73f46lJ5A8)
