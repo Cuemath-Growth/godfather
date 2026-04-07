@@ -12408,8 +12408,9 @@ function useDashboardData() {
   raw = raw.filter(r => parseNumber(r['Spent']||r['spent']||0) > 0 || r['thumbnail_url'] || r['image_url']);
   if (!raw.length) { showToast('No Meta Ads data loaded. Go to Settings → Connect & Pull Data first.'); return; }
   raw.forEach(r => extractDateFromAdName(r));
-  showToast(`Using ${raw.length} creatives from dashboard data`);
-  tagCreatives(raw);
+  showToast(`Loading ${raw.length} creatives (tags from cache only — no API calls)`);
+  // Load only — apply cached tags from Supabase, skip API tagging for uncached ads
+  tagCreatives(raw, { skipApiTagging: true });
 }
 
 // DEPRECATED: Old tag_cache Supabase boot removed.
@@ -12421,6 +12422,7 @@ _tagCacheLoaded = true;
 async function tagCreatives(rawData, opts = {}) {
   const pilotLimit = opts.pilotLimit || 0; // 0 = no limit
   const forceRetag = opts.forceRetag || false; // true = skip cache, re-tag via API
+  const skipApiTagging = opts.skipApiTagging || false; // true = load only, no Haiku API calls
   document.getElementById('taggerUpload').style.display = 'none';
   document.getElementById('taggerProgress').classList.remove('hidden');
   document.getElementById('taggerResults').classList.add('hidden');
@@ -12489,6 +12491,25 @@ async function tagCreatives(rawData, opts = {}) {
     document.getElementById('taggerExportBtn').style.display = '';
     document.getElementById('taggerBackupBtn').style.display = '';
     showToast(`${cachedResults.length} creatives loaded from cache (0 API calls)`);
+    showTaggerResults();
+    return;
+  }
+
+  // skipApiTagging: load cached + uncached without API calls (Load Data mode)
+  if (skipApiTagging) {
+    const allResults = [...cachedResults, ...needsTagging.map((c, i) => ({ ...c, tags: {}, id: Date.now() + i }))];
+    state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(allResults)));
+    state.taggerData.forEach(c => {
+      if (c.tags && !c.tags.campaign_audience) {
+        const camp = c['Campaign name'] || c['campaign name'] || '';
+        c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
+      }
+    });
+    saveTaggerData();
+    document.getElementById('taggerProgress').classList.add('hidden');
+    const _tcEl = document.getElementById('taggerCount'); if (_tcEl) _tcEl.textContent = `${state.taggerData.length} creatives`;
+    showToast(`Loaded ${state.taggerData.length} creatives (${cachedResults.length} with tags, ${needsTagging.length} untagged — 0 API calls)`);
+    if (leadsData.length) mergeCRMWithMeta();
     showTaggerResults();
     return;
   }
