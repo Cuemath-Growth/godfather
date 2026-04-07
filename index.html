@@ -12506,6 +12506,22 @@ async function tagCreatives(rawData, opts = {}) {
       }
     });
     saveTaggerData();
+    // Rebuild tag map + invalidate perf cache so all UI views pick up fresh tags
+    _tagMap = {};
+    (state.taggerData || []).forEach(c => {
+      const key = normalizeAdName(c['Ad name'] || c['ad name']);
+      if (!key) return;
+      if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return;
+      _tagMap[key] = {
+        tags: c.tags || {},
+        type: c['Creative type'] || c['creative type'] || '',
+        thumb: c.thumbnail_url || c.image_url || '',
+        campaign: c['Campaign name'] || c['campaign name'] || '',
+        adset: c['Ad set name'] || c['ad set name'] || '',
+      };
+    });
+    invalidateAdPerfCache();
+    console.log(`Tag map rebuilt: ${Object.keys(_tagMap).length} creatives with tags`);
     document.getElementById('taggerProgress').classList.add('hidden');
     const _tcEl = document.getElementById('taggerCount'); if (_tcEl) _tcEl.textContent = `${state.taggerData.length} creatives`;
     showToast(`Loaded ${state.taggerData.length} creatives (${cachedResults.length} with tags, ${needsTagging.length} untagged — 0 API calls)`);
@@ -12615,6 +12631,22 @@ async function tagCreatives(rawData, opts = {}) {
     }
   });
   saveTaggerData();
+  // Rebuild tag map + invalidate perf cache so all UI views pick up fresh tags
+  _tagMap = {};
+  (state.taggerData || []).forEach(c => {
+    const key = normalizeAdName(c['Ad name'] || c['ad name']);
+    if (!key) return;
+    if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return;
+    _tagMap[key] = {
+      tags: c.tags || {},
+      type: c['Creative type'] || c['creative type'] || '',
+      thumb: c.thumbnail_url || c.image_url || '',
+      campaign: c['Campaign name'] || c['campaign name'] || '',
+      adset: c['Ad set name'] || c['ad set name'] || '',
+    };
+  });
+  invalidateAdPerfCache();
+  console.log(`Tag map rebuilt: ${Object.keys(_tagMap).length} creatives with tags`);
   document.getElementById('taggerProgress').classList.add('hidden');
   document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
   document.getElementById('taggerExportBtn').style.display = '';

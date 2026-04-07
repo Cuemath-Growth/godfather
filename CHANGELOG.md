@@ -4,6 +4,16 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tag Map Fix — Tags invisible after Pilot 50 / Load Data (2026-04-07)
+
+### Bug: All UI views showed "No tags" / "Needs tagging" despite 50 pilot tags saved to Supabase
+- **Root cause:** `_tagMap` (used by `getAdPerformance()` → all UI views) was built once in `buildLookupMaps()` at startup but never rebuilt after `tagCreatives()` updated `state.taggerData`
+- **Two broken paths:** Both the Pilot 50 path and the `skipApiTagging` (Load Data) path updated `state.taggerData` but never refreshed `_tagMap` or invalidated `_adPerfCache`
+- **Fix:** Added `_tagMap` rebuild + `invalidateAdPerfCache()` at end of both code paths in `tagCreatives()`
+- **Affected views:** Grid, Data Table, Heatmap, Combos, Creative Review — all now pick up tags immediately after tagging or loading
+
+---
+
 ## Phase 4 — UI Overhaul & Taxonomy Consistency (2026-04-05 night)
 
 ### Create Tab Overhaul
