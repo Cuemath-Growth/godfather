@@ -7473,17 +7473,20 @@ function renderDayByDay() {
   // Limit to 200 rows for performance
   const display = rows.slice(0, 200);
 
-  // QL lookup: count leads per ad per day — respect dashboard geo filter
+  // QL/TD lookup: use getAdPerformanceDaily() which has proper CRM matching
+  // (token overlap, utm_term aliases) instead of naive exact-match lookup
   const _qlGeo = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const _qlMarket = _qlGeo === 'all' ? null : _qlGeo;
   const qlLookup = {};
-  filterLeadsByMarket(leadsData, _qlGeo).forEach(r => {
-    const ad = normalizeAdName(r.mx_utm_adcontent);
-    const day = r.lead_created_date || '';
-    if (ad && day && String(r.qls) === '1') {
-      const key = ad + '|' + day;
-      qlLookup[key] = (qlLookup[key] || 0) + 1;
-    }
-  });
+  const tdLookup = {};
+  try {
+    const dailyPerf = getAdPerformanceDaily(_qlMarket, null, null);
+    dailyPerf.forEach(r => {
+      const key = normalizeAdName(r.ad_name) + '|' + r.date;
+      qlLookup[key] = (qlLookup[key] || 0) + (r.ql || 0);
+      tdLookup[key] = (tdLookup[key] || 0) + (r.td || 0);
+    });
+  } catch(e) { console.warn('Day-by-Day QL lookup failed:', e.message); }
 
   const thClass = 'px-2 py-2 text-[10px] font-bold text-text-muted uppercase tracking-wider text-left cursor-pointer hover:text-text-primary';
   let html = `<div class="overflow-x-auto"><table class="w-full text-xs">
@@ -7499,13 +7502,16 @@ function renderDayByDay() {
         <th class="${thClass} text-right" title="Cost per click (INR)">CPC</th>
         <th class="${thClass} text-right" title="Avg times each person saw this ad. Amber >1.5x, Red >2x = ad fatigue">Freq</th>
         <th class="${thClass} text-right" title="Qualified Leads from CRM">QL</th>
+        <th class="${thClass} text-right" title="Trials Done from CRM">TD</th>
       </tr>
     </thead><tbody>`;
 
   display.forEach(r => {
     const freq = r.frequency || 0;
     const rowBg = freq > 2.0 ? 'bg-red-50' : freq >= 1.5 ? 'bg-amber-50' : '';
-    const ql = qlLookup[(normalizeAdName(r.ad_name) + '|' + r.date)] || 0;
+    const _dayKey = normalizeAdName(r.ad_name) + '|' + r.date;
+    const ql = qlLookup[_dayKey] || 0;
+    const td = tdLookup[_dayKey] || 0;
     const shortName = r.ad_name.length > 40 ? r.ad_name.slice(0, 40) + '...' : r.ad_name;
     html += `<tr class="${rowBg} border-b border-gray-100 hover:bg-surface-secondary">
       <td class="px-2 py-1.5 text-text-muted whitespace-nowrap">${r.date}</td>
@@ -7518,6 +7524,7 @@ function renderDayByDay() {
       <td class="px-2 py-1.5 text-right text-text-muted">${r.cpc > 0 ? '₹' + Math.round(r.cpc) : '—'}</td>
       <td class="px-2 py-1.5 text-right font-semibold ${freq > 2.0 ? 'text-accent-red' : freq >= 1.5 ? 'text-amber-600' : ''}" title="Frequency: avg times each person saw this ad. >2x = fatigue risk">${freq > 0 ? freq.toFixed(1) + 'x' : '—'}</td>
       <td class="px-2 py-1.5 text-right ${ql > 0 ? 'font-semibold' : 'text-text-muted'}">${ql || '—'}</td>
+      <td class="px-2 py-1.5 text-right ${td > 0 ? 'font-semibold text-green-700' : 'text-text-muted'}">${td || '—'}</td>
     </tr>`;
   });
 
