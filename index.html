@@ -12385,11 +12385,20 @@ function loadTaggerData(input) {
 }
 
 function useDashboardData() {
-  if (!state.rawData.metaAds?.length) { showToast('No Meta Ads data loaded. Upload in Settings first.'); return; }
-  const raw = state.rawData.metaAds.filter(r => parseNumber(r['Spent']||r['spent']||0) > 0);
-  if (!raw.length) { showToast('No creatives with spend found'); return; }
+  // Try multiple data sources: rawData.metaAds (sheet), getAdPerformance (Supabase+CRM), metaCreatives (Meta API)
+  let raw = state.rawData.metaAds?.length ? state.rawData.metaAds : [];
+  if (!raw.length) {
+    // Fall back to getAdPerformance which combines Supabase meta_ad_data + CRM
+    raw = typeof getAdPerformance === 'function' ? getAdPerformance(null, null, null) : [];
+  }
+  if (!raw.length && metaCreatives?.length) {
+    // Last resort: metaCreatives from Meta API pull (has thumbnails but less metrics)
+    raw = metaCreatives.map(c => ({ 'Ad name': c.name, 'thumbnail_url': c.thumbnail_url, 'image_url': c.image_url, 'Spent': 0 }));
+  }
+  raw = raw.filter(r => parseNumber(r['Spent']||r['spent']||0) > 0 || r['thumbnail_url'] || r['image_url']);
+  if (!raw.length) { showToast('No Meta Ads data loaded. Go to Settings → Connect & Pull Data first.'); return; }
   raw.forEach(r => extractDateFromAdName(r));
-  showToast(`Using ${raw.length} creatives. Tagging...`);
+  showToast(`Using ${raw.length} creatives from dashboard data`);
   tagCreatives(raw);
 }
 
