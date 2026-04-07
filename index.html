@@ -992,16 +992,13 @@
                 <table class="w-full text-xs">
                   <thead id="taggerTableHead">
                     <tr class="bg-surface-tertiary border-b border-gray-200">
-                      <th class="text-left px-3 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] sticky-col bg-surface-tertiary" style="min-width:200px;width:22%">Creative</th>
-                      <th class="text-center px-1.5 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%" title="Performance verdict">Verdict</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:60px;width:6%">Spend</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:42px;width:4%" title="Click-Through Rate — Clicks ÷ Impressions">CTR</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:50px;width:5%" title="Cost Per Click">CPC</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:35px;width:3%" title="Qualified Leads">QL</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:50px;width:5%" title="What % of clicks become qualified leads">Clk→QL</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%" title="Trial Done">TD</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%" title="Cost Per Trial Done">CPTD</th>
-                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:120px;width:18%">Tags</th>
+                      <th class="text-left px-3 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] sticky-col bg-surface-tertiary" style="min-width:200px;width:20%">Creative</th>
+                      <th class="text-left px-1.5 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px;width:16%" title="What should you do with this creative?">Insight</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:6%">Spend</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%">QL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%">TD</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%" title="Cost Per Trial Done — THE metric">CPTD</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px;width:18%">Tags</th>
                     </tr>
                   </thead>
                   <tbody id="taggerTableBody"></tbody>
@@ -14107,6 +14104,20 @@ function renderTaggerAdRow(c, catFilter, indent) {
   const pl = indent ? `pl-${indent * 4 + 3}` : 'pl-3';
   const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
 
+  // Insight text (same logic as Performance tab)
+  const _ins = (() => {
+    if (spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
+    if (td_val >= 3 && cptd_val < (mktThresholds.cptd?.green||35000)) return { text: 'Scale — proven CPTD', color: 'text-green-700', icon: '↑' };
+    if (td_val >= 1 && cptd_val < (mktThresholds.cptd?.amber||50000)) return { text: 'Working — keep running', color: 'text-green-600', icon: '✓' };
+    if (spend > 50000 && td_val === 0) return { text: 'Kill — ' + formatCurrency(spend) + ' burnt', color: 'text-red-700', icon: '✗' };
+    if (spend > 20000 && td_val === 0 && ql <= 2) return { text: 'Budget leak — pause', color: 'text-red-600', icon: '⚠' };
+    if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR — fatigue', color: 'text-amber-600', icon: '↓' };
+    if (ql >= 5 && td_val === 0) return { text: 'Funnel break — no TDs', color: 'text-amber-700', icon: '⚠' };
+    if (ql >= 3 && clickQL > 3) return { text: 'Promising — add budget', color: 'text-blue-600', icon: '→' };
+    if (spend > 10000 && ql <= 1) return { text: 'Weak — low leads', color: 'text-gray-500', icon: '↓' };
+    return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
+  })();
+
   return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ${verdictBorder}">
     <td class="${pl} px-3 py-2">
       <div class="flex items-center gap-2">
@@ -14117,12 +14128,9 @@ function renderTaggerAdRow(c, catFilter, indent) {
         </div>
       </div>
     </td>
-    <td class="px-1.5 py-2 text-center"><span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${vStyles[v.color]}" title="${v.reason}">${v.label}</span></td>
+    <td class="px-1.5 py-2"><span class="text-[9px] font-bold ${_ins.color}" title="${v.reason}">${_ins.icon} ${_ins.text}</span></td>
     <td class="px-2 py-2 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
-    <td class="px-2 py-2 text-right text-[11px] ${ctr > 1.5 ? 'text-accent-green font-bold' : ctr > 0.8 ? 'text-text-primary' : ctr > 0 ? 'text-accent-red' : 'text-text-muted'}">${ctr > 0 ? ctr.toFixed(2)+'%' : '\u2014'}</td>
-    <td class="px-2 py-2 text-right text-[11px]">${cpc > 0 ? formatCurrency(cpc) : '\u2014'}</td>
     <td class="px-2 py-2 text-right text-[11px]">${ql > 0 ? Math.round(ql) : '<span class="text-text-muted">0</span>'}</td>
-    <td class="px-2 py-2 text-right text-[11px] ${clickQL > 3 ? 'text-accent-green font-bold' : clickQL > 1 ? 'text-text-primary' : 'text-text-muted'}">${clickQL > 0 ? clickQL.toFixed(1)+'%' : '\u2014'}</td>
     <td class="px-2 py-2 text-right text-[11px] font-semibold">${td_val > 0 ? Math.round(td_val) : '<span class="text-text-muted">0</span>'}</td>
     <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>` : '<span class="text-text-muted">\u2014</span>'}</td>
     <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5">${tagHtml || '<span class="text-text-muted text-[9px]">—</span>'}</div></td>
@@ -14137,20 +14145,29 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount) {
   const cptdColor = totals.cptd > 0 ? (totals.cptd < 40000 ? 'text-accent-green' : totals.cptd < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
   const ctrColor = totals.ctr > 1.5 ? 'text-accent-green font-bold' : totals.ctr > 0.8 ? '' : totals.ctr > 0 ? 'text-accent-red' : 'text-text-muted';
 
+  // Group-level insight
+  const _gIns = (() => {
+    if (totals.spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
+    if (totals.td >= 3 && totals.cptd < 40000) return { text: 'Scale — ' + totals.td + ' TDs at ' + formatCurrency(totals.cptd), color: 'text-green-700', icon: '↑' };
+    if (totals.td >= 1 && totals.cptd < 70000) return { text: 'Working — ' + totals.td + ' TD' + (totals.td > 1 ? 's' : ''), color: 'text-green-600', icon: '✓' };
+    if (totals.spend > 50000 && totals.td === 0) return { text: 'Kill — ' + formatCurrency(totals.spend) + ', 0 TDs', color: 'text-red-700', icon: '✗' };
+    if (totals.spend > 20000 && totals.td === 0 && totals.ql <= 2) return { text: 'Budget leak', color: 'text-red-600', icon: '⚠' };
+    if (totals.ql >= 5 && totals.td === 0) return { text: 'Funnel break — ' + totals.ql + ' QLs, 0 TDs', color: 'text-amber-700', icon: '⚠' };
+    return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
+  })();
+
   return `<tr class="${bgClass} tagger-group-row" onclick="toggleTaggerGroup('${groupId}')">
-    <td class="px-3 py-2.5 ${pl} font-bold" colspan="2">
+    <td class="px-3 py-2.5 ${pl} font-bold">
       <span class="text-[10px] text-text-muted mr-1 tagger-arrow" data-group="${groupId}">&#9654;</span>
       <span title="${label}" class="text-[11px]">${shortLabel}</span>
       <span class="text-[10px] text-text-muted ml-1.5 font-normal">${childCount} ad${childCount !== 1 ? 's' : ''}</span>
     </td>
+    <td class="px-1.5 py-2.5"><span class="text-[9px] font-bold ${_gIns.color}">${_gIns.icon} ${_gIns.text}</span></td>
     <td class="px-2 py-2.5 text-right font-bold text-[11px]">${formatCurrency(totals.spend)}</td>
-    <td class="px-2 py-2.5 text-right text-[11px] ${ctrColor}">${totals.ctr > 0 ? totals.ctr.toFixed(2)+'%' : '-'}</td>
-    <td class="px-2 py-2.5 text-right text-[11px]">${totals.cpc > 0 ? formatCurrency(totals.cpc) : '-'}</td>
     <td class="px-2 py-2.5 text-right text-[11px]">${totals.ql}</td>
-    <td class="px-2 py-2.5 text-right text-[11px]">${totals.clickQL > 0 ? totals.clickQL.toFixed(1)+'%' : '-'}</td>
     <td class="px-2 py-2.5 text-right font-bold text-[11px]">${totals.td}</td>
     <td class="px-2 py-2.5 text-right font-bold text-[11px] ${cptdColor}">${totals.cptd > 0 ? formatCurrency(totals.cptd) : '-'}</td>
-    <td class="px-2 py-2.5 text-[10px] text-text-muted">${totals.td > 0 ? (totals.td >= 3 ? '✓ Converting' : 'Early signal') : totals.ql > 0 ? 'QLs only' : 'No conversions'}</td>
+    <td class="px-2 py-2.5"></td>
   </tr>`;
 }
 
