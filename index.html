@@ -4392,20 +4392,33 @@ async function fetchPLAData(apiKey) {
   const leadsJson = await leadsRes.json();
   const costJson = await costRes.json();
 
+  // --- Build ad_id → ad_name lookup from metaAdData (loaded earlier in boot) ---
+  const adIdToName = {};
+  (metaAdData || []).forEach(r => {
+    if (r.ad_id && r.ad_name) adIdToName[String(r.ad_id)] = r.ad_name;
+  });
+  console.log(`PLA: ad_id→ad_name lookup built from ${Object.keys(adIdToName).length} meta ads`);
+
   // --- PLA Leads: normalize, filter meta-only, deduplicate ---
   const rawPLA = parseSheetValues(leadsJson.values).filter(r => r.created_on && r.created_on.length > 0);
   const existingPids = new Set(leadsData.map(r => r.prospectid).filter(Boolean));
-  let added = 0, skippedDup = 0, skippedNonMeta = 0;
+  let added = 0, skippedDup = 0, skippedNonMeta = 0, adIdResolved = 0;
   rawPLA.forEach(r => {
     const normalized = normalizePLALead(r);
     if (!normalized) { skippedNonMeta++; return; }
+    // Resolve numeric utm_content (ad ID) to actual ad name for CRM→Meta matching
+    const rawContent = (normalized.mx_utm_adcontent || '').trim();
+    if (/^\d{10,}$/.test(rawContent) && adIdToName[rawContent]) {
+      normalized.mx_utm_adcontent = adIdToName[rawContent];
+      adIdResolved++;
+    }
     const pid = normalized.prospectid;
     if (pid && existingPids.has(pid)) { skippedDup++; return; }
     if (pid) existingPids.add(pid);
     leadsData.push(normalized);
     added++;
   });
-  console.log(`PLA leads: ${rawPLA.length} raw → ${added} added, ${skippedDup} duplicate, ${skippedNonMeta} non-meta`);
+  console.log(`PLA leads: ${rawPLA.length} raw → ${added} added, ${skippedDup} dup, ${skippedNonMeta} non-meta, ${adIdResolved} ad IDs resolved to names`);
 
   // --- PLA Cost: normalize, filter meta-only, deduplicate by campaign+day ---
   const rawCost = parseSheetValues(costJson.values);
