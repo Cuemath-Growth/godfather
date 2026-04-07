@@ -7216,7 +7216,8 @@ function renderOracleActions() {
           <div><span class="text-xs font-semibold">${r.displayName}</span> ${r.type ? `<span class="text-[9px] text-text-muted">(${r.type})</span>` : ''}</div>
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-accent-green">${r.cpql ? formatCurrency(r.cpql) + ' CPQL' : '\u2014'}</span>
-            <button onclick="markActionDone('Scaled creator: ${r.displayName.replace(/'/g,"\\'")}','scale','')" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done &#10003;</button>
+            <button onclick="oracleAction('creator_scale:${r.displayName.replace(/'/g,"\\'")}','creator','done','${r.displayName.replace(/'/g,"\\'")}');this.textContent='Done ✓';this.disabled=true" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">${getOracleAction('creator_scale:'+r.displayName)?.status==='done'?'Done ✓':'Scale ✓'}</button>
+            <button onclick="oracleAction('creator_scale:${r.displayName.replace(/'/g,"\\'")}','creator','snoozed','${r.displayName.replace(/'/g,"\\'")}');this.closest('.flex').parentElement.style.display='none'" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">7d</button>
           </div>
         </div>`;
       });
@@ -7229,7 +7230,8 @@ function renderOracleActions() {
           <div><span class="text-xs font-semibold">${r.displayName}</span></div>
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-accent-red">${r.cpql ? formatCurrency(r.cpql) + ' CPQL' : formatCurrency(r.spend) + ' spent, 0 QLs'}</span>
-            <button onclick="markActionDone('Paused creator: ${r.displayName.replace(/'/g,"\\'")}','pause','')" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done &#10003;</button>
+            <button onclick="oracleAction('creator_pause:${r.displayName.replace(/'/g,"\\'")}','creator','done','${r.displayName.replace(/'/g,"\\'")}');this.textContent='Done ✓';this.disabled=true" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">${getOracleAction('creator_pause:'+r.displayName)?.status==='done'?'Done ✓':'Paused ✓'}</button>
+            <button onclick="oracleAction('creator_pause:${r.displayName.replace(/'/g,"\\'")}','creator','snoozed','${r.displayName.replace(/'/g,"\\'")}');this.closest('.flex').parentElement.style.display='none'" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">7d</button>
           </div>
         </div>`;
       });
@@ -13704,7 +13706,11 @@ function renderCreativeReview() {
     html += `<div class="bg-green-50 rounded-xl border border-green-200 p-4">
       <h4 class="text-xs font-bold text-green-800 mb-2">✓ DO MORE OF</h4>
       <ul class="space-y-1.5">
-        ${strongWins.map(([tag, count]) => `<li class="text-[11px]"><span class="font-bold text-green-800">${tagLabel(tag)}</span> <span class="text-green-600">— appears in ${count} winning creatives</span></li>`).join('')}
+        ${strongWins.map(([tag, count]) => {
+          const tid = 'rec_do:' + tag.replace(/'/g,'');
+          const acted = getOracleAction(tid);
+          return `<li class="text-[11px] flex items-center justify-between"><div><span class="font-bold text-green-800">${tagLabel(tag)}</span> <span class="text-green-600">— in ${count} winners</span></div><div class="flex gap-1">${acted?.status==='done' ? '<span class="text-[9px] text-green-600 font-bold">✓ Noted</span>' : `<button onclick="oracleAction('${tid}','recommendation','done','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-green-200 text-green-800 font-bold hover:bg-green-300">Noted</button><button onclick="oracleAction('${tid}','recommendation','dismissed','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Skip</button>`}</div></li>`;
+        }).join('')}
       </ul>
     </div>`;
   }
@@ -13712,7 +13718,11 @@ function renderCreativeReview() {
     html += `<div class="bg-red-50 rounded-xl border border-red-200 p-4">
       <h4 class="text-xs font-bold text-red-800 mb-2">✗ AVOID / RETHINK</h4>
       <ul class="space-y-1.5">
-        ${strongLosses.map(([tag, count]) => `<li class="text-[11px]"><span class="font-bold text-red-800">${tagLabel(tag)}</span> <span class="text-red-600">— appears in ${count} underperforming creatives</span></li>`).join('')}
+        ${strongLosses.map(([tag, count]) => {
+          const tid = 'rec_avoid:' + tag.replace(/'/g,'');
+          const acted = getOracleAction(tid);
+          return `<li class="text-[11px] flex items-center justify-between"><div><span class="font-bold text-red-800">${tagLabel(tag)}</span> <span class="text-red-600">— in ${count} underperformers</span></div><div class="flex gap-1">${acted?.status==='done' ? '<span class="text-[9px] text-red-600 font-bold">✓ Noted</span>' : `<button onclick="oracleAction('${tid}','recommendation','done','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-red-200 text-red-800 font-bold hover:bg-red-300">Noted</button><button onclick="oracleAction('${tid}','recommendation','dismissed','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Skip</button>`}</div></li>`;
+        }).join('')}
       </ul>
     </div>`;
   }
