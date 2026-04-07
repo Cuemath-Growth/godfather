@@ -13422,6 +13422,34 @@ function renderTaggerInsights() {
 // Designed for: graphic designers, video editors, copy writers, content heads, performance team, HOD
 // Answers: what went live, how is it doing, what's working as a pattern, what to make next
 
+function _taggerItemId(adName, verdict) {
+  return 'tagger:' + verdict + ':' + normalizeAdName(adName);
+}
+
+function _taggerCardActions(adName, verdict) {
+  const itemId = _taggerItemId(adName, verdict);
+  const esc = s => s.replace(/'/g, "\\'");
+  const shortName = shortAdName(adName);
+  const action = getOracleAction(itemId);
+  const existingNote = action?.note || '';
+  const noteId = 'note_' + itemId.replace(/[^a-zA-Z0-9]/g, '_');
+  const statusLabel = action?.status === 'done' ? '<span class="text-[9px] text-green-600 font-bold">✓ Done</span> '
+    : action?.status === 'snoozed' ? '<span class="text-[9px] text-amber-600 font-bold">⏸ Snoozed</span> ' : '';
+
+  const actionBtns = verdict === 'scale' || verdict === 'working'
+    ? `<button onclick="oracleAction('${esc(itemId)}','tagger_scale','done','${esc(shortName)}');renderCreativeReview()" class="text-[9px] px-2 py-1 rounded-full bg-green-100 text-green-700 font-bold hover:bg-green-200">Scaled ✓</button>
+       <button onclick="oracleAction('${esc(itemId)}','tagger_scale','dismissed','${esc(shortName)}');renderCreativeReview()" class="text-[9px] px-2 py-1 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Not now</button>
+       <button onclick="oracleAction('${esc(itemId)}','tagger_scale','snoozed','${esc(shortName)}');renderCreativeReview()" class="text-[9px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>`
+    : `<button onclick="oracleAction('${esc(itemId)}','tagger_pause','done','${esc(shortName)}');renderCreativeReview()" class="text-[9px] px-2 py-1 rounded-full bg-green-100 text-green-700 font-bold hover:bg-green-200">Paused ✓</button>
+       <button onclick="oracleAction('${esc(itemId)}','tagger_pause','dismissed','${esc(shortName)}');renderCreativeReview()" class="text-[9px] px-2 py-1 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Keep running</button>
+       <button onclick="oracleAction('${esc(itemId)}','tagger_pause','snoozed','${esc(shortName)}');renderCreativeReview()" class="text-[9px] px-2 py-1 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>`;
+
+  return `<div class="mt-2 pt-2 border-t border-gray-100">
+    <div class="flex items-center gap-1.5 mb-1.5">${statusLabel}${actionBtns}</div>
+    <input type="text" id="${noteId}" placeholder="Add a note..." value="${esc(existingNote)}" onblur="oracleSaveNote('${esc(_taggerItemId(adName, verdict))}', this.value)" onkeydown="if(event.key==='Enter'){this.blur()}" class="w-full text-[9px] px-2 py-1 rounded-lg border border-gray-200 bg-surface-secondary text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none" />
+  </div>`;
+}
+
 function renderCreativeReview() {
   const container = document.getElementById('creativeReviewContent');
   if (!container) return;
@@ -13448,12 +13476,13 @@ function renderCreativeReview() {
     b.avgCPTD = b.td > 0 ? b.spend/b.td : 0;
   });
 
-  // ── Classify all creatives ──
+  // ── Classify all creatives, filter out actioned items ──
   const verdicts = data.map(c => ({ c, v: getCreativeVerdict(c) }));
-  const scale = verdicts.filter(x => x.v.key === 'scale').sort((a,b) => parseNumber(b.c['TD']||0) - parseNumber(a.c['TD']||0));
-  const working = verdicts.filter(x => x.v.key === 'working').sort((a,b) => parseNumber(b.c['TD']||0) - parseNumber(a.c['TD']||0));
-  const fatigued = verdicts.filter(x => x.v.key === 'fatigued').sort((a,b) => parseNumber(b.c['Spent']||0) - parseNumber(a.c['Spent']||0));
-  const pause = verdicts.filter(x => x.v.key === 'pause').sort((a,b) => parseNumber(b.c['Spent']||0) - parseNumber(a.c['Spent']||0));
+  const _vis = (x) => isItemVisible(_taggerItemId(x.c['Ad name'] || x.c['ad name'] || '', x.v.key));
+  const scale = verdicts.filter(x => x.v.key === 'scale' && _vis(x)).sort((a,b) => parseNumber(b.c['TD']||0) - parseNumber(a.c['TD']||0));
+  const working = verdicts.filter(x => x.v.key === 'working' && _vis(x)).sort((a,b) => parseNumber(b.c['TD']||0) - parseNumber(a.c['TD']||0));
+  const fatigued = verdicts.filter(x => x.v.key === 'fatigued' && _vis(x)).sort((a,b) => parseNumber(b.c['Spent']||0) - parseNumber(a.c['Spent']||0));
+  const pause = verdicts.filter(x => x.v.key === 'pause' && _vis(x)).sort((a,b) => parseNumber(b.c['Spent']||0) - parseNumber(a.c['Spent']||0));
   const watch = verdicts.filter(x => x.v.key === 'watch');
   const newAds = verdicts.filter(x => x.v.key === 'new');
 
@@ -13537,6 +13566,7 @@ function renderCreativeReview() {
         </div>
       </div>
       ${campaign ? `<p class="text-[9px] text-text-muted mt-2 truncate" title="${campaign}">Campaign: ${campaign.length > 60 ? campaign.slice(0,57)+'...' : campaign}</p>` : ''}
+      ${_taggerCardActions(name, v.key)}
     </div>`;
   }
 
