@@ -1603,15 +1603,12 @@
                   <table class="w-full text-[11px] table-fixed">
                     <thead><tr class="bg-surface-tertiary border-b border-gray-200">
                       <th class="text-left px-3 py-2 font-bold text-text-muted sticky-col bg-surface-tertiary" style="width:22%">Creative</th>
-                      <th class="text-center px-2 py-2 font-bold text-text-muted">Format</th>
+                      <th class="text-left px-2 py-2 font-bold text-text-muted" style="width:18%" title="What should you do with this creative?">Insight</th>
                       <th class="text-right px-2 py-2 font-bold text-text-muted">Spend</th>
-                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="Click-Through Rate — Clicks ÷ Impressions">CTR</th>
                       <th class="text-right px-2 py-2 font-bold text-text-muted" title="Qualified Leads — signups">QL</th>
-                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="Cost Per Qualified Lead — Spend ÷ QL">CPQL</th>
-                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="True Qualified Lead — US: NRI only, others: all QL">TQL</th>
-                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="Cost Per True Qualified Lead — Spend ÷ TQL">CPTQL</th>
                       <th class="text-right px-2 py-2 font-bold text-text-muted" title="Trial Done — completed trial class">TD</th>
-                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="Cost Per Trial Done — Spend ÷ TD">CPTD</th>
+                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="Cost Per Trial Done — Spend ÷ TD. THE primary metric.">CPTD</th>
+                      <th class="text-right px-2 py-2 font-bold text-text-muted" title="Click-Through Rate — Clicks ÷ Impressions">CTR</th>
                       <th class="text-right px-2 py-2 font-bold text-text-muted" title="What % of leads complete a trial">QL→TD%</th>
                       <th class="text-right px-2 py-2 font-bold text-text-muted" title="Enrolled students">Paid</th>
                     </tr></thead>
@@ -17066,23 +17063,36 @@ function renderSentinelTable() {
   function cpqlColorClass(val) { return val > 0 ? (val < 15000 ? 'text-accent-green' : val < 25000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted'; }
   function cptdColorClass(val) { return val > 0 ? (val < 40000 ? 'text-accent-green' : val < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted'; }
 
+  // Helper: one-line actionable insight for a performance row
+  function _perfInsight(m, sc) {
+    const spend = m.spend || 0, td = m.td || 0, ql = m.ql || 0, cptd = m.cptd || 0, ctr = m.ctr || 0, clickQL = m.clicks > 0 ? (ql / m.clicks * 100) : 0;
+    if (spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
+    if (td >= 3 && cptd < 40000) return { text: 'Scale — proven CPTD', color: 'text-green-700', icon: '↑' };
+    if (td >= 1 && cptd < 70000) return { text: 'Working — keep running', color: 'text-green-600', icon: '✓' };
+    if (spend > 50000 && td === 0) return { text: 'Kill — ₹' + Math.round(spend/1000) + 'K burnt, 0 TDs', color: 'text-red-700', icon: '✗' };
+    if (spend > 20000 && td === 0 && ql <= 2) return { text: 'Budget leak — pause', color: 'text-red-600', icon: '⚠' };
+    if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR — creative fatigue', color: 'text-amber-600', icon: '↓' };
+    if (ql >= 5 && td === 0) return { text: 'Funnel break — QLs not converting', color: 'text-amber-700', icon: '⚠' };
+    if (ql >= 3 && clickQL > 3) return { text: 'Promising — needs more spend', color: 'text-blue-600', icon: '→' };
+    if (spend > 10000 && ql <= 1) return { text: 'Weak — low engagement', color: 'text-gray-500', icon: '↓' };
+    return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
+  }
+
   // Helper: render a single ad row
   function renderAdRow(r, indent) {
     const m = r.metrics;
     const sc = r.scores;
     const name = r['Ad name'] || r['ad name'] || 'Unknown';
     const pl = indent ? 'pl-' + (indent * 4 + 3) : 'pl-3';
+    const insight = _perfInsight(m, sc);
     return `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
       <td class="px-3 py-2 ${pl} sticky-col bg-white"><span class="font-medium" title="${name}">${shortAdName(name)}</span></td>
-      <td class="px-2 py-2 text-center"><span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${r.type==='video' ? 'bg-accent-purple-light text-accent-purple' : 'bg-accent-blue-light text-accent-blue'}">${r.type}</span></td>
+      <td class="px-2 py-2"><span class="text-[9px] font-bold ${insight.color}" title="${insight.text}">${insight.icon} ${insight.text}</span></td>
       <td class="px-2 py-2 text-right">${formatCurrency(m.spend)}</td>
-      <td class="px-2 py-2 text-right">${m.ctr ? m.ctr.toFixed(2)+'%' : '-'}</td>
       <td class="px-2 py-2 text-right">${Math.round(m.ql)}</td>
-      <td class="px-2 py-2 text-right font-bold ${SCORE_STYLES[sc.cpql].text}">${m.cpql ? formatCurrency(m.cpql) : '-'}</td>
-      <td class="px-2 py-2 text-right">${Math.round(m.tql||0)}</td>
-      <td class="px-2 py-2 text-right">${((m.tql||0) === 0 && m.td > 0) ? '\u2014' : (m.cptql ? formatCurrency(m.cptql) : '-')}</td>
       <td class="px-2 py-2 text-right">${Math.round(m.td)}</td>
       <td class="px-2 py-2 text-right font-bold ${SCORE_STYLES[sc.cptd].text}">${m.cptd ? formatCurrency(m.cptd) : '-'}</td>
+      <td class="px-2 py-2 text-right">${m.ctr ? m.ctr.toFixed(2)+'%' : '-'}</td>
       <td class="px-2 py-2 text-right ${SCORE_STYLES[sc.ql_td_pct||'gray'].text}">${m.ql_td_pct ? m.ql_td_pct.toFixed(1)+'%' : '-'}</td>
       <td class="px-2 py-2 text-right">${Math.round(m.paid)}</td>
     </tr>`;
@@ -17093,20 +17103,19 @@ function renderSentinelTable() {
     const shortLabel = label.length > 60 ? label.substring(0,57)+'...' : label;
     const bgClass = level === 'campaign' ? 'bg-surface-tertiary/50' : 'bg-surface-secondary/30';
     const pl = level === 'adset' ? 'pl-6' : 'pl-3';
+    const insight = _perfInsight(totals, {});
     return `<tr class="${bgClass} cursor-pointer hover:bg-surface-tertiary sentinel-group-row" data-group="${groupId}" onclick="toggleSentinelGroup('${groupId}')">
-      <td class="px-3 py-2.5 font-bold ${pl}" colspan="2">
+      <td class="px-3 py-2.5 font-bold ${pl}">
         <span class="text-[10px] text-text-muted mr-1 sentinel-arrow" data-group="${groupId}">&#9654;</span>
         <span title="${label}">${shortLabel}</span>
         <span class="text-[10px] text-text-muted ml-2">(${childCount} ${level === 'campaign' && viewLevel === 'adset' ? 'ad sets' : 'ads'})</span>
       </td>
+      <td class="px-2 py-2.5"><span class="text-[9px] font-bold ${insight.color}">${insight.icon} ${insight.text}</span></td>
       <td class="px-2 py-2.5 text-right font-bold">${formatCurrency(totals.spend)}</td>
-      <td class="px-2 py-2.5 text-right">${totals.ctr ? totals.ctr.toFixed(2)+'%' : '-'}</td>
       <td class="px-2 py-2.5 text-right">${totals.ql}</td>
-      <td class="px-2 py-2.5 text-right font-bold ${cpqlColorClass(totals.cpql)}">${totals.cpql > 0 ? formatCurrency(totals.cpql) : '-'}</td>
-      <td class="px-2 py-2.5 text-right">${totals.tql||0}</td>
-      <td class="px-2 py-2.5 text-right">${(totals.tql === 0 && totals.td > 0) ? '\u2014' : (totals.cptql > 0 ? formatCurrency(totals.cptql) : '-')}</td>
       <td class="px-2 py-2.5 text-right">${Math.round(totals.td)}</td>
       <td class="px-2 py-2.5 text-right font-bold ${cptdColorClass(totals.cptd)}">${totals.cptd > 0 ? formatCurrency(totals.cptd) : '-'}</td>
+      <td class="px-2 py-2.5 text-right">${totals.ctr ? totals.ctr.toFixed(2)+'%' : '-'}</td>
       <td class="px-2 py-2.5 text-right">-</td>
       <td class="px-2 py-2.5 text-right">${Math.round(totals.paid||0)}</td>
     </tr>`;
@@ -17117,7 +17126,7 @@ function renderSentinelTable() {
   if (viewLevel === 'ad') {
     // Flat ad-level view — no grouping
     rows.slice(0, 200).forEach(r => { html += renderAdRow(r, 0); });
-    if (rows.length > 200) html += '<tr><td colspan="12" class="px-3 py-2 text-center text-xs text-text-muted">Showing top 200 of ' + rows.length + ' ads. Export CSV for full data.</td></tr>';
+    if (rows.length > 200) html += '<tr><td colspan="9" class="px-3 py-2 text-center text-xs text-text-muted">Showing top 200 of ' + rows.length + ' ads. Export CSV for full data.</td></tr>';
 
   } else if (viewLevel === 'adset') {
     // Group by Ad Set, with expandable ads inside
@@ -17160,7 +17169,7 @@ function renderSentinelTable() {
           '<td class="px-2 py-2 text-right">' + Math.round(r.metrics.paid) + '</td></tr>';
       });
     });
-    if (sortedAdSets.length > 50) html += '<tr><td colspan="12" class="px-3 py-2 text-center text-xs text-text-muted">Showing top 50 ad sets of ' + sortedAdSets.length + '. Export CSV for full data.</td></tr>';
+    if (sortedAdSets.length > 50) html += '<tr><td colspan="9" class="px-3 py-2 text-center text-xs text-text-muted">Showing top 50 ad sets of ' + sortedAdSets.length + '. Export CSV for full data.</td></tr>';
 
   } else {
     // Campaign view (default): campaign rows, click to expand to ads
@@ -17193,7 +17202,7 @@ function renderSentinelTable() {
     });
 
     if (sortedCampaigns.length > 30) {
-      html += '<tr><td colspan="12" class="px-3 py-2 text-center text-xs text-text-muted">Showing top 30 campaigns of ' + sortedCampaigns.length + '. Export CSV for full data.</td></tr>';
+      html += '<tr><td colspan="9" class="px-3 py-2 text-center text-xs text-text-muted">Showing top 30 campaigns of ' + sortedCampaigns.length + '. Export CSV for full data.</td></tr>';
     }
   }
 
