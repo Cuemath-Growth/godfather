@@ -815,6 +815,25 @@
           </div>
         </div>
 
+        <!-- Tag Actions — OUTSIDE upload/results, always visible -->
+        <div id="taggerActionBar" class="flex items-center gap-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <span class="text-xs font-bold text-amber-800">Tag:</span>
+          <button onclick="useDashboardData()" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-blue-400 bg-white text-blue-700 hover:bg-blue-100 shadow-sm" title="Load ads from dashboard data (Google Sheets + Meta API)">
+            Load Data
+          </button>
+          <button onclick="retagCreatives(true, 50)" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-amber-400 bg-white text-amber-700 hover:bg-amber-100 shadow-sm" title="Tag up to 50 untagged creatives via Haiku vision (bypasses cache)">
+            Pilot 50
+          </button>
+          <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold btn-primary rounded-lg shadow-sm" title="Tags all new/untagged creatives">
+            Tag All New
+          </button>
+          <button onclick="retagCreatives(true)" class="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-50" title="Re-tag ALL creatives from scratch (ignores cache, uses API credits)">
+            Re-tag All
+          </button>
+          <div class="flex-1"></div>
+          <span id="taggerActionCount" class="text-xs text-amber-700"></span>
+        </div>
+
         <!-- Upload Section -->
         <div id="taggerUpload" class="mb-6">
           <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-6">
@@ -878,24 +897,6 @@
           <div class="mb-5">
             <h3 class="text-base font-bold mb-3">Tag Performance Insights</h3>
             <div id="taggerInsights" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-          </div>
-
-          <!-- Tag Actions — always visible -->
-          <div class="flex items-center gap-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-            <span class="text-xs font-bold text-amber-800">Tag:</span>
-            <button onclick="retagCreatives(true, 50)" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-amber-400 bg-white text-amber-700 hover:bg-amber-100 shadow-sm" title="Tag up to 50 untagged creatives (pilot validation)">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              Pilot 50
-            </button>
-            <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold btn-primary rounded-lg shadow-sm" title="Tags all new/untagged creatives">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              Tag All New
-            </button>
-            <button onclick="retagCreatives(true)" class="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-50" title="Re-tag ALL creatives from scratch (ignores cache, uses API credits)">
-              Re-tag All
-            </button>
-            <div class="flex-1"></div>
-            <span id="taggerUntaggedCount" class="text-xs text-amber-700"></span>
           </div>
 
           <!-- Section Tabs -->
@@ -3478,6 +3479,15 @@ function navigateTo(view) {
   if (fbt) fbt.textContent = titles[view] || '';
   if (fbd) fbd.style.display = (view === 'settings' || view === 'generate' || !titles[view]) ? 'none' : '';
   // Show saved tagger results when switching to tagger — with loading spinner
+  // Update action bar count whenever navigating to tagger
+  if (view === 'tagger') {
+    const _acEl = document.getElementById('taggerActionCount');
+    if (_acEl) {
+      const _n = state.taggerData.length;
+      const _adPerf = typeof getAdPerformance === 'function' ? getAdPerformance(null, null, null).length : 0;
+      _acEl.textContent = _n > 0 ? `${_n} creatives loaded` : (_adPerf > 0 ? `${_adPerf} ads in dashboard — click Load Data` : 'No data yet');
+    }
+  }
   if (view === 'tagger' && state.taggerData.length) {
     document.getElementById('taggerUpload').style.display = 'none';
     const _taggerResults = document.getElementById('taggerResults');
@@ -6004,7 +6014,7 @@ async function refreshData() {
   // Skip if Supabase load is still pending — it may have 12K+ creatives
   if (!state.taggerData.length && !state._supabaseLoadPending && state.rawData.metaAds?.length) {
     console.log('Meta sheet has data but tagger is empty:', state.rawData.metaAds.length, 'rows');
-    const raw = state.rawData.metaAds.filter(r => parseNumber(r['Spent']||r['spent']||0) > 0);
+    const raw = (state.rawData.metaAds||[]).filter(r => parseNumber(r['Spent']||r['spent']||0) > 0);
     raw.forEach(r => extractDateFromAdName(r));
     if (raw.length && confirm(`${raw.length} ads found but not tagged. Tag them now? (Uses Claude credits)\n\nClick Cancel to skip tagging — data will still be available for Oracle.`)) {
       tagCreatives(raw);
@@ -6495,7 +6505,7 @@ async function runAnalysis() {
       dataSummary += '\nTOP 10 BEST CPQL ADS (LEADING METRIC):\n' + JSON.stringify(sortedQL.slice(0,10).map(adRow), null, 2);
     }
   } else if (state.rawData.metaAds) {
-    const ads = state.rawData.metaAds.filter(r => parseNumber(r['Spent']||r['spent']||0)>0);
+    const ads = (state.rawData.metaAds||[]).filter(r => parseNumber(r['Spent']||r['spent']||0)>0);
     dataSummary += '\n\nMETA ADS DATA:\n'+JSON.stringify(ads.slice(0,80),null,2);
   }
 
@@ -12885,7 +12895,7 @@ function showTaggerResults() {
   const _tb = document.getElementById('taggerThumbBtn');
   if (_tb) _tb.classList.toggle('hidden', _tc > _taggerSource.length * 0.5);
   // Show untagged count in tag action bar
-  const _utEl = document.getElementById('taggerUntaggedCount');
+  const _utEl = document.getElementById('taggerActionCount');
   if (_utEl) {
     const _ut = state.taggerData.filter(c => !c.tags || !c.tags.hook || c.tags.hook === 'Unknown').length;
     _utEl.textContent = _ut > 0 ? `${_ut} untagged of ${state.taggerData.length}` : `All ${state.taggerData.length} tagged`;
