@@ -1295,7 +1295,7 @@
                 <p class="text-xs font-semibold text-red-700">Reset Tagger Data (if spend is inflated)</p>
                 <p class="text-[10px] text-text-muted">Clears localStorage tagger data. Tags in creative_tags (Supabase) are preserved. Re-pull from Meta API after reset.</p>
               </div>
-              <button onclick="if(confirm('This clears tagger performance data from localStorage. Tags in creative_tags (Supabase) are preserved. You will need to re-pull from Meta API. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];showToast('Tagger data cleared. Tags preserved in Supabase. Re-pull from Meta API.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
+              <button onclick="if(confirm('This clears tagger performance data from localStorage. Tags in creative_tags (Supabase) are preserved. You will need to re-pull from Meta API. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];rebuildTagMap();showToast('Tagger data cleared. Tags preserved in Supabase. Re-pull from Meta API.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
             </div>
           </div>
         </div>
@@ -4087,6 +4087,7 @@ async function connectMetaApi() {
     // Merge CRM data
     if (leadsData.length) mergeCRMWithMeta();
     saveTaggerData();
+    rebuildTagMap();
     // Sync clean data to Supabase (replaces corrupted data)
     syncTaggerToSupabase(state.taggerData);
     // Find untagged ads (no tags even after cache rehydration)
@@ -4964,20 +4965,7 @@ function buildLookupMaps() {
   console.log(`Unmatched campaigns: ${leadsWithCamp - leadsMatchedCamp} leads — older campaigns before mid-2024 not in cost tab`);
 
   // TAG MAP: lookup tags + creative type + thumbnails by normalized ad name from taggerData
-  _tagMap = {};
-  (state.taggerData || []).forEach(c => {
-    const key = normalizeAdName(c['Ad name'] || c['ad name']);
-    if (!key) return;
-    if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return; // keep first with tags
-    _tagMap[key] = {
-      tags: c.tags || {},
-      type: c['Creative type'] || c['creative type'] || '',
-      thumb: c.thumbnail_url || c.image_url || '',
-      campaign: c['Campaign name'] || c['campaign name'] || '',
-      adset: c['Ad set name'] || c['ad set name'] || '',
-    };
-  });
-  console.log(`Tag map: ${Object.keys(_tagMap).length} creatives with tags`);
+  rebuildTagMap();
 }
 
 let _tagMap = {}; // { normalizedAdName: { tags, type, thumb, campaign, adset } }
@@ -5334,6 +5322,26 @@ function getPortfolioMetrics(market, from, to) {
 
 // Invalidate cache when data sources change
 function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; _dailyCache = { key: '', data: [] }; }
+
+// Rebuild _tagMap from state.taggerData + invalidate perf cache.
+// MUST be called every time state.taggerData is set or mutated.
+function rebuildTagMap() {
+  _tagMap = {};
+  (state.taggerData || []).forEach(c => {
+    const key = normalizeAdName(c['Ad name'] || c['ad name']);
+    if (!key) return;
+    if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return;
+    _tagMap[key] = {
+      tags: c.tags || {},
+      type: c['Creative type'] || c['creative type'] || '',
+      thumb: c.thumbnail_url || c.image_url || '',
+      campaign: c['Campaign name'] || c['campaign name'] || '',
+      adset: c['Ad set name'] || c['ad set name'] || '',
+    };
+  });
+  invalidateAdPerfCache();
+  console.log(`Tag map rebuilt: ${Object.keys(_tagMap).length} creatives with tags`);
+}
 
 function getCampaignSpend(campaignName, market, startDate, endDate) {
   // Fast path: use pre-built map for all-time, all-market
@@ -5929,6 +5937,7 @@ function mergeCRMWithMeta() {
     // Recompute derived metrics (CPTD, CPNRI) now that CRM added TD/NRI/Paid values
     state.taggerData = ensureDerivedMetrics(state.taggerData);
     saveTaggerData();
+    rebuildTagMap();
   } else {
     console.warn('CRM merge: 0 matches');
   }
@@ -6026,6 +6035,7 @@ async function refreshData() {
       // Rehydrate tags from cache so we don't lose existing tag work
       const restored = rehydrateTagsFromCache(state.taggerData);
       saveTaggerData();
+      rebuildTagMap();
       showToast(`${raw.length} ads loaded${restored ? `, ${restored} tags restored from cache` : ' without tagging'}.`);
     }
   }
@@ -6280,6 +6290,7 @@ async function fullRefresh() {
     // Step 4: Recompute derived metrics and save
     state.taggerData = ensureDerivedMetrics(state.taggerData);
     saveTaggerData();
+    rebuildTagMap();
     if (state.taggerData.length) {
       showToast('Full refresh done! ' + state.taggerData.length + ' creatives, QLs restored from Meta API.');
       renderPipeline();
@@ -12282,6 +12293,7 @@ _rawLocal.forEach(c => {
 // Migrate old field names in tags (hook→hook, format→content_format, campaign_audience→campaign_audience)
 _rawLocal.forEach(c => { if (c.tags) c.tags = migrateTags(c.tags); });
 state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(_rawLocal)));
+rebuildTagMap();
 // Backfill _date from campaign names for existing data missing dates
 let _dateBackfilled = 0;
 state.taggerData.forEach(c => { if (!c['_date']) { extractDateFromAdName(c); if (c['_date']) _dateBackfilled++; } });
@@ -12486,22 +12498,7 @@ async function tagCreatives(rawData, opts = {}) {
       }
     });
     saveTaggerData();
-    // Rebuild tag map + invalidate perf cache so all UI views pick up cached tags
-    _tagMap = {};
-    (state.taggerData || []).forEach(c => {
-      const key = normalizeAdName(c['Ad name'] || c['ad name']);
-      if (!key) return;
-      if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return;
-      _tagMap[key] = {
-        tags: c.tags || {},
-        type: c['Creative type'] || c['creative type'] || '',
-        thumb: c.thumbnail_url || c.image_url || '',
-        campaign: c['Campaign name'] || c['campaign name'] || '',
-        adset: c['Ad set name'] || c['ad set name'] || '',
-      };
-    });
-    invalidateAdPerfCache();
-    console.log(`Tag map rebuilt: ${Object.keys(_tagMap).length} creatives with tags (all cached)`);
+    rebuildTagMap();
     document.getElementById('taggerProgress').classList.add('hidden');
     document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
     document.getElementById('taggerExportBtn').style.display = '';
@@ -12522,22 +12519,7 @@ async function tagCreatives(rawData, opts = {}) {
       }
     });
     saveTaggerData();
-    // Rebuild tag map + invalidate perf cache so all UI views pick up fresh tags
-    _tagMap = {};
-    (state.taggerData || []).forEach(c => {
-      const key = normalizeAdName(c['Ad name'] || c['ad name']);
-      if (!key) return;
-      if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return;
-      _tagMap[key] = {
-        tags: c.tags || {},
-        type: c['Creative type'] || c['creative type'] || '',
-        thumb: c.thumbnail_url || c.image_url || '',
-        campaign: c['Campaign name'] || c['campaign name'] || '',
-        adset: c['Ad set name'] || c['ad set name'] || '',
-      };
-    });
-    invalidateAdPerfCache();
-    console.log(`Tag map rebuilt: ${Object.keys(_tagMap).length} creatives with tags`);
+    rebuildTagMap();
     document.getElementById('taggerProgress').classList.add('hidden');
     const _tcEl = document.getElementById('taggerCount'); if (_tcEl) _tcEl.textContent = `${state.taggerData.length} creatives`;
     showToast(`Loaded ${state.taggerData.length} creatives (${cachedResults.length} with tags, ${needsTagging.length} untagged — 0 API calls)`);
@@ -12647,22 +12629,7 @@ async function tagCreatives(rawData, opts = {}) {
     }
   });
   saveTaggerData();
-  // Rebuild tag map + invalidate perf cache so all UI views pick up fresh tags
-  _tagMap = {};
-  (state.taggerData || []).forEach(c => {
-    const key = normalizeAdName(c['Ad name'] || c['ad name']);
-    if (!key) return;
-    if (_tagMap[key] && _tagMap[key].tags && Object.keys(_tagMap[key].tags).length > 0) return;
-    _tagMap[key] = {
-      tags: c.tags || {},
-      type: c['Creative type'] || c['creative type'] || '',
-      thumb: c.thumbnail_url || c.image_url || '',
-      campaign: c['Campaign name'] || c['campaign name'] || '',
-      adset: c['Ad set name'] || c['ad set name'] || '',
-    };
-  });
-  invalidateAdPerfCache();
-  console.log(`Tag map rebuilt: ${Object.keys(_tagMap).length} creatives with tags`);
+  rebuildTagMap();
   document.getElementById('taggerProgress').classList.add('hidden');
   document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
   document.getElementById('taggerExportBtn').style.display = '';
@@ -14568,6 +14535,7 @@ function restoreTaggedData() {
       if (!confirm(`Restore ${backup.creativeCount} creatives from ${backup.exportDate}? This will replace current data.`)) return;
       state.taggerData = deduplicateByAdName(ensureDerivedMetrics(backup.taggerData));
       saveTaggerData();
+      rebuildTagMap();
       if (backup.influencerTypes) { state._influencerTypes = backup.influencerTypes; localStorage.setItem('gf_influencerTypes', JSON.stringify(backup.influencerTypes)); }
       showToast(`Restored ${backup.creativeCount} creatives! Refresh page to see changes.`);
     } catch(err) { showToast('Restore failed: ' + err.message); }
