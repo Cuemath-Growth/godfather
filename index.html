@@ -8184,11 +8184,12 @@ function renderOracleModules() {
       html += `<div class="mb-4"><h4 class="text-xs font-bold text-accent-green uppercase tracking-wider mb-2">Top 5 Performers</h4>
         <div class="overflow-x-auto"><table class="w-full text-xs table-fixed">
           <thead><tr class="border-b border-gray-100 text-text-muted">
-            <th class="text-left py-1.5 px-2 font-semibold" style="width:30%">Creative</th>
+            <th class="text-left py-1.5 px-2 font-semibold" style="width:28%">Creative</th>
             <th class="text-left py-1.5 px-2 font-semibold">Market</th>
             <th class="text-left py-1.5 px-2 font-semibold">Format</th>
             <th class="text-right py-1.5 px-2 font-semibold">CPTD</th>
             <th class="text-left py-1.5 px-2 font-semibold">Audience</th>
+            <th class="text-right py-1.5 px-2 font-semibold" style="width:12%">Action</th>
           </tr></thead><tbody>`;
       top5.forEach(r => {
         const name = r['Ad name'] || r['ad name'] || 'Unknown';
@@ -8196,12 +8197,15 @@ function renderOracleModules() {
         const format = r.type || (r['Creative type']||'').toLowerCase();
         const cptdHtml = r.metrics?.cptd ? formatCurrency(r.metrics.cptd) : (r.metrics?.cpql ? `<span class="text-text-muted">${formatCurrency(r.metrics.cpql)}</span><br><span class="text-[8px] text-text-muted font-normal">(CPQL)</span>` : '—');
         const audience = r.tags?.campaign_audience || '-';
+        const _t5id = 'perf_top:' + normalizeAdName(name);
+        const _t5a = getOracleAction(_t5id);
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
           <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
           <td class="py-1.5 px-2">${market}</td>
           <td class="py-1.5 px-2">${format}</td>
           <td class="py-1.5 px-2 text-right font-bold text-accent-green">${cptdHtml}</td>
           <td class="py-1.5 px-2">${audience}</td>
+          <td class="py-1.5 px-2 text-right">${_t5a?.status==='done' ? '<span class="text-[9px] text-green-600 font-bold">Scaled ✓</span>' : `<button onclick="oracleAction('${_t5id}','perf_top','done','${shortAdName(name).replace(/'/g,"\\\\'")}');renderOracleCardsV2()" class="text-[9px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold hover:bg-green-200">Scale</button>`}</td>
         </tr>`;
       });
       html += `</tbody></table></div></div>`;
@@ -8213,11 +8217,12 @@ function renderOracleModules() {
       html += `<div><h4 class="text-xs font-bold text-accent-red uppercase tracking-wider mb-2">Top 5 Budget Drains</h4>
         <div class="overflow-x-auto"><table class="w-full text-xs table-fixed">
           <thead><tr class="border-b border-gray-100 text-text-muted">
-            <th class="text-left py-1.5 px-2 font-semibold" style="width:30%">Creative</th>
+            <th class="text-left py-1.5 px-2 font-semibold" style="width:28%">Creative</th>
             <th class="text-left py-1.5 px-2 font-semibold">Market</th>
             <th class="text-left py-1.5 px-2 font-semibold">Format</th>
             <th class="text-right py-1.5 px-2 font-semibold">CPTD</th>
             <th class="text-left py-1.5 px-2 font-semibold">Audience</th>
+            <th class="text-right py-1.5 px-2 font-semibold" style="width:12%">Action</th>
           </tr></thead><tbody>`;
       bottom5.forEach(r => {
         const name = r['Ad name'] || r['ad name'] || 'Unknown';
@@ -8225,12 +8230,15 @@ function renderOracleModules() {
         const format = r.type || (r['Creative type']||'').toLowerCase();
         const cptdHtml = r.metrics?.cptd ? formatCurrency(r.metrics.cptd) : (r.metrics?.cpql ? `<span class="text-text-muted">${formatCurrency(r.metrics.cpql)}</span><br><span class="text-[8px] text-text-muted font-normal">(CPQL)</span>` : '—');
         const audience = r.tags?.campaign_audience || '-';
+        const _b5id = 'perf_drain:' + normalizeAdName(name);
+        const _b5a = getOracleAction(_b5id);
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
           <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
           <td class="py-1.5 px-2">${market}</td>
           <td class="py-1.5 px-2">${format}</td>
           <td class="py-1.5 px-2 text-right font-bold text-red-600">${cptdHtml}</td>
           <td class="py-1.5 px-2">${audience}</td>
+          <td class="py-1.5 px-2 text-right">${_b5a?.status==='done' ? '<span class="text-[9px] text-red-600 font-bold">Paused ✓</span>' : `<button onclick="oracleAction('${_b5id}','perf_drain','done','${shortAdName(name).replace(/'/g,"\\\\'")}');renderOracleCardsV2()" class="text-[9px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-bold hover:bg-red-200">Pause</button>`}</td>
         </tr>`;
       });
       html += `</tbody></table></div></div>`;
@@ -13731,6 +13739,37 @@ function renderCreativeReview() {
   }
 
   html += `</div></div>`;
+
+  // ── SECTION 6: Action Log — what you did, when, and outcomes ──
+  const recentActions = _oracleActions
+    .filter(a => a.item_id.startsWith('tagger:') && a.status !== 'dismissed')
+    .sort((a, b) => new Date(b.actioned_at || 0) - new Date(a.actioned_at || 0))
+    .slice(0, 10);
+  if (recentActions.length) {
+    html += `<div class="mb-6">
+      <h3 class="text-base font-bold mb-1">Action Log</h3>
+      <p class="text-xs text-text-muted mb-3">Your recent decisions on creatives. Notes are shared context for the team.</p>
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-[11px]">
+          <thead><tr class="bg-surface-secondary border-b border-gray-200 text-text-muted">
+            <th class="text-left py-1.5 px-3 font-semibold">Creative</th>
+            <th class="text-left py-1.5 px-3 font-semibold">Action</th>
+            <th class="text-left py-1.5 px-3 font-semibold">When</th>
+            <th class="text-left py-1.5 px-3 font-semibold">Note</th>
+          </tr></thead><tbody>`;
+    recentActions.forEach(a => {
+      const actionLabel = a.status === 'done' ? (a.card_type === 'tagger_scale' ? '✓ Scaled' : '✓ Paused') : a.status === 'snoozed' ? '⏸ Snoozed' : a.status;
+      const actionColor = a.status === 'done' ? 'text-green-700' : 'text-amber-600';
+      const when = a.actioned_at ? new Date(a.actioned_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
+      html += `<tr class="border-b border-gray-50">
+        <td class="py-1.5 px-3 font-medium truncate" style="max-width:200px" title="${a.item_name||''}">${a.item_name || a.item_id.split(':').pop()}</td>
+        <td class="py-1.5 px-3 ${actionColor} font-bold">${actionLabel}</td>
+        <td class="py-1.5 px-3 text-text-muted">${when}</td>
+        <td class="py-1.5 px-3 text-text-secondary italic">${a.note || '—'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div></div>`;
+  }
 
   container.innerHTML = html;
 }
