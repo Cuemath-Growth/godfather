@@ -12604,7 +12604,9 @@ async function tagCreatives(rawData, opts = {}) {
   saveTagCache(tagCache);
 
   // --- Phase 3: Merge and finalize ---
-  state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged])));
+  // Include skipped ads (pilot mode: ads beyond pilotLimit that weren't tagged)
+  const skippedAds = pilotLimit > 0 ? needsTagging.slice(pilotLimit).map((c, i) => ({ ...c, tags: c.tags || {}, id: Date.now() + 90000 + i })) : [];
+  state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged, ...skippedAds])));
   // Ensure campaign_audience is always parsed (cached rows may lack it)
   state.taggerData.forEach(c => {
     if (c.tags && !c.tags.campaign_audience) {
