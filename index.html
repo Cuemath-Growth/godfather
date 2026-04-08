@@ -5362,11 +5362,12 @@ function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; }
 // Single source of truth for ALL views. Joins leadsData (date-aware QLs/TDs) + metaAdData (date-aware spend).
 // Aggregates from getAdPerformanceDaily(). Single source of truth for all views.
 // Enriches with tags from _tagMap. Returns backward-compatible field names.
-function getAdPerformance(market, startDate, endDate) {
+function getAdPerformance(market, startDate, endDate, opts) {
   const start = startDate || COST_DATA_START || '';
   const end = endDate || new Date().toISOString().slice(0, 10);
+  const includeNonLP = opts?.includeNonLP || false;
 
-  const cacheKey = `${market||'all'}|${start}|${end}`;
+  const cacheKey = `${market||'all'}|${start}|${end}|${includeNonLP?'all':'lp'}`;
   if (_adPerfCache.key === cacheKey && _adPerfCache.data.length) return _adPerfCache.data;
 
   // Aggregate daily rows by ad name
@@ -5403,8 +5404,11 @@ function getAdPerformance(market, startDate, endDate) {
   Object.entries(adMap).forEach(([key, a]) => {
     // Skip: no leads AND no significant spend
     if (a.ql === 0 && a.spend < 5000) return;
-    // Skip: instant form campaigns — CRM can't attribute leads, data unreliable
-    if (!_isLPCampaign(a)) return;
+    // Instant form campaigns — CRM can't attribute leads, data unreliable
+    if (!_isLPCampaign(a)) {
+      if (!includeNonLP) return;
+      a.ql = 0; a.nri = 0; a.tql = 0; a.td = 0; a.paid = 0; // Zero CRM — keep spend/clicks
+    }
 
     const tag = _tagMap[key] || {};
     const adMarket = a.market || '';
@@ -12786,7 +12790,7 @@ function useDashboardData() {
   let raw = state.rawData.metaAds?.length ? state.rawData.metaAds : [];
   if (!raw.length) {
     // Fall back to getAdPerformance which combines Supabase meta_ad_data + CRM
-    raw = typeof getAdPerformance === 'function' ? getAdPerformance(null, null, null) : [];
+    raw = typeof getAdPerformance === 'function' ? getAdPerformance(null, null, null, { includeNonLP: true }) : [];
   }
   if (!raw.length && metaCreatives?.length) {
     // Last resort: metaCreatives from Meta API pull (has thumbnails but less metrics)
@@ -13391,7 +13395,7 @@ function showTaggerResults() {
   // Show export/backup buttons + thumbnail status
   const _expBtn = document.getElementById('taggerExportBtn'); if (_expBtn) _expBtn.style.display = '';
   const _bkpBtn = document.getElementById('taggerBackupBtn'); if (_bkpBtn) _bkpBtn.style.display = '';
-  const _taggerSource = metaAdData.length > 0 ? getAdPerformance(null, null, null) : sanitizeTaggerData(state.taggerData || []).filter(c => _isLPCampaign(c));
+  const _taggerSource = metaAdData.length > 0 ? getAdPerformance(null, null, null, { includeNonLP: true }) : sanitizeTaggerData(state.taggerData || []);
   const _tc = _taggerSource.filter(c => c['thumbnail_url'] || c['image_url']).length;
   const _te = document.getElementById('taggerThumbCount');
   if (_te) _te.textContent = _tc > 0 ? `${_tc} thumbnails` : 'No thumbnails';
@@ -13645,7 +13649,7 @@ function getFilteredTaggerData(filterElId, minSpend) {
   const { from, to } = getGlobalDateRange();
   const market = country === 'all' ? null : country;
   const threshold = minSpend !== undefined ? minSpend : LENS_MIN_SPEND;
-  return getAdPerformance(market, from || null, to || null).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
+  return getAdPerformance(market, from || null, to || null, { includeNonLP: true }).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
 }
 
 function _updateTaggerThresholdNote(countryVal) {
