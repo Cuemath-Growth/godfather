@@ -1047,9 +1047,10 @@
               <h3 class="text-sm font-bold">Creative Grid</h3>
               <div class="flex items-center gap-2">
                 <select id="gridSortBy" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="state._gridPage=1;renderCreativeGrid()">
+                  <option value="recent">Most Recent</option>
+                  <option value="spend_desc">Highest Spend</option>
                   <option value="cptd_asc">Best CPTD</option>
                   <option value="cpql_asc">Best CPTQL</option>
-                  <option value="spend_desc">Highest Spend</option>
                   <option value="td_desc">Most TDs</option>
                 </select>
                 <select id="gridTagFilter" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium max-w-[200px]" onchange="state._gridPage=1;renderCreativeGrid()">
@@ -15163,12 +15164,22 @@ function renderCreativeGrid() {
   }
 
   // Sort based on dropdown — minimum ₹1K spend to qualify for "best" sorts
-  const gridSort = document.getElementById('gridSortBy')?.value || 'cptd_asc';
+  const gridSort = document.getElementById('gridSortBy')?.value || 'recent';
   const MIN_GRID_SPEND = 1000;
   data.sort((a,b) => {
     const s = c => parseNumber(c['Spent']||c['spent']||0);
     const q = c => parseNumber(c['QL']||c['ql']||0);
     const t = c => parseNumber(c['TD']||c['td']||0);
+    if (gridSort === 'recent') {
+      // Sort by date extracted from ad name (DDMMYY suffix) or _date field, newest first
+      const dA = a['_date'] || (a['Ad name']||'').match(/(\d{6})$/)?.[1] || '000000';
+      const dB = b['_date'] || (b['Ad name']||'').match(/(\d{6})$/)?.[1] || '000000';
+      // Convert DDMMYY to YYMMDD for comparison
+      const sortA = dA.length === 6 ? dA.slice(4,6)+dA.slice(2,4)+dA.slice(0,2) : dA;
+      const sortB = dB.length === 6 ? dB.slice(4,6)+dB.slice(2,4)+dB.slice(0,2) : dB;
+      if (sortA !== sortB) return sortB.localeCompare(sortA);
+      return s(b) - s(a); // tie-break by spend
+    }
     if (gridSort === 'cptd_asc') {
       const aS = s(a), bS = s(b), aT = t(a), bT = t(b);
       const aV = aT > 0 && aS >= MIN_GRID_SPEND ? aS/aT : Infinity;
@@ -15220,12 +15231,14 @@ function renderCreativeGrid() {
       }).join('');
 
     const thumbUrl = c['image_url'] || c['thumbnail_url'] || '';
+    const _hasCRM = ql > 0 || tdVal > 0 || c._hasCRM;
+    const _noCRMLabel = '<span class="text-[9px] text-gray-400 italic">No CRM</span>';
     return `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-      ${thumbUrl ? `<div class="h-40 bg-gray-50 overflow-hidden flex items-center justify-center"><img src="${thumbUrl}" class="max-w-full max-h-full object-contain" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-text-muted text-2xl text-gray-300\\'>${type === 'Video' ? '\u25B6' : '\u25A1'}</div>'" /></div>` : `<div class="h-40 bg-surface-tertiary flex items-center justify-center"><span class="text-2xl text-gray-300">${type === 'Video' ? '\u25B6' : '\u25A1'}</span></div>`}
+      ${thumbUrl ? `<div class="h-56 bg-gray-50 overflow-hidden flex items-center justify-center"><img src="${thumbUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-text-muted text-3xl text-gray-300\\'>${type === 'Video' ? '\u25B6' : '\u25A1'}</div>'" /></div>` : `<div class="h-56 bg-surface-tertiary flex items-center justify-center"><span class="text-3xl text-gray-300">${type === 'Video' ? '\u25B6' : '\u25A1'}</span></div>`}
       <div class="p-4">
       <div class="flex items-center justify-between mb-2">
         <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${type==='Video'?'bg-accent-purple-light text-accent-purple':'bg-accent-blue-light text-accent-blue'}">${type}</span>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border ${badgeBg} ${badgeColor}">${badgeMetric > 0 ? formatCurrency(badgeMetric)+' '+badgeLabel : '\u2014'}</span>
+        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border ${badgeBg} ${badgeColor}">${badgeMetric > 0 ? formatCurrency(badgeMetric)+' '+badgeLabel : _hasCRM ? '\u2014' : 'No CRM'}</span>
       </div>
       <p class="text-xs font-semibold mb-1 truncate" title="${name}">${shortAdName(name)}</p>
       <p class="text-[10px] text-text-muted mb-3 truncate" title="${campaign}">${campaign}</p>
@@ -15236,11 +15249,11 @@ function renderCreativeGrid() {
         </div>
         <div class="bg-surface-secondary rounded-lg py-1.5 px-1">
           <p class="text-[10px] text-text-muted">QLs</p>
-          <p class="text-xs font-bold">${Math.round(ql)}</p>
+          <p class="text-xs font-bold">${_hasCRM ? Math.round(ql) : _noCRMLabel}</p>
         </div>
         <div class="bg-surface-secondary rounded-lg py-1.5 px-1">
           <p class="text-[10px] text-text-muted">TDs</p>
-          <p class="text-xs font-bold">${Math.round(parseNumber(c['TD']||c['td']||0))}</p>
+          <p class="text-xs font-bold">${_hasCRM ? Math.round(tdVal) : _noCRMLabel}</p>
         </div>
       </div>
       <div class="flex flex-wrap gap-1">${displayTags || '<span class="text-[10px] text-text-muted">No tags</span>'}</div>
