@@ -1971,16 +1971,31 @@ const GODFATHER_TAXONOMY = {
     // ── Parsed tag (from campaign name — NOT AI-tagged) ──
     campaign_audience: {
       label: 'Audience', type: 'parsed', color: 'orange',
-      description: 'Target audience derived from campaign naming convention',
-      values: ['NRI', 'Influencer', 'Vernacular', 'Retargeting', 'Broad/Advantage+', 'PLA', 'General'],
+      description: 'Target audience derived from campaign naming convention. Priority: Influencer > Vernacular > NRI > Chinese > K-2 > High School > PLA > CTF > LAL > HNI > Retargeting > Interest > Broad > Geo > General.',
+      values: ['Influencer', 'Vernacular', 'NRI', 'Chinese', 'K-2', 'High School', 'PLA', 'Creative Testing', 'Lookalike', 'HNI', 'Retargeting', 'Interest', 'Broad/Advantage+', 'Geo', 'General'],
       parse: function(campaignName) {
         const camp = (campaignName || '').toLowerCase();
-        if (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('_pla_') || camp.includes('pla_') || camp.includes('instant') || camp.includes('on_facebook')) return 'PLA';
-        if (camp.includes('nri') || camp.includes('desi') || camp.includes('indianaudience')) return 'NRI';
-        if (camp.includes('influencer') || camp.includes('influ')) return 'Influencer';
-        if (camp.includes('vernac') || camp.includes('telugu') || camp.includes('tamil') || camp.includes('gujarati') || camp.includes('hindi')) return 'Vernacular';
+        // Priority 1: Content type
+        if (camp.includes('influencer') || camp.includes('postboost')) return 'Influencer';
+        // Priority 2: Language
+        if (camp.includes('telugu') || camp.includes('gujarati') || camp.includes('tamil') || camp.includes('malayalam') || camp.includes('hindi') || camp.includes('lang-combined') || camp.includes('vernac')) return 'Vernacular';
+        // Priority 3: Ethnicity/diaspora
+        if (camp.includes('nri') || camp.includes('expat') || camp.includes('indian') || camp.includes('desi')) return 'NRI';
+        if (camp.includes('chinese')) return 'Chinese';
+        // Priority 4: Grade bands
+        if (camp.includes('k-2') || camp.includes('k_2')) return 'K-2';
+        if (camp.includes('high-school') || camp.includes('high_school')) return 'High School';
+        // Priority 5: Flow/campaign type
+        if (camp.includes('_pla_')) return 'PLA';
+        if (camp.includes('ctf')) return 'Creative Testing';
+        // Priority 6: Targeting mechanism
+        if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('lookalike')) return 'Lookalike';
+        if (camp.includes('hni')) return 'HNI';
         if (camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt')) return 'Retargeting';
-        if (camp.includes('broad') || camp.includes('advantage')) return 'Broad/Advantage+';
+        if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment')) return 'Interest';
+        if (camp.includes('advantage') || camp.includes('broad')) return 'Broad/Advantage+';
+        // Priority 7: Geo
+        if (camp.includes('zipcode') || camp.includes('pincode') || camp.includes('location') || camp.includes('cities')) return 'Geo';
         return 'General';
       }
     }
