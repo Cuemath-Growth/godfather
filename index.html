@@ -8201,7 +8201,7 @@ function renderOracleModules() {
         const _t5id = 'perf_top:' + normalizeAdName(name);
         const _t5a = getOracleAction(_t5id);
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
-          <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
+          <td class="py-1.5 px-2 font-medium" style="max-width:200px"><div class="truncate" title="${name}">${shortAdName(name)}</div></td>
           <td class="py-1.5 px-2">${market}</td>
           <td class="py-1.5 px-2">${format}</td>
           <td class="py-1.5 px-2 text-right font-bold text-accent-green">${cptdHtml}</td>
@@ -8234,7 +8234,7 @@ function renderOracleModules() {
         const _b5id = 'perf_drain:' + normalizeAdName(name);
         const _b5a = getOracleAction(_b5id);
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
-          <td class="py-1.5 px-2 font-medium" title="${name}">${shortAdName(name)}</td>
+          <td class="py-1.5 px-2 font-medium" style="max-width:200px"><div class="truncate" title="${name}">${shortAdName(name)}</div></td>
           <td class="py-1.5 px-2">${market}</td>
           <td class="py-1.5 px-2">${format}</td>
           <td class="py-1.5 px-2 text-right font-bold text-red-600">${cptdHtml}</td>
@@ -17173,17 +17173,15 @@ function renderSentinelTable() {
       const gid = 'as_' + ai;
       html += renderAggRow(adSet, at, gid, 'adset', at.adCount);
       adSetMap[adSet].forEach(r => {
+        const _childIns = _perfInsight(r.metrics, r.scores || {});
         html += '<tr class="border-b border-gray-50 hover:bg-surface-secondary/50 hidden sentinel-child" data-parent="' + gid + '">' +
-          '<td class="px-3 py-2 pl-10"><span class="font-medium" title="' + (r['Ad name']||r['ad name']||'Unknown') + '">' + shortAdName(r['Ad name']||r['ad name']||'Unknown') + '</span></td>' +
-          '<td class="px-2 py-2 text-center"><span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ' + (r.type==='video' ? 'bg-accent-purple-light text-accent-purple' : 'bg-accent-blue-light text-accent-blue') + '">' + r.type + '</span></td>' +
+          '<td class="px-3 py-2 pl-10" style="max-width:230px"><div class="truncate"><span class="font-medium" title="' + (r['Ad name']||r['ad name']||'Unknown') + '">' + shortAdName(r['Ad name']||r['ad name']||'Unknown') + '</span></div></td>' +
+          '<td class="px-2 py-2" style="min-width:130px"><span class="text-[9px] font-bold ' + _childIns.color + '">' + _childIns.icon + ' ' + _childIns.text + '</span></td>' +
           '<td class="px-2 py-2 text-right">' + formatCurrency(r.metrics.spend) + '</td>' +
-          '<td class="px-2 py-2 text-right">' + (r.metrics.ctr ? r.metrics.ctr.toFixed(2)+'%' : '-') + '</td>' +
           '<td class="px-2 py-2 text-right">' + Math.round(r.metrics.ql) + '</td>' +
-          '<td class="px-2 py-2 text-right font-bold ' + SCORE_STYLES[r.scores.cpql].text + '">' + (r.metrics.cpql ? formatCurrency(r.metrics.cpql) : '-') + '</td>' +
-          '<td class="px-2 py-2 text-right">' + Math.round(r.metrics.tql||0) + '</td>' +
-          '<td class="px-2 py-2 text-right">' + (((r.metrics.tql||0) === 0 && r.metrics.td > 0) ? '\u2014' : (r.metrics.cptql ? formatCurrency(r.metrics.cptql) : '-')) + '</td>' +
           '<td class="px-2 py-2 text-right">' + Math.round(r.metrics.td) + '</td>' +
           '<td class="px-2 py-2 text-right font-bold ' + SCORE_STYLES[r.scores.cptd].text + '">' + (r.metrics.cptd ? formatCurrency(r.metrics.cptd) : '-') + '</td>' +
+          '<td class="px-2 py-2 text-right">' + (r.metrics.ctr ? r.metrics.ctr.toFixed(2)+'%' : '-') + '</td>' +
           '<td class="px-2 py-2 text-right ' + SCORE_STYLES[r.scores.ql_td_pct||'gray'].text + '">' + (r.metrics.ql_td_pct ? r.metrics.ql_td_pct.toFixed(1)+'%' : '-') + '</td>' +
           '<td class="px-2 py-2 text-right">' + Math.round(r.metrics.paid) + '</td></tr>';
       });
@@ -17203,17 +17201,15 @@ function renderSentinelTable() {
           const m = r.metrics;
           const sc = r.scores;
           const name = r['Ad name'] || r['ad name'] || 'Unknown';
+          const _cmpIns = _perfInsight(m, sc || {});
           html += '<tr class="border-b border-gray-50 hover:bg-surface-secondary/50 hidden sentinel-child" data-parent="' + gid + '">' +
-            '<td class="px-3 py-2 pl-8"><span class="font-medium" title="' + name + '">' + shortAdName(name) + '</span></td>' +
-            '<td class="px-2 py-2 text-center"><span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ' + (r.type==='video' ? 'bg-accent-purple-light text-accent-purple' : 'bg-accent-blue-light text-accent-blue') + '">' + r.type + '</span></td>' +
+            '<td class="px-3 py-2 pl-8" style="max-width:230px"><div class="truncate"><span class="font-medium" title="' + name + '">' + shortAdName(name) + '</span></div></td>' +
+            '<td class="px-2 py-2" style="min-width:130px"><span class="text-[9px] font-bold ' + _cmpIns.color + '">' + _cmpIns.icon + ' ' + _cmpIns.text + '</span></td>' +
             '<td class="px-2 py-2 text-right">' + formatCurrency(m.spend) + '</td>' +
-            '<td class="px-2 py-2 text-right">' + (m.ctr ? m.ctr.toFixed(2)+'%' : '-') + '</td>' +
             '<td class="px-2 py-2 text-right">' + Math.round(m.ql) + '</td>' +
-            '<td class="px-2 py-2 text-right font-bold ' + SCORE_STYLES[sc.cpql].text + '">' + (m.cpql ? formatCurrency(m.cpql) : '-') + '</td>' +
-            '<td class="px-2 py-2 text-right">' + Math.round(m.tql||0) + '</td>' +
-            '<td class="px-2 py-2 text-right">' + (((m.tql||0) === 0 && m.td > 0) ? '\u2014' : (m.cptql ? formatCurrency(m.cptql) : '-')) + '</td>' +
             '<td class="px-2 py-2 text-right">' + Math.round(m.td) + '</td>' +
             '<td class="px-2 py-2 text-right font-bold ' + SCORE_STYLES[sc.cptd].text + '">' + (m.cptd ? formatCurrency(m.cptd) : '-') + '</td>' +
+            '<td class="px-2 py-2 text-right">' + (m.ctr ? m.ctr.toFixed(2)+'%' : '-') + '</td>' +
             '<td class="px-2 py-2 text-right ' + SCORE_STYLES[sc.ql_td_pct||'gray'].text + '">' + (m.ql_td_pct ? m.ql_td_pct.toFixed(1)+'%' : '-') + '</td>' +
             '<td class="px-2 py-2 text-right">' + Math.round(m.paid) + '</td></tr>';
         });
@@ -18251,7 +18247,7 @@ function renderInfluLeaderboard(filteredCreators) {
         const asCpql = as.ql > 0 ? as.spend / as.ql : null;
         const asCptd = as.td > 0 ? as.spend / as.td : null;
         html += `<tr class="border-b border-gray-100">
-          <td class="px-2 py-1.5 font-medium">${shortAdName(as.name)}</td>
+          <td class="px-2 py-1.5 font-medium" style="max-width:200px"><div class="truncate" title="${as.name}">${shortAdName(as.name)}</div></td>
           <td class="text-right px-2 py-1.5">${as.ads.length}</td>
           <td class="text-right px-2 py-1.5">${formatCurrency(as.spend)}</td>
           <td class="text-right px-2 py-1.5">${as.ql}</td>
