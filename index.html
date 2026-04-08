@@ -13536,7 +13536,10 @@ function _isLPCampaign(c) {
   const camp = ((c['Campaign name'] || c['campaign name'] || c.campaign || '') + ' ' + (c['Ad name'] || c['ad name'] || c.adName || '')).toLowerCase();
   // CHECK NEGATIVE FIRST — instant form signals override LP signals
   // (campaigns like "LEAP_BAU_Signup_LP" contain both "leap" AND "signup" — leap wins)
-  if (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('_pla_') || camp.includes('pla_') || camp.includes('instant') || camp.includes('on_facebook')) return false;
+  // PLA campaigns have their own CRM data (pla_dump) so they pass through
+  const isPLA = camp.includes('_pla_') || camp.includes('pla_') || camp.includes('_pla ') || camp.endsWith('_pla');
+  if (!isPLA && (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('instant') || camp.includes('on_facebook'))) return false;
+  if (isPLA) return true;
   // Positive signals: campaign runs on a landing page
   if (camp.includes('signup') || camp.includes('_lp_') || camp.includes('_lp-') || camp.includes('-lp_') || camp.endsWith('_lp') || camp.endsWith('-lp') || camp.includes('_fop') || camp.includes('lpfop')) return true;
   // Default: no LP signal = assume instant form — exclude to avoid unmatchable CRM numbers
