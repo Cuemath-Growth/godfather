@@ -12567,6 +12567,21 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
         if (!state._tagLookup[t.ad_name]) state._tagLookup[t.ad_name] = t;
       });
       console.log(`creative_tags: ${tags.length} rows loaded into tag lookup`);
+      // Backfill thumbnails from creative_tags into taggerData + _tagMap
+      let thumbBackfilled = 0;
+      state.taggerData.forEach(c => {
+        if (c.thumbnail_url || c.image_url) return; // already has one
+        const name = c['Ad name'] || c['ad name'] || '';
+        const lookup = state._tagLookup[name];
+        if (lookup?.thumbnail_url) {
+          c.thumbnail_url = lookup.thumbnail_url;
+          thumbBackfilled++;
+        }
+      });
+      if (thumbBackfilled > 0) {
+        rebuildTagMap(); // Update _tagMap with new thumbnails
+        console.log(`Backfilled ${thumbBackfilled} thumbnails from creative_tags`);
+      }
       // Backup to localStorage (read-only fallback if Supabase is down)
       try {
         localStorage.setItem('gf_creative_tags_backup', JSON.stringify(tags));
@@ -12853,7 +12868,8 @@ async function tagCreatives(rawData, opts = {}) {
         visual_style: tags.visual_style || null,
         campaign_audience: tags.campaign_audience || null,
         model_used: 'claude-haiku-4-5-20251001',
-        image_fetched: imageFetched
+        image_fetched: imageFetched,
+        thumbnail_url: creative['thumbnail_url'] || null
       };
       supabaseUpsert('creative_tags', [supaRow], 'ad_name,account').catch(e => console.warn('Supabase write failed:', e.message));
 
