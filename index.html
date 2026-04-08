@@ -318,6 +318,7 @@
               <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
               <div class="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
               <h3 class="text-sm font-bold">Pause Now</h3>
+              <span class="text-[10px] text-red-500 font-medium hidden sm:inline">Ads burning budget without results — pause or reallocate</span>
               <span id="pauseNowBadge" class="text-[10px] text-amber-700 font-bold px-1.5 py-0.5 rounded bg-amber-50"></span>
               <div class="ml-auto relative" onclick="event.stopPropagation()">
                 <button onclick="event.preventDefault();this.nextElementSibling.classList.toggle('hidden')" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg></button>
@@ -1532,15 +1533,17 @@
                 <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                   <table class="w-full text-[11px] table-fixed">
                     <thead><tr class="bg-surface-tertiary border-b border-gray-200">
-                      <th class="text-left px-2 py-2 font-bold text-text-muted text-[10px]" style="width:30%">Creative</th>
+                      <th class="text-left px-2 py-2 font-bold text-text-muted text-[10px]" style="width:22%">Creative</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]">Spend</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]">CTR</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]" title="Cost Per TQL">CPTQL</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]" title="Cost Per Trial Done">CPTD</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]">TDs</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]" title="Funnel conversion — % of leads that complete a trial">QL→TD%</th>
+                      <th class="text-left px-1.5 py-2 font-bold text-text-muted text-[10px]" style="width:18%">Insight</th>
+                      <th class="px-1.5 py-2 font-bold text-text-muted text-[10px]" style="width:7%"></th>
                     </tr></thead>
-                    <tbody id="sentinelTop5"><tr><td colspan="7" class="px-3 py-4 text-center text-xs text-text-muted">Run analysis to see top performers</td></tr></tbody>
+                    <tbody id="sentinelTop5"><tr><td colspan="9" class="px-3 py-4 text-center text-xs text-text-muted">Run analysis to see top performers</td></tr></tbody>
                   </table>
                 </div>
               </div>
@@ -1552,15 +1555,17 @@
                 <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
                   <table class="w-full text-[11px] table-fixed">
                     <thead><tr class="bg-surface-tertiary border-b border-gray-200">
-                      <th class="text-left px-2 py-2 font-bold text-text-muted text-[10px]" style="width:30%">Creative</th>
+                      <th class="text-left px-2 py-2 font-bold text-text-muted text-[10px]" style="width:22%">Creative</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]">Spend</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]">CTR</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]" title="Cost Per True Qualified Lead">CPTQL</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]" title="Cost Per Trial Done — Spend ÷ TD">CPTD</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]">TDs</th>
                       <th class="text-right px-1.5 py-2 font-bold text-text-muted text-[10px]" title="Funnel conversion — % of leads that complete a trial">QL→TD%</th>
+                      <th class="text-left px-1.5 py-2 font-bold text-text-muted text-[10px]" style="width:18%">Insight</th>
+                      <th class="px-1.5 py-2 font-bold text-text-muted text-[10px]" style="width:7%"></th>
                     </tr></thead>
-                    <tbody id="sentinelBottom5"><tr><td colspan="7" class="px-3 py-4 text-center text-xs text-text-muted">Run analysis to see underperformers</td></tr></tbody>
+                    <tbody id="sentinelBottom5"><tr><td colspan="9" class="px-3 py-4 text-center text-xs text-text-muted">Run analysis to see underperformers</td></tr></tbody>
                   </table>
                 </div>
               </div>
@@ -1592,6 +1597,7 @@
                     <option value="spend_desc">Highest Spend</option>
                     <option value="ql_desc">Most QLs</option>
                   </select>
+                  <span class="text-[9px] text-text-muted ml-1">Score = 40% CPTD + 30% CPQL + 20% QL→TD% + 10% Spend</span>
                   <button onclick="exportSentinelCSV()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200">Export CSV</button>
                 </div>
               </div>
@@ -1633,8 +1639,9 @@
                 </div>
               </div>
               <div id="dayByDayTable" class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
-                <p class="text-xs text-text-muted p-4">Pull Meta API data to see daily ad health. Available on deployed site only.</p>
+                <p class="text-xs text-text-muted p-4" id="dayByDayPlaceholder">Loading daily data...</p>
               </div>
+              <script>document.addEventListener('DOMContentLoaded', () => { const ph = document.getElementById('dayByDayPlaceholder'); if (ph && typeof metaAdData !== 'undefined' && metaAdData.length > 0) { ph.style.display = 'none'; } });</script>
             </div>
           </div>
         </div>
@@ -7094,11 +7101,21 @@ function renderOracleActions() {
       const market = extractMarket(c);
       const audience = extractAudience(c);
       const thumb = c['image_url']||c['thumbnail_url']||'';
+      // WHY reason — uses market-specific CPTD thresholds from SENTINEL_THRESHOLDS
+      const _cTD = td(c), _cQL = ql(c), _cSpend = spend(c);
+      const _mktTh = (typeof SENTINEL_THRESHOLDS !== 'undefined' ? SENTINEL_THRESHOLDS[market] : null) || { cptd: { green: 35000 } };
+      const _cptdGreen = _mktTh.cptd?.green || 35000;
+      const _cCPTD = _cTD > 0 ? _cSpend / _cTD : Infinity;
+      const _whyReason = (_cTD === 0 && _cSpend > 30000) ? 'Burning budget with zero trial dones'
+        : (_cQL === 0 && _cSpend > 20000) ? 'No qualified leads despite significant spend'
+        : (_cCPTD > _cptdGreen * 2 && _cCPTD < Infinity) ? `Cost per trial is ${Math.round(_cCPTD / _cptdGreen)}x over target`
+        : 'Underperforming vs portfolio average';
       html += `<div class="flex items-center gap-3 p-3 bg-accent-red-light/50 border border-red-200 rounded-xl">
         ${thumb ? `<img src="${thumb}" class="w-12 h-12 rounded-lg object-cover shrink-0 border border-red-200" onerror="this.outerHTML='<div class=\'w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px]\'>No img</div>'" />` : '<div class="w-12 h-12 rounded-lg bg-red-100 flex items-center justify-center shrink-0"><svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>'}
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold truncate" title="${name}">${shortAdName(name)}</p>
-          <p class="text-[10px] text-red-700">${market} · ${audience} · ${formatCurrency(spend(c))} spent · ${ql(c) > 0 ? Math.round(ql(c)) + ' TQLs' : 'No TQLs'}</p>
+          <p class="text-[10px] text-red-700">${market} · ${audience} · ${formatCurrency(_cSpend)} spent · ${_cQL > 0 ? Math.round(_cQL) + ' TQLs' : 'No TQLs'}</p>
+          <p class="text-[10px] font-semibold text-red-600 mt-0.5">&#9888; ${_whyReason}</p>
         </div>
         <div class="flex flex-col gap-1 shrink-0 items-end">
           <button onclick="copyAndLog('${name.replace(/'/g, "\\'")}','pause',${spend(c)},${ql(c)},'${market}');renderActionLog()" class="text-[10px] px-3 py-1 rounded-full bg-red-600 text-white font-bold hover:bg-red-700" title="Copy ad name to find in Meta Ads Manager">Copy & Pause</button>
@@ -7114,6 +7131,7 @@ function renderOracleActions() {
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold truncate" title="${name}">${shortAdName(name)}</p>
           <p class="text-[10px] text-amber-700">CPTQL ${formatCurrency(cpql)} (30%+ above avg) · ${formatCurrency(spend(c))} spent</p>
+          <p class="text-[10px] font-semibold text-amber-600 mt-0.5">&#9888; Creative fatigue — cost per lead rising above portfolio average</p>
         </div>
         <div class="flex gap-1 shrink-0">
           <button onclick="copyAndLog('${name.replace(/'/g, "\\'")}','refresh',${spend(c)},${ql(c)},'${fatiguedMarket}');renderActionLog()" class="text-[10px] px-3 py-1 rounded-full bg-amber-500 text-white font-bold hover:bg-amber-600" title="Copy ad name — refresh creative or swap audience">Copy Name</button>
@@ -7551,7 +7569,10 @@ function _pauseCardActions(itemId, shortName) {
 // ── Section 4: Day-by-Day table rendering ──
 function renderDayByDay() {
   const container = document.getElementById('dayByDayTable');
-  if (!container || !metaAdData.length) return;
+  if (!container) return;
+  const ph = document.getElementById('dayByDayPlaceholder');
+  if (!metaAdData.length) { if (ph) ph.textContent = 'Loading daily data...'; return; }
+  if (ph) ph.style.display = 'none';
   const search = (document.getElementById('dayByDaySearch')?.value || '').toLowerCase();
   const sortBy = document.getElementById('dayByDaySort')?.value || 'spend';
 
@@ -9040,7 +9061,7 @@ function renderMetricTicker() {
     html += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">`;
     kpis.forEach(k => {
       html += `<div class="metric-card bg-white rounded-xl p-3">
-        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">${k.label}</p>
+        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1" ${k.label === 'CPTQL' ? 'title="Cost Per Qualified Lead — lower is better. Green < ₹10K (US)"' : ''}>${k.label}</p>
         <div class="flex items-center gap-1">
           <p class="text-lg font-black text-accent-${k.color}">${k.value}</p>
           ${k.trend}
@@ -10249,6 +10270,7 @@ ${offerLine}
   document.getElementById('resultMarket').textContent = brief.market;
   document.getElementById('resultTargeting').textContent = brief.targeting || brief.audience;
   document.getElementById('resultContent').innerHTML = markdownToHtml(content);
+  addVariationCopyButtons();
   document.getElementById('refinementBar').style.display = '';
   document.getElementById('imageGenSection').style.display = 'none';
   // Reset feedback buttons
@@ -11108,6 +11130,7 @@ function showResult(content, brief) {
   const modelInfo = `<div class="mb-3 flex items-center gap-2"><span class="text-[9px] px-2 py-0.5 rounded-full ${modelClass} font-bold">${modelLabel}</span><span class="text-[9px] text-text-muted">${brief.format}${brief.subFormat ? ' > ' + brief.subFormat : ''}</span></div>`;
 
   document.getElementById('resultContent').innerHTML = modelInfo + validationHtml + markdownToHtml(content) + optionWarning + whyWarning + accelBanner;
+  addVariationCopyButtons();
   // Character count for ad copy limits
   const plainText = content.replace(/[#*_`>\[\]()]/g, '').trim();
   const lines = plainText.split('\n').filter(l => l.trim());
@@ -11264,6 +11287,7 @@ function showForgeVersion(idx) {
   const v = entry.versions[idx];
   const violations = validateBrand(v.content);
   document.getElementById("resultContent").innerHTML = renderBrandViolations(violations) + markdownToHtml(v.content);
+  addVariationCopyButtons();
   state.lastGeneratedContent = v.content; saveState("lastContent", v.content);
   document.getElementById("forgeVersionPills").querySelectorAll("button").forEach((b, i) => {
     b.className = `px-2.5 py-1 rounded-full text-[10px] font-semibold transition ${i === idx ? "bg-accent-purple text-white" : "bg-surface-tertiary text-text-muted hover:bg-gray-200"}`;
@@ -13177,7 +13201,7 @@ function showTaggerResults() {
   const _utEl = document.getElementById('taggerActionCount');
   if (_utEl) {
     const _ut = state.taggerData.filter(c => !c.tags || !c.tags.hook || c.tags.hook === 'Unknown').length;
-    _utEl.textContent = _ut > 0 ? `${_ut} untagged of ${state.taggerData.length}` : `All ${state.taggerData.length} tagged`;
+    _utEl.textContent = _ut > 0 ? `${_ut} untagged — click Re-tag All to tag with Haiku vision` : `All ${state.taggerData.length} tagged`;
   }
   // Render accurate aggregate metrics from perf tracker + CRM
   renderLensAggregateMetrics();
@@ -13737,11 +13761,24 @@ function renderCreativeReview() {
     const thumb = c['image_url'] || c['thumbnail_url'] || '';
     const campaign = c['Campaign name'] || c['campaign name'] || '';
     const tags = c.tags || {};
-    const hookTag = tags.hook && tags.hook !== 'Unknown' ? tags.hook : '';
+    // Build ALL non-empty tag pills from taxonomy
+    const _skipFields = new Set(['confidence', 'campaign_audience', 'creative_type', 'talent_name']);
+    const _allTagPills = [];
+    GODFATHER_TAXONOMY.allFields.forEach(f => {
+      if (_skipFields.has(f)) return;
+      const val = tags[f];
+      if (!val || val === 'Unknown' || val === 'null' || val === 'N/A') return;
+      const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(f)] || TAG_COLORS.gray;
+      _allTagPills.push(`<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`);
+    });
+    // Always show audience last if present
     const audTag = tags.campaign_audience && tags.campaign_audience !== 'Unknown' ? tags.campaign_audience : '';
-    const fmtTag = tags.content_format && tags.content_format !== 'Unknown' ? tags.content_format : '';
-    const prodTag = tags.production_style && tags.production_style !== 'Unknown' ? tags.production_style : '';
-    const hasAnyTag = hookTag || audTag || fmtTag || prodTag;
+    if (audTag) _allTagPills.push(`<span class="text-[9px] px-1.5 py-0.5 rounded ${TAG_COLORS.orange.bg} ${TAG_COLORS.orange.text} font-medium">${tagLabel(audTag)}</span>`);
+    const hasAnyTag = _allTagPills.length > 0;
+    const _maxPills = 8;
+    const _visiblePills = _allTagPills.slice(0, _maxPills).join('');
+    const _morePills = _allTagPills.length > _maxPills ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">+${_allTagPills.length - _maxPills} more</span>` : '';
+    const _confBadge = tags.confidence === 'confirmed' ? '<span class="text-[8px] text-green-600 ml-1">\u{1F441} Vision</span>' : tags.confidence === 'inferred' ? '<span class="text-[8px] text-amber-600 ml-1">\u{1F4DD} Text</span>' : '';
 
     const vColors = { green: 'border-green-300 bg-green-50', amber: 'border-amber-300 bg-amber-50', red: 'border-red-300 bg-red-50', gray: 'border-gray-200 bg-gray-50' };
     const vBadge = { green: 'bg-green-100 text-green-700', amber: 'bg-amber-100 text-amber-700', red: 'bg-red-100 text-red-700', gray: 'bg-gray-100 text-gray-500' };
@@ -13767,7 +13804,7 @@ function renderCreativeReview() {
           </div>
           <p class="text-[11px] font-semibold leading-tight mb-1 truncate" title="${name}">${shortAdName(name)}</p>
           <p class="text-[10px] text-text-secondary leading-snug mb-2">${v.reason}</p>
-          ${hasAnyTag ? `<div class="flex flex-wrap gap-1 mb-2">${hookTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-medium">${tagLabel(hookTag)}</span>` : ''}${fmtTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">${tagLabel(fmtTag)}</span>` : ''}${prodTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-teal-50 text-teal-700 font-medium">${tagLabel(prodTag)}</span>` : ''}${audTag ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700 font-medium">${tagLabel(audTag)}</span>` : ''}</div>` : '<div class="mb-2"><span class="text-[9px] text-gray-400 italic">Needs tagging</span></div>'}
+          ${hasAnyTag ? `<div class="flex flex-wrap items-center gap-1 mb-2">${_visiblePills}${_morePills}${_confBadge}</div>` : '<div class="mb-2"><span class="text-[9px] text-gray-400 italic">Needs tagging</span></div>'}
           <div class="grid grid-cols-4 gap-2 text-[10px]">
             <div><span class="text-text-muted block">CTR</span><span class="font-bold ${ctr > 1.5 ? 'text-green-700' : ctr > 0 ? '' : 'text-text-muted'}">${ctr > 0 ? ctr.toFixed(2)+'%' : '—'}</span>${showBenchmark ? ` ${cmp(ctr, b.avgCTR, false)}` : ''}</div>
             <div><span class="text-text-muted block">CPC</span><span class="font-bold">${cpc > 0 ? formatCurrency(cpc) : '—'}</span>${showBenchmark ? ` ${cmp(cpc, b.avgCPC, true)}` : ''}</div>
@@ -17105,7 +17142,7 @@ function renderSentinelAnomalies() {
 }
 
 function renderSentinelTop5() {
-  const renderRows = (items, tbodyId) => {
+  const renderRows = (items, tbodyId, isTop) => {
     document.getElementById(tbodyId).innerHTML = items.length ? items.map(r => {
       const m = r.metrics;
       const name = r['Ad name'] || r['ad name'] || 'Unknown';
@@ -17113,6 +17150,19 @@ function renderSentinelTop5() {
       const sThumb = r['thumbnail_url'] || r['image_url'] || '';
       // Show top 2 tags for context (WHY is this ad top/bottom?)
       const topTags = r.tags ? ['hook','pain_benefit','emotional_tone'].map(cat => r.tags[cat]).filter(v => v && v !== 'Unknown').slice(0,2).map(v => `<span class="text-[8px] px-1 py-0.5 rounded bg-surface-tertiary text-text-muted">${tagLabel(v)}</span>`).join(' ') : '';
+      // Insight text and action button
+      let insightHtml, actionHtml;
+      const cptdStr = m.cptd && m.cptd < 10000000 ? formatCurrency(m.cptd) : '';
+      if (isTop) {
+        insightHtml = `<span class="text-green-600 font-medium text-[10px]">Scale — proven${cptdStr ? ' at ' + cptdStr + ' CPTD' : ''}</span>`;
+        actionHtml = `<button onclick="navigator.clipboard.writeText('${name.replace(/'/g,"\\'")} SCALE');this.textContent='✅'" class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 whitespace-nowrap" title="Copy ad name + SCALE">Scale ↑</button>`;
+      } else if (Math.round(m.td || 0) > 0) {
+        insightHtml = `<span class="text-amber-600 font-medium text-[10px]">Watch — expensive${cptdStr ? ' at ' + cptdStr + ' CPTD' : ''}</span>`;
+        actionHtml = `<button onclick="navigator.clipboard.writeText('${name.replace(/'/g,"\\'")} PAUSE');this.textContent='✅'" class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 whitespace-nowrap" title="Copy ad name + PAUSE">Pause ⏸</button>`;
+      } else {
+        insightHtml = `<span class="text-red-600 font-medium text-[10px]">Kill — zero conversions</span>`;
+        actionHtml = `<button onclick="navigator.clipboard.writeText('${name.replace(/'/g,"\\'")} PAUSE');this.textContent='✅'" class="px-1.5 py-0.5 text-[9px] font-bold rounded bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 whitespace-nowrap" title="Copy ad name + PAUSE">Pause ⏸</button>`;
+      }
       return `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
         <td class="px-2 py-2" style="max-width:180px"><div class="flex items-center gap-1.5">${sThumb ? `<img src="${sThumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : ''}<div><span class="font-medium text-[10px] truncate block" style="max-width:130px" title="${name}">${shortAdName(name)}</span>${topTags ? `<div class="flex gap-0.5 mt-0.5">${topTags}</div>` : ''}</div></div></td>
         <td class="px-2 py-2 text-right text-[11px] whitespace-nowrap">${formatCurrency(m.spend)}</td>
@@ -17121,12 +17171,14 @@ function renderSentinelTop5() {
         <td class="px-2 py-2 text-right text-[11px] font-bold ${SCORE_STYLES[sc.cptd].text}">${m.cptd && m.cptd < 10000000 ? formatCurrency(m.cptd) : '<span class="text-gray-400 font-normal">' + ((m.td||0) === 0 ? 'No TDs' : '-') + '</span>'}</td>
         <td class="px-2 py-2 text-right text-[11px]">${Math.round(m.td||0)}</td>
         <td class="px-2 py-2 text-right text-[11px]">${m.ql_td_pct ? m.ql_td_pct.toFixed(1)+'%' : '-'}</td>
+        <td class="px-1.5 py-2 text-left">${insightHtml}</td>
+        <td class="px-1.5 py-2 text-center">${actionHtml}</td>
       </tr>`;
-    }).join('') : '<tr><td colspan="7" class="px-3 py-4 text-center text-xs text-text-muted">Ranked by composite: 40% CPTD + 30% CPTQL + 20% QL→TD% + 10% Spend. Min 5 TQLs + 1 TD.</td></tr>';
+    }).join('') : '<tr><td colspan="9" class="px-3 py-4 text-center text-xs text-text-muted">Ranked by composite: 40% CPTD + 30% CPTQL + 20% QL→TD% + 10% Spend. Min 5 TQLs + 1 TD.</td></tr>';
   };
 
-  renderRows(state.sentinelOutput.top5, 'sentinelTop5');
-  renderRows(state.sentinelOutput.bottom5, 'sentinelBottom5');
+  renderRows(state.sentinelOutput.top5, 'sentinelTop5', true);
+  renderRows(state.sentinelOutput.bottom5, 'sentinelBottom5', false);
 
   // Auto-populate Top 5 / Bottom 5 from getAdPerformance if Sentinel hasn't run yet
   if (!state.sentinelOutput?.top5?.length) {
@@ -17138,8 +17190,8 @@ function renderSentinelTop5() {
       const withCPTD = perf.map(r => ({ ...r, _cptd: r['Spent'] / r['TD'] })).sort((a, b) => a._cptd - b._cptd);
       const top5 = withCPTD.slice(0, 5).map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.content_format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
       const bottom5 = withCPTD.slice(-5).reverse().map(r => ({ ad_name: stripCampaignPrefix(r['Ad name']), market: r._market, format: r.tags?.content_format || '', audience: r.tags?.audience || '', metrics: { cptd: r._cptd, td: r['TD'], ql_td_pct: r['QL-TD%'] }, _scores: { cptd: r._cptd < 30000 ? 'good' : r._cptd < 60000 ? 'ok' : 'bad' } }));
-      renderRows(top5, 'sentinelTop5');
-      renderRows(bottom5, 'sentinelBottom5');
+      renderRows(top5, 'sentinelTop5', true);
+      renderRows(bottom5, 'sentinelBottom5', false);
     } catch (e) { console.error('Auto-populate top/bottom:', e); }
   }
 }
@@ -17778,6 +17830,27 @@ function renderFreeformMessages() {
 
 function copyOutput() { if(state.lastGeneratedContent) { navigator.clipboard.writeText(state.lastGeneratedContent); showToast('Copied!'); } }
 function copyText(t) { navigator.clipboard.writeText(t); showToast('Copied!'); }
+function addVariationCopyButtons() {
+  const el = document.getElementById('resultContent'); if (!el) return;
+  el.querySelectorAll('strong').forEach(s => {
+    if (!/^Option \d/.test(s.textContent)) return;
+    // Find the section boundary: from this <strong>'s parent to the next <hr> or end
+    let node = s.closest('p') || s.parentElement;
+    let text = '';
+    let sib = node;
+    while (sib) {
+      sib = sib.nextElementSibling;
+      if (!sib || sib.tagName === 'HR') break;
+      text += sib.innerText + '\n';
+    }
+    if (!text.trim()) return;
+    const btn = document.createElement('button');
+    btn.className = 'ml-2 px-1.5 py-0.5 text-[9px] rounded bg-surface-tertiary hover:bg-gray-200 text-text-muted font-medium';
+    btn.textContent = 'Copy';
+    btn.onclick = (e) => { e.stopPropagation(); navigator.clipboard.writeText(text.trim()); showToast('Variation copied!'); };
+    s.parentElement.appendChild(btn);
+  });
+}
 function savePreferences() {
   state.preferences = { defaultMarket:document.getElementById('settingsDefaultMarket').value, refreshInterval:parseInt(document.getElementById('settingsRefreshInterval').value) };
   localStorage.setItem('gf_preferences',JSON.stringify(state.preferences));
@@ -18378,7 +18451,7 @@ function renderInfluLeaderboard(filteredCreators) {
             <span>${r.displayName}</span>
             ${r.handle ? `<span class="text-[9px] text-text-muted ml-1">@${r.handle}</span>` : ''}
             ${tier ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-bold uppercase ${tier === 'scale' ? 'bg-green-100 text-green-700' : tier === 'watch' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${tier}</span>` : ''}
-            ${r.creatorType ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium ${r.creatorType === 'in-house' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}">${r.creatorType === 'in-house' ? 'In-house' : 'Partner'}</span>` : ''}
+            ${(() => { const m = r.primaryMarket; if (m === 'India') return '<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium bg-pink-50 text-pink-600">India UGC</span>'; if (m === 'US' || m === 'Canada') return '<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium bg-purple-50 text-purple-600">US Partnership</span>'; return m ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium bg-gray-50 text-gray-600">${m}</span>` : ''; })()}
           </div>
         </div>
       </td>

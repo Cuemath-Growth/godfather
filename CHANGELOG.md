@@ -4,6 +4,24 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tagger Creative Review — Show All Tags + Confidence Badge (2026-04-05)
+
+### Creative Review card tag pills
+- `creativeCard()` (~line 13740): replaced hardcoded 4-tag pills (hook, audience, format, production) with dynamic loop over ALL `GODFATHER_TAXONOMY.allFields`
+- Skips: confidence, campaign_audience (shown last), creative_type (redundant with Video/Static badge), talent_name (free text)
+- Uses `TAG_COLORS[GODFATHER_TAXONOMY.getColor(f)]` for per-field coloring
+- Shows up to 8 pills, then "+N more" overflow pill
+- Audience pill always rendered last
+
+### Confidence badge
+- After tag pills: green "eye Vision" if `tags.confidence === 'confirmed'`, amber "memo Text" if `'inferred'`
+- 8px text, subtle inline badge
+
+### Untagged CTA label
+- `showTaggerResults()` (~line 13180): changed untagged count text from `"N untagged of M"` to `"N untagged — click Re-tag All to tag with Haiku vision"`
+
+---
+
 ## Learning System — Outcomes, Wrong Verdicts, Suppression (2026-04-08)
 
 ### #3: Action outcome tracking
