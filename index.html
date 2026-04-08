@@ -11733,6 +11733,86 @@ function scoreMetric(value, thresholds, inverted) {
   }
 }
 
+// ── Market Analysis Summary ──
+function getMarketAnalysisSummary() {
+  const markets = ['US', 'India', 'AUS', 'MEA', 'UK'];
+  const results = [];
+  markets.forEach(market => {
+    const ads = typeof getAdPerformance === 'function' ? getAdPerformance(market, null, null) : [];
+    if (!ads.length) { results.push({ market, totalAds: 0, totalSpend: 0, avgCPTD: null, avgCPQL: null, bestHook: null, worstHook: null, bestFormat: null, worstFormat: null, bestAudience: null, worstAudience: null, verdict: 'No data', topAction: 'No ads found' }); return; }
+    const th = SENTINEL_THRESHOLDS[market] || SENTINEL_THRESHOLDS['US'];
+    const totalSpend = ads.reduce((s, a) => s + parseNumber(a['Spent'] || 0), 0);
+    const totalTDs = ads.reduce((s, a) => s + parseNumber(a['TD'] || 0), 0);
+    const totalQLs = ads.reduce((s, a) => s + parseNumber(a['QL'] || 0), 0);
+    const avgCPTD = totalTDs > 0 ? totalSpend / totalTDs : null;
+    const avgCPQL = totalQLs > 0 ? totalSpend / totalQLs : null;
+
+    // Group by tag dimensions
+    function groupByTag(tagKey) {
+      const groups = {};
+      ads.forEach(a => {
+        const tag = (a.tags && a.tags[tagKey]) || 'Unknown';
+        if (tag === 'Unknown' || tag === 'null' || tag === 'N/A') return;
+        if (!groups[tag]) groups[tag] = { spend: 0, tds: 0, qls: 0, ads: 0 };
+        groups[tag].spend += parseNumber(a['Spent'] || 0);
+        groups[tag].tds += parseNumber(a['TD'] || 0);
+        groups[tag].qls += parseNumber(a['QL'] || 0);
+        groups[tag].ads += 1;
+      });
+      // Only groups with >= 3 ads
+      const filtered = Object.entries(groups).filter(([, v]) => v.ads >= 3).map(([name, v]) => ({
+        name, cptd: v.tds > 0 ? v.spend / v.tds : Infinity, cpql: v.qls > 0 ? v.spend / v.qls : Infinity, tds: v.tds, ads: v.ads
+      }));
+      filtered.sort((a, b) => a.cptd - b.cptd);
+      return filtered;
+    }
+
+    const hooks = groupByTag('hook');
+    const formats = groupByTag('content_format');
+    const audiences = groupByTag('campaign_audience');
+
+    const best = (arr) => arr.length ? { name: arr[0].name, cptd: arr[0].cptd, ads: arr[0].ads } : null;
+    const worst = (arr) => arr.length ? { name: arr[arr.length - 1].name, cptd: arr[arr.length - 1].cptd, ads: arr[arr.length - 1].ads } : null;
+
+    const verdict = avgCPTD === null ? 'No trials' : avgCPTD <= th.cptd.green ? 'On track' : avgCPTD <= th.cptd.amber ? 'Watch' : 'Over budget';
+
+    const bestH = best(hooks), worstH = worst(hooks);
+    const bestF = best(formats), worstF = worst(formats);
+    const topAction = bestH && worstH && bestH.name !== worstH.name
+      ? `Scale ${bestH.name}, reduce ${worstH.name}`
+      : bestH ? `Scale ${bestH.name}` : 'Need more tagged data';
+
+    results.push({
+      market, totalAds: ads.length, totalSpend, avgCPTD, avgCPQL,
+      bestHook: bestH, worstHook: worstH,
+      bestFormat: bestF, worstFormat: worstF,
+      bestAudience: best(audiences), worstAudience: worst(audiences),
+      verdict, topAction
+    });
+  });
+  return results;
+}
+
+function renderMarketAnalysis() {
+  const data = getMarketAnalysisSummary();
+  const fmtC = (v) => v != null && v !== Infinity ? (v >= 1000 ? (v/1000).toFixed(1) + 'K' : Math.round(v)) : '-';
+  console.log('\n=== MARKET ANALYSIS SUMMARY ===\n');
+  console.table(data.map(d => ({
+    Market: d.market,
+    Ads: d.totalAds,
+    Spend: fmtC(d.totalSpend),
+    'Avg CPTD': fmtC(d.avgCPTD),
+    'Avg CPQL': fmtC(d.avgCPQL),
+    'Best Hook': d.bestHook ? `${d.bestHook.name} (${fmtC(d.bestHook.cptd)} CPTD, ${d.bestHook.ads} ads)` : '-',
+    'Worst Hook': d.worstHook ? `${d.worstHook.name} (${fmtC(d.worstHook.cptd)} CPTD)` : '-',
+    'Best Format': d.bestFormat ? `${d.bestFormat.name} (${fmtC(d.bestFormat.cptd)} CPTD)` : '-',
+    'Best Audience': d.bestAudience ? `${d.bestAudience.name} (${fmtC(d.bestAudience.cptd)} CPTD)` : '-',
+    Verdict: d.verdict,
+    Action: d.topAction
+  })));
+  return data;
+}
+
 const METRIC_TOOLTIPS = {
   'Spend': 'Total ad spend on Meta',
   'CTR': 'Click-Through Rate — Clicks ÷ Impressions',
@@ -18319,16 +18399,34 @@ function renderInfluLeaderboard(filteredCreators) {
   const totalAds = rows.reduce((s, r) => s + r.ads.length, 0);
   const creatorsWithTD = rows.filter(r => r.td > 0).length;
 
-  // ROI Verdict tiers
-  const avgCPTD = totalTD > 0 ? totalSpend / totalTD : Infinity;
-  const scaleCreators = rows.filter(r => r.cptd !== null && r.cptd < avgCPTD && r.td >= 5);
-  const watchCreators = rows.filter(r => r.td > 0 && (r.cptd === null || r.cptd >= avgCPTD));
-  const dropCreators = rows.filter(r => r.td === 0 && r.spend >= 5000);
+  // ROI Verdict tiers — market-aware using SENTINEL_THRESHOLDS
+  const lowDataCreators = [], scaleCreators = [], watchCreators = [], overCreators = [], funnelLeakCreators = [], dropCreators = [];
+  rows.forEach(r => {
+    const mktTh = SENTINEL_THRESHOLDS[r.primaryMarket] || SENTINEL_THRESHOLDS['US'];
+    // Low Data: fewer than 3 ads OR less than 50K spend
+    if (r.ads.length < 3 || r.spend < 50000) {
+      lowDataCreators.push(r);
+    } else if (r.td > 0 && r.cptd !== null && r.cptd <= mktTh.cptd.green) {
+      scaleCreators.push(r);
+    } else if (r.td > 0 && r.cptd !== null && r.cptd <= mktTh.cptd.amber) {
+      watchCreators.push(r);
+    } else if (r.td > 0 && r.cptd !== null && r.cptd > mktTh.cptd.amber) {
+      overCreators.push(r);
+    } else if (r.ql > 0 && r.td === 0 && r.spend >= 50000) {
+      funnelLeakCreators.push(r);
+    } else {
+      // 0 QLs (and spend >= 50K, not low data)
+      dropCreators.push(r);
+    }
+  });
 
   // Assign tier to each row for border coloring
   const tierMap = {};
+  lowDataCreators.forEach(r => { tierMap[r.name] = 'lowdata'; });
   scaleCreators.forEach(r => { tierMap[r.name] = 'scale'; });
   watchCreators.forEach(r => { tierMap[r.name] = 'watch'; });
+  overCreators.forEach(r => { tierMap[r.name] = 'over'; });
+  funnelLeakCreators.forEach(r => { tierMap[r.name] = 'funnelleak'; });
   dropCreators.forEach(r => { tierMap[r.name] = 'drop'; });
 
   const scaleTDs = scaleCreators.reduce((s, r) => s + r.td, 0);
@@ -18338,6 +18436,12 @@ function renderInfluLeaderboard(filteredCreators) {
   const watchSpend = watchCreators.reduce((s, r) => s + r.spend, 0);
   const watchAvgCPTD = watchTDs > 0 ? watchSpend / watchTDs : 0;
   const dropSpend = dropCreators.reduce((s, r) => s + r.spend, 0);
+  const overTDs = overCreators.reduce((s, r) => s + r.td, 0);
+  const overSpend = overCreators.reduce((s, r) => s + r.spend, 0);
+  const overAvgCPTD = overTDs > 0 ? overSpend / overTDs : 0;
+  const funnelLeakSpend = funnelLeakCreators.reduce((s, r) => s + r.spend, 0);
+  const funnelLeakQLs = funnelLeakCreators.reduce((s, r) => s + r.ql, 0);
+  const lowDataSpend = lowDataCreators.reduce((s, r) => s + r.spend, 0);
 
   let html = '';
 
@@ -18373,7 +18477,7 @@ function renderInfluLeaderboard(filteredCreators) {
   }
 
   const winDist = getTagDistribution(scaleCreators);
-  const loseDist = getTagDistribution(dropCreators);
+  const loseDist = getTagDistribution([...dropCreators, ...overCreators]);
 
   // Find tags that are significantly MORE common in winners vs losers (and vice versa)
   const catLabels = { hook: 'Hook', emotional_tone: 'Tone', pain_benefit: 'Angle' };
@@ -18408,7 +18512,7 @@ function renderInfluLeaderboard(filteredCreators) {
     }) : [];
 
   // ROI Verdict + Why
-  html += `<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">`;
+  html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">`;
   const verdictNameList = (creators) => {
     const names = creators.map(c => c.displayName);
     const shown = names.slice(0, 5).join(', ');
@@ -18433,12 +18537,35 @@ function renderInfluLeaderboard(filteredCreators) {
       <p class="text-[9px] text-text-muted mt-1">${verdictNameList(watchCreators)}</p>
     </div>`;
   }
+  if (overCreators.length) {
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4" style="border-left:4px solid #ef4444">
+      <p class="text-[10px] font-bold uppercase mb-1 text-red-700">OVER (${overCreators.length})</p>
+      <p class="text-[11px] text-text-secondary"><strong>${Math.round(overTDs)} TDs</strong> at <strong>${formatCurrency(overAvgCPTD)}</strong> CPTD — above market threshold</p>
+      <p class="text-[10px] text-red-700 mt-1">CPTD too high. Test new hooks or reduce budget.</p>
+      <p class="text-[9px] text-text-muted mt-1">${verdictNameList(overCreators)}</p>
+    </div>`;
+  }
+  if (funnelLeakCreators.length) {
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4" style="border-left:4px solid #ef4444">
+      <p class="text-[10px] font-bold uppercase mb-1 text-red-700">FUNNEL LEAK (${funnelLeakCreators.length})</p>
+      <p class="text-[11px] text-text-secondary"><strong>${Math.round(funnelLeakQLs)} QLs</strong> but <strong>0 TDs</strong> from <strong>${formatCurrency(funnelLeakSpend)}</strong> spend</p>
+      <p class="text-[10px] text-red-700 mt-1">QLs but no trials — check CRM follow-up</p>
+      <p class="text-[9px] text-text-muted mt-1">${verdictNameList(funnelLeakCreators)}</p>
+    </div>`;
+  }
   if (dropCreators.length) {
     html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4" style="border-left:4px solid #ef4444">
       <p class="text-[10px] font-bold uppercase mb-1 ${URGENCY.pause.text}">${URGENCY.pause.icon} DROP (${dropCreators.length})</p>
-      <p class="text-[11px] text-text-secondary"><strong>${formatCurrency(dropSpend)}</strong> spent, zero trials</p>
+      <p class="text-[11px] text-text-secondary"><strong>${formatCurrency(dropSpend)}</strong> spent, zero QLs</p>
       <p class="text-[10px] text-red-700 mt-1">Reallocate ${formatCurrency(dropSpend)} to Scale creators above.</p>
       <p class="text-[9px] text-text-muted mt-1">${verdictNameList(dropCreators)}</p>
+    </div>`;
+  }
+  if (lowDataCreators.length) {
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4" style="border-left:4px solid #9ca3af">
+      <p class="text-[10px] font-bold uppercase mb-1 text-gray-500">LOW DATA (${lowDataCreators.length})</p>
+      <p class="text-[11px] text-text-secondary">&lt;3 ads or &lt;50K spend — not enough data to judge</p>
+      <p class="text-[9px] text-text-muted mt-1">${verdictNameList(lowDataCreators)}</p>
     </div>`;
   }
   html += `</div>`;
@@ -18518,10 +18645,14 @@ function renderInfluLeaderboard(filteredCreators) {
   }
 
   // Leaderboard verdict + table
-  const leaderVerdict = scaleCreators.length > 0 && dropCreators.length > 0
-    ? `${scaleCreators.length} creators worth scaling, ${dropCreators.length} to drop. Move ${formatCurrency(dropSpend)} from drops to ${scaleCreators[0]?.displayName || 'top performer'}.`
-    : scaleCreators.length > 0 ? `${scaleCreators.length} creators performing well. Increase budget on top ${Math.min(3, scaleCreators.length)}.`
-    : `No clear winners yet. ${rows.length} creators tracked, need more data before scaling.`;
+  const leaderParts = [];
+  if (scaleCreators.length) leaderParts.push(`${scaleCreators.length} to Scale`);
+  if (watchCreators.length) leaderParts.push(`${watchCreators.length} Watch`);
+  if (overCreators.length) leaderParts.push(`${overCreators.length} Over budget`);
+  if (funnelLeakCreators.length) leaderParts.push(`${funnelLeakCreators.length} Funnel Leak`);
+  if (dropCreators.length) leaderParts.push(`${dropCreators.length} Drop`);
+  if (lowDataCreators.length) leaderParts.push(`${lowDataCreators.length} Low Data`);
+  const leaderVerdict = leaderParts.length ? leaderParts.join(' · ') + `. ${scaleCreators.length > 0 && (dropCreators.length + overCreators.length) > 0 ? `Move ${formatCurrency(dropSpend + overSpend)} from drops/over to ${scaleCreators[0]?.displayName || 'top performer'}.` : scaleCreators.length > 0 ? `Increase budget on top ${Math.min(3, scaleCreators.length)}.` : 'Need more data before scaling.'}` : `No clear winners yet. ${rows.length} creators tracked.`;
   html += `<p class="text-xs font-medium text-text-secondary mb-3">${leaderVerdict}</p>`;
   html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm overflow-hidden"><div class="overflow-x-auto">
     <table class="w-full text-[11px] table-fixed"><thead><tr class="bg-surface-tertiary border-b border-gray-200">
@@ -18544,7 +18675,7 @@ function renderInfluLeaderboard(filteredCreators) {
     const hasAdSets = r.adSetList.length > 1;
     const expandId = 'influ-expand-' + idx;
     const tier = tierMap[r.name] || '';
-    const tierBorder = tier === 'scale' ? 'border-left:4px solid #22c55e' : tier === 'watch' ? 'border-left:4px solid #f59e0b' : tier === 'drop' ? 'border-left:4px solid #ef4444' : '';
+    const tierBorder = tier === 'scale' ? 'border-left:4px solid #22c55e' : tier === 'watch' ? 'border-left:4px solid #f59e0b' : tier === 'over' ? 'border-left:4px solid #ef4444' : tier === 'funnelleak' ? 'border-left:4px solid #ef4444' : tier === 'drop' ? 'border-left:4px solid #ef4444' : tier === 'lowdata' ? 'border-left:4px solid #9ca3af' : '';
     html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50 ${hasAdSets ? 'cursor-pointer' : ''}" style="${tierBorder}" ${hasAdSets ? `onclick="document.getElementById('${expandId}').classList.toggle('hidden')"` : ''}>
       <td class="px-3 py-2.5 font-semibold sticky-col bg-white">
         <div class="flex items-center gap-2">
@@ -18553,7 +18684,7 @@ function renderInfluLeaderboard(filteredCreators) {
           <div>
             <span>${r.displayName}</span>
             ${r.handle ? `<span class="text-[9px] text-text-muted ml-1">@${r.handle}</span>` : ''}
-            ${tier ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-bold uppercase ${tier === 'scale' ? 'bg-green-100 text-green-700' : tier === 'watch' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${tier}</span>` : ''}
+            ${tier ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-bold uppercase ${tier === 'scale' ? 'bg-green-100 text-green-700' : tier === 'watch' ? 'bg-amber-100 text-amber-700' : tier === 'over' ? 'bg-red-100 text-red-700' : tier === 'funnelleak' ? 'bg-red-100 text-red-700' : tier === 'lowdata' ? 'bg-gray-100 text-gray-500' : 'bg-red-100 text-red-700'}">${tier === 'lowdata' ? 'Low Data' : tier === 'funnelleak' ? 'Funnel Leak' : tier}</span>` : ''}
             ${(() => { const m = r.primaryMarket; if (m === 'India') return '<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium bg-pink-50 text-pink-600">India UGC</span>'; if (m === 'US' || m === 'Canada') return '<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium bg-purple-50 text-purple-600">US Partnership</span>'; return m ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium bg-gray-50 text-gray-600">${m}</span>` : ''; })()}
           </div>
         </div>
