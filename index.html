@@ -17103,8 +17103,8 @@ function renderSentinelTable() {
     const pl = indent ? 'pl-' + (indent * 4 + 3) : 'pl-3';
     const insight = _perfInsight(m, sc);
     return `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
-      <td class="px-3 py-2 ${pl} sticky-col bg-white"><span class="font-medium" title="${name}">${shortAdName(name)}</span></td>
-      <td class="px-2 py-2"><span class="text-[9px] font-bold ${insight.color}" title="${insight.text}">${insight.icon} ${insight.text}</span></td>
+      <td class="px-3 py-2 ${pl} sticky-col bg-white" style="max-width:250px"><div class="truncate"><span class="font-medium" title="${name}">${shortAdName(name)}</span></div></td>
+      <td class="px-2 py-2" style="min-width:140px"><span class="text-[9px] font-bold ${insight.color}" title="${insight.text}">${insight.icon} ${insight.text}</span></td>
       <td class="px-2 py-2 text-right">${formatCurrency(m.spend)}</td>
       <td class="px-2 py-2 text-right">${Math.round(m.ql)}</td>
       <td class="px-2 py-2 text-right">${Math.round(m.td)}</td>
@@ -17122,12 +17122,14 @@ function renderSentinelTable() {
     const pl = level === 'adset' ? 'pl-6' : 'pl-3';
     const insight = _perfInsight(totals, {});
     return `<tr class="${bgClass} cursor-pointer hover:bg-surface-tertiary sentinel-group-row" data-group="${groupId}" onclick="toggleSentinelGroup('${groupId}')">
-      <td class="px-3 py-2.5 font-bold ${pl}">
-        <span class="text-[10px] text-text-muted mr-1 sentinel-arrow" data-group="${groupId}">&#9654;</span>
-        <span title="${label}">${shortLabel}</span>
-        <span class="text-[10px] text-text-muted ml-2">(${childCount} ${level === 'campaign' && viewLevel === 'adset' ? 'ad sets' : 'ads'})</span>
+      <td class="px-3 py-2.5 font-bold ${pl}" style="max-width:250px">
+        <div class="truncate">
+          <span class="text-[10px] text-text-muted mr-1 sentinel-arrow" data-group="${groupId}">&#9654;</span>
+          <span title="${label}">${shortLabel}</span>
+          <span class="text-[10px] text-text-muted ml-2">(${childCount} ${level === 'campaign' && viewLevel === 'adset' ? 'ad sets' : 'ads'})</span>
+        </div>
       </td>
-      <td class="px-2 py-2.5"><span class="text-[9px] font-bold ${insight.color}">${insight.icon} ${insight.text}</span></td>
+      <td class="px-2 py-2.5" style="min-width:140px"><span class="text-[9px] font-bold ${insight.color}">${insight.icon} ${insight.text}</span></td>
       <td class="px-2 py-2.5 text-right font-bold">${formatCurrency(totals.spend)}</td>
       <td class="px-2 py-2.5 text-right">${totals.ql}</td>
       <td class="px-2 py-2.5 text-right">${Math.round(totals.td)}</td>
