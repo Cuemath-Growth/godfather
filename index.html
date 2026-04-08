@@ -1971,32 +1971,31 @@ const GODFATHER_TAXONOMY = {
     // ── Parsed tag (from campaign name — NOT AI-tagged) ──
     campaign_audience: {
       label: 'Audience', type: 'parsed', color: 'orange',
-      description: 'Target audience derived from campaign naming convention. Priority: Influencer > Vernacular > NRI > Chinese > K-2 > High School > PLA > CTF > LAL > HNI > Retargeting > Interest > Broad > Geo > General.',
-      values: ['Influencer', 'Vernacular', 'NRI', 'Chinese', 'K-2', 'High School', 'PLA', 'Creative Testing', 'Lookalike', 'HNI', 'Retargeting', 'Interest', 'Broad/Advantage+', 'Geo', 'General'],
+      description: 'Target audience + onboarding flow from campaign name. Format: "Audience (Flow)" where Flow = BAU or PLA.',
+      values: ['Influencer (BAU)', 'Influencer (PLA)', 'Vernacular (BAU)', 'NRI (BAU)', 'NRI (PLA)', 'Chinese (PLA)', 'K-2 (PLA)', 'High School (BAU)', 'Creative Testing (BAU)', 'Creative Testing (PLA)', 'Lookalike (BAU)', 'Lookalike (PLA)', 'HNI (BAU)', 'Retargeting (BAU)', 'Interest (BAU)', 'Interest (PLA)', 'Broad (BAU)', 'Broad (PLA)', 'Geo (BAU)', 'General (BAU)', 'General (PLA)'],
       parse: function(campaignName) {
         const camp = (campaignName || '').toLowerCase();
-        // Priority 1: Content type
-        if (camp.includes('influencer') || camp.includes('postboost')) return 'Influencer';
-        // Priority 2: Language
-        if (camp.includes('telugu') || camp.includes('gujarati') || camp.includes('tamil') || camp.includes('malayalam') || camp.includes('hindi') || camp.includes('lang-combined') || camp.includes('vernac')) return 'Vernacular';
-        // Priority 3: Ethnicity/diaspora
-        if (camp.includes('nri') || camp.includes('expat') || camp.includes('indian') || camp.includes('desi')) return 'NRI';
-        if (camp.includes('chinese')) return 'Chinese';
-        // Priority 4: Grade bands
-        if (camp.includes('k-2') || camp.includes('k_2')) return 'K-2';
-        if (camp.includes('high-school') || camp.includes('high_school')) return 'High School';
-        // Priority 5: Flow/campaign type
-        if (camp.includes('_pla_')) return 'PLA';
-        if (camp.includes('ctf')) return 'Creative Testing';
-        // Priority 6: Targeting mechanism
-        if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('lookalike')) return 'Lookalike';
-        if (camp.includes('hni')) return 'HNI';
-        if (camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt')) return 'Retargeting';
-        if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment')) return 'Interest';
-        if (camp.includes('advantage') || camp.includes('broad')) return 'Broad/Advantage+';
-        // Priority 7: Geo
-        if (camp.includes('zipcode') || camp.includes('pincode') || camp.includes('location') || camp.includes('cities')) return 'Geo';
-        return 'General';
+        // Detect flow: PLA = automated (no AC), BAU = sales-led
+        const isPLA = camp.includes('_pla_') || camp.includes('_pla ') || camp.endsWith('_pla');
+        const flow = isPLA ? 'PLA' : 'BAU';
+        // Detect audience (priority order)
+        let audience = 'General';
+        // Creator-name campaigns (March_Sahar, March_Preethi, etc.)
+        if (/^(march|april|may|june|july|aug|sep|oct|nov|dec|jan|feb)_/i.test(camp)) audience = 'Influencer';
+        else if (camp.includes('influencer') || camp.includes('postboost')) audience = 'Influencer';
+        else if (camp.includes('telugu') || camp.includes('gujarati') || camp.includes('tamil') || camp.includes('malayalam') || camp.includes('hindi') || camp.includes('lang-combined') || camp.includes('vernac')) audience = 'Vernacular';
+        else if (camp.includes('nri') || camp.includes('expat') || camp.includes('indian') || camp.includes('desi')) audience = 'NRI';
+        else if (camp.includes('chinese')) audience = 'Chinese';
+        else if (camp.includes('k-2') || camp.includes('k_2')) audience = 'K-2';
+        else if (camp.includes('high-school') || camp.includes('high_school')) audience = 'High School';
+        else if (camp.includes('ctf')) audience = 'Creative Testing';
+        else if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('lookalike')) audience = 'Lookalike';
+        else if (camp.includes('hni')) audience = 'HNI';
+        else if (camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt')) audience = 'Retargeting';
+        else if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment')) audience = 'Interest';
+        else if (camp.includes('advantage') || camp.includes('broad')) audience = 'Broad';
+        else if (camp.includes('zipcode') || camp.includes('pincode') || camp.includes('location') || camp.includes('cities')) audience = 'Geo';
+        return `${audience} (${flow})`;
       }
     }
   },
