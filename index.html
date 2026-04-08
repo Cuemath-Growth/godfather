@@ -1838,6 +1838,50 @@ async function supabaseDeleteAll(table) {
   }
 }
 
+// ---- Supabase: library_assets loader ----
+async function loadLibraryFromSupabase() {
+  try {
+    const rows = await supabaseGet('library_assets', 'select=*&order=updated_at.desc');
+    if (rows && rows.length) {
+      state.library = rows;
+      localStorage.setItem('gf_library', JSON.stringify(state.library));
+      console.log(`Boot: ${rows.length} library assets from Supabase`);
+      return true;
+    }
+  } catch(e) {
+    console.warn('loadLibraryFromSupabase error:', e.message);
+  }
+  // Fallback: localStorage backup
+  try {
+    const cached = JSON.parse(localStorage.getItem('gf_library') || '[]');
+    if (cached.length) {
+      state.library = cached;
+      console.log(`Boot: ${cached.length} library assets from localStorage fallback`);
+      return true;
+    }
+  } catch(_) {}
+  return false;
+}
+
+// ---- Supabase: single-row delete helper ----
+async function supabaseDeleteRow(table, column, value) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${column}=eq.${value}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=minimal'
+      }
+    });
+    if (!res.ok) throw new Error(`Supabase DELETE ${res.status}: ${await res.text()}`);
+    return true;
+  } catch(e) {
+    console.warn('supabaseDeleteRow error:', e.message);
+    return false;
+  }
+}
+
 // ==================== GODFATHER TAXONOMY (Single Source of Truth) ====================
 // Every tag field, allowed value, color, and label lives here.
 // Tagger prompt, Lens heatmap, Library badges, Combos, Grid — ALL read from this constant.
@@ -2214,11 +2258,11 @@ const state = {
   _libraryLastFetchTime: null, // Timestamp of last library fetch
   analysis: JSON.parse(localStorage.getItem('gf_analysis') || 'null'),
   currentBrief: JSON.parse(localStorage.getItem('gf_currentBrief') || '{}'),
-  library: JSON.parse(localStorage.getItem('gf_library') || '[]'),
-  generationHistory: JSON.parse(localStorage.getItem('gf_generationHistory') || '[]'),
+  library: [], // loaded from Supabase library_assets at boot; localStorage is write-through backup
+  generationHistory: [], // hydrated from Supabase on boot; localStorage is write-through backup
   forgeVersions: [], // [{id, versions: [{content, timestamp, label}]}]
   conversationHistory: [],
-  lastGeneratedContent: localStorage.getItem('gf_lastContent') || '',
+  lastGeneratedContent: '', // no longer persisted from localStorage on boot
   currentView: 'dashboard',
   isGenerating: false,
   sentinelOutput: JSON.parse(localStorage.getItem('gf_sentinelOutput') || 'null'),
@@ -3386,6 +3430,8 @@ function init() {
     loadCachedAdData().then(ok => { if (ok) console.log(`Boot: ${metaAdData.length} metaAdData rows`); return ok; }).catch(e => { console.error('Boot metaAdData:', e); return false; }),
     // Supabase: oracle actions (Pause Now/Make More card states)
     loadOracleActions().catch(e => { console.error('Boot oracle:', e); }),
+    // Supabase: library_assets (creative library)
+    loadLibraryFromSupabase().catch(e => { console.error('Boot library:', e); }),
     // Google Sheets: CRM leads + cost data (only if credentials exist)
     (_bootSheetUrl && _bootApiKey)
       ? fetchSheetData(_bootSheetUrl, _bootApiKey)
@@ -3393,6 +3439,32 @@ function init() {
           .then(c => fetchPLAData(_bootApiKey).then(p => { console.log(`Boot PLA: +${p.leads} leads, +${p.cost} cost`); return c; }))
           .catch(e => { console.error('Boot sheets:', e); return null; })
       : Promise.resolve(null),
+    // Supabase: generation history (last 50, newest first)
+    supabaseGet('generation_history', 'select=*&order=created_at.desc&limit=50')
+      .then(rows => {
+        if (rows && rows.length) {
+          state.generationHistory = rows.map(r => ({
+            id: new Date(r.created_at).getTime(),
+            brief: r.brief || {},
+            content: r.output || '',
+            date: r.created_at,
+            status: r.feedback || null
+          }));
+          state.lastGeneratedContent = state.generationHistory[0]?.content || '';
+          try { localStorage.setItem('gf_generationHistory', JSON.stringify(state.generationHistory)); } catch(_){}
+          console.log(`Boot: ${rows.length} generation_history rows from Supabase`);
+        } else {
+          // Fallback: localStorage if Supabase returned nothing
+          try { state.generationHistory = JSON.parse(localStorage.getItem('gf_generationHistory') || '[]'); } catch(_){ state.generationHistory = []; }
+          state.lastGeneratedContent = state.generationHistory[0]?.content || '';
+          console.log(`Boot: generation_history fallback to localStorage (${state.generationHistory.length} rows)`);
+        }
+      })
+      .catch(e => {
+        console.error('Boot generation_history:', e);
+        try { state.generationHistory = JSON.parse(localStorage.getItem('gf_generationHistory') || '[]'); } catch(_){ state.generationHistory = []; }
+        state.lastGeneratedContent = state.generationHistory[0]?.content || '';
+      }),
   ];
 
   Promise.all(bootPromises).then(([metaOk, , sheetsResult]) => {
@@ -7350,7 +7422,7 @@ function renderOracleActions() {
       marketList.innerHTML = '<p class="text-xs text-text-muted py-3">No market data available.</p>';
     }
   }
-  renderActionLog();
+  renderActionLog(true); // async: load from Supabase on tab render
 }
 
 // ── Section 2: Oracle Pause Now + Make More from CRM data ──
@@ -10186,6 +10258,10 @@ ${offerLine}
   state.generationHistory.unshift({ id: genId, brief: {...brief}, content, date: new Date().toISOString(), status: null });
   if (state.generationHistory.length > 50) state.generationHistory = state.generationHistory.slice(0, 50);
   localStorage.setItem('gf_generationHistory', JSON.stringify(state.generationHistory));
+  // Fire-and-forget Supabase insert
+  supabaseUpsert('generation_history', [{ brief: brief, output: content, model: brief.model || 'template', feedback: null }])
+    .then(ok => { if (ok) console.log('generation_history: saved to Supabase'); })
+    .catch(e => console.warn('generation_history Supabase insert failed:', e));
   navigator.clipboard.writeText(content).catch(() => {});
   showToast('Copy generated \u2014 copied to clipboard');
 }
@@ -15968,8 +16044,10 @@ function renderAudienceMap() {
 // ==================== LIBRARY ====================
 function saveToLibrary() {
   if (!state.lastGeneratedContent) return;
-  state.library.unshift({ id:Date.now(), brief:{...state.currentBrief}, content:state.lastGeneratedContent, date:new Date().toISOString(), rating:null });
+  const item = { id:Date.now(), brief:{...state.currentBrief}, content:state.lastGeneratedContent, date:new Date().toISOString(), rating:null, updated_at:new Date().toISOString() };
+  state.library.unshift(item);
   localStorage.setItem('gf_library', JSON.stringify(state.library));
+  supabaseUpsert('library_assets', [item], 'id').catch(e => console.warn('Library upsert failed:', e.message));
   showToast('Saved to library!');
 }
 
@@ -16633,7 +16711,7 @@ function loadFromLibrary(id) {
   if (outputEl) outputEl.innerHTML = markdownToHtml(item.content);
   showToast('Loaded from library');
 }
-function deleteFromLibrary(id) { state.library=state.library.filter(i=>i.id!==id); localStorage.setItem('gf_library',JSON.stringify(state.library)); renderLibrary(); }
+function deleteFromLibrary(id) { state.library=state.library.filter(i=>i.id!==id); localStorage.setItem('gf_library',JSON.stringify(state.library)); supabaseDeleteRow('library_assets','id',id).catch(e=>console.warn('Library delete failed:',e.message)); renderLibrary(); }
 function regenFromLibrary(id) { const i=state.library.find(x=>x.id===id); if(i) generateFromBrief({geo:i.brief.market,platform:i.brief.platform,format:i.brief.format,icp:i.brief.audience,targeting:i.brief.targeting,angle:i.brief.angle||''}); }
 
 function generateAllHighPriority() {
@@ -19164,36 +19242,63 @@ function copyToClipboard(text) {
 
 // ==================== ACTION LOG (Recommendation Tracking) ====================
 function logAction(adName, actionType, context) {
-  const log = JSON.parse(localStorage.getItem('gf_actionLog') || '[]');
-  log.unshift({
+  const entry = {
     adName,
     action: actionType, // 'pause', 'scale', 'refresh', 'deploy'
     context, // { spend, tql, cptd, market, reason }
     timestamp: new Date().toISOString(),
     outcome: null // filled later when user reports result
-  });
+  };
+  const log = JSON.parse(localStorage.getItem('gf_actionLog') || '[]');
+  log.unshift(entry);
   // Keep last 100 actions
   if (log.length > 100) log.length = 100;
   localStorage.setItem('gf_actionLog', JSON.stringify(log));
+  // Fire-and-forget sync to Supabase
+  supabaseUpsert('action_log', [{ action: actionType, details: { adName, context, timestamp: entry.timestamp, outcome: null } }]).catch(e => console.warn('action_log sync error:', e.message));
 }
 function copyAndLog(adName, actionType, spend, tql, market) {
   copyToClipboard(adName);
   logAction(adName, actionType, { spend, tql, market });
 }
 function getActionLog() { return JSON.parse(localStorage.getItem('gf_actionLog') || '[]'); }
+// Async version: loads from Supabase first, falls back to localStorage
+async function getActionLogAsync() {
+  try {
+    const rows = await supabaseGet('action_log', 'select=*&order=created_at.desc&limit=100');
+    if (rows && rows.length) {
+      // Map Supabase rows back to local format
+      const log = rows.map(r => ({
+        adName: r.details?.adName || '',
+        action: r.action,
+        context: r.details?.context || {},
+        timestamp: r.details?.timestamp || r.created_at,
+        done: !!r.details?.done,
+        outcome: r.details?.outcome || null
+      }));
+      // Write-through: update localStorage with Supabase truth
+      localStorage.setItem('gf_actionLog', JSON.stringify(log));
+      return log;
+    }
+  } catch(e) { console.warn('getActionLogAsync fallback to localStorage:', e.message); }
+  return JSON.parse(localStorage.getItem('gf_actionLog') || '[]');
+}
 
 // Mark a recommendation as "Done" — adds to action log with timestamp
 function markActionDone(description, actionType, market) {
-  const log = JSON.parse(localStorage.getItem('gf_actionLog') || '[]');
-  log.unshift({
+  const entry = {
     adName: description,
     action: actionType,
     context: { market: market || '', source: 'done_button' },
     timestamp: new Date().toISOString(),
     done: true
-  });
+  };
+  const log = JSON.parse(localStorage.getItem('gf_actionLog') || '[]');
+  log.unshift(entry);
   if (log.length > 100) log.length = 100;
   localStorage.setItem('gf_actionLog', JSON.stringify(log));
+  // Fire-and-forget sync to Supabase
+  supabaseUpsert('action_log', [{ action: actionType, details: { adName: description, context: entry.context, timestamp: entry.timestamp, done: true } }]).catch(e => console.warn('action_log sync error:', e.message));
   showToast('Marked done: ' + description.substring(0, 50));
   renderActionLog();
 }
@@ -19204,15 +19309,26 @@ function markExistingActionDone(idx) {
   if (log[idx]) {
     log[idx].done = true;
     localStorage.setItem('gf_actionLog', JSON.stringify(log));
+    // Fire-and-forget sync the done update to Supabase
+    const a = log[idx];
+    supabaseUpsert('action_log', [{ action: a.action, details: { adName: a.adName, context: a.context, timestamp: a.timestamp, done: true } }]).catch(e => console.warn('action_log sync error:', e.message));
     showToast('Marked done');
     renderActionLog();
   }
 }
 
-function renderActionLog() {
+function renderActionLog(useAsync) {
   const el = document.getElementById('oracleActionLog');
   if (!el) return;
+  if (useAsync) {
+    // On initial/tab load, fetch from Supabase then render
+    getActionLogAsync().then(log => _renderActionLogInner(el, log));
+    return;
+  }
   const log = getActionLog();
+  _renderActionLogInner(el, log);
+}
+function _renderActionLogInner(el, log) {
   // Update counter badge
   const counterEl = document.getElementById('actionLogCounter');
   const navBadge = document.getElementById('navActionBadge');
