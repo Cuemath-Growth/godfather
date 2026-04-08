@@ -4832,7 +4832,7 @@ function isNRIEthnicity(row) {
 function filterLeadsByMarket(data, market) {
   if (market === 'all') return data;
   if (!market) return [];  // empty market = empty result, never leak all rows
-  const GEO_TERMS = { 'US':['us','usa','united states'], 'India':['india','in'], 'MEA':['mea','middle east','uae','saudi','me'], 'ME':['mea','middle east','uae','saudi','me'], 'UK':['uk','united kingdom'], 'ROW':['apac','others'], 'APAC':['apac','others'], 'Canada':['canada'] };
+  const GEO_TERMS = { 'US':['us','usa','united states','canada'], 'India':['india','in'], 'MEA':['mea','middle east','uae','saudi','me'], 'ME':['mea','middle east','uae','saudi','me'], 'UK':['uk','united kingdom'], 'ROW':['apac','others'], 'APAC':['apac','others'], 'Canada':['canada'] };
   return data.filter(r => {
     const cb = (r.country_bucket || r.region || '').trim().toLowerCase();
     if (market === 'AUS') {
@@ -4870,7 +4870,9 @@ function filterCostByMarket(data, market) {
       return false;
     }
     if (market === 'APAC') return seg === 'apac' || seg === 'row' || seg === 'aus' || seg === 'anz';
-    // US, India — direct match
+    // US — include Canada rows
+    if (market === 'US') return seg === 'us' || seg === 'canada' || camp.startsWith('CAN_');
+    // India and others — direct match
     return seg === market.toLowerCase();
   });
 }
@@ -5112,10 +5114,19 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const normName = normalizeAdName(r.mx_utm_adcontent);
     if (!normName) return;
     const key = normName + '|' + d;
-    if (!crmDaily[key]) crmDaily[key] = { date: d, normName, adName: r.mx_utm_adcontent, campaign: r.mx_utm_campaign || '', market: r.country_bucket || '', ql: 0, nri: 0, td: 0, paid: 0, invalid: 0, total: 0 };
+    if (!crmDaily[key]) crmDaily[key] = { date: d, normName, adName: r.mx_utm_adcontent, campaign: r.mx_utm_campaign || '', market: r.country_bucket || '', ql: 0, nri: 0, tql: 0, td: 0, paid: 0, invalid: 0, total: 0 };
     const c = crmDaily[key];
     c.total++;
-    if (String(r.qls) === '1') c.ql++;
+    if (String(r.qls) === '1') {
+      c.ql++;
+      // Per-market TQL: US/Canada=NRI, India/MEA=IB/IGCSE board, others=all QLs
+      const _cb = (r.country_bucket || '').trim();
+      const _isUSCan = _cb === 'US' || _cb === 'Canada';
+      const _isIBMkt = _cb === 'India' || _cb === 'IN' || _cb === 'ME' || _cb === 'MEA';
+      if (_isUSCan) { if (isNRIEthnicity(r)) c.tql++; }
+      else if (_isIBMkt) { if (['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim())) c.tql++; }
+      else { c.tql++; } // APAC, UK, AUS — all QLs qualify
+    }
     if (isNRIEthnicity(r)) c.nri++;
     if (String(r.trials_done) === '1') c.td++;
     if (String(r.paid) === '1') c.paid++;
@@ -5189,10 +5200,9 @@ function getAdPerformanceDaily(market, startDate, endDate) {
 
     const ql = crm?.ql || 0;
     const nri = crm?.nri || 0;
+    const tql = crm?.tql || 0;
     const td = crm?.td || 0;
     const paid = crm?.paid || 0;
-    const isUS = adMarket === 'US' || adMarket === 'Canada';
-    const tql = isUS ? nri : ql;
 
     results.push({
       date: d, ad_name: m.adName, ad_id: m.ad_id, campaign_name: m.campaign, adset_name: m.adset,
@@ -5220,12 +5230,10 @@ function getAdPerformanceDaily(market, startDate, endDate) {
       else if (market === 'US') { if (adMarket !== 'US' && adMarket !== 'Canada') return; }
       else { if (adMarket !== market) return; }
     }
-    const isUS = adMarket === 'US' || adMarket === 'Canada';
-    const tql = isUS ? c.nri : c.ql;
     results.push({
       date: c.date, ad_name: c.adName, ad_id: '', campaign_name: c.campaign, adset_name: '',
       spend: null, impressions: 0, clicks: 0,
-      ql: c.ql, nri: c.nri, tql, td: c.td, paid: c.paid, invalid: c.invalid,
+      ql: c.ql, nri: c.nri, tql: c.tql, td: c.td, paid: c.paid, invalid: c.invalid,
       cpql: null, cptql: null, cptd: null, ctr: 0, cpc: 0,
       _market: adMarket, _source: 'crm_only', _crmMatched: true
     });
@@ -5265,14 +5273,14 @@ function getAdPerformance(market, startDate, endDate) {
     if (!adMap[key]) adMap[key] = {
       adName: r.ad_name, campaign: r.campaign_name, adset: r.adset_name, ad_id: r.ad_id,
       spend: 0, impressions: 0, clicks: 0,
-      ql: 0, nri: 0, td: 0, paid: 0, invalid: 0, totalLeads: 0,
+      ql: 0, nri: 0, tql: 0, td: 0, paid: 0, invalid: 0, totalLeads: 0,
       market: r._market, source: r._source, hasMeta: false, hasCRM: false
     };
     const a = adMap[key];
     a.spend += r.spend || 0;
     a.impressions += r.impressions || 0;
     a.clicks += r.clicks || 0;
-    a.ql += r.ql; a.nri += r.nri; a.td += r.td; a.paid += r.paid; a.invalid += r.invalid;
+    a.ql += r.ql; a.nri += r.nri; a.tql += r.tql; a.td += r.td; a.paid += r.paid; a.invalid += r.invalid;
     a.totalLeads += r.ql + r.invalid;
     if (r._source === 'meta_insights') a.hasMeta = true;
     if (r._crmMatched) a.hasCRM = true;
@@ -5294,10 +5302,8 @@ function getAdPerformance(market, startDate, endDate) {
 
     const tag = _tagMap[key] || {};
     const adMarket = a.market || '';
-    const isUS = adMarket === 'US' || adMarket === 'Canada';
-    const isIBMarket = adMarket === 'India' || adMarket === 'ME' || adMarket === 'MEA';
-    // Per-market TQL: US=NRI, India/MEA=IB/IGCSE boards, others=all QLs
-    const tql = isUS ? a.nri : (isIBMarket ? (a.ibCount || a.ql) : a.ql);
+    // TQL pre-computed from daily rows (US=NRI, India/MEA=IB/IGCSE, others=all QLs)
+    const tql = a.tql;
     const adSpend = a.spend > 0 ? a.spend : null;
     const spendSource = a.hasMeta ? 'meta_insights' : (adSpend ? 'campaign_prorated' : null);
 
@@ -11548,7 +11554,7 @@ const SENTINEL_THRESHOLDS = {
 };
 
 function scoreMetric(value, thresholds, inverted) {
-  if (!thresholds || !value) return 'gray';
+  if (!thresholds || value == null || value === undefined) return 'gray';
   if (inverted) {
     // Higher is better (ql_td_pct, etc.)
     if (value >= thresholds.green) return 'green';
@@ -13186,7 +13192,7 @@ function _isLPCampaign(c) {
   // (campaigns like "LEAP_BAU_Signup_LP" contain both "leap" AND "signup" — leap wins)
   if (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('_pla_') || camp.includes('pla_') || camp.includes('instant') || camp.includes('on_facebook')) return false;
   // Positive signals: campaign runs on a landing page
-  if (camp.includes('signup') || camp.includes('_lp_') || camp.includes('_lp-') || camp.includes('-lp_') || camp.includes('_fop') || camp.includes('lpfop')) return true;
+  if (camp.includes('signup') || camp.includes('_lp_') || camp.includes('_lp-') || camp.includes('-lp_') || camp.endsWith('_lp') || camp.endsWith('-lp') || camp.includes('_fop') || camp.includes('lpfop')) return true;
   // Default: no LP signal = assume instant form — exclude to avoid unmatchable CRM numbers
   return false;
 }
@@ -13937,6 +13943,10 @@ function getCreativeVerdict(c) {
     return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials — stop immediately.` };
   }
 
+  // FUNNEL BREAK: high QLs but zero TDs — something broken between QL and TD
+  if (spend > 15000 && ql >= 5 && td === 0)
+    return { label: 'Watch', key: 'watch', color: 'amber', reason: `Funnel break: ${ql} QLs but 0 TDs after ${formatCurrency(spend)} spent. Check LP→trial flow.` };
+
   // WATCH: some signal but not conclusive
   if (ql >= 1 || td >= 1)
     return { label: 'Watch', key: 'watch', color: 'amber', reason: `${ql} QLs, ${td} TDs — early signal, needs more data.` };
@@ -14111,8 +14121,8 @@ function renderTaggerAdRow(c, catFilter, indent) {
     if (td_val >= 1 && cptd_val < (mktThresholds.cptd?.amber||50000)) return { text: 'Working — keep running', color: 'text-green-600', icon: '✓' };
     if (spend > 50000 && td_val === 0) return { text: 'Kill — ' + formatCurrency(spend) + ' burnt', color: 'text-red-700', icon: '✗' };
     if (spend > 20000 && td_val === 0 && ql <= 2) return { text: 'Budget leak — pause', color: 'text-red-600', icon: '⚠' };
+    if (spend > 15000 && ql >= 5 && td_val === 0) return { text: 'Funnel break — no TDs', color: 'text-amber-700', icon: '⚠' };
     if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR — fatigue', color: 'text-amber-600', icon: '↓' };
-    if (ql >= 5 && td_val === 0) return { text: 'Funnel break — no TDs', color: 'text-amber-700', icon: '⚠' };
     if (ql >= 3 && clickQL > 3) return { text: 'Promising — add budget', color: 'text-blue-600', icon: '→' };
     if (spend > 10000 && ql <= 1) return { text: 'Weak — low leads', color: 'text-gray-500', icon: '↓' };
     return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
@@ -14142,17 +14152,19 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount) {
   const shortLabel = label.length > 55 ? label.substring(0,52)+'...' : label;
   const bgClass = level === 'campaign' ? 'bg-surface-tertiary/60' : 'bg-surface-secondary/40';
   const pl = level === 'adset' ? 'pl-6' : 'pl-3';
-  const cptdColor = totals.cptd > 0 ? (totals.cptd < 40000 ? 'text-accent-green' : totals.cptd < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+  const _tgrMkt = document.getElementById('taggerFilterCountry')?.value || 'US';
+  const _tgrTh = SENTINEL_THRESHOLDS[_tgrMkt] || SENTINEL_THRESHOLDS['US'];
+  const cptdColor = totals.cptd > 0 ? (totals.cptd <= (_tgrTh.cptd?.green||35000) ? 'text-accent-green' : totals.cptd <= (_tgrTh.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
   const ctrColor = totals.ctr > 1.5 ? 'text-accent-green font-bold' : totals.ctr > 0.8 ? '' : totals.ctr > 0 ? 'text-accent-red' : 'text-text-muted';
 
   // Group-level insight
   const _gIns = (() => {
     if (totals.spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
-    if (totals.td >= 3 && totals.cptd < 40000) return { text: 'Scale — ' + totals.td + ' TDs at ' + formatCurrency(totals.cptd), color: 'text-green-700', icon: '↑' };
-    if (totals.td >= 1 && totals.cptd < 70000) return { text: 'Working — ' + totals.td + ' TD' + (totals.td > 1 ? 's' : ''), color: 'text-green-600', icon: '✓' };
+    if (totals.td >= 3 && totals.cptd <= (_tgrTh.cptd?.green||35000)) return { text: 'Scale — ' + totals.td + ' TDs at ' + formatCurrency(totals.cptd), color: 'text-green-700', icon: '↑' };
+    if (totals.td >= 1 && totals.cptd <= (_tgrTh.cptd?.amber||50000)) return { text: 'Working — ' + totals.td + ' TD' + (totals.td > 1 ? 's' : ''), color: 'text-green-600', icon: '✓' };
     if (totals.spend > 50000 && totals.td === 0) return { text: 'Kill — ' + formatCurrency(totals.spend) + ', 0 TDs', color: 'text-red-700', icon: '✗' };
     if (totals.spend > 20000 && totals.td === 0 && totals.ql <= 2) return { text: 'Budget leak', color: 'text-red-600', icon: '⚠' };
-    if (totals.ql >= 5 && totals.td === 0) return { text: 'Funnel break — ' + totals.ql + ' QLs, 0 TDs', color: 'text-amber-700', icon: '⚠' };
+    if (totals.spend > 15000 && totals.ql >= 5 && totals.td === 0) return { text: 'Funnel break — ' + totals.ql + ' QLs, 0 TDs', color: 'text-amber-700', icon: '⚠' };
     return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
   })();
 
@@ -17076,20 +17088,23 @@ function renderSentinelTable() {
     }
   });
 
-  // Helper: color for CPQL value
-  function cpqlColorClass(val) { return val > 0 ? (val < 15000 ? 'text-accent-green' : val < 25000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted'; }
-  function cptdColorClass(val) { return val > 0 ? (val < 40000 ? 'text-accent-green' : val < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted'; }
+  // Helper: color for CPQL/CPTD value using market thresholds
+  const _sentGeo = (document.getElementById('sentinelGeo')?.value || 'US');
+  const _sentTh = SENTINEL_THRESHOLDS[_sentGeo] || SENTINEL_THRESHOLDS['US'];
+  function cpqlColorClass(val, market) { const th = market ? (SENTINEL_THRESHOLDS[market] || _sentTh) : _sentTh; return val > 0 ? (val <= th.cpql.green ? 'text-accent-green' : val <= th.cpql.amber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted'; }
+  function cptdColorClass(val, market) { const th = market ? (SENTINEL_THRESHOLDS[market] || _sentTh) : _sentTh; return val > 0 ? (val <= th.cptd.green ? 'text-accent-green' : val <= th.cptd.amber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted'; }
 
   // Helper: one-line actionable insight for a performance row
-  function _perfInsight(m, sc) {
+  function _perfInsight(m, sc, market) {
+    const th = SENTINEL_THRESHOLDS[market] || _sentTh;
     const spend = m.spend || 0, td = m.td || 0, ql = m.ql || 0, cptd = m.cptd || 0, ctr = m.ctr || 0, clickQL = m.clicks > 0 ? (ql / m.clicks * 100) : 0;
     if (spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
-    if (td >= 3 && cptd < 40000) return { text: 'Scale — proven CPTD', color: 'text-green-700', icon: '↑' };
-    if (td >= 1 && cptd < 70000) return { text: 'Working — keep running', color: 'text-green-600', icon: '✓' };
-    if (spend > 50000 && td === 0) return { text: 'Kill — ₹' + Math.round(spend/1000) + 'K burnt, 0 TDs', color: 'text-red-700', icon: '✗' };
+    if (td >= 3 && cptd <= (th.cptd?.green||35000)) return { text: 'Scale — proven CPTD', color: 'text-green-700', icon: '↑' };
+    if (td >= 1 && cptd <= (th.cptd?.amber||50000)) return { text: 'Working — keep running', color: 'text-green-600', icon: '✓' };
+    if (spend > 50000 && td === 0) return { text: 'Kill — ' + formatCurrency(spend) + ' burnt, 0 TDs', color: 'text-red-700', icon: '✗' };
     if (spend > 20000 && td === 0 && ql <= 2) return { text: 'Budget leak — pause', color: 'text-red-600', icon: '⚠' };
+    if (spend > 15000 && ql >= 5 && td === 0) return { text: 'Funnel break — QLs not converting', color: 'text-amber-700', icon: '⚠' };
     if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR — creative fatigue', color: 'text-amber-600', icon: '↓' };
-    if (ql >= 5 && td === 0) return { text: 'Funnel break — QLs not converting', color: 'text-amber-700', icon: '⚠' };
     if (ql >= 3 && clickQL > 3) return { text: 'Promising — needs more spend', color: 'text-blue-600', icon: '→' };
     if (spend > 10000 && ql <= 1) return { text: 'Weak — low engagement', color: 'text-gray-500', icon: '↓' };
     return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
@@ -17101,7 +17116,7 @@ function renderSentinelTable() {
     const sc = r.scores;
     const name = r['Ad name'] || r['ad name'] || 'Unknown';
     const pl = indent ? 'pl-' + (indent * 4 + 3) : 'pl-3';
-    const insight = _perfInsight(m, sc);
+    const insight = _perfInsight(m, sc, _sentGeo);
     return `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
       <td class="px-3 py-2 ${pl} sticky-col bg-white" style="max-width:250px"><div class="truncate"><span class="font-medium" title="${name}">${shortAdName(name)}</span></div></td>
       <td class="px-2 py-2" style="min-width:140px"><span class="text-[9px] font-bold ${insight.color}" title="${insight.text}">${insight.icon} ${insight.text}</span></td>
@@ -17120,7 +17135,7 @@ function renderSentinelTable() {
     const shortLabel = label.length > 60 ? label.substring(0,57)+'...' : label;
     const bgClass = level === 'campaign' ? 'bg-surface-tertiary/50' : 'bg-surface-secondary/30';
     const pl = level === 'adset' ? 'pl-6' : 'pl-3';
-    const insight = _perfInsight(totals, {});
+    const insight = _perfInsight(totals, {}, _sentGeo);
     return `<tr class="${bgClass} cursor-pointer hover:bg-surface-tertiary sentinel-group-row" data-group="${groupId}" onclick="toggleSentinelGroup('${groupId}')">
       <td class="px-3 py-2.5 font-bold ${pl}" style="max-width:250px">
         <div class="truncate">
@@ -17133,7 +17148,7 @@ function renderSentinelTable() {
       <td class="px-2 py-2.5 text-right font-bold">${formatCurrency(totals.spend)}</td>
       <td class="px-2 py-2.5 text-right">${totals.ql}</td>
       <td class="px-2 py-2.5 text-right">${Math.round(totals.td)}</td>
-      <td class="px-2 py-2.5 text-right font-bold ${cptdColorClass(totals.cptd)}">${totals.cptd > 0 ? formatCurrency(totals.cptd) : '-'}</td>
+      <td class="px-2 py-2.5 text-right font-bold ${cptdColorClass(totals.cptd, _sentGeo)}">${totals.cptd > 0 ? formatCurrency(totals.cptd) : '-'}</td>
       <td class="px-2 py-2.5 text-right">${totals.ctr ? totals.ctr.toFixed(2)+'%' : '-'}</td>
       <td class="px-2 py-2.5 text-right">-</td>
       <td class="px-2 py-2.5 text-right">${Math.round(totals.paid||0)}</td>
@@ -17173,7 +17188,7 @@ function renderSentinelTable() {
       const gid = 'as_' + ai;
       html += renderAggRow(adSet, at, gid, 'adset', at.adCount);
       adSetMap[adSet].forEach(r => {
-        const _childIns = _perfInsight(r.metrics, r.scores || {});
+        const _childIns = _perfInsight(r.metrics, r.scores || {}, _sentGeo);
         html += '<tr class="border-b border-gray-50 hover:bg-surface-secondary/50 hidden sentinel-child" data-parent="' + gid + '">' +
           '<td class="px-3 py-2 pl-10" style="max-width:230px"><div class="truncate"><span class="font-medium" title="' + (r['Ad name']||r['ad name']||'Unknown') + '">' + shortAdName(r['Ad name']||r['ad name']||'Unknown') + '</span></div></td>' +
           '<td class="px-2 py-2" style="min-width:130px"><span class="text-[9px] font-bold ' + _childIns.color + '">' + _childIns.icon + ' ' + _childIns.text + '</span></td>' +
@@ -17201,7 +17216,7 @@ function renderSentinelTable() {
           const m = r.metrics;
           const sc = r.scores;
           const name = r['Ad name'] || r['ad name'] || 'Unknown';
-          const _cmpIns = _perfInsight(m, sc || {});
+          const _cmpIns = _perfInsight(m, sc || {}, _sentGeo);
           html += '<tr class="border-b border-gray-50 hover:bg-surface-secondary/50 hidden sentinel-child" data-parent="' + gid + '">' +
             '<td class="px-3 py-2 pl-8" style="max-width:230px"><div class="truncate"><span class="font-medium" title="' + name + '">' + shortAdName(name) + '</span></div></td>' +
             '<td class="px-2 py-2" style="min-width:130px"><span class="text-[9px] font-bold ' + _cmpIns.color + '">' + _cmpIns.icon + ' ' + _cmpIns.text + '</span></td>' +
