@@ -18315,6 +18315,7 @@ function renderInfluLeaderboard(filteredCreators) {
             <span>${r.displayName}</span>
             ${r.handle ? `<span class="text-[9px] text-text-muted ml-1">@${r.handle}</span>` : ''}
             ${tier ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-bold uppercase ${tier === 'scale' ? 'bg-green-100 text-green-700' : tier === 'watch' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}">${tier}</span>` : ''}
+            ${r.creatorType ? `<span class="text-[8px] px-1 py-0.5 rounded ml-1 font-medium ${r.creatorType === 'in-house' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}">${r.creatorType === 'in-house' ? 'In-house' : 'Partner'}</span>` : ''}
           </div>
         </div>
       </td>
