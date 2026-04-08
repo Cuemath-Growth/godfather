@@ -3997,6 +3997,22 @@ async function backfillThumbnails() {
   }
 
   console.log(`Thumbnail backfill done: ${matched} matched out of ${apiAds} API ads across ${accounts.length} accounts. ${errors} errors.`);
+  // Persist thumbnails to Supabase creative_tags
+  if (matched > 0) {
+    const thumbUpdates = state.taggerData.filter(c => c.thumbnail_url).map(c => ({
+      ad_name: c['Ad name'] || c['ad name'] || '',
+      account: c['_account'] || '',
+      thumbnail_url: c.thumbnail_url
+    })).filter(r => r.ad_name && r.thumbnail_url);
+    if (thumbUpdates.length) {
+      // Batch upsert in chunks of 100
+      for (let i = 0; i < thumbUpdates.length; i += 100) {
+        supabaseUpsert('creative_tags', thumbUpdates.slice(i, i + 100), 'ad_name,account').catch(e => console.warn('Thumb save error:', e.message));
+      }
+      console.log(`Saved ${thumbUpdates.length} thumbnails to Supabase creative_tags`);
+    }
+  }
+  rebuildTagMap();
   saveTaggerData();
   showToast(matched > 0 ? `Thumbnails + ad copy: ${matched} ads enriched` : `0 matches (${apiAds} API ads fetched, ${errors} errors). Check console.`);
   if (state.currentView === 'tagger') showTaggerResults();
@@ -12838,6 +12854,16 @@ async function tagCreatives(rawData, opts = {}) {
         if (jsonMatch) tags = JSON.parse(jsonMatch[0]);
       }
       tags.confidence = imageFetched ? 'confirmed' : 'inferred';
+
+      // Override talent_type/talent_name from influencer roster (ground truth beats AI guess)
+      const rosterMatch = typeof _matchGroundTruth === 'function' ? _matchGroundTruth(adName) : null;
+      if (rosterMatch) {
+        tags.talent_type = 'Influencer';
+        tags.talent_name = rosterMatch.name || tags.talent_name;
+      } else if (tags.talent_type === 'Influencer' && !rosterMatch) {
+        // AI said Influencer but not in roster → likely parent testimonial
+        tags.talent_type = 'Parent';
+      }
 
       // Cache in localStorage
       if (adName) tagCache[adName] = tags;
