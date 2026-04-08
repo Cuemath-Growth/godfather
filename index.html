@@ -3414,6 +3414,12 @@ function init() {
     buildLookupMaps();
     if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
 
+    // Auto-hydrate tagger data if localStorage was empty but metaAdData exists
+    if (!state.taggerData.length && metaAdData.length) {
+      console.log('Boot: taggerData empty, auto-hydrating from metaAdData + Supabase tags...');
+      useDashboardData();
+    }
+
     // Invalidate any stale caches from Phase 1 localStorage loads
     invalidateAdPerfCache();
 
@@ -5303,6 +5309,7 @@ function getAdPerformance(market, startDate, endDate) {
 
     const tag = _tagMap[key] || {};
     const adMarket = a.market || '';
+    const isUS = adMarket === 'US' || adMarket === 'Canada';
     // TQL pre-computed from daily rows (US=NRI, India/MEA=IB/IGCSE, others=all QLs)
     const tql = a.tql;
     const adSpend = a.spend > 0 ? a.spend : null;
