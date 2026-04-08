@@ -4,6 +4,71 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tagger Tab — Godmode Sweep (2026-04-09)
+
+### Layout Fixes (post-screenshot review)
+- **Global filter bar (date picker) now visible on Tagger tab** (~line 3567): Removed `'tagger'` from the hide list. Date pickers, presets (Mo/30d/90d/All), and global geo filter now accessible from Tagger.
+- **Tag Performance Insights moved inside Creative Review tab**: Was above the tab bar (visible on all sub-tabs). Now inside `taggerTab-review` — only shows when Creative Review is active. Data Table/Heatmap/Combos/Grid no longer have insights cluttering above them.
+
+### Phase 1: Data Layer
+- `tagged_at` bridged into tag data flow (~line 12840, 12948): Supabase cache load and API tagging both set `tags.tagged_at`, enabling downstream renderers to show tag dates
+- `taggerCount` now updates on initial load (~line 13408), not just on country change — fixes "0 creatives" display when Meta API fails but Supabase loads
+- `correctTagsFromAdName()` verified correct for statics — keeps AI vision for talent_type (Child/Parent/None/Tutor), no change needed
+
+### Phase 2: Data Table Upgrades
+- **"vs avg" CPTD arrows** (~line 14542+): `renderTaggerTable()` computes per-market benchmarks, passes to `renderTaggerAdRow()`. CPTD cell shows ▼/▲ percentage vs portfolio average (green below, red above, hidden within 5%)
+- **Compact action buttons** in Insight cell: Scale (↑) or Pause (⏹) button per row, persists via `oracleAction()` to Supabase. Shows ✓/⏸ after action taken
+- **Tag column max-height**: `max-h-[2.5rem] overflow-hidden` prevents tag pill wrapping from blowing up row height
+- **Metric tooltips** on Spend/QL/TD column headers: title attributes with definitions
+- **tagged_at badge**: Small date (e.g., "Apr 9") shown after confidence dot in tag pills, with full timestamp on hover
+
+### Phase 3: Metric Legend Bar
+- **New HTML block** between tab bar and tab content (~line 916): Shows CPTD/CPQL/QL→TD% definitions + green/amber/red color legend + dynamic threshold note
+- `_updateTaggerThresholdNote()` helper: Updates threshold note on country change and initial load (e.g., "Green = CPTD < ₹35,000 (US default)")
+
+### Phase 4: Thumbnails + Empty States
+- **Unified thumbnail fallbacks**: Data Table now shows ▶/□ (was `?`), Grid shows ▶/□ (was emoji). Matches Creative Review pattern across all views
+- **Fetch Thumbnails button**: Now visible when ANY creatives lack thumbnails (was hidden at >50% coverage)
+- **Heatmap empty state**: Actionable guidance instead of "No data" — suggests changing filters or running Pilot 50
+- **Combos empty state**: Explains "Need 3+ creatives per tag combo" instead of bare "No data"
+- **Supabase failure toast**: Shows "Tag database offline — using local backup" warning when creative_tags load fails
+
+### Phase 5: Insights Density
+- **Insight cards reduced from 6 to 3** (~line 13765): One clean row in 3-col grid, instantly scannable. Remaining insights still available in Heatmap tab
+
+### Functions modified
+- `rebuildTagMap()` — no change needed (tags.tagged_at flows through c.tags)
+- `renderTaggerTable()` — added benchmark computation
+- `renderTaggerAdRow(c, catFilter, indent, benchmarks)` — new param, CPTD arrow, action button, tag max-height, tagged_at badge, unified thumbnail fallback
+- `showTaggerResults()` — taggerCount on load, threshold note init, button visibility fix
+- `onTaggerCountryChange()` — threshold note update
+- `_updateTaggerThresholdNote()` — new helper function
+- `renderTaggerHeatmap()` — helpful empty state
+- `renderTagCombos()` — helpful empty state
+- `renderTaggerInsights()` — slice(0,3) instead of slice(0,6)
+- `renderCreativeGrid()` — unified thumbnail fallback
+
+---
+
+## Creators Tab — Market-Aware Verdicts + Market Analysis Functions (2026-04-05)
+
+### Creator verdict logic rewrite (~line 18322)
+- Replaced naive avgCPTD-based Scale/Watch/Drop with market-aware SENTINEL_THRESHOLDS
+- New tiers: **Low Data** (<3 ads or <50K spend, gray badge), **Scale** (CPTD < green), **Watch** (CPTD < amber), **Over** (CPTD > amber, red), **Funnel Leak** (QLs > 0 but 0 TDs, red), **Drop** (0 QLs, red)
+- Summary cards updated: added Over, Funnel Leak, Low Data cards alongside Scale/Watch/Drop
+- Tier badges in table rows updated with all 6 tiers
+- Leaderboard verdict text now shows counts for all tiers
+
+### getMarketAnalysisSummary() (~line 11737)
+- New function: returns structured analysis for each market (US/India/AUS/MEA/UK)
+- Groups ads by hook, content_format, campaign_audience; computes avg CPTD/CPQL for groups with >=3 ads
+- Returns best/worst for each dimension, overall verdict vs SENTINEL_THRESHOLDS, actionable topAction string
+
+### renderMarketAnalysis() (~line 11796)
+- Console helper: call `renderMarketAnalysis()` from browser console to get a clean table of all markets
+
+---
+
 ## Tagger Creative Review — Show All Tags + Confidence Badge (2026-04-05)
 
 ### Creative Review card tag pills

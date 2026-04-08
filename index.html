@@ -894,12 +894,6 @@
             </div>
           </div>
 
-          <!-- Insights Summary -->
-          <div class="mb-5">
-            <h3 class="text-base font-bold mb-3">Tag Performance Insights</h3>
-            <div id="taggerInsights" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-          </div>
-
           <!-- Section Tabs -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1 flex-wrap">
@@ -914,8 +908,23 @@
             </select>
           </div>
 
+          <!-- Metric legend bar -->
+          <div id="taggerMetricLegend" class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] text-gray-400 py-1.5 px-1">
+            <span><strong class="text-gray-500">CPTD</strong> = Spend &divide; Trial Dones</span>
+            <span><strong class="text-gray-500">CPQL</strong> = Spend &divide; Qualified Leads</span>
+            <span><strong class="text-gray-500">QL&rarr;TD%</strong> = Trial Done &divide; QL</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> Below target</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Watch zone</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Over threshold</span>
+            <span id="taggerThresholdNote" class="font-medium text-gray-500"></span>
+          </div>
+
           <!-- Tab: Creative Review (Landing View) -->
           <div id="taggerTab-review" class="tagger-tab">
+            <div class="mb-5">
+              <h3 class="text-base font-bold mb-3">Tag Performance Insights</h3>
+              <div id="taggerInsights" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+            </div>
             <div id="creativeReviewContent"></div>
           </div>
 
@@ -995,9 +1004,9 @@
                     <tr class="bg-surface-tertiary border-b border-gray-200">
                       <th class="text-left px-3 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] sticky-col bg-surface-tertiary" style="min-width:200px;width:20%">Creative</th>
                       <th class="text-left px-1.5 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px;width:16%" title="What should you do with this creative?">Insight</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:6%">Spend</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%">QL</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%">TD</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:6%" title="Total Meta ad spend (INR)">Spend</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%" title="Qualified Leads — signups meeting quality criteria">QL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:30px;width:3%" title="Trial Dones — completed demo classes. THE conversion metric.">TD</th>
                       <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:55px;width:5%" title="Cost Per Trial Done — THE metric">CPTD</th>
                       <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px;width:18%">Tags</th>
                     </tr>
@@ -3553,7 +3562,7 @@ function navigateTo(view) {
   document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
   // Show/hide global filter bar (hidden on Settings and Forge)
   const filterBar = document.getElementById('globalFilterBar');
-  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'leads' || view === 'tagger' || view === 'library') ? 'none' : '';
+  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'leads' || view === 'library') ? 'none' : '';
   const titles = { dashboard:'Dashboard', generate:'Create', tagger:'Tagger', intel:'Insights', library:'Library', leads:'Performance', influencer:'Creators', settings:'Settings' };
   const subs = { dashboard:'What to do right now', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', intel:'What\'s working & why', library:'Your creative assets', leads:'Funnel scoring & performance', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
@@ -12707,6 +12716,7 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
   } catch(e) {
     state._supabaseLoadPending = false;
     console.warn('creative_tags load failed, trying localStorage backup:', e.message);
+    if (typeof showToast === 'function') showToast('Tag database offline \u2014 using local backup', 'warn');
     // Fallback: read-only localStorage backup (Crack #23 fix)
     try {
       const backup = JSON.parse(localStorage.getItem('gf_creative_tags_backup') || '[]');
@@ -12837,7 +12847,9 @@ async function tagCreatives(rawData, opts = {}) {
       // Extract all taxonomy fields from cached row
       GODFATHER_TAXONOMY.allFields.forEach(f => { if (row[f] != null) tags[f] = row[f]; });
       tags.confidence = row.confidence || 'cached';
-      cachedResults.push({ ...c, tags, id: Date.now() + cachedResults.length, _cached: true });
+      tags.tagged_at = row.tagged_at || '';
+      const _thumbUrl = row.thumbnail_url || '';
+      cachedResults.push({ ...c, tags, thumbnail_url: _thumbUrl || c.thumbnail_url || '', image_url: c.image_url || _thumbUrl || '', id: Date.now() + cachedResults.length, _cached: true });
       return;
     }
 
@@ -12945,6 +12957,7 @@ async function tagCreatives(rawData, opts = {}) {
         if (jsonMatch) tags = JSON.parse(jsonMatch[0]);
       }
       tags.confidence = imageFetched ? 'confirmed' : 'inferred';
+      tags.tagged_at = new Date().toISOString();
 
       // Override parseable fields from ad name — deterministic beats AI guess
       correctTagsFromAdName(tags, adName, creative['Campaign name'] || creative['campaign name'] || '');
@@ -13383,13 +13396,18 @@ function showTaggerResults() {
   const _te = document.getElementById('taggerThumbCount');
   if (_te) _te.textContent = _tc > 0 ? `${_tc} thumbnails` : 'No thumbnails';
   const _tb = document.getElementById('taggerThumbBtn');
-  if (_tb) _tb.classList.toggle('hidden', _tc > _taggerSource.length * 0.5);
+  if (_tb) _tb.classList.toggle('hidden', _tc >= _taggerSource.length);
   // Show untagged count in tag action bar
   const _utEl = document.getElementById('taggerActionCount');
   if (_utEl) {
     const _ut = state.taggerData.filter(c => !c.tags || !c.tags.hook || c.tags.hook === 'Unknown').length;
     _utEl.textContent = _ut > 0 ? `${_ut} untagged — click Re-tag All to tag with Haiku vision` : `All ${state.taggerData.length} tagged`;
   }
+  // Update creative count on initial load (not just on country change)
+  const _countEl = document.getElementById('taggerCount');
+  if (_countEl) _countEl.textContent = `${_taggerSource.length} creatives`;
+  // Update metric legend threshold note
+  _updateTaggerThresholdNote();
   // Render accurate aggregate metrics from perf tracker + CRM
   renderLensAggregateMetrics();
   // Match tagged ads to Library source assets
@@ -13627,6 +13645,14 @@ function getFilteredTaggerData(filterElId, minSpend) {
   return getAdPerformance(market, from || null, to || null).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
 }
 
+function _updateTaggerThresholdNote(countryVal) {
+  const _thNote = document.getElementById('taggerThresholdNote');
+  if (!_thNote) return;
+  const _cv = countryVal || document.getElementById('taggerFilterCountry')?.value || 'all';
+  const _th = SENTINEL_THRESHOLDS[_cv === 'all' ? 'US' : _cv] || SENTINEL_THRESHOLDS['US'];
+  _thNote.textContent = `Green = CPTD < ${formatCurrency(_th.cptd?.green || 35000)} (${_cv === 'all' ? 'US default' : _cv})`;
+}
+
 function onTaggerCountryChange() {
   syncGeoFilter('taggerFilterCountry');
   state._taggerTablePage = 1; state._heatmapPage = 1; state._gridPage = 1;
@@ -13638,6 +13664,8 @@ function onTaggerCountryChange() {
   const countryVal = document.getElementById('taggerFilterCountry').value;
   const label = countryVal === 'all' ? `${filtered.length} creatives` : `${filtered.length} creatives (${countryVal})`;
   document.getElementById('taggerCount').textContent = label;
+  // Update threshold note in metric legend
+  _updateTaggerThresholdNote(countryVal);
 }
 
 // Pagination state
@@ -13733,7 +13761,7 @@ function renderTaggerInsights() {
   });
 
   insights.sort((a,b) => b.improvement - a.improvement);
-  insights.slice(0, 6).forEach(ins => {
+  insights.slice(0, 3).forEach(ins => {
     const tc = TAG_COLORS[ins.color] || TAG_COLORS.purple;
     const ratio = ins.worstMetric > 0 && ins.bestMetric > 0 ? ins.worstMetric / ins.bestMetric : 1;
     const savingsLabel = ratio >= 2 ? Math.round(ratio * 10) / 10 + 'x cheaper' : ins.improvement + '% cheaper';
@@ -14396,7 +14424,7 @@ function toggleTaggerGroup(groupId) {
 window.toggleTaggerGroup = toggleTaggerGroup;
 
 // ── Render a single ad row for tagger table ──
-function renderTaggerAdRow(c, catFilter, indent) {
+function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
   const name = c['Ad name'] || c['ad name'] || c['Creative name'] || 'Unknown';
   let type = c['Creative type'] || c['creative type'] || '-';
   if (type === 'Unknown' || type === '-') {
@@ -14469,22 +14497,48 @@ function renderTaggerAdRow(c, catFilter, indent) {
     return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
   })();
 
+  // CPTD "vs avg" arrow (benchmark from renderTaggerTable)
+  const _bm = benchmarks?.[mkt];
+  const _cptdArrow = (_bm?.avgCPTD > 0 && cptd_val > 0) ? (() => {
+    const pct = Math.round((cptd_val - _bm.avgCPTD) / _bm.avgCPTD * 100);
+    return Math.abs(pct) <= 5 ? '' : pct < 0
+      ? `<div class="text-[8px] text-green-600">\u25BC${Math.abs(pct)}%</div>`
+      : `<div class="text-[8px] text-red-500">\u25B2${pct}%</div>`;
+  })() : '';
+
+  // Compact action button for Data Table rows
+  const _actId = _taggerItemId(name, v.key);
+  const _existAct = getOracleAction(_actId);
+  const _isScaleType = v.key === 'scale' || v.key === 'working';
+  const _isPauseType = v.key === 'pause' || v.key === 'fatigued';
+  const _escName = name.replace(/'/g, "\\'");
+  const _escShort = shortAdName(name).replace(/'/g, "\\'");
+  let _actBtn = '';
+  if (_existAct?.status === 'done') _actBtn = '<span class="ml-1 text-[8px] text-green-500">\u2713</span>';
+  else if (_existAct?.status === 'snoozed') _actBtn = '<span class="ml-1 text-[8px] text-amber-500">\u23F8</span>';
+  else if (_isScaleType) _actBtn = `<button onclick="oracleAction('${_escName}','tagger_scale','done','${_escShort}');renderTaggerTable()" class="ml-1 text-[8px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-bold hover:bg-green-200" title="Mark as scaled">\u2191</button>`;
+  else if (_isPauseType) _actBtn = `<button onclick="oracleAction('${_escName}','tagger_pause','done','${_escShort}');renderTaggerTable()" class="ml-1 text-[8px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-bold hover:bg-red-200" title="Mark as paused">\u23F9</button>`;
+
+  // tagged_at badge
+  const _tagDate = tags.tagged_at ? new Date(tags.tagged_at).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '';
+  if (_tagDate) tagHtml += ` <span class="text-[7px] text-gray-400" title="Tagged: ${tags.tagged_at}">${_tagDate}</span>`;
+
   return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ${verdictBorder}">
     <td class="${pl} px-3 py-2">
       <div class="flex items-center gap-2">
-        ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0"><span class="text-[8px] text-gray-400">?</span></div>'}
+        ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0"><span class="text-[8px] text-gray-400">' + (type === 'Video' ? '\u25B6' : '\u25A1') + '</span></div>'}
         <div style="max-width:200px">
           <span class="font-medium text-[11px] block leading-tight" title="${name}">${shortAdName(name)}</span>
-          <span class="text-[9px] text-text-muted">${market} · ${type}</span>
+          <span class="text-[9px] text-text-muted">${market} \u00B7 ${type}</span>
         </div>
       </div>
     </td>
-    <td class="px-1.5 py-2"><span class="text-[9px] font-bold ${_ins.color}" title="${v.reason}">${_ins.icon} ${_ins.text}</span></td>
+    <td class="px-1.5 py-2"><span class="text-[9px] font-bold ${_ins.color}" title="${v.reason}">${_ins.icon} ${_ins.text}</span>${_actBtn}</td>
     <td class="px-2 py-2 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
     <td class="px-2 py-2 text-right text-[11px]">${ql > 0 ? Math.round(ql) : '<span class="text-text-muted">0</span>'}</td>
     <td class="px-2 py-2 text-right text-[11px] font-semibold">${td_val > 0 ? Math.round(td_val) : '<span class="text-text-muted">0</span>'}</td>
-    <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>` : '<span class="text-text-muted">\u2014</span>'}</td>
-    <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5">${tagHtml || '<span class="text-text-muted text-[9px]">—</span>'}</div></td>
+    <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>${_cptdArrow}` : '<span class="text-text-muted">\u2014</span>'}</td>
+    <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5 max-h-[2.5rem] overflow-hidden">${tagHtml || '<span class="text-text-muted text-[9px]">\u2014</span>'}</div></td>
   </tr>`;
 }
 
@@ -14533,6 +14587,16 @@ function renderTaggerTable() {
   let data = getFilteredTaggerDataWithDropdowns();
   data = sortTaggerData(data, sortBy);
 
+  // Compute per-market benchmarks for "vs avg" arrows
+  const _benchmarks = {};
+  data.forEach(c => {
+    const mkt = extractMarket(c) || 'US';
+    if (!_benchmarks[mkt]) _benchmarks[mkt] = { spend:0, td:0 };
+    _benchmarks[mkt].spend += parseNumber(c['Spent']||c['spent']||0);
+    _benchmarks[mkt].td += parseNumber(c['TD']||c['td']||0);
+  });
+  Object.values(_benchmarks).forEach(b => { b.avgCPTD = b.td > 0 ? b.spend / b.td : 0; });
+
   // Verdict summary
   const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0 };
   data.forEach(c => { const v = getCreativeVerdict(c); verdictCounts[v.key] = (verdictCounts[v.key]||0) + 1; });
@@ -14549,7 +14613,7 @@ function renderTaggerTable() {
     const page = state._taggerTablePage || 1;
     const paged = data.slice((page-1)*TAGGER_PAGE_SIZE, page*TAGGER_PAGE_SIZE);
     renderPager('taggerTablePager', page, data.length, 'goTaggerTablePage');
-    tbody.innerHTML = paged.map(c => renderTaggerAdRow(c, catFilter, 0)).join('');
+    tbody.innerHTML = paged.map(c => renderTaggerAdRow(c, catFilter, 0, _benchmarks)).join('');
     return;
   }
 
@@ -14593,7 +14657,7 @@ function renderTaggerTable() {
       Object.values(hierarchy[campaign]).forEach(ads => {
         ads.forEach(c => {
           html += `<tr class="hidden tagger-child border-b border-gray-50" data-parent="${gid}">` +
-            renderTaggerAdRow(c, catFilter, 2).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
+            renderTaggerAdRow(c, catFilter, 2, _benchmarks).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
             `</tr>`;
         });
       });
@@ -14620,7 +14684,7 @@ function renderTaggerTable() {
       html += renderTaggerGroupRow(adSet, at, gid, 'adset', at.count);
       adSetMap[adSet].forEach(c => {
         html += `<tr class="hidden tagger-child border-b border-gray-50" data-parent="${gid}">` +
-          renderTaggerAdRow(c, catFilter, 2).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
+          renderTaggerAdRow(c, catFilter, 2, _benchmarks).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
           `</tr>`;
       });
     });
@@ -14632,7 +14696,7 @@ function renderTaggerTable() {
 function renderTaggerHeatmap() {
   const container = document.getElementById('taggerHeatmap');
   const filteredData = getFilteredTaggerData(undefined, 1000); // Lower threshold for heatmap (₹1K) — aggregates across tags
-  if (!filteredData.length) { container.innerHTML = '<p class="text-sm text-text-muted">No data</p>'; return; }
+  if (!filteredData.length) { container.innerHTML = '<div class="text-center py-8"><p class="text-sm text-text-muted mb-2">No tagged creatives for this market/date range.</p><p class="text-xs text-gray-400">Change the country filter, widen the date range, or click <strong>Load Data</strong> then <strong>Pilot 50</strong> to tag creatives.</p></div>'; return; }
 
   // Build heatmap: tag category x avg CPTD (primary), CPQL (secondary)
   const cats = ['hook','content_format','pain_benefit','emotional_tone','cta_type','language','campaign_audience'];
@@ -14780,7 +14844,7 @@ function editTags(id) {
 function renderTagCombos() {
   const container = document.getElementById('taggerCombos');
   const filteredData = getFilteredTaggerData();
-  if (!filteredData.length) { container.innerHTML = '<p class="text-sm text-text-muted">No data</p>'; return; }
+  if (!filteredData.length) { container.innerHTML = '<div class="text-center py-8"><p class="text-sm text-text-muted mb-2">Need 3+ creatives per tag combo with performance data.</p><p class="text-xs text-gray-400">Tag more creatives or widen filters to see winning/losing patterns.</p></div>'; return; }
 
   // Helper: compute median of numeric array
   function median(arr) {
@@ -15150,7 +15214,7 @@ function renderCreativeGrid() {
 
     const thumbUrl = c['image_url'] || c['thumbnail_url'] || '';
     return `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-      ${thumbUrl ? `<div class="h-40 bg-gray-50 overflow-hidden flex items-center justify-center"><img src="${thumbUrl}" class="max-w-full max-h-full object-contain" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-text-muted text-[10px]\\'>No preview</div>'" /></div>` : `<div class="h-40 bg-surface-tertiary flex items-center justify-center"><span class="text-[10px] text-text-muted">${type === 'Video' ? '🎬' : '🖼️'} ${type || 'Creative'}</span></div>`}
+      ${thumbUrl ? `<div class="h-40 bg-gray-50 overflow-hidden flex items-center justify-center"><img src="${thumbUrl}" class="max-w-full max-h-full object-contain" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-text-muted text-2xl text-gray-300\\'>${type === 'Video' ? '\u25B6' : '\u25A1'}</div>'" /></div>` : `<div class="h-40 bg-surface-tertiary flex items-center justify-center"><span class="text-2xl text-gray-300">${type === 'Video' ? '\u25B6' : '\u25A1'}</span></div>`}
       <div class="p-4">
       <div class="flex items-center justify-between mb-2">
         <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${type==='Video'?'bg-accent-purple-light text-accent-purple':'bg-accent-blue-light text-accent-blue'}">${type}</span>

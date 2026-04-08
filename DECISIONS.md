@@ -30,7 +30,7 @@ Every design decision with FULL specificity. Read this BEFORE building anything.
 - **Model badge:** "Haiku" in teal (was "Sonnet" in purple).
 
 ### Brand safety
-- **Decision:** Post-generation banned phrase check on Create output. NOT YET IMPLEMENTED.
+- **Decision:** Post-generation banned phrase check on Create output. IMPLEMENTED — validateBrand() + BANNED_WORDS + BANNED_SUBSTITUTIONS.
 
 ---
 
