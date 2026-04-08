@@ -12734,7 +12734,7 @@ async function tagCreatives(rawData, opts = {}) {
     state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(cachedResults)));
     // Ensure campaign_audience is always parsed (cached rows may lack it)
     state.taggerData.forEach(c => {
-      if (c.tags && !c.tags.campaign_audience) {
+      if (c.tags) { // Always re-parse — parser is free, values evolve
         const camp = c['Campaign name'] || c['campaign name'] || '';
         c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
       }
@@ -12760,7 +12760,7 @@ async function tagCreatives(rawData, opts = {}) {
     const allResults = [...cachedResults, ...needsTagging.map((c, i) => ({ ...c, tags: {}, id: Date.now() + i }))];
     state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(allResults)));
     state.taggerData.forEach(c => {
-      if (c.tags && !c.tags.campaign_audience) {
+      if (c.tags) { // Always re-parse — parser is free, values evolve
         const camp = c['Campaign name'] || c['campaign name'] || '';
         c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
       }
@@ -12875,7 +12875,7 @@ async function tagCreatives(rawData, opts = {}) {
   state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics([...cachedResults, ...newlyTagged, ...skippedAds])));
   // Ensure campaign_audience is always parsed (cached rows may lack it)
   state.taggerData.forEach(c => {
-    if (c.tags && !c.tags.campaign_audience) {
+    if (c.tags) { // Always re-parse — parser is free, values evolve
       const camp = c['Campaign name'] || c['campaign name'] || '';
       c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
     }
