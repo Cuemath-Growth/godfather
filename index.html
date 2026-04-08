@@ -2191,6 +2191,7 @@ const DEFAULT_SHEETS = {
   regionalUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1622533630#gid=1622533630',
   influencerUrl: 'https://docs.google.com/spreadsheets/d/1laJcSF7qcHiaKgze0032poaT7QBSNGk99k0ZJXTFZ-Q/gviz/tq?tqx=out:csv&gid=645685654',
   creatorRosterUrl: 'https://docs.google.com/spreadsheets/d/1mhntjIuXl1DQnKd3SzlJczsNlqsAd1wWoZ_4hYmMif0/gviz/tq?tqx=out:csv&gid=1892749954',
+  influencerGroundTruthId: '1KKzqnMRpfrmLkU5u8gPk45j_QdBwFr0x4Pw0TSsidnE',
   libraryUrl: 'https://docs.google.com/spreadsheets/d/1PCIBvtS5xoNUECaaU7ZQJhf6ST96jzlfSvXPX3pOk0o/edit?gid=0#gid=0',
   libraryTabs: [
     { gid: '0', type: 'Video' },
@@ -6117,6 +6118,38 @@ async function refreshData() {
       });
       console.log('Creator roster fetched:', state._creatorRoster.length, 'creators');
     } catch(e) { console.error('Creator roster:', e); }
+  }
+
+  // Fetch influencer ground truth — the REAL creator list with in-house vs partnership
+  if (state.sheetConfig.influencerGroundTruthId && GOOGLE_API_KEY) {
+    try {
+      const _gtRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${state.sheetConfig.influencerGroundTruthId}/values/Sheet1?key=${GOOGLE_API_KEY}`);
+      if (_gtRes.ok) {
+        const _gtJson = await _gtRes.json();
+        const _gtRows = parseSheetValues(_gtJson.values);
+        state._influencerGroundTruth = {};
+        _gtRows.forEach(r => {
+          const name = (r['Influencer Name'] || '').trim();
+          if (!name) return;
+          const username = (r['Username'] || '').trim().toLowerCase();
+          const inhouse = (r['In-house Edited'] || '').trim().toLowerCase() === 'done';
+          const key = name.toLowerCase().replace(/[^a-z]/g, '');
+          if (!state._influencerGroundTruth[key]) {
+            state._influencerGroundTruth[key] = { name, usernames: new Set(), type: inhouse ? 'in-house' : 'partnership', total: 0, inhouse: 0 };
+          }
+          const e = state._influencerGroundTruth[key];
+          if (username) e.usernames.add(username);
+          e.total++;
+          if (inhouse) { e.inhouse++; e.type = 'in-house'; }
+        });
+        Object.values(state._influencerGroundTruth).forEach(e => {
+          const fn = e.name.split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '');
+          if (fn.length >= 3 && !state._influencerGroundTruth[fn]) state._influencerGroundTruth[fn] = e;
+          e.usernames.forEach(u => { const c = u.replace(/[^a-z0-9_]/g, ''); if (c.length >= 3) state._influencerGroundTruth[c] = e; });
+        });
+        console.log('Influencer ground truth:', Object.keys(state._influencerGroundTruth).length, 'keys from', _gtRows.length, 'rows');
+      }
+    } catch(e) { console.error('Influencer ground truth:', e); }
   }
 
   // Persist only Meta ads data to localStorage (other sheets fetched fresh each session)
@@ -12628,6 +12661,11 @@ async function tagCreatives(rawData, opts = {}) {
     document.getElementById('taggerExportBtn').style.display = '';
     document.getElementById('taggerBackupBtn').style.display = '';
     showToast(`${cachedResults.length} creatives loaded from cache (0 API calls)`);
+    // Auto-load metaAdData if empty
+    if (!metaAdData.length) {
+      await loadCachedAdData();
+      if (metaAdData.length) { buildLookupMaps(); if (leadsData.length) mergeCRMWithMeta(); invalidateAdPerfCache(); }
+    }
     showTaggerResults();
     return;
   }
@@ -12648,6 +12686,11 @@ async function tagCreatives(rawData, opts = {}) {
     const _tcEl = document.getElementById('taggerCount'); if (_tcEl) _tcEl.textContent = `${state.taggerData.length} creatives`;
     showToast(`Loaded ${state.taggerData.length} creatives (${cachedResults.length} with tags, ${needsTagging.length} untagged — 0 API calls)`);
     if (leadsData.length) mergeCRMWithMeta();
+    // Auto-load metaAdData if empty
+    if (!metaAdData.length) {
+      await loadCachedAdData();
+      if (metaAdData.length) { buildLookupMaps(); if (leadsData.length) mergeCRMWithMeta(); invalidateAdPerfCache(); }
+    }
     showTaggerResults();
     return;
   }
@@ -12769,6 +12812,19 @@ async function tagCreatives(rawData, opts = {}) {
   showToast(`Tagged ${state.taggerData.length} creatives — ${apiCalls} Haiku calls, ${imagesFetched} images${savings}${pilotNote}`);
   console.log(`Tagger complete: ${apiCalls} API calls (model: claude-haiku-4-5-20251001), ${imagesFetched} images fetched, ${cachedResults.length} cached`);
   if (leadsData.length) mergeCRMWithMeta();
+
+  // Auto-load metaAdData if empty — Insights/Performance/Combos need it
+  if (!metaAdData.length) {
+    console.log('Post-tag: metaAdData empty — auto-loading from Supabase...');
+    await loadCachedAdData();
+    if (metaAdData.length) {
+      buildLookupMaps();
+      if (leadsData.length) mergeCRMWithMeta();
+      invalidateAdPerfCache();
+      console.log(`Post-tag: loaded ${metaAdData.length} metaAdData rows, all tabs ready`);
+    }
+  }
+
   showTaggerResults();
   // AUTO-BACKUP: save tagged data to file after every tag session
   if (state.taggerData.length > 50) {
@@ -17702,23 +17758,46 @@ function _cleanHandle(raw) {
 }
 
 // ---- INFLUENCER AD IDENTIFICATION ----
-// Gate: campaign name contains "Influencer"/"Influ", OR tagger tagged as Influencer UGC
-// Creator name: extracted from end of ad name before date suffix (DDMMYY)
-// Roster: used for metadata enrichment (handle, ethnicity) only
+// Priority 1: Ground truth sheet (influencer names + in-house/partnership)
+// Priority 2: Campaign name contains "Influencer"/"Influ"
+// Priority 3: Ad name contains "influencer"/"postboost"
+
+function _matchGroundTruth(adName) {
+  const gt = state._influencerGroundTruth;
+  if (!gt || !adName) return null;
+  // Extract name segments from ad name (after _Video_, before date suffix)
+  const segments = adName.replace(/_\d{6}$/, '').split(/[-_]/);
+  // Try each segment and combinations against ground truth
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const seg = segments[i].toLowerCase().replace(/[^a-z]/g, '');
+    if (seg.length >= 3 && gt[seg]) return gt[seg];
+    // Try two-segment combo (e.g., "Payal_Jethwa")
+    if (i > 0) {
+      const combo = (segments[i-1] + segments[i]).toLowerCase().replace(/[^a-z]/g, '');
+      if (combo.length >= 5 && gt[combo]) return gt[combo];
+    }
+  }
+  // Try talent_name tag
+  return null;
+}
 
 function _isInfluencerAd(c) {
   const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
   const campName = (c['Campaign name'] || c['campaign name'] || '').toLowerCase();
 
-  // ONLY these signals qualify as influencer:
-  // 1. Campaign name contains "Influencer" or "Influ" (naming convention)
+  // Priority 1: Ground truth — creator name found in the influencer sheet
+  if (_matchGroundTruth(c['Ad name'] || c['ad name'] || '')) return true;
+  // Priority 2: Campaign name contains "Influencer" or "Influ"
   if (campName.includes('influencer') || campName.includes('influ')) return true;
-  // 2. Ad name contains "influencer" or "postboost" (post-boost of creator content)
+  // Priority 3: Ad name contains "influencer" or "postboost"
   if (adName.includes('influencer') || adName.includes('postboost')) return true;
-
-  // talent_name alone is NOT enough — testimonials, brand ads, and in-house creatives
-  // all have person names. Only campaign/ad name "Influencer" gate is reliable.
   return false;
+}
+
+// Get creator type from ground truth: 'in-house' | 'partnership' | null
+function _getCreatorType(adName) {
+  const gt = _matchGroundTruth(adName);
+  return gt ? gt.type : null;
 }
 
 // For backward compat — used by renderInfluCompare
@@ -17884,14 +17963,18 @@ function getInfluencerAds(geoFilter, formatFilter) {
     const creatorLabel = (talentTag && talentTag !== 'None' && talentTag !== 'Unknown') ? talentTag : _extractCreatorFromAdName(adName);
     if (creatorLabel === 'Unknown') return;
 
-    const key = creatorLabel;
+    const gtMatch = _matchGroundTruth(adName);
+    // Use ground truth name if available (canonical), else fallback to extracted label
+    const canonicalName = gtMatch ? gtMatch.name : creatorLabel;
+    const key = canonicalName;
     if (!creators[key]) {
       const roster = _enrichCreatorFromRoster(creatorLabel, rosterLookup);
       creators[key] = {
-        name: creatorLabel,
-        handle: roster?.handle || '',
+        name: canonicalName,
+        handle: roster?.handle || (gtMatch?.usernames ? [...gtMatch.usernames][0] || '' : ''),
         ethnicity: roster?.ethnicity || '',
         rosterStatus: roster?.status || '',
+        creatorType: gtMatch?.type || null, // 'in-house' | 'partnership' | null
         ads: [], adSets: {}, spend: 0, ql: 0, td: 0, nri: 0, paid: 0
       };
     }
