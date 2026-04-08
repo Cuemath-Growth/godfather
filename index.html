@@ -12764,9 +12764,8 @@ async function tagCreatives(rawData, opts = {}) {
     state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(cachedResults)));
     // Ensure campaign_audience is always parsed (cached rows may lack it)
     state.taggerData.forEach(c => {
-      if (c.tags) { // Always re-parse — parser is free, values evolve
-        const camp = c['Campaign name'] || c['campaign name'] || '';
-        c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
+      if (c.tags) { // Always re-parse — deterministic corrections from ad name
+        correctTagsFromAdName(c.tags, c['Ad name'] || c['ad name'] || '', c['Campaign name'] || c['campaign name'] || '');
       }
     });
     saveTaggerData();
@@ -12790,9 +12789,8 @@ async function tagCreatives(rawData, opts = {}) {
     const allResults = [...cachedResults, ...needsTagging.map((c, i) => ({ ...c, tags: {}, id: Date.now() + i }))];
     state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(allResults)));
     state.taggerData.forEach(c => {
-      if (c.tags) { // Always re-parse — parser is free, values evolve
-        const camp = c['Campaign name'] || c['campaign name'] || '';
-        c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
+      if (c.tags) { // Always re-parse — deterministic corrections from ad name
+        correctTagsFromAdName(c.tags, c['Ad name'] || c['ad name'] || '', c['Campaign name'] || c['campaign name'] || '');
       }
     });
     saveTaggerData();
@@ -12855,22 +12853,11 @@ async function tagCreatives(rawData, opts = {}) {
       }
       tags.confidence = imageFetched ? 'confirmed' : 'inferred';
 
-      // Override talent_type/talent_name from influencer roster (ground truth beats AI guess)
-      const rosterMatch = typeof _matchGroundTruth === 'function' ? _matchGroundTruth(adName) : null;
-      if (rosterMatch) {
-        tags.talent_type = 'Influencer';
-        tags.talent_name = rosterMatch.name || tags.talent_name;
-      } else if (tags.talent_type === 'Influencer' && !rosterMatch) {
-        // AI said Influencer but not in roster → likely parent testimonial
-        tags.talent_type = 'Parent';
-      }
+      // Override parseable fields from ad name — deterministic beats AI guess
+      correctTagsFromAdName(tags, adName, creative['Campaign name'] || creative['campaign name'] || '');
 
       // Cache in localStorage
       if (adName) tagCache[adName] = tags;
-
-      // Parse campaign_audience from campaign name (not AI — rule-based)
-      const campaignName = creative['Campaign name'] || creative['campaign name'] || '';
-      tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(campaignName);
 
       // Write to Supabase (fire-and-forget) — composite PK: (ad_name, account)
       const acct = creative['_account'] || '';
@@ -13021,6 +13008,52 @@ async function visionScanCreators() {
   });
   saveTaggerData();
   showToast(`Vision scan complete: ${scanned} thumbnails processed.`);
+}
+
+// ── Deterministic tag correction from ad name ──
+// These fields are encoded in the naming convention and more reliable than AI guessing.
+// Runs AFTER AI tagging to override unreliable AI values with parsed facts.
+function correctTagsFromAdName(tags, adName, campaignName) {
+  const name = (adName || '').toLowerCase();
+  const parts = (adName || '').split(/[-_]/);
+
+  // 1. creative_type: always from name
+  if (name.includes('_video') || name.includes('-video') || name.startsWith('video')) tags.creative_type = 'Video';
+  else if (name.includes('_static') || name.includes('-static') || name.startsWith('static')) tags.creative_type = 'Static';
+
+  // 2. content_format: "Testimonial" in name → Testimonial
+  if (name.includes('testimonial')) tags.content_format = 'Testimonial';
+
+  // 3. production_style: parse from name
+  if (name.includes('_ai_') || name.includes('_ai-') || name.includes('-ai_') || name.includes('ai_creatives') || name.includes('ai_video')) tags.production_style = 'AI Generated';
+  else if (tags.creative_type === 'Static') tags.production_style = 'Static Graphic';
+
+  // 4. talent_name + talent_type: roster is ground truth
+  const rosterMatch = typeof _matchGroundTruth === 'function' ? _matchGroundTruth(adName) : null;
+  if (rosterMatch) {
+    tags.talent_type = 'Influencer';
+    tags.talent_name = rosterMatch.name || tags.talent_name;
+  } else if (tags.creative_type === 'Static') {
+    // Statics don't feature people (AI hallucinates "Child"/"Parent" on graphics)
+    tags.talent_type = 'None';
+    tags.talent_name = 'None';
+  } else if (name.includes('testimonial')) {
+    // Video testimonials without roster match → Parent testimonial
+    tags.talent_type = 'Parent';
+  } else if (tags.talent_type === 'Influencer') {
+    // AI said Influencer but not in roster → likely Parent
+    tags.talent_type = 'Parent';
+  }
+
+  // 5. language: from ad name keywords
+  if (name.includes('telugu')) tags.language = 'Telugu';
+  else if (name.includes('tamil')) tags.language = 'Tamil';
+  else if (name.includes('gujarati')) tags.language = 'Gujarati';
+  else if (name.includes('malayalam')) tags.language = 'Malayalam';
+  else if (name.includes('hindi')) tags.language = 'Hindi';
+
+  // 6. campaign_audience: always from campaign name (deterministic)
+  tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(campaignName);
 }
 
 function buildTaggerSystemPrompt() {
