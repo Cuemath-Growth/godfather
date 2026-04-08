@@ -17692,18 +17692,25 @@ function _cleanHandle(raw) {
 // Roster: used for metadata enrichment (handle, ethnicity) only
 
 function _isInfluencerAd(c) {
-  // Priority 1: talent_name tag from AI tagger (decision #23)
-  const talentName = c.tags?.talent_name;
-  if (talentName && talentName !== 'None' && talentName !== 'Unknown' && talentName !== '') return true;
-  // Priority 2: talent_type tag is Influencer
-  const talentType = (c.tags?.talent_type || '').toLowerCase();
-  if (talentType === 'influencer') return true;
-  // Fallback: campaign name heuristic
-  const campName = (c['Campaign name'] || c['campaign name'] || '').toLowerCase();
-  if (campName.includes('influencer') || campName.includes('influ')) return true;
-  // Fallback: ad name heuristic
   const adName = (c['Ad name'] || c['ad name'] || '').toLowerCase();
+  const campName = (c['Campaign name'] || c['campaign name'] || '').toLowerCase();
+  const talentType = (c.tags?.talent_type || '').toLowerCase();
+  const contentFormat = (c.tags?.content_format || '').toLowerCase();
+
+  // EXCLUDE: testimonial creatives are NOT influencer ads, even if they have a person's name
+  if (adName.includes('testimonial') || campName.includes('testimonial') ||
+      talentType === 'testimonial' || contentFormat === 'testimonial') return false;
+
+  // Priority 1: talent_type tag is explicitly "Influencer"
+  if (talentType === 'influencer') return true;
+  // Priority 2: campaign name contains "Influencer"
+  if (campName.includes('influencer') || campName.includes('influ')) return true;
+  // Priority 3: ad name contains "influencer" or "postboost"
   if (adName.includes('influencer') || adName.includes('postboost')) return true;
+  // Priority 4: talent_name exists AND talent_type is not testimonial/brand (already excluded above)
+  const talentName = c.tags?.talent_name;
+  if (talentName && talentName !== 'None' && talentName !== 'Unknown' && talentName !== '' &&
+      talentType !== 'brand' && talentType !== 'in-house') return true;
   return false;
 }
 
