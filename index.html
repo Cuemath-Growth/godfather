@@ -12979,7 +12979,21 @@ async function buildTaggerMessage(creative) {
   const content = [];
   let imageFetched = false;
 
-  // Image FIRST (if available)
+  // If no cached thumbnail but we have ad_id, fetch fresh from Meta API
+  if (!imageUrl && adId && state.metaApi?.token) {
+    try {
+      const freshData = await callMetaAPI(`${adId}`, { fields: 'creative{thumbnail_url,image_url}' });
+      imageUrl = freshData?.creative?.thumbnail_url || freshData?.creative?.image_url || '';
+      if (imageUrl) {
+        creative['thumbnail_url'] = imageUrl;
+        console.log('Fetched thumbnail via Meta API for:', adName);
+      }
+    } catch(e) {
+      console.warn('Meta API thumbnail fetch failed for:', adName, e.message);
+    }
+  }
+
+  // Image FIRST (if available — cached or freshly fetched)
   if (imageUrl) {
     try {
       const imgData = await fetchImageAsBase64(imageUrl);
@@ -12988,25 +13002,7 @@ async function buildTaggerMessage(creative) {
         imageFetched = true;
       }
     } catch(e) {
-      console.warn('Image fetch failed for:', adName, '— trying fresh Meta API thumbnail...');
-      // Cached URL expired (403) — fetch fresh thumbnail via Meta API
-      if (adId && state.metaApi?.token) {
-        try {
-          const freshData = await callMetaAPI(`${adId}`, { fields: 'creative{thumbnail_url,image_url}' });
-          const freshUrl = freshData?.creative?.thumbnail_url || freshData?.creative?.image_url;
-          if (freshUrl) {
-            creative['thumbnail_url'] = freshUrl; // Update cache for future use
-            const imgData2 = await fetchImageAsBase64(freshUrl);
-            if (imgData2 && imgData2.base64) {
-              content.push({ type: 'image', source: { type: 'base64', media_type: imgData2.mimeType, data: imgData2.base64 } });
-              imageFetched = true;
-              console.log('Fresh thumbnail fetched for:', adName);
-            }
-          }
-        } catch(e2) {
-          console.warn('Fresh thumbnail also failed for:', adName, e2.message);
-        }
-      }
+      console.warn('Image proxy failed for:', adName, e.message);
     }
   }
 
