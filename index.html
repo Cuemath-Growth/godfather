@@ -1290,9 +1290,9 @@
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-xs font-semibold text-red-700">Reset Tagger Data (if spend is inflated)</p>
-                <p class="text-[10px] text-text-muted">Clears localStorage tagger data. Tags in creative_tags (Supabase) are preserved. Re-pull from Meta API after reset.</p>
+                <p class="text-[10px] text-text-muted">Clears in-memory tagger data. Tags in Supabase are preserved. Reload page to re-hydrate.</p>
               </div>
-              <button onclick="if(confirm('This clears tagger performance data from localStorage. Tags in creative_tags (Supabase) are preserved. You will need to re-pull from Meta API. Continue?')){localStorage.removeItem('gf_taggerData');state.taggerData=[];rebuildTagMap();showToast('Tagger data cleared. Tags preserved in Supabase. Re-pull from Meta API.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
+              <button onclick="if(confirm('This clears in-memory tagger data. Tags in creative_tags (Supabase) are preserved. Reload page to re-hydrate from Supabase. Continue?')){state.taggerData=[];rebuildTagMap();showToast('Tagger data cleared. Tags preserved in Supabase. Reload to re-hydrate.');runGroundTruthQA();}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 hover:bg-red-200 shrink-0">Reset Data</button>
             </div>
           </div>
         </div>
@@ -2203,7 +2203,7 @@ const state = {
   apiKey: API_KEY,
   sheetConfig: (() => { const saved = JSON.parse(localStorage.getItem('gf_sheetConfig') || 'null') || {}; const filtered = {}; Object.entries(saved).forEach(([k,v]) => { if (v && v !== '') filtered[k] = v; }); return { ...DEFAULT_SHEETS, ...filtered, libraryTabs: DEFAULT_SHEETS.libraryTabs }; })(),
   preferences: JSON.parse(localStorage.getItem('gf_preferences') || '{"defaultMarket":"US","refreshInterval":1800000}'),
-  rawData: JSON.parse(localStorage.getItem('gf_rawData') || '{"metaAds":null}'),
+  rawData: { metaAds: null }, // No longer cached in localStorage — fetched fresh from sheets
   // _crmLeads: REMOVED — all CRM data flows through leadsData (Google Sheets API leads!A:BG)
   _costsTracker: null,   // Costs tracker sheet — fetched fresh each session
   _regionalData: null,   // Regional performance sheet — fetched fresh each session
@@ -2341,19 +2341,8 @@ function deduplicateByAdName(data) {
 function backfillUnknownTags(data) { return data; }
 
 function saveTaggerData() {
-  // SAFEGUARD: Never overwrite a large dataset with empty/tiny data
-  const existing = localStorage.getItem('gf_taggerData');
-  if (existing) {
-    try {
-      const existingCount = JSON.parse(existing).length || 0;
-      if (existingCount > 100 && state.taggerData.length < 10) {
-        console.error(`BLOCKED: saveTaggerData() tried to overwrite ${existingCount} creatives with ${state.taggerData.length}. Refusing.`);
-        return;
-      }
-    } catch(_) {}
-  }
-  // Tags go to Supabase — no localStorage for tagger data (too large, causes quota errors)
-  // Async sync to Supabase (non-blocking)
+  // No localStorage — tags live in Supabase creative_tags only.
+  // taggerData is in-memory only, hydrated from metaAdData + creative_tags on boot.
   syncTaggerToSupabase(state.taggerData).catch(e => console.warn('Supabase tagger sync error:', e));
 }
 
@@ -4440,19 +4429,14 @@ async function fetchPLAData(apiKey) {
 }
 
 function loadCachedData() {
-  const ts = parseInt(localStorage.getItem('gf_v2_timestamp') || '0');
-  const age = Date.now() - ts;
-  const SIX_HOURS = 6 * 60 * 60 * 1000;
-  if (age > SIX_HOURS) return false;
-  try {
-    leadsData = JSON.parse(localStorage.getItem('gf_v2_leadsData') || '[]');
-    costData = JSON.parse(localStorage.getItem('gf_v2_costData') || '[]');
-    return leadsData.length > 0;
-  } catch { return false; }
+  // Ghost read removed — gf_v2_leadsData/costData saves were removed.
+  // Data comes fresh from Google Sheets on every boot.
+  return false;
 }
 
 function getDataTimestamp() {
-  const ts = parseInt(localStorage.getItem('gf_v2_timestamp') || '0');
+  // Timestamp comes from last Supabase/Sheets fetch, not localStorage
+  const ts = state._lastSyncTime || parseInt(localStorage.getItem('gf_lastSyncTs') || '0');
   if (!ts) return null;
   return new Date(ts);
 }
@@ -4473,12 +4457,9 @@ function _safeCacheSet(key, value) {
 let metaCreatives = []; // { id, name, thumbnail_url, image_url, body, title, cta, status, effective_status }
 
 function loadCachedCreatives() {
-  const ts = parseInt(localStorage.getItem('gf_v2_creativesTs') || '0');
-  if (Date.now() - ts > 6 * 60 * 60 * 1000) return false;
-  try {
-    metaCreatives = JSON.parse(localStorage.getItem('gf_v2_metaCreatives') || '[]');
-    return metaCreatives.length > 0;
-  } catch { return false; }
+  // Ghost read removed — gf_v2_metaCreatives save was removed.
+  // Creatives come from Meta API or Supabase on boot.
+  return false;
 }
 
 async function fetchMetaCreatives(force = false) {
@@ -12441,29 +12422,10 @@ function migrateTags(tags) {
   return out;
 }
 
-// Load tagger data: localStorage immediately, then try Supabase async
-// One-time spend deflation: old dedup SUMMED spend across duplicates — divide by _dedupCount to fix
-const _rawLocal = JSON.parse(localStorage.getItem('gf_taggerData') || '[]');
-_rawLocal.forEach(c => {
-  const dc = c._dedupCount || 1;
-  if (dc > 1 && !c._spendDeflated) {
-    ['Spent','spent','QL','ql','NRI','nri','TD','td','TS','ts','Paid','paid','Impressions','impressions','Clicks','clicks','net_booking'].forEach(f => {
-      if (c[f] !== undefined && parseNumber(c[f]) > 0) c[f] = Math.round(parseNumber(c[f]) / dc);
-    });
-    c._dedupCount = 1;
-    c._spendDeflated = true;
-  }
-});
-// Migrate old field names in tags (hook→hook, format→content_format, campaign_audience→campaign_audience)
-_rawLocal.forEach(c => { if (c.tags) c.tags = migrateTags(c.tags); });
-state.taggerData = deduplicateByAdName(backfillUnknownTags(ensureDerivedMetrics(_rawLocal)));
+// Tagger data: initialized empty, hydrated from Supabase metaAdData + creative_tags in boot sequence.
+// No more localStorage reads — gf_taggerData save was removed in commit 1ce5de6.
+state.taggerData = [];
 rebuildTagMap();
-// Backfill _date from campaign names for existing data missing dates
-let _dateBackfilled = 0;
-state.taggerData.forEach(c => { if (!c['_date']) { extractDateFromAdName(c); if (c['_date']) _dateBackfilled++; } });
-if (_dateBackfilled > 0) { console.log(`Backfilled _date on ${_dateBackfilled}/${state.taggerData.length} creatives from campaign names`); saveTaggerData(); }
-const _localTaggerCount = state.taggerData.length;
-console.log(`Using localStorage fallback (${_localTaggerCount} creatives)`);
 
 // DEPRECATED: rehydrateTagsFromCache — old localStorage tag cache no longer used.
 // Tags are loaded from creative_tags Supabase table at render time, not rehydrated into taggerData.
@@ -16770,7 +16732,7 @@ function _runSentinelViewInner() {
 
 function clearSentinelCache() {
   if (!confirm('This will clear Sentinel analysis cache. Your tagged creative data (2300+ tags) will NOT be deleted. Continue?')) return;
-  // DO NOT remove gf_taggerData — that's 2300+ tagged creatives worth significant API credits
+  // Tags live in Supabase creative_tags — safe to clear localStorage caches
   localStorage.removeItem('gf_sentinelOutput');
   localStorage.removeItem('gf_analysis');
   state.sentinelOutput = null;
