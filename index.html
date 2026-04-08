@@ -2256,7 +2256,7 @@ const state = {
   _librarySheet: null, // Library creative assets from GSheet — fetched on tab open
   _libraryPollInterval: null, // Background polling interval ID
   _libraryLastFetchTime: null, // Timestamp of last library fetch
-  analysis: JSON.parse(localStorage.getItem('gf_analysis') || 'null'),
+  analysis: null, // Recomputed on render — no persistence needed
   currentBrief: JSON.parse(localStorage.getItem('gf_currentBrief') || '{}'),
   library: [], // loaded from Supabase library_assets at boot; localStorage is write-through backup
   generationHistory: [], // hydrated from Supabase on boot; localStorage is write-through backup
@@ -2265,7 +2265,7 @@ const state = {
   lastGeneratedContent: '', // no longer persisted from localStorage on boot
   currentView: 'dashboard',
   isGenerating: false,
-  sentinelOutput: JSON.parse(localStorage.getItem('gf_sentinelOutput') || 'null'),
+  sentinelOutput: null, // Recomputed on render — no persistence needed
   _libraryDeployments: null
 };
 
