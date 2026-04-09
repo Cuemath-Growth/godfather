@@ -11635,6 +11635,11 @@ function downloadImage(index) {
 // ==================== CREATIVE TAGGER ====================
 // TAG_DISPLAY removed — new taxonomy uses plain English values directly
 function tagLabel(code) { return _TAG_VALUE_RENAMES[code] || code; }
+function _hdThumb(url) {
+  if (!url) return '';
+  return url.includes('fbcdn.net') ? url + (url.includes('?') ? '&' : '?') + 'width=600' : url;
+}
+
 function shortAdName(name) {
   if (!name || name.length < 40) return name;
   // Strip date suffix (_DDMMYY or -DDMMYY at end)
@@ -13067,7 +13072,7 @@ async function visionScanCreators() {
   // Find influencer ads with thumbnails that haven't been scanned
   const candidates = (state.taggerData || []).filter(c => {
     if (!_isInfluencerAd(c)) return false;
-    const thumb = c['image_url'] || c['thumbnail_url'] || '';
+    const thumb = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
     if (!thumb) return false;
     const adName = c['Ad name'] || c['ad name'] || '';
     return adName && !visionCache[adName];
@@ -13992,7 +13997,7 @@ function renderCreativeReview() {
     const mkt = extractMarket(c) || 'US';
     const b = benchmarks[mkt] || {};
     const type = c['Creative type'] || 'Unknown';
-    const thumb = c['image_url'] || c['thumbnail_url'] || '';
+    const thumb = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
     const campaign = c['Campaign name'] || c['campaign name'] || '';
     const tags = c.tags || {};
     // Build ALL non-empty tag pills from taxonomy
@@ -14497,7 +14502,7 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
   else if (conf === 'inferred') tagHtml += ' <span class="text-[7px] text-amber-400" title="Tagged from text only (no image)">&#9679;</span>';
   else if (!tagHtml || tagCount === 0) tagHtml = '<span class="text-[9px] text-gray-400 italic" title="Not yet tagged with new taxonomy. Use Pilot 50 or Re-tag All.">Needs tagging</span>';
 
-  const thumb = c['image_url'] || c['thumbnail_url'] || '';
+  const thumb = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
   const market = extractMarket(c);
   const pl = indent ? `pl-${indent * 4 + 3}` : 'pl-3';
   const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
@@ -15241,7 +15246,7 @@ function renderCreativeGrid() {
         return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(tags[cat])}</span>`;
       }).join('');
 
-    const thumbUrl = c['image_url'] || c['thumbnail_url'] || '';
+    const thumbUrl = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
     const _hasCRM = ql > 0 || tdVal > 0 || c._hasCRM;
     const _noCRMLabel = '<span class="text-[9px] text-gray-400 italic">No CRM</span>';
     return `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
