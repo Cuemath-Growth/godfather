@@ -13208,7 +13208,18 @@ async function buildTaggerMessage(creative) {
   const content = [];
   let imageFetched = false;
 
-  // If no cached thumbnail but we have ad_id, fetch fresh from Meta API
+  // Fallback 1: check _adMap (built from metaAdData, has thumbnails from prior fetches)
+  if (!imageUrl && _adMap) {
+    const mapEntry = _adMap[normalizeAdName(adName)];
+    if (mapEntry?.thumbnail_url) { imageUrl = mapEntry.thumbnail_url; creative['thumbnail_url'] = imageUrl; }
+    else if (mapEntry?.image_url) { imageUrl = mapEntry.image_url; creative['thumbnail_url'] = imageUrl; }
+  }
+  // Fallback 2: check Supabase tag cache (thumbnails saved from prior Fetch Thumbnails runs)
+  if (!imageUrl && state._tagLookup) {
+    const tagRow = state._tagLookup[adName] || state._tagLookup[adName + '||' + (creative['_account'] || '')];
+    if (tagRow?.thumbnail_url) { imageUrl = tagRow.thumbnail_url; creative['thumbnail_url'] = imageUrl; }
+  }
+  // Fallback 3: fetch fresh from Meta API via ad_id
   if (!imageUrl && adId && state.metaApi?.token) {
     try {
       const freshData = await callMetaAPI(`${adId}`, { fields: 'creative{thumbnail_url,image_url}' });
