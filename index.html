@@ -3977,7 +3977,7 @@ async function backfillThumbnails() {
     if (!success) {
       console.log(`[${account.name}] Creative expansion failed, trying adcreatives fallback...`);
       try {
-        let data = await callMetaAPI(`${account.id}/adcreatives`, { fields: 'name,thumbnail_url,image_url,body,title,object_story_spec', limit: '500' });
+        let data = await callMetaAPI(`${account.id}/adcreatives`, { fields: 'name,thumbnail_url,image_url,effective_image_url,body,title,object_story_spec', limit: '500' });
         let page = 1;
         while (data && page <= 30) {
           if (data.data?.length) {
@@ -3986,8 +3986,9 @@ async function backfillThumbnails() {
               const idx = findMatch(creative.name);
               if (idx !== undefined) {
                 const t = state.taggerData[idx];
-                t['thumbnail_url'] = creative.thumbnail_url || t['thumbnail_url'] || '';
-                t['image_url'] = creative.image_url || t['image_url'] || '';
+                const _bestImg2 = creative.effective_image_url || creative.image_url || creative.thumbnail_url || '';
+                t['thumbnail_url'] = _bestImg2 || t['thumbnail_url'] || '';
+                t['image_url'] = _bestImg2 || t['image_url'] || '';
                 if (creative.body) t['ad_body'] = creative.body;
                 if (creative.title) t['ad_title'] = creative.title;
                 matched++;
@@ -12854,6 +12855,8 @@ async function tagCreatives(rawData, opts = {}) {
     // Check Supabase cache first — keyed by "ad_name||account" or "ad_name"
     const acctKey = adName + '||' + (c['_account'] || '');
     const cacheRow = supabaseCache[acctKey] || supabaseCache[adName];
+    // Always grab thumbnail from Supabase, even if tags are empty
+    const _supaThumb = cacheRow?.thumbnail_url || '';
     if (cacheRow && (cacheRow.hook || cacheRow.talent_type)) {
       const row = cacheRow;
       const tags = {};
@@ -12861,10 +12864,11 @@ async function tagCreatives(rawData, opts = {}) {
       GODFATHER_TAXONOMY.allFields.forEach(f => { if (row[f] != null) tags[f] = row[f]; });
       tags.confidence = row.confidence || 'cached';
       tags.tagged_at = row.tagged_at || '';
-      const _thumbUrl = row.thumbnail_url || '';
-      cachedResults.push({ ...c, tags, thumbnail_url: _thumbUrl || c.thumbnail_url || '', image_url: c.image_url || _thumbUrl || '', id: Date.now() + cachedResults.length, _cached: true });
+      cachedResults.push({ ...c, tags, thumbnail_url: _supaThumb || c.thumbnail_url || '', image_url: c.image_url || _supaThumb || '', id: Date.now() + cachedResults.length, _cached: true });
       return;
     }
+    // Even if no tags cached, copy thumbnail from Supabase (saved by Fetch Thumbnails)
+    if (_supaThumb) { c.thumbnail_url = c.thumbnail_url || _supaThumb; c.image_url = c.image_url || _supaThumb; }
 
     // Check localStorage cache (old or new taxonomy — migrate if needed)
     const localCached = tagCache[adName];
@@ -13027,6 +13031,17 @@ async function tagCreatives(rawData, opts = {}) {
       c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
     }
   });
+  // Final pass: backfill thumbnails from Supabase _tagLookup for any creative still missing one
+  if (state._tagLookup) {
+    let _thumbFilled = 0;
+    state.taggerData.forEach(c => {
+      if (c.thumbnail_url || c.image_url) return;
+      const name = c['Ad name'] || c['ad name'] || '';
+      const row = state._tagLookup[name];
+      if (row?.thumbnail_url) { c.thumbnail_url = row.thumbnail_url; c.image_url = row.thumbnail_url; _thumbFilled++; }
+    });
+    if (_thumbFilled > 0) console.log(`Backfilled ${_thumbFilled} thumbnails from Supabase in Phase 3`);
+  }
   saveTaggerData();
   rebuildTagMap();
   document.getElementById('taggerProgress').classList.add('hidden');
