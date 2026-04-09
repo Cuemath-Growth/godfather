@@ -3941,7 +3941,7 @@ async function backfillThumbnails() {
     let success = false;
     try {
       // Strategy 1: creative field expansion via proxy
-      let data = await callMetaAPI(`${account.id}/ads`, { fields: 'name,creative{thumbnail_url,image_url,effective_image_url,body,title}', limit: '50' });
+      let data = await callMetaAPI(`${account.id}/ads`, { fields: 'name,effective_image_url,creative{thumbnail_url,image_url,body,title}', limit: '50' });
       let page = 1;
       while (data && page <= 15) {
         if (data.data?.length) {
@@ -3952,7 +3952,7 @@ async function backfillThumbnails() {
             const idx = findMatch(ad.name);
             if (idx !== undefined && ad.creative) {
               const t = state.taggerData[idx];
-              const _bestImg = ad.creative.effective_image_url || ad.creative.image_url || ad.creative.thumbnail_url || '';
+              const _bestImg = ad.effective_image_url || ad.creative.image_url || ad.creative.thumbnail_url || '';
               t['image_url'] = _bestImg || t['image_url'] || '';
               t['thumbnail_url'] = _bestImg || t['thumbnail_url'] || '';
               if (ad.creative.body) t['ad_body'] = ad.creative.body;
@@ -3977,7 +3977,7 @@ async function backfillThumbnails() {
     if (!success) {
       console.log(`[${account.name}] Creative expansion failed, trying adcreatives fallback...`);
       try {
-        let data = await callMetaAPI(`${account.id}/adcreatives`, { fields: 'name,thumbnail_url,image_url,effective_image_url,body,title,object_story_spec', limit: '500' });
+        let data = await callMetaAPI(`${account.id}/adcreatives`, { fields: 'name,thumbnail_url,image_url,body,title,object_story_spec', limit: '500' });
         let page = 1;
         while (data && page <= 30) {
           if (data.data?.length) {
