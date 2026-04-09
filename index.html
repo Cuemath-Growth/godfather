@@ -3941,7 +3941,7 @@ async function backfillThumbnails() {
     let success = false;
     try {
       // Strategy 1: creative field expansion via proxy
-      let data = await callMetaAPI(`${account.id}/ads`, { fields: 'name,creative{thumbnail_url,image_url,body,title}', limit: '50' });
+      let data = await callMetaAPI(`${account.id}/ads`, { fields: 'name,creative{thumbnail_url,image_url,effective_image_url,body,title}', limit: '50' });
       let page = 1;
       while (data && page <= 15) {
         if (data.data?.length) {
@@ -3952,8 +3952,9 @@ async function backfillThumbnails() {
             const idx = findMatch(ad.name);
             if (idx !== undefined && ad.creative) {
               const t = state.taggerData[idx];
-              t['thumbnail_url'] = ad.creative.thumbnail_url || t['thumbnail_url'] || '';
-              t['image_url'] = ad.creative.image_url || t['image_url'] || '';
+              const _bestImg = ad.creative.effective_image_url || ad.creative.image_url || ad.creative.thumbnail_url || '';
+              t['image_url'] = _bestImg || t['image_url'] || '';
+              t['thumbnail_url'] = _bestImg || t['thumbnail_url'] || '';
               if (ad.creative.body) t['ad_body'] = ad.creative.body;
               if (ad.creative.title) t['ad_title'] = ad.creative.title;
               if (ad.creative.description) t['ad_description'] = ad.creative.description;
@@ -4008,18 +4009,20 @@ async function backfillThumbnails() {
 
   console.log(`Thumbnail backfill done: ${matched} matched out of ${apiAds} API ads across ${accounts.length} accounts. ${errors} errors.`);
   // Persist thumbnails to Supabase creative_tags
+  // IMPORTANT: must match existing row's account field, not taggerData's _account (often empty)
   if (matched > 0) {
-    const thumbUpdates = state.taggerData.filter(c => c.thumbnail_url).map(c => ({
-      ad_name: c['Ad name'] || c['ad name'] || '',
-      account: c['_account'] || '',
-      thumbnail_url: c.thumbnail_url
-    })).filter(r => r.ad_name && r.thumbnail_url);
+    const thumbUpdates = state.taggerData.filter(c => c.thumbnail_url).map(c => {
+      const adName = c['Ad name'] || c['ad name'] || '';
+      // Find the existing Supabase row's account to match the composite PK
+      const existingRow = state._tagLookup?.[adName];
+      const account = c['_account'] || existingRow?.account || '';
+      return { ad_name: adName, account, thumbnail_url: c.thumbnail_url };
+    }).filter(r => r.ad_name && r.thumbnail_url);
     if (thumbUpdates.length) {
-      // Batch upsert in chunks of 100
       for (let i = 0; i < thumbUpdates.length; i += 100) {
         supabaseUpsert('creative_tags', thumbUpdates.slice(i, i + 100), 'ad_name,account').catch(e => console.warn('Thumb save error:', e.message));
       }
-      console.log(`Saved ${thumbUpdates.length} thumbnails to Supabase creative_tags`);
+      console.log(`Saved ${thumbUpdates.length} thumbnails to Supabase (matched existing accounts)`);
     }
   }
   rebuildTagMap();
