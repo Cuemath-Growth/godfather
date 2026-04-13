@@ -4,7 +4,20 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
-## Phase 1.5: Critical Fixes (2026-04-14, commit dc51434)
+## Phase 1.5: Critical Fixes + Sweeps (2026-04-14, commits dc51434 → 65f3b3e)
+
+### Sweep: Trend noise in ALL 5 comparison systems (71223ea)
+- calcTrend() (secondary cards), cmp() (Tagger grid), WoW Digest (pct/arrow/color), Sentinel diagnosis (pctChange)
+- All now: suppress near-zero prior, cap >200% as multiplier, suppress <5% as not actionable
+
+### Sweep: BAU logic in PLA paths (c1ee6f6)
+- WoW WHY "Driver 2" NRI shift: skipped for PLA (NRI irrelevant for broad audience)
+- Oracle avgCPTQL baseline: getPortfolioMetrics → getMarketMetrics (same class as Dashboard KPI fix)
+- Taxonomy parser: added pla_ and eval_ start-of-string patterns (was inconsistent with _isPLACampaignName)
+
+### Sweep: Final audit (65f3b3e)
+- PLA detail expansion: "NRI: X" → "QL→TD%: X%" (copy-paste leftover from BAU branch)
+- Verified clean: no remaining getPortfolioMetrics display issues, no old sheet ID, no NRI display leaks
 
 ### 1.10: Dashboard KPIs → getMarketMetrics (universal)
 - **ROOT CAUSE** of India CPTD ₹167: Dashboard used getPortfolioMetrics (Meta API spend) — India has only 3.6% coverage (₹73.8K vs ₹20.1L in cost tab)
