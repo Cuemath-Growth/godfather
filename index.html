@@ -9295,18 +9295,12 @@ function renderMetricTicker() {
     }
   }
 
-  // Use getPortfolioMetrics when available (clean data layer), fallback to getMarketMetrics (legacy)
-  // PLA OVERRIDE: getPortfolioMetrics depends on CRM→Meta join which is lossy for PLA
-  // (~20% of PLA leads match Meta ads). Use getMarketMetrics for PLA (counts directly from CRM).
+  // Use getMarketMetrics for Dashboard KPIs — it uses costData (source of truth for spend)
+  // + CRM direct counts. getPortfolioMetrics uses Meta API spend which is incomplete for
+  // India (3.6% coverage) and PLA (~20% match). Keep getPortfolioMetrics for per-ad views only.
   const market = dashCountry || 'all';
   const _isPLAFlow = getFlowFilter() === 'pla';
-  const _usePortfolio = !_isPLAFlow && typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
-  const pm = _usePortfolio ? getPortfolioMetrics(market, from, to) : null;
-  // Wire metrics that getPortfolioMetrics doesn't compute
-  const _portfolioTS = _usePortfolio ? getTS(market, from, to) : 0;
-  const _portfolioInvalid = _usePortfolio ? getInvalid(market, from, to) : 0;
-  const _portfolioAsian = _usePortfolio ? getAsian(market, from, to) : 0;
-  const m = _usePortfolio ? { spend: pm.spend, ql: pm.ql, tql: pm.tql, td: pm.td, enrolled: pm.paid, cptql: pm.cptql, cptd: pm.cptd, cac: pm.cac, ql_td_pct: pm.qlTdPct / 100, nri: pm.nri, invalid: _portfolioInvalid, ts: _portfolioTS, asian: _portfolioAsian } : getMarketMetrics(market, from || undefined, to || undefined);
+  const m = getMarketMetrics(market, from || undefined, to || undefined);
   const totalSpend = m.spend;
   const cptql = m.cptql || 0;
   const cptd = m.cptd || 0;
@@ -9328,23 +9322,30 @@ function renderMetricTicker() {
       const pf = priorFrom.toISOString().slice(0,10), pt = priorTo.toISOString().slice(0,10);
       const _fmtD = d => { const _m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; const _d=new Date(d); return _m[_d.getMonth()]+' '+_d.getDate(); };
       priorLabel = `vs ${_fmtD(pf)} – ${_fmtD(pt)}`;
-      const _pm = _usePortfolio ? getPortfolioMetrics(market, pf, pt) : getMarketMetrics(market, pf, pt);
+      const _pm = getMarketMetrics(market, pf, pt);
       priorSpend = _pm.spend;
-      priorCrm = { tql: _pm.tql, td: _pm.td, paid: _pm.paid || _pm.enrolled, ql: _pm.ql };
+      priorCrm = { tql: _pm.tql, td: _pm.td, paid: _pm.paid || _pm.enrolled, ql: _pm.ql, ts: _pm.ts || 0 };
     }
     const priorCptd = priorCrm.td > 0 && priorSpend > 0 ? priorSpend / priorCrm.td : 0;
     const priorCptql = priorCrm.tql > 0 && priorSpend > 0 ? priorSpend / priorCrm.tql : 0;
 
     // Trend helper: returns arrow + pct badge
+    // Suppresses noise: near-zero prior → "new", <3% change → nothing, >200% → multiplier format
     const trend = (curr, prior, inverted) => {
       if (!curr || !prior || prior === 0) return '';
+      // Suppress when prior is too small (baseline noise → meaningless 495% spikes)
+      if (Math.abs(prior) < Math.abs(curr) * 0.1) return '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold ml-1">new</span>';
       const pct = ((curr - prior) / prior * 100);
-      if (Math.abs(pct) < 1) return '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold ml-1">→ flat</span>';
+      if (Math.abs(pct) < 3) return ''; // <3% = flat = not actionable, show nothing
       const good = inverted ? pct < -3 : pct > 3;
       const bad = inverted ? pct > 3 : pct < -3;
       const cls = good ? 'bg-accent-green-light text-green-700' : bad ? 'bg-accent-red-light text-red-700' : 'bg-surface-tertiary text-text-muted';
-      const arrow = pct > 1 ? '↑' : pct < -1 ? '↓' : '→';
-      const displayPct = Math.abs(pct) > 999 ? (Math.abs(pct/100).toFixed(0) + 'x') : Math.abs(pct).toFixed(0) + '%';
+      const arrow = pct > 0 ? '\u2191' : '\u2193';
+      // Cap: >500% → "5x", 200-500% → "2.1x", else normal %
+      let displayPct;
+      if (Math.abs(pct) > 500) displayPct = Math.round(Math.abs(pct) / 100) + 'x';
+      else if (Math.abs(pct) > 200) displayPct = (Math.abs(pct) / 100).toFixed(1) + 'x';
+      else displayPct = Math.abs(pct).toFixed(0) + '%';
       return `<span class="text-[9px] px-1.5 py-0.5 rounded-full ${cls} font-bold ml-1">${arrow}${displayPct}</span>`;
     };
 
@@ -9357,8 +9358,7 @@ function renderMetricTicker() {
     let bestGeo = '', worstGeo = '', bestCptd = Infinity, worstCptd = 0;
     if (dashCountry === 'all') {
       ['US','India','AUS','MEA','UK'].forEach(g => {
-        const gm = _usePortfolio ? getPortfolioMetrics(g, from, to) : getMarketMetrics(g, from || undefined, to || undefined);
-        // PLA uses getMarketMetrics (via _usePortfolio=false) so this path already works
+        const gm = getMarketMetrics(g, from || undefined, to || undefined);
         if ((gm.td || 0) >= 5 && gm.spend > 0) {
           const gc = gm.spend / gm.td;
           if (gc < bestCptd) { bestCptd = gc; bestGeo = g; }
@@ -9394,8 +9394,10 @@ function renderMetricTicker() {
     }
     if (leakCount > 0) {
       tldrParts.push(`<span class="text-accent-red font-semibold">Action: ${leakCount} budget leaks (${formatCurrency(leakSpend)} recoverable) — pause now.</span>`);
-    } else if (crm.paid > 0 && cac > 0) {
+    } else if (crm.paid > 0 && cac > 0 && !_isPLAFlow) {
       tldrParts.push(`<span class="text-accent-green font-semibold">${crm.paid} enrolled at ${formatCurrency(cac)} CAC.</span>`);
+    } else if (_isPLAFlow && _tbCount > 0) {
+      tldrParts.push(`<span class="text-accent-green font-semibold">${_tbCount} trials booked (${_tbRate}).</span>`);
     }
 
     // ── RENDER: TL;DR → Hero CPTD → KPI row → Visual Funnel ──
@@ -9457,11 +9459,16 @@ function renderMetricTicker() {
 
     // 3. Secondary KPI cards (smaller, with trends)
     const priorQlTdPct = priorCrm.ql > 0 ? (priorCrm.td / priorCrm.ql * 100) : 0;
+    // 4th card: PLA = Trials Booked (lead-gen metric), BAU = Enrolled (enrollment metric)
+    const _tbCount = _isPLAFlow ? (m.ts || 0) : 0;
+    const _tbRate = _isPLAFlow && crm.ql > 0 ? ((_tbCount / crm.ql) * 100).toFixed(0) + '% booking rate' : '';
     const kpis = [
       { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: dateLabel },
       { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: `${crm.tql.toLocaleString()} TQLs` },
-      { label: 'QL→TD%', value: tqlTdPct > 0 ? tqlTdPct.toFixed(1) + '%' : '—', color: tqlTdPct >= 25 ? 'green' : tqlTdPct >= 15 ? 'orange' : 'red', trend: trend(tqlTdPct, priorQlTdPct, false), sub: 'Cohort conversion' },
-      { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toLocaleString() : '—', color: crm.paid > 0 ? 'green' : 'blue', trend: trend(crm.paid, priorCrm.paid, false), sub: crm.paid > 0 ? `CAC ${formatCurrency(cac)}` : '' },
+      { label: 'QL\u2192TD%', value: tqlTdPct > 0 ? tqlTdPct.toFixed(1) + '%' : '—', color: tqlTdPct >= 25 ? 'green' : tqlTdPct >= 15 ? 'orange' : 'red', trend: trend(tqlTdPct, priorQlTdPct, false), sub: 'Cohort conversion' },
+      _isPLAFlow
+        ? { label: 'Trials Booked', value: _tbCount > 0 ? _tbCount.toLocaleString() : '—', color: 'purple', trend: trend(_tbCount, priorCrm.ts || 0, false), sub: _tbRate }
+        : { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toLocaleString() : '—', color: crm.paid > 0 ? 'green' : 'blue', trend: trend(crm.paid, priorCrm.paid, false), sub: crm.paid > 0 ? `CAC ${formatCurrency(cac)}` : '' },
     ];
     html += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">`;
     kpis.forEach(k => {
@@ -13734,8 +13741,7 @@ function renderLensAggregateMetrics() {
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
   const _market = resolvedGeo === 'all' ? null : resolvedGeo;
-  const _usePM = getFlowFilter() !== 'pla' && typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
-  const m = _usePM ? (() => { const p = getPortfolioMetrics(_market, fromDate, toDate); return { spend: p.spend, ql: p.ql, tql: p.tql, td: p.td, enrolled: p.paid, cptql: p.cptql, cptd: p.cptd, cac: p.cac }; })() : getMarketMetrics(_market, fromDate, toDate);
+  const m = getMarketMetrics(_market, fromDate, toDate);
   if (!m || m.spend === 0) return;
   const srcLabel = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All time';
 
