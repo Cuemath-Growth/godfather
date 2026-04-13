@@ -2004,8 +2004,8 @@ const GODFATHER_TAXONOMY = {
       parse: function(campaignName) {
         const camp = (campaignName || '').toLowerCase();
         // Detect flow: PLA/Eval = automated (no sales call), BAU = sales-led
-        const isPLA = camp.includes('_pla_') || camp.includes('_pla ') || camp.endsWith('_pla');
-        const isEval = camp.includes('_eval_') || camp.includes('_eval ') || camp.endsWith('_eval');
+        const isPLA = camp.includes('_pla_') || camp.includes('pla_') || camp.includes('_pla ') || camp.endsWith('_pla');
+        const isEval = camp.includes('_eval_') || camp.includes('eval_') || camp.includes('_eval ') || camp.endsWith('_eval');
         const flow = (isPLA || isEval) ? 'PLA' : 'BAU';
         // Detect audience (priority order)
         let audience = 'General';
@@ -8176,15 +8176,16 @@ function _buildWoWWhy(twCost, lwCost, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD
     reasons.push(`<strong>${top.m}</strong> TDs dropped ${top.lwT}→${top.twT} (${Math.round((1 - top.twT / top.lwT) * 100)}% decline)`);
   }
 
-  // Driver 2: NRI vs non-NRI shift (US-specific — NRI is what converts)
-  const twNRI_TD = twCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
-  const lwNRI_TD = lwCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
-  const twNonNRI_TD = twTD - twNRI_TD;
-  const lwNonNRI_TD = lwTD - lwNRI_TD;
-  if (lwNRI_TD > 0 && twNRI_TD < lwNRI_TD * 0.7 && lwNRI_TD >= 2) {
-    reasons.push(`NRI TDs dropped ${lwNRI_TD}→${twNRI_TD} — your highest-converting segment is slowing`);
-  } else if (twNRI_TD > lwNRI_TD * 1.3 && twNRI_TD >= 2) {
-    reasons.push(`NRI TDs up ${lwNRI_TD}→${twNRI_TD} — core segment accelerating`);
+  // Driver 2: NRI vs non-NRI shift (BAU US-specific — NRI is what converts)
+  // SKIP for PLA: NRI is irrelevant, PLA targets broad audience
+  if (getFlowFilter() !== 'pla') {
+    const twNRI_TD = twCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
+    const lwNRI_TD = lwCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
+    if (lwNRI_TD > 0 && twNRI_TD < lwNRI_TD * 0.7 && lwNRI_TD >= 2) {
+      reasons.push(`NRI TDs dropped ${lwNRI_TD}\u2192${twNRI_TD} \u2014 your highest-converting segment is slowing`);
+    } else if (twNRI_TD > lwNRI_TD * 1.3 && twNRI_TD >= 2) {
+      reasons.push(`NRI TDs up ${lwNRI_TD}\u2192${twNRI_TD} \u2014 core segment accelerating`);
+    }
   }
 
   // Driver 3: Funnel leak — QL→TD conversion rate change
@@ -8416,8 +8417,9 @@ function renderOracleCardsV2() {
     _spendSource: r._spendSource,
     _hasCRM: r._hasCRM,
   }));
-  const _pm0 = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0 ? getPortfolioMetrics(market, from, to) : null;
-  const avgCPTQL = _pm0 ? (_pm0.cptql || 20000) : (getQL() > 0 ? getSpend() / getQL() : 20000);
+  // Use getMarketMetrics for baseline (costData = source of truth, not Meta API)
+  const _mm0 = getMarketMetrics(market || 'all', from, to);
+  const avgCPTQL = _mm0.cptql || (getQL() > 0 ? getSpend() / getQL() : 20000);
 
   const isPaused = (adName) => {
     const key = normalizeAdName(adName);
