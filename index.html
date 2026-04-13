@@ -5030,7 +5030,17 @@ function isNRIEthnicity(row) {
 function filterLeadsByMarket(data, market) {
   if (market === 'all') return data;
   if (!market) return [];  // empty market = empty result, never leak all rows
-  const GEO_TERMS = { 'US':['us','usa','united states','canada'], 'India':['india','in'], 'MEA':['mea','middle east','uae','saudi','me'], 'ME':['mea','middle east','uae','saudi','me'], 'UK':['uk','united kingdom'], 'ROW':['apac','others'], 'APAC':['apac','others'], 'Canada':['canada'] };
+  // EXACT match sets — no substring matching (cb.includes('us') matched 'aus')
+  const GEO_EXACT = {
+    'US': new Set(['us','usa','united states','canada']),
+    'India': new Set(['india','in','asia']),
+    'MEA': new Set(['mea','middle east','uae','saudi','me']),
+    'ME': new Set(['mea','middle east','uae','saudi','me']),
+    'UK': new Set(['uk','united kingdom']),
+    'ROW': new Set(['apac','others','row']),
+    'APAC': new Set(['apac','others','row']),
+    'Canada': new Set(['canada'])
+  };
   return data.filter(r => {
     const cb = (r.country_bucket || r.region || '').trim().toLowerCase();
     if (market === 'AUS') {
@@ -5041,8 +5051,8 @@ function filterLeadsByMarket(data, market) {
       }
       return false;
     }
-    const terms = GEO_TERMS[market] || [market.toLowerCase()];
-    return terms.some(g => cb.includes(g));
+    const terms = GEO_EXACT[market] || new Set([market.toLowerCase()]);
+    return terms.has(cb);
   });
 }
 
@@ -5114,13 +5124,13 @@ function getTQL(market, startDate, endDate) {
   if (market === 'India') return rows.filter(isTQLBoard).length;
   if (market === 'ME' || market === 'MEA') return rows.filter(isTQLBoard).length;
   if (market === 'AUS' || market === 'UK' || market === 'APAC') return rows.length;
-  // All geos — apply per-market logic to each row
+  // All geos — apply per-market logic to each row (case-insensitive)
   return rows.filter(r => {
-    const cb = (r.country_bucket || '').trim();
-    if (cb === 'US' || cb === 'Canada') return isNRI(r);
-    if (cb === 'India' || cb === 'IN') return isTQLBoard(r);
-    if (cb === 'ME' || cb === 'MEA') return isTQLBoard(r);
-    return true; // APAC, UK — all QLs qualify
+    const cb = (r.country_bucket || '').trim().toLowerCase();
+    if (cb === 'us' || cb === 'usa' || cb === 'canada') return isNRI(r);
+    if (cb === 'india' || cb === 'in' || cb === 'asia') return isTQLBoard(r);
+    if (cb === 'me' || cb === 'mea') return isTQLBoard(r);
+    return true; // APAC, UK, AUS — all QLs qualify
   }).length;
 }
 
@@ -5318,9 +5328,9 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     if (String(r.qls) === '1') {
       c.ql++;
       // Per-market TQL: US/Canada=NRI, India/MEA=IB/IGCSE board, others=all QLs
-      const _cb = (r.country_bucket || '').trim();
-      const _isUSCan = _cb === 'US' || _cb === 'Canada';
-      const _isIBMkt = _cb === 'India' || _cb === 'IN' || _cb === 'ME' || _cb === 'MEA';
+      const _cb = (r.country_bucket || '').trim().toLowerCase();
+      const _isUSCan = _cb === 'us' || _cb === 'usa' || _cb === 'canada';
+      const _isIBMkt = _cb === 'india' || _cb === 'in' || _cb === 'asia' || _cb === 'me' || _cb === 'mea';
       if (_isUSCan) { if (isNRIEthnicity(r)) c.tql++; }
       else if (_isIBMkt) { if (['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim())) c.tql++; }
       else { c.tql++; } // APAC, UK, AUS — all QLs qualify
@@ -6464,13 +6474,12 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   else if (geoFilter === 'MEA' || geoFilter === 'ME') { tql = qlFiltered.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
   else if (geoFilter === 'all') {
     tql = qlFiltered.filter(r => {
-      const cb = (r['country_bucket'] || '').trim();
-      const eth = (r['ethnicity'] || '').toLowerCase();
+      const cb = (r['country_bucket'] || '').trim().toLowerCase();
       const board = r['board (ME)'] || r['board'] || '';
-      if (cb === 'US' || cb === 'Canada') return isNRIEthnicity(r);
-      if (cb === 'India' || cb === 'IN') return INDIA_TQL_BOARDS.has(board);
-      if (cb === 'ME' || cb === 'MEA') return MEA_TQL_BOARDS.has(board);
-      return true; // APAC, UK — all qualify
+      if (cb === 'us' || cb === 'usa' || cb === 'canada') return isNRIEthnicity(r);
+      if (cb === 'india' || cb === 'in' || cb === 'asia') return INDIA_TQL_BOARDS.has(board);
+      if (cb === 'me' || cb === 'mea') return MEA_TQL_BOARDS.has(board);
+      return true; // APAC, UK, AUS — all qualify
     }).length;
   } else { tql = ql; }
 
