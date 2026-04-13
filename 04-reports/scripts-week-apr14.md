@@ -7,50 +7,44 @@
 
 ---
 
-{"parentUuid":null,"isSidechain":true,"promptId":"a473b170-6a39-4921-b079-ed8ae0cc307d","agentId":"ae0673c7fec7d7f0a","type":"user","message":{"role":"user","content":"You are Forge — Cuemath's video script engine. Regenerate 5 production-ready video scripts. 
+## Script Formats Used
 
-CRITICAL: Every script MUST have voiceover (VO) on every beat. No silent text cards. The VO must sound like a real human talking to another parent — conversational, warm, direct. Not robotic. Not corporate.
-
-Use these EXACT formats from Cuemath's existing scripts:
-
-FORMAT A — Beat-based AI Video:
+**FORMAT A — Beat-based AI Video:**
 ```
 Beat | Visual (AI-easy) | Audio (VO) + On-Screen Text
 ```
 
-FORMAT B — Timed AI Video:  
+**FORMAT B — Timed AI Video:**
 ```
 Time | Visual Direction | Audio (VO) + On-screen Text
 ```
 
-FORMAT C — Timed with sections:
+**FORMAT C — Timed with sections:**
 ```
 [Time range] SECTION NAME
-VO: \"spoken text\"
+VO: "spoken text"
 Visual: description
-OST: \"on-screen text\"
+OST: "on-screen text"
 ```
 
-## BRAND RULES
+## Brand Rules Applied
 - MathFit™ on first mention. FUAR: Fluency, Understanding, Application, Reasoning.
 - Parent-facing. Never address children directly.
 - Banned: classroom, center, guaranteed marks, shortcuts, speed tricks, easy math, unlock potential, bright future, love for learning, amazing, incredible, powerful.
-- CTA: verbal + visual. \"Book a free 1:1 trial\" or \"Book a free trial class\"
+- CTA: verbal + visual. "Book a free 1:1 trial" or "Book a free trial class"
 - Content formula: Lead with emotion → Anchor to system → Close on outcome
-- Headline must contain \"math.\" Every creative must reinforce \"1:1.\"
+- Headline must contain "math." Every creative must reinforce "1:1."
 - Brand reveals LATE — last 3-5 seconds
 
-## REFERENCE: How existing Cuemath AI video scripts sound
+## Reference Tone (from existing Cuemath scripts)
 
-Here's the ACTUAL voice from their scripts — match this tone:
+> "AI can calculate in seconds. What matters now is — can your child explain why those steps work? Because math isn't memorizing steps. It's clear thinking. At Cuemath, we build that in our 1-on-1 live classes. So your child can explain the why. Make your child MathFit™. Book a free 1:1 trial."
 
-\"AI can calculate in seconds. What matters now is — can your child explain why those steps work? Because math isn't memorizing steps. It's clear thinking. At Cuemath, we build that in our 1-on-1 live classes. So your child can explain the why. Make your child MathFit™. Book a free 1:1 trial.\"
+> "Meet Arya. Six months ago, math meant hundreds of worksheets… and she still felt confused. Then she tried Cuemath. With live 1:1 personalized learning — and visuals that actually make ideas click — now she understands the concepts… and enjoys math. Book a free 1:1 trial."
 
-\"Meet Arya. Six months ago, math meant hundreds of worksheets… and she still felt confused. Then she tried Cuemath. With live 1:1 personalized learning — and visuals that actually make ideas click — now she understands the concepts… and enjoys math. Book a free 1:1 trial.\"
+> "Here's the thing about AMC 8 — it's not testing what your child knows. It's testing how they think. And school doesn't really prepare them for that. The kids who do well? They've learned to look at a problem they've never seen before and find a way through it. That's trainable. That's what a Cuemath dedicated tutor actually does."
 
-\"Here's the thing about AMC 8 — it's not testing what your child knows. It's testing how they think. And school doesn't really prepare them for that. The kids who do well? They've learned to look at a problem they've never seen before and find a way through it. That's trainable. That's what a Cuemath dedicated tutor actually does.\"
-
-Notice: conversational, parent-to-parent, specific, no jargon, sounds like a smart friend explaining something.
+Voice: conversational, parent-to-parent, specific, no jargon, sounds like a smart friend explaining something.
 
 ---
 

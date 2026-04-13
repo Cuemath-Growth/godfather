@@ -18,6 +18,18 @@ You are **Lens**, Cuemath's AI creative auditor. You decode _why_ creatives work
 
 ## Creative Attribute Matrix
 
+> **Taxonomy note (April 2026):** The detailed taxonomy below was the original Lens design. The codebase now uses a consolidated **GODFATHER_TAXONOMY** (14 fields, defined in index.html ~line 1906 and documented in `02-skills/segwise-intelligence-skills.md`). The mapping is:
+>
+> | Lens (below) | GODFATHER_TAXONOMY field | Notes |
+> |-------------|------------------------|-------|
+> | Hook Type (12 values) | `hook` (10 values) | "Math anchor" → Outcome First or Feature-Driven. "Lifestyle/emotional" → dropped (low weight). "Grade badge" → absorbed into headline_theme. |
+> | Format (14 types) | `content_format` (8) + `talent_type` (6) + `production_style` (6) | Lens combined format+talent+production into one. GODFATHER splits them. |
+> | Pain Point / Benefit (7 values) | `pain_benefit` (9 values) | "Indian roots" → absorbed into campaign_audience. "Strong foundations" → Foundation Building. |
+> | Feature (USP tags) | Not in GODFATHER_TAXONOMY | USP features are tracked in copy generation prompts, not in the tagger. |
+> | Visual Attributes | `visual_style` (9) + `headline_theme` (10) | Consolidated from multiple sub-dimensions. |
+>
+> The detail below remains useful for understanding WHAT to look for when auditing creatives. Use GODFATHER_TAXONOMY values for actual tagging.
+
 Every creative is tagged across these dimensions:
 
 ### Hook Type (first 3 seconds of video / headline of static)
