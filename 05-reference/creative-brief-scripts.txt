@@ -1,0 +1,3789 @@
+﻿Plan
+LOC 1: Pedagogy + MathFit Definition
+Definition:
+Explain how Cuemath teaches and what “MathFit” means as a skills framework (thinking, reasoning, problem-solving, number sense). It’s a belief-building LOC: “math = thinking”, not “math = worksheets.”
+Videos: 10 (7 NRI | 3 Global)
+Key levers (must hit 2–3 per video):
+* Explain-to-learn (child articulates “why”)
+
+* Reasoning-first (conceptual understanding before speed)
+
+* Critical thinking (patterns, logic, non-routine thinking)
+
+* Number sense (foundational intuition; early grades)
+
+* Progression of skills (skills that scale as grade increases)
+
+* AI-era framing (answers are easy; thinking is the advantage) without drifting into USPs
+Examples: 
+   1. In an AI world, answers are easy. The advantage is reasoning through unfamiliar math questions.
+   2. Your child guesses the answer in math problem in seconds. But when the teacher asks them to explain they freeze?
+   3. Your child can Google math answers in seconds. What matters is how they think through problems to excel in the AI world. 
+   4. Want your child to think clearly under pressure—in math?
+   5. Research shows your child’s confidence affects their grades—especially in math.
+   6. Does your child get the math answer… but can’t explain it?
+   7. Do you hear ‘Oh now I got it’ in math… and then the next question is wrong?
+   8. Does your child forget math a week after learning it?
+   9. Do you want your child to actually understand math, not copy steps?
+________________
+
+
+LOC 2: USPs (Why Cuemath is Better — but without naming competitors)
+Definition:
+Feature-to-outcome messaging: what Cuemath offers that drives results—without direct competitor call-outs. This is where we prove “better” through tangible differentiators.
+Videos: 20 (14 NRI | 6 Global)
+Key levers:
+   * 1:1 personalization (pace, attention, instant correction)
+
+   * Consistency (same tutor / accountability / structured weekly plan)
+
+   * Customization (level-based progression, gap-based plan)
+
+   * Tutor quality (training, approach, child engagement) — keep it outcome-tied
+
+   * Platform advantage (if needed): interactive tools that support learning (not “just Zoom”)
+
+   * Measurable progress (milestones, improvement markers)
+Guardrails:
+      * Don’t mention competitor names.
+
+      * Keep every feature tied to a parent-visible outcome (tests, confidence, independence).
+
+Examples:
+1. Want math progress you can actually see at school?
+2. Do you feel like you don’t even know why your child is stuck in math?
+3. What if someone pinpointed the exact math gap for your child quickly?
+4. Does your child get bored the moment math starts? (leads to platform advantage as proof)
+________________
+
+
+LOC 3: Trial Class (What you get in 1 trial)
+Definition:
+ Crystal-clear “what happens next” LOC: remove friction and build trust by outlining the trial journey: diagnose → teach → plan → next steps.
+Videos: 5 (3 NRI | 2 Global)
+Key levers:
+         * Diagnosis first (identify gaps, current level)
+
+         * Instant value (child learns something in-class)
+
+         * Roadmap output (what we’ll do next + how often)
+
+         * Expectation setting (what parents will see in weeks)
+
+         * Low-risk entry (simple CTA, easy booking)
+Examples:
+            1. Want to see exactly what your child is missing in math?
+            2. In just one class, we’ll not just find the math gaps but also help you create a personalized plan for your child. 
+            3. This is not just a free demo. It’s an actual live 1:1 class with India’s top math tutors.
+            4. You know your child needs that extra help in math but not sure where to begin? Start with this 1:1 trial. 
+________________
+
+
+LOC 4: Acceleration Track (Ahead in School)
+Definition:
+Outcome-led school improvement: help kids move faster with clarity—accuracy, speed, test readiness, homework independence. This is not “remedial”; it’s structured acceleration.
+Videos: 10 (7 NRI | 3 Global)
+Key levers:
+            * Accuracy before speed
+
+            * Time management (finish more questions)
+
+            * Careless mistakes system (checking routines, step discipline)
+
+            * Test calm (reduce freeze, reduce anxiety through structure)
+
+            * Homework independence (parent not needed daily)
+
+            * Visible school outcomes (marks/teacher feedback without overclaiming)
+Examples:
+               1. “Want your child placed in the accelerated math track at school?”
+               2. “If your child is simply keeping up in math, then give them the right tools today to accelerate them at school.”
+               3. “If your child finishes math homework faster than their classmates, they’re ready for more.”
+               4. “Being ‘ahead at school’ isn’t luck. It’s a systematic approach.”
+               5. “To reach the next level in math, your child needs structure, not more worksheets.”
+               6. “Accelerated math track takes a strong math foundation—especially the US common core curriculum.”
+
+More direct “parent intent” variants
+ 7) I want my child to qualify for the advanced math track at school. And I knew I had to start now. 
+8)  Now, he’s not just trying to catch up at school. He’s actually ahead in his math class
+
+
+________________
+
+
+LOC 5: Topicwise Fix (High-intent pain points)
+Definition:
+Single-topic, high-intent creatives: fractions/decimals/word problems/algebra basics, etc. “You’re stuck here → here’s the method → here’s the next step.”
+Videos: 20 (14 NRI | 6 Global)
+Key levers:
+                  * Specificity (one topic per video)
+
+                  * Method reveal (simple framework: steps, visuals, error pattern)
+
+                  * Fast clarity moment (mini “aha”)
+
+                  * Repeatable practice loop (how improvement happens)
+Examples: 
+                     1. Are fractions suddenly making math stressful for your child?
+                     2. Fractions don’t need memorising. They need a method.
+                     3. Why do fractions feel confusing after grade 4?
+                     4. Tired of your child making‘silly mistakes’ in math exams?
+                     5. Does your child freeze on word problems?
+                     6. Fractions feel hard when kids don’t ‘see’ parts of a whole.
+                     7. Most ‘silly mistakes’ in decimals are place-value mistakes.
+                     8. If 0.6 and 0.06 look the same to your child, then they are not actually understanding math.
+                     9. Your child starts solving… then suddenly doesn’t know what to do next.
+                     10. Long math questions are where marks disappear.
+                     11. Is your child still guessing the next step while solving their math problems? They worksheets won’t help. 
+________________
+
+
+LOC 6: Competition Track (AMC8 / Kangaroo / MOEMS / Olympiad mindset)
+Videos: 20 (14 NRI | 6 Global)
+Definition:
+ Non-routine problem-solving and strategy. Position as “thinking math” training: approach, patterns, reasoning under time.
+Key levers:
+                     * School math ≠ contest math (non-routine)
+
+                     * Strategy frameworks (approach-first)
+
+                     * Reasoning under pressure
+
+                     * Consistency + deliberate practice
+
+                     * Mistake analysis (learn from patterns of errors)
+
+Guardrails:
+                        * Avoid “guaranteed ranks/medals”; keep it training-focused.
+Examples:
+                        1. Want your child to feel confident walking into Math Kangaroo?
+                        2. Planning AMC 8 this year? Don’t leave prep to the last month.
+                        3. Want your child to score higher on AMC 8 without stress?
+                        4. Want your child to feel confident walking into Math Kangaroo
+                        5. Your child knows how to solve competiton style questions… but cracks under pressure?
+                        6. The real problem why your child is scared of math competions isn’t the math— it’s time management. 
+                        7. School math alone won’t help your child ace competitive prep. 
+                        8. At Cuemath, we train kids in timed problem-solving so they don’t panic on hard questions in exams. 
+
+
+________________
+
+
+LOC 7: High School Track (Grades 8–12 / SAT-style readiness)
+Definition:
+ Address the high school “math jump”: algebra/functions/geometry reasoning and avoiding repeated relearning. Structured clarity → performance.
+Videos: 10 (7 NRI | 3 Global)
+Key levers:
+                        * Foundation exposure (why it suddenly feels hard)
+
+                        * Concept chains (prerequisite linking)
+
+                        * Accuracy + step discipline
+
+                        * Reasoning focus (esp. geometry/functions)
+
+                        * Exam-style readiness (timed thinking, without overpromising)
+Examples:
+                           1. “Algebra was fine last year—what changed this year?”
+                           2. “Long math questions are where marks disappear.”
+                           3. “Your child isn’t ‘bad at math’—they’re losing marks in the steps.”
+                           4. “One weak topic can slow every chapter in high school math.”
+                           5. “You’re paying for practice, but the same mistakes keep repeating.”
+                           6. “Ahead in math class is good. Staying ahead needs structure.”
+                           7. “Top students don’t do more problems—they fix gaps early.”
+                           8. “SAT math isn’t a Grade 11 problem—it’s a thinking habit built earlier.”
+                           9. Competitive colleges reward course rigor—high school math is where that starts.
+                           10. “Want your child to get into top STEM colleges? Then top math grades alone won’t help.
+
+
+LOC 8: Offline vs Online
+Definition (brand-book aligned)
+Reframe the bias that “offline = real learning” and “online = passive.”
+Cuemath’s stance: it’s not just online learning — it’s smarter learning because the experience is hands-on, visual, collaborative, and math-first.
+Videos: 10 (7 NRI | 3 Global)
+Key levers (pick 2–3 per video)
+                           * Learn by doing, not watching (active participation)
+
+                           * Collaboration live: tutor + child solve together (not “tutor talks, child listens”)
+
+                           * Visual math tools (whiteboard/visual cues make concepts stick)
+
+                           * Gamified daily habits (daily challenges/puzzles that build fluency + fun)
+
+                           * Designed for math, not repurposed video (math-first platform)
+Examples:
+                              1. Watching a teacher solve math on a whiteboard isn’t the same as doing it, be it online or offline classes. 
+                              2. In a good math class, your child isn’t a spectator—they solve live with the tutor and get instant feedback.
+                              3. Algebra and geometry don’t click from listening—they click when kids see the concepts visually.
+                              4. Who said online math classes aren’t interactive? At Cuemath, kids write on our whiteboard, explain their answers, and win badges during the class.
+                              5. This isn’t another math tuition class on Zoom—it’s live problem-solving with your tutor.
+                              6. Why waste time commuting when your child can learn math with the best Indian tutors at home? 
+________________
+
+
+LOC 9: Group Classes vs 1:1 Classes
+Definition 
+Contrast “slice of attention” in group settings vs full personalization in 1:1.
+ This is about attention, pace, feedback, and accountability — regardless of online/offline medium.
+Videos: 10 (7 NRI | 3 Global)
+Key levers
+                              * Full tutor focus vs “a slice of attention”
+
+                              * Pace matching (fast where strong, slow where gaps exist)
+
+                              * Instant correction (fix misconceptions in the moment)
+
+                              * Participation (quiet kids speak up in 1:1)
+
+                              * Long-term mentorship / relationship (trust → progress)
+Examples:
+1. Your child shouldn’t slow down—or be rushed—to keep up with the class In 1:1, everything is personalised to them. 
+2. In a group, the pace is for the class. In 1:1, the pace is for your child.
+3. In group classes, doubts wait. In 1:1, doubts get solved immediately.
+4. One teacher can’t fix twenty different gaps at the same time.
+5. Quiet kids fall behind in batches. 1:1 makes them participate.
+6. This is not batch coaching. It’s focused learning with instant correction.
+7. Your child needs a tutor who knows their learning patterns, gaps, and strengths.
+
+LOC 10: Quirky 
+Definition
+A performance LOC that uses snackable social proof + math-meme interstitials to create thumb-stopping attention, then converts with a tight VO explainer tied to Cuemath’s pedagogy/MathFit (without drifting into generic “funny content”).
+Videos: 10 (6 NRI | 4 Global)
+Pillar A: Social Proof (non-testimonial)
+What it means
+Proof delivered as visual evidence (cards/quotes/ratings/outcomes) — not parent talking-head testimonials.
+Key levers
+                                 * Proof cards: “Parent outcome snippets” (blurred names), rating-style tiles, “most common parent wins”
+
+                                 * Outcome framing (high intent):
+
+                                    * “fewer careless mistakes”
+
+                                    * “child explains answers”
+
+                                    * “tests feel calmer”
+
+                                    * “homework independence”
+
+                                       * Credibility stacking: 3 proof bites in 10 seconds (fast cuts, big captions)
+
+                                       * No overpromises: say “parents report / commonly seen” vs “guaranteed”
+
+What this looks like (structure)
+0–3s: Proof punch (big card)
+3–15s: 2–3 more proof cards (rapid)
+15–35s: VO explains why (MathFit / method)
+35–45s: CTA
+Examples:
+                                          1. One method to stop algebra from feeling abstract.
+                                          2. One checking habit that saves marks.
+                                          3. One alignment rule that fixes decimal errors.
+                                          4. This is why worksheets fail most kids.
+________________
+
+
+Pillar B: Math Memes + VO Explainers (interstitial style)
+What it means
+Use math meme moments every 3–5 seconds as pattern interrupts, but keep a single clear VO spine that teaches something.
+Key levers
+                                          * Meme → meaning: meme must map to a concept (guessing, memorizing, careless mistakes, word problem freeze)
+
+                                          * Interstitial cadence: meme beat every 3–5 sec (visual + text), VO stays calm and authoritative
+
+                                          * One takeaway per ad: “Stop guessing → build number sense” / “Accuracy routine fixes careless mistakes”
+
+                                          * Asian-parent-coded tone: structured, disciplined, early mastery
+
+What this looks like (structure)
+0–3s: Meme + pain (hard stop)
+3–12s: “That’s not laziness. It’s a gap.”
+12–30s: 3-step framework (visual overlay)
+30–45s: proof card + CTA
+Example: AUS
+                                             1. Most parents say the same thing: math homework turns into a daily argument.
+                                             2. “Sillymistakes” in math tests usually come from the same missing step.
+                                             3. Most kids don’t hate math—they hate feeling lost halfway through a problem.
+                                             4. When kids understand the math, they stop dreading it. 
+                                             5. 
+
+LOC 11: Parent Relief
+Definition 
+Creatives that start from the parent’s lived reality (time, energy, household routine) and promise a specific relief outcome: the child can do math more independently, with fewer fights, and less parent involvement—because the child has a clear method and support system.
+Videos: 10 (7 NRI | 3 Global)
+Key levers 
+                                             * Homework independence: child starts/finishes without parent sitting beside them
+
+                                             * Weeknight stress reduction: fewer arguments, less tension around math
+
+                                             * Energy timing: math happens when kids are tired → build a smoother routine
+
+                                             * Parent time back: parent stops becoming the math teacher
+
+                                             * Consistency/routine: repeatable structure that fits busy schedules
+
+                                             * Emotional relief: calmer evenings, less dread around math
+
+Examples:
+                                                1. Do you end up teaching math at home every night?
+                                                2. Between school, activities, and dinner—does math turn into a fight?
+                                                3. What if math homework didn’t need you sitting beside them?
+                                                4. 3 mistakes parents make with early math.
+                                                5. 5 signs your child needs math help now.
+                                                6. You shouldn’t have to sit beside your child for every math question.
+                                                7. Math homework shouldn’t take the whole evening.
+                                                8. Weeknights are already full. Math shouldn’t add stress.
+                                                9. Our goal is simple: your child starts math homework on their own.
+                                                10. Less arguing. More independence in math. That’s the real win at home.
+
+
+
+
+Copywriting formulas to use:
+
+
+This handbook is designed for training. Each section starts with the Formula Definition, followed by a Mapped Script where every sentence is explicitly tagged to its corresponding part of the formula.
+________________
+
+
+1. PAS (Problem – Agitate – Solution)
+Formula:
+                                                * Problem: State a specific frustration.
+                                                * Agitate: Explain the emotional or long-term cost of that problem.
+                                                * Solution: Introduce the Cuemath way as the relief.
+Mapped Script:
+                                                * (Problem): "Math homework used to end in tears at our house every single night."
+                                                * (Agitate): "Watching my daughter lose her confidence was the hardest part—she felt 'slow' because she was trying to memorize steps she didn't actually understand."
+                                                * (Solution): "We switched to Cuemath, where tutors don't just give the answers—they help kids understand the logic behind the numbers."
+                                                * (CTA): "Stop the homework battle. Book a free trial today."
+________________
+
+
+2. BAB (Before – After – Bridge)
+Formula:
+                                                * Before: The "Chaos" state (life before Cuemath).
+                                                * After: The "Success" state (life after Cuemath).
+                                                * Bridge: The specific part of the Cuemath method that caused the change.
+Mapped Script:
+                                                * (Before): "Two months ago, I had to sit over my son for two hours just to get him through one page of math."
+                                                * (After): "Yesterday, I found him doing his homework on his own—with a smile on his face."
+                                                * (Bridge): "The difference was switching to a method that focuses on why math works, rather than just how to get the answer."
+                                                * (CTA): "Get your evenings back. Try a free session today."
+________________
+
+
+3. AIDA (Attention – Interest – Desire – Action)
+Formula:
+                                                * Attention: A bold, scroll-stopping hook.
+                                                * Interest: A surprising fact or insight that keeps them watching.
+                                                * Desire: The emotional payoff of the product.
+                                                * Action: A clear command.
+Mapped Script:
+                                                * (Attention): "Stop telling your kids to memorize math formulas!"
+                                                * (Interest): "Most kids struggle because they are taught to follow a recipe. But when the recipe changes on a test, they get lost."
+                                                * (Desire): "Cuemath builds 'Math Logic.' Our students learn to explain their reasoning, so the concepts actually stick for life."
+                                                * (Action): "Build a foundation that lasts. Book a free trial now."
+________________
+
+
+4. FAB (Feature – Advantage – Benefit)
+Formula:
+                                                * Feature: A factual part of the service.
+                                                * Advantage: What that feature does.
+                                                * Benefit: How that makes the parent’s or child's life better.
+Mapped Script:
+                                                * (Feature): "Cuemath provides 1-on-1 sessions with visual learning tools."
+                                                * (Advantage): "This means your child gets a personal mentor's full attention and can actually see how the numbers work."
+                                                * (Benefit): "The result is no more guessing on tests and a child who feels genuinely smart in the classroom."
+                                                * (CTA): "Experience the difference. Book a free class."
+________________
+
+
+5. 4Ps (Promise – Picture – Proof – Push)
+Formula:
+                                                * Promise: A bold claim of a result.
+                                                * Picture: Helping the parent visualize a better reality.
+                                                * Proof: A demonstration or evidence of success.
+                                                * Push: A low-friction call to action.
+Mapped Script:
+                                                * (Promise): "We promise to turn your child into a confident, independent math learner."
+                                                * (Picture): "Imagine a world where you never have to argue about math homework ever again."
+                                                * (Proof): "[Video: Student explains a concept to a tutor] This is the 'Aha!' moment our students experience every day."
+                                                * (Push): "Don't wait for the next report card. Click below to try it risk-free."
+________________
+
+
+6. Myth vs. Reality (Contrast)
+Formula:
+                                                * Myth: A common but incorrect belief.
+                                                * Reality: The logical truth.
+                                                * Transition: How Cuemath delivers that truth.
+Mapped Script:
+                                                * (Myth): "A lot of parents think some kids are just born 'bad at math.'"
+                                                * (Reality): "The truth is, kids don't hate math; they hate being confused. Most struggle is just a lack of logic-based teaching."
+                                                * (Transition): "Cuemath fixes the confusion. Our tutors ensure your child never feels lost in a crowded classroom again."
+                                                * (CTA): "Change their math story. Book a free trial."
+________________
+
+
+7. VSL Light (The Logic Chain)
+Formula:
+                                                * Goal: The big-picture outcome.
+                                                * Obstacle: Why they aren't reaching it now.
+                                                * Solution: How Cuemath removes that obstacle.
+Mapped Script:
+                                                * (Goal): "Your child’s future career in tech or science starts with a strong math foundation."
+                                                * (Obstacle): "But in a crowded classroom, a teacher can't stop the whole lesson just to help one student catch up."
+                                                * (Solution): "Cuemath provides a personal math mentor who moves at your child's exact pace, ensuring every concept is mastered."
+                                                * (CTA): "Invest in their future. Sign up for a free session."
+________________
+
+
+8. Social Proof (Trust)
+Formula:
+                                                * Social Proof: Evidence of global scale.
+                                                * Authority: The credentials/quality behind the service.
+                                                * Result: The outcome for the community.
+Mapped Script:
+                                                * (Social Proof): "There’s a reason over 200,000 parents in 80 countries have chosen Cuemath."
+                                                * (Authority): "We combine a world-class curriculum with the top 1% of certified math tutors to deliver results schools can't match."
+                                                * (Result): "Our students consistently show a massive boost in logical reasoning within the first few months."
+                                                * (CTA): "Join the global community. Book your free diagnostic test."
+________________
+
+
+9. The Checklist (Self-Selection)
+Formula:
+                                                * Qualify: Ask questions to find the right audience.
+                                                * Identify: Name the common root cause.
+                                                * Cure: Present the solution.
+Mapped Script:
+                                                * (Qualify): "Is your child making silly mistakes on easy problems? Forgetting what they learned by the next day? Or saying 'I’m just not good at math'?"
+                                                * (Identify): "These aren't 'ability' issues—they are signs of a weak foundation built on memorization."
+                                                * (Cure): "Cuemath’s 1-on-1 sessions find those gaps and fill them with logic-based learning."
+                                                * (CTA): "Stop the cycle today. Try a free class."
+________________
+
+
+10. Risk Reversal (The Barrier-Breaker)
+Formula:
+                                                * Objection: Acknowledge the parent's hesitation.
+                                                * Counter: Provide a logical reason why it’s not an issue.
+                                                * Guarantee: Remove the financial/time risk.
+Mapped Script:
+                                                * (Objection): "I know you're worried about adding another 'extra' class to your child's busy schedule."
+                                                * (Counter): "But because Cuemath is 1-on-1, it’s highly efficient. We solve core issues in one hour that schools struggle to fix in a month."
+                                                * (Guarantee): "The first session is completely free. If they don't feel more confident after 60 minutes, you've lost nothing."
+                                                * (CTA): "Try it risk-free. Book now."
+
+
+
+
+Hooks
+K-2 
+
+
+TOPIC 1: MATH BASICS & FOUNDATIONS
+1.
+ Hook: Is your child struggling with basic math?
+Follow-up: Grade X basics decide everything later.
+Proof beats: 1:1 live classes • Strong foundations, explained simply • Aligned to the US Common Core curriculum
+ CTA: Book a free Cuemath trial class.
+2.
+ Hook: If your child is guessing in math…
+Follow-up: It usually means the concepts are not clear yet.
+Proof beats: Personalized plan • Same tutor each class • Common Core topics, taught with clearer basics
+CTA: Try a free 1:1 class.
+3.
+ Hook: Basic math should feel simple.
+Follow-up: If it doesn’t, the basics need fixing.
+Proof beats: Concepts first • 1:1 attention • No random topics—Common Core–aligned
+ CTA: Start with a free trial.
+4.
+ Hook: Math confusion starts small in early ages.
+Follow-up: And it stacks up fast.
+Proof beats: Foundations-first plan • Parent progress updates • Aligned to your child’s grade in US Common Core
+ CTA: Book a free class.
+5.
+ Hook: Don’t let your child “just manage” math.
+Follow-up: Help them actually understand it now.
+Proof beats: Clear “why” behind answers • Personalized pace • Common Core–aligned learning that shows up in homework
+CTA: Try a free trial class.
+________________
+
+
+TOPIC 2: CONFIDENCE & MATH FEAR
+6.
+ Hook: Does your child say, “I can’t do math”?
+Follow-up: Most times, they’re just confused.
+Proof beats: Calm 1:1 support • Tutor explains until it clicks • Same Common Core topics—made easier
+CTA: Book a free trial.
+7.
+ Hook: Math shouldn’t feel scary in Grade 1.
+Follow-up: Fix it early—before it becomes a habit.
+Proof beats: Gentle pace • Same tutor for comfort • Common Core–aligned so it matches school
+CTA: Try a free 1:1 class.
+8.
+ Hook: If math feels hard, kids shut down.
+Follow-up: Confidence comes when it makes sense.
+Proof beats: Concepts made simple • 1:1 attention • Parent progress updates
+CTA: Start with a free trial.
+9.
+ Hook: Your child doesn’t need pressure in math.
+Follow-up: They need clarity.
+Proof beats: Personalized learning plan • Same tutor long-term • Common Core–aligned so there’s no mismatch
+CTA: Book a free class.
+10. (Parent Proof)
+ Hook: “My child doesn’t fear math anymore.”
+Follow-up: That’s what clarity does.
+Proof beats: 1:1 live teaching • Consistent tutor • Aligned to US Common Core
+ CTA: Try a free trial class.
+________________
+
+
+TOPIC 3: HOMEWORK STRESS & PARENT PAIN
+11.
+ Hook: Why does math homework take so long?
+Follow-up: Usually there concepts aren’t clear.
+Proof beats: 1:1 clears confusion fast • Simple steps kids can repeat • Aligned to Common Core homework topics
+CTA: Book a free trial.
+12.
+ Hook: Math homework shouldn’t end in fights.
+Follow-up: When kids understand, they stop resisting.
+Proof beats: Concepts-first teaching • Same tutor builds routine • Common Core–aligned, so it helps right away
+CTA: Try a free class.
+13.
+ Hook: If you have to explain every math question…
+Follow-up: It’s not more homework that your child needs.
+Proof beats: Tutor builds independence • 1:1 attention • Same Common Core topics, taught clearly
+CTA: Start a free 1:1 trial.
+14.
+ Hook: Math homework shouldn’t steal your evenings.
+Follow-up: Fix the basics—and homework gets easier.
+Proof beats: Strong foundations • Parent updates • Common Core–aligned learning
+CTA: Book a free trial.
+15. (Parent Proof)
+ Hook: “Math homework is faster and calmer now.”
+Follow-up: That’s the power of clarity.
+Proof beats: 1:1 support • Consistent tutor • Common Core topics, not random practice
+CTA: Try a free class.
+________________
+
+
+TOPIC 4: ENGAGEMENT & BOREDOM (PLATFORM: VISUALS, GAMES, STICKERS)
+16.
+ Hook: Does your child get bored in math fast?
+Follow-up: Then math needs to feel more kid-friendly.
+Proof beats: Fun visuals + games • Stickers/rewards • Practice matched to US Common Core topics
+CTA: Book a free trial.
+17.
+ Hook: If math feels boring, kids stop trying.
+Follow-up: We keep it visual, active, and fun.
+Proof beats: Interactive practice • Tutor keeps it engaging live • Common Core–aligned practice
+CTA: Try a free class.
+18.
+ Hook: Worksheets don’t work for every kid.
+Follow-up: Some kids need math to feel playful.
+Proof beats: Visual learning tools • Rewards that motivate • Aligned to US Common Core
+ CTA: Book a free trial.
+19. (Parent Proof)
+ Hook: “My child stays engaged in math now.”
+Follow-up: Because it feels fun—not like a lecture.
+Proof beats: Games + visuals • 1:1 live interaction • Common Core–aligned learning
+CTA: Try a free 1:1 class.
+________________
+
+
+TOPIC 5: TUTOR TRUST & CONSISTENCY
+20.
+ Hook: The right math tutor changes everything.
+Follow-up: Especially for small kids.
+Proof beats: Same tutor every class • Tutor matched to your child • Common Core–aligned plan
+CTA: Book a free trial.
+21.
+ Hook: Does your child take time to warm up?
+Follow-up: Then switching math tutors won’t help.
+Proof beats: Consistent tutor relationship • Personalized plan • Aligned to US Common Core
+ CTA: Try a free class.
+22. (Parent Proof)
+ Hook: “Our tutor really understands my child.”
+Follow-up: That’s when math started improving.
+Proof beats: Same tutor long-term • Calm 1:1 support • Common Core topics
+CTA: Book a free trial.
+________________
+
+
+TOPIC 6: AI-WORLD / FUTURE-READY THINKING (GENERAL CONTEXT, NOT PRODUCT AI)
+23.
+ Hook: In an AI world, answers are easy—thinking matters.
+Follow-up: Math is where kids learn to think clearly.
+Proof beats: Foundations + clarity • 1:1 live classes • Common Core–aligned learning
+CTA: Try a free trial.
+24.
+ Hook: Don’t just aim for math answers.
+Follow-up: Build problem-solving your child can explain.
+Proof beats: Clear “why” behind answers • Tutor builds thinking habits • Aligned to US Common Core
+ CTA: Book a free class.
+25.
+ Hook: Your child won’t win on speed alone.
+Follow-up: They’ll win on clear thinking.
+Proof beats: Concepts first • Personalized pace • Common Core–aligned foundation-building
+CTA: Try a free trial.
+26.
+ Hook: Screens can give answers.
+Follow-up: Your child needs understanding.
+Proof beats: 1:1 guidance • Strong foundations • US Common Core–aligned practice
+CTA: Book a free class.
+________________
+
+
+TOPIC 7: BUSY PARENT / ROUTINE BREAKS (UNIVERSAL, WORKS FOR NRIs TOO)
+27.
+ Hook: If your evenings are chaos, math needs to be simple.
+Follow-up: A clear plan saves time and stress.
+Proof beats: Same tutor weekly • Personalized plan • Common Core–aligned so it matches school
+Optional reassurance: Reschedule/pause/cancel; refund unused classes
+CTA: Book a free trial.
+28.
+ Hook: Working parents—math shouldn’t depend on your time.
+Follow-up: Your child needs consistent support.
+Proof beats: 1:1 live classes • Same tutor every class • Common Core–aligned
+ Optional reassurance: Flexible rescheduling if needed
+CTA: Try a free class.
+29.
+ Hook: When routines break, math slips fast.
+Follow-up: Especially in K–2.
+Proof beats: Steady weekly routine • Parent updates • Aligned to US Common Core topics
+Optional reassurance: Pause/cancel options
+CTA: Book a free trial.
+________________
+
+
+TOPIC 8: REELS LISTICLES (RETENTION FORMATS)
+30.
+ Hook: 3 reasons your child struggles in math.
+Follow-up: Reason one: the basics were never fully clear.
+Proof beats: 1:1 clarity-first teaching • Same tutor consistency • Common Core–aligned plan
+CTA: Book a free trial.
+31.
+ Hook: 5 signs your child needs help in math.
+Follow-up: Sign one: guessing instead of understanding.
+Proof beats: Personalized plan • Tutor explains until it clicks • Aligned to US Common Core
+ CTA: Try a free class.
+32.
+ Hook: 3 mistakes parents make with early math.
+Follow-up: Mistake one: rushing answers before understanding.
+Proof beats: Concepts first • Calm pace • Common Core–aligned learning
+CTA: Book a free trial.
+________________
+
+
+
+
+VO PROOF-BEAT BANK (Natural, spoken lines)
+A) Core learning (pick 1–2)
+                                                * “It’s 1:1, so my child actually gets attention.”
+
+                                                * “They slow down and make sure my child really understands.”
+
+                                                * “They start from the basics, so nothing feels shaky.”
+
+                                                * “It’s not rushing — it’s building it properly.”
+
+                                                * “My child stopped guessing because it finally made sense.”
+
+                                                * “They teach the ‘why’ in a way kids get.”
+
+B) US Common Core alignment (pick 1)
+                                                   * “It follows the US Common Core, so it matches what school is doing.”
+
+                                                   * “It’s the same Common Core topics my child is learning in class.”
+
+                                                   * “So it doesn’t feel like ‘extra’ math — it helps with school math.”
+
+                                                   * “We weren’t doing random stuff — it was aligned to school.”
+
+C) Engagement / boredom (platform) (pick 1)
+                                                      * “My child stays involved because it’s visual and fun.”
+
+                                                      * “They use games and little rewards, so my child actually tries.”
+
+                                                      * “The stickers sound small, but it really motivates my kid.”
+
+                                                      * “It doesn’t feel like a worksheet — my child actually participates.”
+
+                                                      * “My kid doesn’t zone out — it keeps them engaged.”
+
+D) Tutor consistency & trust (pick 1)
+                                                         * “It’s the same tutor, so my child opened up faster.”
+
+                                                         * “Not starting over with a new teacher every week helped a lot.”
+
+                                                         * “My child got comfortable — that’s when progress started.”
+
+                                                         * “The tutor knows exactly where my child gets stuck.”
+
+E) Parent relief / independence (pick 1)
+                                                            * “I don’t have to sit for every question anymore.”
+
+                                                            * “Homework got easier because the classwork made sense.”
+
+                                                            * “Evenings are calmer now — math doesn’t take over.”
+
+                                                            * “My child tries first instead of calling me immediately.”
+
+F) Progress visibility (pick 1)
+                                                               * “I can actually see what my child improved on.”
+
+                                                               * “I’m not guessing anymore — I know what they’re working on next.”
+
+                                                               * “It’s clearer to me what’s going well and what needs help.”
+
+G) AI-world bridge (general context, not product AI) (pick 1)
+                                                                  * “In an AI world, answers are everywhere — thinking is the real skill.”
+
+                                                                  * “I don’t just want answers. I want my child to understand.”
+
+                                                                  * “The goal is clear thinking — and math is a great place to build it.”
+
+H) Optional reassurance (policies) — keep it light (pick 1, only if needed)
+                                                                     * “And if our week gets crazy, we can reschedule.”
+
+                                                                     * “If we travel, we can pause and continue.”
+
+                                                                     * “If it doesn’t work for us, we can stop — we’re not stuck.”
+
+I) CTA bank (pick 1)
+                                                                        * “Book a free trial class.”
+
+                                                                        * “Try one class and see the difference.”
+
+                                                                        * “Start with a free trial.”
+
+
+
+3-6
+
+
+TOPIC 1: GRADES & SCHOOL CONFIDENCE
+1.
+ Hook: What if you stopped worrying about math grades?
+Follow-up: That happens when your child truly understands the basics.
+Proof beats: 1:1 live classes • Foundations-first • US Common Core–aligned
+CTA: Book a free trial class.
+2.
+ Hook: Want math progress you can actually see at school?
+Follow-up: Not just “more practice”—better understanding.
+Proof beats: Concepts-first learning • Same tutor weekly • Common Core topics
+CTA: Try a free class.
+3.
+ Hook: Imagine your child feeling confident in math class.
+Follow-up: No guessing—just knowing what to do.
+Proof beats: Clarity that builds confidence • Guided practice • US Common Core–aligned
+CTA: Book a free trial.
+________________
+
+
+TOPIC 2: WORD PROBLEMS & MULTI-STEP QUESTIONS
+4. (Question)
+ Hook: Does your child get stuck on math word problems?
+Follow-up: Most kids struggle with the thinking steps, not the reading.
+Proof beats: Tutor guides reasoning (cue-don’t-tell) • Practice like school questions • Common Core–aligned
+CTA: Try a free class.
+5.
+ Hook: What if word problems stopped ending in frustration?
+Follow-up: Your child learns to break them down calmly.
+Proof beats: 1:1 live guidance • Think-aloud reasoning • Common Core word-problem practice
+CTA: Book a free trial.
+6. (Question)
+ Hook: Does your child freeze on long math questions?
+Follow-up: They need to feel sure about the steps.
+Proof beats: Guided multi-step practice • Strong foundations • US Common Core–aligned
+CTA: Start a free trial.
+________________
+
+
+TOPIC 3: FRACTIONS & DECIMALS (BIGGEST 3–6 BREAKPOINT)
+7. (Question)
+ Hook: Are fractions suddenly making math stressful?
+Follow-up: This is where a lot of kids lose confidence.
+Proof beats: Foundations-first • Clear explanations • Common Core fractions topics
+CTA: Book a free trial.
+8.
+ Hook: Imagine your child not skipping fraction questions anymore.
+Follow-up: Because fractions finally make sense.
+Proof beats: 1:1 clarity-building • Practice at the right level • US Common Core–aligned
+CTA: Try a free class.
+9. (Question)
+ Hook: Do decimals cause silly mistakes again and again?
+Follow-up: That usually means one gap is still unclear.
+Proof beats: Tutor fixes gaps • Guided feedback • Common Core topics
+CTA: Book a free trial.
+________________
+
+
+TOPIC 4: SILLY MISTAKES, TEST CALM, SPEED (WITHOUT PRESSURE)
+10. (Question)
+ Hook: Tired of seeing “careless mistakes” in math tests?
+Follow-up: Most kids rush when they’re not fully sure.
+Proof beats: Builds thinking habits • Simple checking routine • US Common Core aligned
+CTA: Try a free class.
+11.
+ Hook: What if math tests felt calmer for your child?
+Follow-up: When the steps are clear, panic drops.
+Proof beats: Clarity-first learning • Guided practice • Common Core topics
+CTA: Book a free trial.
+12.
+ Hook: Want your child to finish more questions in math tests?
+Follow-up: Speed comes naturally when the method is clear.
+Proof beats: Fluency builds over time • Feedback that improves accuracy • US Common Core aligned
+CTA: Start a free trial.
+________________
+
+
+TOPIC 5: INDEPENDENCE (HOMEWORK WITHOUT YOU)
+13.
+ Hook: What if math homework didn’t need you sitting beside them?
+Follow-up: That independence can be built—step by step.
+Proof beats: Cue-don’t-tell (no spoon-feeding) • Same tutor weekly • Common Core topics
+CTA: Book a free trial.
+14. (Question)
+ Hook: Do you end up teaching math at home every night?
+Follow-up: Your child needs clarity—not more homework.
+Proof beats: 1:1 live classes • Tutor guides reasoning • US Common Core–aligned
+CTA: Try a free class.
+15.
+ Hook: Imagine your child starting math homework on their own.
+Follow-up: And only coming to you when it’s truly needed.
+Proof beats: Builds thinking habits • Guided practice • Common Core topics
+CTA: Book a free trial.
+________________
+
+
+TOPIC 6: BUSY EVENINGS / ROUTINE BREAKS (SPECIFIC, NOT “CHAOS”)
+16. (Question)
+ Hook: Between school, activities, and dinner—does math turn into a fight?
+Follow-up: That’s when confusion feels twice as big.
+Proof beats: Same tutor weekly • 1:1 clarity-building • US Common Core aligned
+Optional reassurance: Reschedule/pause/cancel; unused classes refundable
+CTA: Try a free class.
+17. (Question)
+ Hook: Does math homework happen when your child is already tired?
+Follow-up: A clear way to solve makes nights faster and calmer.
+Proof beats: Concepts-first learning • Guided practice • Common Core topics
+CTA: Book a free trial.
+18.
+ Hook: What if weeknights didn’t end with math stress?
+Follow-up: Clear basics change the whole routine.
+Proof beats: Foundations-first • Same tutor weekly • US Common Core aligned
+CTA: Start a free trial.
+________________
+
+
+TOPIC 7: ENGAGEMENT & MOTIVATION (PLATFORM — SELECTIVE)
+19. (Question)
+ Hook: Does your child get bored the moment math starts?
+Follow-up: Then practice won’t stick—no matter what you try.
+Proof beats: Visual, interactive learning • Games + rewards • Common Core topics
+CTA: Try a free class.
+20.
+ Hook: What if math practice didn’t feel like a chore?
+Follow-up: Kids do better when it feels active and engaging.
+Proof beats: Interactive practice • Tutor keeps it involved live • US Common Core aligned
+CTA: Book a free trial.
+________________
+
+
+TOPIC 8: GAP DIAGNOSIS (HIGH PARENT INTENT: “WHAT IS MY CHILD MISSING?”)
+21. (Question)
+ Hook: Do you feel like you don’t even know what your child is stuck on in math?
+Follow-up: Most times, it’s one small gap that’s been missed.
+Proof beats: Personalized plan • Foundations-first • US Common Core aligned
+CTA: Book a free trial.
+22.
+ Hook: What if someone pinpointed the exact math gap quickly?
+Follow-up: Progress becomes much easier after that.
+Proof beats: 1:1 attention • Tutor fixes foundations • Common Core topics
+CTA: Try a free class.
+________________
+
+
+TOPIC 9: RETENTION (LEARNED IT… FORGOT IT)
+23. (Question)
+ Hook: Does your child learn math today… and forget it next week?
+Follow-up: That usually means memorizing, not understanding.
+Proof beats: Learn the “why” • Tutor guides reasoning • US Common Core aligned
+CTA: Start a free trial.
+24.
+ Hook: What if math actually stayed with your child?
+Follow-up: That’s what happens when basics are clear.
+Proof beats: Concepts-first • Guided practice • Same tutor weekly
+CTA: Book a free class.
+________________
+
+
+TOPIC 10: AI-ERA THINKING (CLEAR “HOW/WHY” BRIDGE)
+25.
+ Hook: Your child can Google math answers in seconds.
+Follow-up: School still rewards understanding and clear steps.
+Proof beats: Concepts-first learning • Think-aloud reasoning • US Common Core aligned
+CTA: Book a free trial.
+26.
+ Hook: With AI everywhere, copying answers is easy.
+Follow-up: Explaining the “why” is the real advantage.
+Proof beats: Tutor guides reasoning (cue-don’t-tell) • Strong foundations • Common Core topics
+CTA: Try a free class.
+27.
+ Hook: Want your child to think clearly under pressure—in math?
+Follow-up: That starts with deep understanding, not shortcuts.
+Proof beats: Clarity-first learning • Guided practice • US Common Core aligned
+CTA: Start a free trial.
+________________
+
+
+TOPIC 11: 1:1 VS GROUP (AND ONLINE VS OFFLINE)
+28. (Question)
+ Hook: Feel like group math classes aren’t helping enough?
+Follow-up: It’s hard to fix one child’s exact gap in a group.
+Proof beats: Truly 1:1 attention • Personalized plan • US Common Core aligned
+CTA: Try a free class.
+29.
+ Hook: What if math class actually moved at your child’s pace?
+Follow-up: That’s where 1:1 makes a difference.
+Proof beats: Full tutor focus • Same tutor weekly • Common Core topics
+CTA: Book a free trial.
+30.
+ Hook: Online math can work—when it’s interactive.
+Follow-up: Kids learn by doing, not just watching.
+Proof beats: Solve together live • Visual tools + practice • US Common Core aligned
+CTA: Try a free class.
+________________
+
+
+TOPIC 12: COMPETITIONS (MATH KANGAROO / AMC 8 / MOEMS)
+31. (Question)
+ Hook: Thinking about Math Kangaroo for your child this year?
+Follow-up: Strong basics first—then challenge questions.
+Proof beats: Foundations-first • Guided problem-solving • Weekly consistency
+CTA: Book a free trial.
+32.
+ Hook: Want your child to feel ready for AMC 8?
+Follow-up: They need clear thinking—not memorized steps.
+Proof beats: Reasoning habits • Gradual challenge practice • Fluency over time
+CTA: Try a free class.
+33.
+ Hook: MOEMS problems feel “different” to your child?
+Follow-up: They test thinking—so we build that thinking step by step.
+Proof beats: Break problems down • Explain reasoning • Confidence through clarity
+CTA: Book a free trial.
+________________
+
+
+TOPIC 13: LISTICLES (META RETENTION FORMAT)
+34.
+ Hook: 3 reasons word problems feel hard in grades 3–6.
+Follow-up: One: kids don’t know the thinking steps.
+Proof beats: Tutor guides reasoning • Practice like school questions • Common Core aligned
+CTA: Try a free class.
+35.
+ Hook: 5 signs your child needs math help right now.
+Follow-up: One: homework takes forever—even on easy topics.
+Proof beats: Foundations-first • 1:1 live attention • US Common Core aligned
+CTA: Book a free trial.
+36.
+ Hook: 3 reasons math homework turns into a fight.
+Follow-up: One: the basics aren’t fully clear yet.
+Proof beats: Concepts-first • Guided practice • Common Core topics
+CTA: Start a free trial.
+________________
+
+
+TOPIC 14: RESEARCH-LED (SIMPLE, NON-JARGONY)
+37.
+ Hook: Research shows early math gaps don’t “go away” on their own.
+Follow-up: They usually show up later as stress and low confidence.
+Proof beats: Foundations-first • 1:1 live classes • US Common Core aligned
+CTA: Book a free trial.
+38.
+ Hook: Research also shows confidence affects performance—especially in math.
+Follow-up: When concepts click, confidence shows up in school.
+Proof beats: Clarity that builds confidence • Same tutor weekly • Common Core topics
+CTA: Try a free class.
+
+
+Quirky
+Script 4: Trustpilot + Social Proof
+
+
+Reference: https://www.facebook.com/ads/library/?id=1131067025516320
+
+
+Time
+	Audio / VO
+	Visuals / Direction
+	0–4s
+	(Hook): "Cuemath can help your child become MathFit. Don’t just take our word for it. See the data. See the difference Cuemath makes."
+	Text overlay: "Proven Results" over a high-quality 1:1 class session.
+	4–8s
+	"With a 4.9/5 rating on Trustpilot, parents across the globe trust us more than any other platform."
+	Visual: A large 4.9/5 star graphic and the Trustpilot logo.
+	8–12s
+	"94% of our parents report a visible improvement in their child's logical thinking."
+	Simple, bold text card: 94% Improved Logical Thinking.
+	12–16s
+	"9 out of 10 students feel more confident and independent when tackling school math."
+	Visual: A child smiling at a laptop, working independently. Text: 90% Gained Math Confidence.
+	16–20s
+	"And 93% of parents saw a positive shift in their child's attitude toward the subject."
+	Visual: Parent and child high-fiving. Text: 93% Love Math Again.
+	20–25s
+	“They don’t just get better scores—they become better thinkers."
+	Split screen: Competitor-style "Worksheet" (Left) vs. Cuemath Logic Board (Right).
+	25–30s
+	"Cuemath. Make your child MathFit—a confident problem-solver, ready for tomorrow."
+	Cuemath logo. Text: "4.9/5 on Trustpilot" + "Book a Free 1:1 Trial. Join 400,000+ happy learners.".
+	
+
+
+
+
+
+
+
+
+
+
+
+Script 3: Social Video - Snowflake
+
+
+Reel link: https://www.instagram.com/reel/DS0QbyzgaTE/?utm_source=ig_web_copy_link&igsh=NTc4MTIwNjQ2YQ==
+
+
+Timestamps:
+01:05-01:10
+Math isn’t just about numbers… around us
+
+
+Add a VO:
+“For instance”
+
+
+00:00-1:04 (but speed up a bit, it’s too long right now)
+A snowflake fits in your hand… much more
+
+
+01:11-01:16
+At Cuemath, we… confidence.
+
+
+
+
+
+
+
+
+Script 2: Social video - Multiplication trick w/ face
+
+
+Reel link: https://www.instagram.com/reel/DTswyZpCkO0/?utm_source=ig_web_copy_link&igsh=NTc4MTIwNjQ2YQ==
+
+
+Time stamps:
+00:00-00:20
+Multiplication every…. Way easier!
+
+00:34-00:51
+Why this works… not memorization.
+
+
+End slate of Australia alongwith voiceover:
+Book a free 1:1 trial class to get a learning plan tailored exactly to your child.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 1: Trustpilot testimonial
+
+
+
+
+Time
+	Visual (Action)
+	On-screen Text
+	Audio (VO / SFX / Music)
+	0.0–0.5s
+	Close-up: child stuck on a worksheet, pencil hovering, tiny sigh.
+	—
+	Music starts low. Light pencil-tap SFX.
+	0.5–2.0s
+	Wider: parent leans in gently, child looks unsure / shrugs.
+	Is your child losing confidence in math?
+	VO (short, conversational): “Is your child losing confidence in math?”
+	2.0–3.0s
+	Parent picks up phone, starts scrolling.
+	You’re not the only one.
+	VO: “You’re not the only one.” + swipe SFX.
+	3.0–3.4s
+	Match cut: zoom into phone screen → full-screen Trustpilot UI.
+	4.9★ on Trustpilot
+	No VO. Tap/click SFX + whoosh. Music lifts slightly.
+	3.4–7.0s
+	Trustpilot UI holds: big rating + slow, readable review scroll. Small Cuemath logo bug in corner.
+	8K reviews (small under rating)
+	
+
+	7.0–7.8s
+	Quick cut: parent UGC selfie clip (authentic, casual) OR parent watching child work.
+	Here’s what parents are saying.
+	VO: “Here’s what parents are saying about boosting their child’s math confidence with Cuemath.”
+	7.8–9.5s
+	Review Card 1 (full screen, large text). 
+  
+
+	“More confident.”
+	No VO 
+	9.5–11.0s
+	Review Card 2 (full screen).
+  
+
+	“Finally understands math.”
+	No VO
+	11.0–12.0s
+	Review Card 3 (full screen).
+  
+
+	“No more math tears.”
+	No VO
+	12.0–12.8s
+	1 quick outcome flash: child smiles + solves next step / explains one line to parent.
+	Confidence is back. (optional)
+	No VO. Optional soft “ding” SFX.
+	12.8–15.0s
+	End card: Cuemath logo + FREE TRIAL CLASS button + QR/URL.
+	Build Math Confidence | Book a Free trial Class
+	VO (summation + CTA): “Build your child’s math confidence with Cuemath. Book a free trial class.”
+	
+
+
+
+
+
+
+
+
+
+AI Videos
+Asian Parent POV script
+HOOK (0–3s) 
+VO: "Your child is in Grade 1."
+Visual: A mother (East Asian) at her laptop, reviewing something with intent — browser tabs visible. She pauses, considers. 
+BODY (3–22s)
+Beat 1 — What you've been measuring against (3–8s) 
+VO: "A classroom of twenty won’t give her the attention she needs. Because they can’t focus on each child individually."
+Visual: Quick montage — crowded classroom, a new face on a screen (different tutor each time). 
+Beat 2 — What her dedicated tutor actually sees (8–14s) 
+ VO: "With Cuemath, your child gets one dedicated tutor, who knows where she excels and where she needs help. And she personalizes the entire curriculum for your child’s pace and goals."
+Visual: Cuemath platform UI — tutor on screen, interactive whiteboard showing a G2 regrouping problem. Tutor's screen shows the child's progress map. The tutor adjusts the next problem in real time.
+Beat 3 — The child proves it (14–19s) 
+Character line (child, brief): "Wait… I have to break the ten first." 
+O: "She's figuring out how numbers work from an early age and building a strong math foundation. That’s the power of personalized 1:1 attention."
+Visual: Child working through the problem on the platform — she pauses, thinks, then moves place value blocks correctly. 
+CLOSE (22–28s) 
+VO: “Book a free trial class today."
+Visual: End card — Cuemath logo + "Cuemath makes kids MathFit™" + "1:1 Online Math Tutoring" Text on screen: "Book a Free Trial" 
+
+
+
+
+Asian Hyperpersonalization Script
+
+VO: “Is your child solving math problems they’ve already mastered? While the advanced concepts that help them get ahead at school get ignored.”
+
+Visual: Screen recording-style — a child scrolling through a generic worksheet, same problem type repeating. Monotone. Time ticking.
+
+Beat 2 — The pivot [3–7s] 
+VO: “That’s what a fixed curriculum does. But Cuemath follows a personalized, structured learning path.”
+Visual: Hard cut to LEAP — personalized learning map, topics branching by mastery level. The screen feels precise, alive, built for this child.
+
+Beat 3 — [7–15s]
+VO: “Cuemath maps exactly where your child is — what they’ve mastered, and where the gaps are. A dedicated math tutor works with them 1:1 to help them stay ahead in school. She adjusts the curriculum in real time as they grow.” 
+
+Visual: Curriculum screen showing mastery-based branching → a mastered topic greyed out, a flagged concept highlighted → tutor guiding a problem on the whiteboard → system auto-advancing to the next level.
+
+Beat 4 — Continuity proof [15–22s]
+VO: “Every class is live and interactive — concepts get broken down step by step, visually, so even the harder topics actually click. Your child’s time goes toward what genuinely moves them forward.
+
+
+Visual: Calendar showing consistent sessions → progress dashboard with topic completion → child working through a new problem type confidently.
+
+
+Close [22–28s] “Book a Free Trial” CTA Visual: Child arriving at the answer independently → end card — Cuemath makes kids MathFit™.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Australian Curriculum go advanced script
+HOOK VO: “Your child’s maths grades are fine. But does the Australian school curriculum challenge them enough?” 
+Visual: Child and mother at a table, report card showing A, laptop open.
+PLATFORM [3–8s] VO: “Cuemath gives your child the space to go deeper into advanced math concepts. A dedicated tutor who works one-on-one with your child focuses on how they reason through problems, and helps them break complex problems step by step.”
+Visual: Transition to LEAP on laptop. Live 1:1 session — tutor on screen, child working through a problem. Tutor asks a question. Child pauses, thinks, responds.
+SOLUTION [8–16s] 
+VO: “Cuemath builds a personalised curriculum around your child’s pace, strengths, and goals — from advanced problem-solving to NAPLAN numeracy prep and selective school test prep. Our tutors help build the fluency, reasoning, and application skills that these tests need. So that they are not just ahead in school but are also ready to ace competitions.”
+Visual: Platform UI showing personalised curriculum path with topic branching → NAPLAN-aligned practice screen visible → child mid-session explaining their reasoning to tutor. Tutor nods.
+CTA [20–25s] VO: “Book a free trial and see what your child is really capable of.” Text overlay: Cuemath logo + “Book a Free Trial” CTA Visual: End card — Cuemath makes kids MathFit™.
+
+
+
+
+
+
+USA Middle School Shift Script
+Target: NRI (Grade 4-5)
+
+HOOK 
+VO: "Most 5th graders can solve their textbook math problems. But ask them to explain their thinking — that's where the gaps show." 
+Visual: Child with parent, looking confused, math chapter fractions showing open book on the table
+BEAT 2 — The Mechanism
+VO: "With Cuemath, your child learns 1:1 with a dedicated Indian tutor who helps them build the reasoning skills, not just get the answers. They ensure that your child develops the kind of deep math thinking that makes them MathFit for life." 
+Visual: Continued platform interaction — tutor guiding, child arriving at the answer independently. Close-up of the platform showing the problem pathway and tutor feedback. Intercut with child's expression — focused, then confident.
+BEAT 3 — The Window
+VO: "Middle school is the right time to build the math foundation your child needs to get into an accelerated track in high school and ace competitions.
+AI scene underneath — child working independently, tutor visible on screen in the background.
+CLOSE (23–30s) VO: "Book a free trial today
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+High School SAT Based Script
+Target: Grades 9-12
+
+HOOK (0–3s) 
+VO: "SAT math doesn't test memory — it tests reasoning. Is your child ready for it?"
+Visual: AI scene — teen at a desk, laptop open, SAT prep book beside them. Plain/modern background. Text overlay (0–0.7s): "SAT math isn't about formulas." 
+
+Beat 1 — Problem escalation (3–7s): 
+VO: "At this level, the problems get layered. One concept builds on three others. And gaps from middle school start showing up."
+Visual: Screen transitions to Cuemath platform UI — a tutor and student working through a multi-step problem on the interactive whiteboard. 
+
+Beat 2 — Mechanism proof (7–14s): 
+VO: "That's where a dedicated tutor makes the difference. Not just teaching formulas but building the reasoning chain your child needs to handle complex problems of Algebra 1, Pre Calculus & AP Calculus they haven't seen before."
+Visual: Close-up of the platform — tutor marking a step, asking a question in the chat, student adjusting their approach. The interaction should look like guided reasoning, not lecturing. 
+
+
+Beat 3 — Outcome framing (14–20s): 
+VO: "It's not about getting As at school anymore. It's about becoming the kind of thinker who's ready for college-level math — and beyond."
+Visual: Split — teen working through a practice problem independently 
+
+CLOSE (25–30s) VO: "Book a free trial."
+Visual: End card
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+________________
+
+
+
+
+State Tests/STAAR Script
+Target: NRI Parents
+
+
+Hook
+VO: "Most kids can follow examples in a math textbook. But the STAAR puts a new problem in front of them. And that's where many kids go blank."
+Visual: Child at desk, state test paper in front of her. Reading a question — not panicking, but visibly unsure where to start. Pencil hovering. That specific frozen moment before the first mark.
+Beat 1 (4–10s) 
+VO: "Cuemath prepares kids specifically for this. Mock tests. Timed drills. And a dedicated Indian tutor in every class who teaches your child how to read a new question, break it down step-by-step and think through problems.”
+Visual: Three-beat visual sequence.
+(1) Child at tablet, timer visible on screen — timed drill in progress. Focused, working fast.
+(2) Platform UI — mock test interface, question on screen, child writing approach steps before the answer.
+(3) Tutor on screen, pointing to the question — not the answer. Child looking at the question again, nodding, then writing.
+VO: "This is what competition-ready actually looks like."
+CLOSE (27–30s)
+CTA spoken: "STAAR season is coming. Book a free trial and start building the skills that show up on test day."
+CTA overlay: Book Your Free Trial
+
+
+________________
+
+
+
+
+
+
+
+
+
+
+Parent POV
+Target: Asian parent 
+
+
+HOOK (0–0.7s)
+On-screen text: "Strong foundations. Independent thinkers."
+BEAT 1 (0.7–6s)
+VO: "In math, strong foundations change everything. The students who build them early approach every new problem with confidence because they know how to think it through."
+Visual: Child working through steps carefully.
+BEAT 2 (6–11s)
+VO: "But without the right guidance, many children learn to just guess answers or memorize steps."
+Visual: Child hesitates at a harder problem. Pauses. Thinking.
+BEAT 3 (11–17s)
+VO: "Cuemath pairs every child with one dedicated tutor — the same person, every class. Someone who knows where the child got stuck last time, what clicked, and exactly what to build on next."
+Visual: Child at tablet. Tutor on screen, annotating a problem. 
+BEAT 4 (17–24s)
+VO: "A child who's learned to think through problems independently doesn't stop at the one in front of him. He’s ready for the next one — and the one after that."
+Visual: Child explains solution to tutor. Tutor nods. 
+CLOSE (24–30s)
+CTA spoken: "Book a free trial and build the right math foundation."
+CTA overlay: Book Your Free Trial
+
+
+
+
+
+
+________________
+
+
+
+
+
+
+Parent POV
+Target Audience: NRI 
+
+
+VO: "When many families move from India to the US, the schools are good. But the math can suddenly feel very different. And even strong students can start to lose confidence."
+Visual: Child in a US classroom. Looking at the worksheet. Other kids are working. She pauses — thinking, unsure.
+
+
+BEAT 2 (6–12s) — What changed
+VO: "That's where Cuemath helps. Every child learns with one dedicated Indian tutor — someone who understands how they were taught to think about math. She follows the US Common Core Curriculum so they’re aligned with school as well as competition math."
+Visual: Child at home desk. Tablet open. Tutor on screen. Tutor annotating the question. Child leaning forward, engaged.
+BEAT 3 (12–18s) — The mechanism
+VO: "The tutor rebuilds how the child thinks through problems — so when an unfamiliar question appears, they have a process to work through it. "
+Visual: Child explaining her answer step by step. Tutor nodding. Child arrives at the answer independently.
+BEAT 4 (18–25s) — The payoff
+VO: "The result isn't a child who's caught up. It's a child who can work through questions they’ve never seen before — on her own."
+Visual: Child closes notebook. Looks composed, ready.
+CLOSE (25–30s)
+CTA spoken: "Book a free trial and build the right math foundation."
+CTA overlay: Book Your Free Trial
+
+
+
+
+________________
+
+
+
+
+
+
+
+
+AMC8 VIDEO SCRIPT
+Duration: 30 seconds+
+Target: US parents of grades 5-8 students (NRI + growth-minded mainstream)
+Format: Text-on-screen + B-roll educational style
+[0.7–7s] PROBLEM
+"Here's the thing about AMC 8 — it's not testing what your child knows. It's testing how they think. And school doesn't really prepare them for that. One method, one formula, move on. AMC 8 doesn't work that way."
+Visual: Student staring at an AMC-style problem, trying the standard method, hitting a wall. Slow zoom on concentrated expression.
+[7–10s] BRIDGE
+"The kids who do well? They've learned to look at a problem they've never seen before and find a way through it. That's trainable."
+Visual: Same student pauses, takes a different path. Quiet shift.
+[10–18s] SOLUTION + PLATFORM UI
+"That's what a Cuemath dedicated tutor actually does. Not more drilling. The tutor asks the right questions — and your child figures it out themselves. That's what builds the thinking AMC8 is looking for."
+Visual: LEAP platform on screen. Tutor asking a guiding question. Student working through two approaches to the same problem. Math Canvas visible. Platform stays on screen throughout.
+[18–23s] PROOF OVERLAY
+Visual: 4.8★ rating overlay + real review text (pull from TrustPilot CSV — verify before production) — name tag + country mandatory on screen
+[23–30s] CTA
+"Get your child AMC 8-ready. Book a free trial."
+Visual: Clean end card. Cuemath logo. "Cuemath makes kids MathFit™"
+On-screen CTA text: Book Your Free Trial
+
+
+
+
+FOUR PILLARS OF MATHFIT
+TIME
+	VISUALS
+	VOICEOVER
+	ON-SCREEN TEXT
+	0-3s
+	Child at desk, overwhelmed by chaotic swirl of math formulas, test papers, timers spinning. Head in hands. Dark, anxious colors (grays, muted blues).
+	Many kids believe they’re just not a math person.
+	"I'm not a math person"
+(Floating in chaos, fades)
+	3-7s
+	Tutor's face appears on screen (warm, friendly). Child looks up. Screen shows "MATHFIT" definition card.
+	But at Cuemath, we believe every child can become MathFit—a confident problem solver and independent thinker.
+	"Cuemath makes kids MathFit”
+
+
+
+
+	7-20s
+	Four boxes appear floating in front of child (clean grid: 2x2). Child reaches out and taps each box sequentially. Each box glows golden when tapped:
+
+
+Box 1 - FLUENCY (Blue)
+Visual: Numbers organizing, practice interface
+
+
+Box 2 - UNDERSTANDING (Amber)
+Visual: Formula becomes transparent, "3x4 = 3 groups of 4" animation
+
+
+Box 3 - APPLICATION (Green)
+Visual: Math connects to shopping cart, real objects
+
+
+Box 4 - REASONING (Purple)
+Visual: New problem appears, child thinks through it
+
+
+Tutor remains visible in small window throughout, nodding encouragingly
+	In every class, tutors build four essential skills:
+Fluency
+Understanding
+Application
+And reasoning
+
+
+Together, these four skills make a child MathFit.
+	Box 1:
+FLUENCY
+Master the basics
+
+
+Box 2:
+UNDERSTANDING
+See the why
+
+
+Box 3:
+APPLICATION
+Math meets life
+
+
+Box 4:
+REASONING
+Solve unfamiliar problems
+
+
+(Each appears as child taps)
+	20-25s
+	All four glowing boxes move together, forming a foundation beneath child. Child stands up confidently on this glowing platform. Tutor gives thumbs up from screen in background. Wide shot—transformed space, bright and empowering.
+	
+
+	
+
+	25-30s
+	Clean CTA card. Left side: Child still standing confident. Right side: "Book Free Trial" button with subtle pulse animation. Cuemath logo bottom.
+	Book a free class and see the difference.
+	"Make Your Child MathFit"
+
+
+[Book Free Trial Class]
+(Button)
+
+
+
+
+	HOOK (0–3s) 
+Visual: A completed Grade 2 math worksheet on a table — all correct, checkmarks down the page. A South Asian woman's hand picks it up. Text overlay (0–0.7s): "She got 100. But watch this." 
+VO: "Her worksheet was perfect. Every answer - correct."
+Beat 1 — The reveal (3–7s) Visual: Same mom, sitting with her daughter at the kitchen table. She points to a subtraction problem — 42 minus 17. The child looks unsure. Mom asks something. The girl hesitates, can't explain. 
+VO: "But when I asked her why she borrowed from the four… she couldn't tell me."
+Beat 2 — The recognition (7–11s) Visual: Mom's expression — not panic, just recognition. She's seen this before. Quick montage: her daughter doing homework, getting answers right mechanically, no pauses to think. 
+VO: "She was doing it the way I learned math growing up. Follow the steps. Get the answer. Move on. That’s not something I wanted for her. I wanted her to have a strong math foundation, that’s when we found Cuemath"
+Beat 3 — The session / platform proof (11–17s) Visual: Cuemath platform UI. Dedicated tutor on screen, interactive whiteboard showing place value blocks — tens and ones. The child is moving blocks on screen, physically breaking 42 into groups. Tutor is guiding, not telling. 
+VO: "Her dedicated tutor didn't just teach the steps. He showed her what the numbers actually mean — why you regroup a ten into ones. Once she understood how numbers work, she was not just confident in solving but she could give reasons too."
+Beat 4 — The shift (17–22s) Visual: Child at the same kitchen table a beat later, explaining the problem back to mom, gesturing with her hands. Mom watching. On-screen overlay: Trustpilot 4.9★ badge. VO: "Now she doesn't just get the answer. She can tell you why it's right. At seven, that's what being MathFit™ means."
+CLOSE (22–28s) Visual: Platform overview transitioning to end card — Cuemath logo + "Cuemath makes kids MathFit™" VO: "1:1 online math tutoring. Book a free trial and build the right math foundation." CTA text overlay: Book a Free Trial
+
+
+________________
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+________________
+
+
+
+
+Completed Videos
+
+
+NAPLAN Video
+Duration: 30 seconds
+Target: Australian parents (ages 35-54)
+Format: Text-on-screen + B-roll educational style
+SCRIPT
+[0-3 sec] HOOK
+ Text overlay on clean gradient background:
+"Most Australian parents don’t know this about NAPLAN maths"
+Visual: Clean modern aesthetic of a home with a child with parent studying, confused”
+[3-10 sec] THE SECRET — Adaptive Format
+ Voiceover + OST:
+"The hardest questions aren’t straightforward sums. They’re word problems — graphs, maps, real-world scenarios. The maths is easy. Finding the question inside the question — that’s where kids get stuck."
+Visual: Close-up of NAPLAN-style question paper on tablet/screen, questions visibly changing difficulty level (simple → complex transition animation), camera slow pan
+[10-18 sec] THE INSIGHT
+ Voiceover continues:
+“NAPLAN doesn’t reward how much your child has studied. It rewards how deeply they understand.”
+Visual: 
+Close-up montage of actual NAPLAN question types: graph → map → word problem scenario, camera panning across different question formats
+[18-26 sec]Depth Over Coverage
+"Cuemath’s 1:1 tutors build exactly this — kids who think clearly, solve confidently, and understand deeply. Not just for NAPLAN, but for life.”
+Visual: Tutor-student interaction, warm lighting, student explaining their reasoning out loud while tutor listens and guides (not just showing answers), collaborative problem-solving scene with visual/conceptual tools on screen
+[26-30 sec] CTA
+“Book a free trial. See the difference in how they think.”
+
+
+Shot list:
+                                                                           1. Overall classroom setting (Australian)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 1 - Memorization vs Clear thinking in the AI era
+
+
+Beat
+	Visual (AI-easy)
+	Audio (VO) + On-screen Text
+	1
+	Open on AI feel: dark blue gradient + floating icons (calculator, “=”, spark, check). Icons snap into “AI” label.
+	VO: “AI can calculate in seconds.” OST: “AI CALCULATES IN SECONDS”
+	2
+	Animated child gets stuck: quick cut to kid staring at a worksheet/tablet, blinking cursor on a “new-looking” problem. Subtle scribble cloud / question marks.
+	VO: “What matters now is—can your child explain why those steps work?” OST: “CAN THEY EXPLAIN WHY?”
+	3
+	Split screen: Left side “MEMORIZE STEPS” (dim), right side “CLEAR THINKING” (bright). Arrow slides to right.
+	VO: “Because math isn’t memorizing steps. It’s clear thinking.” OST: “THINKING > STEPS”
+	4
+	Cut to home desk 1:1 class: animated child at home desk, laptop open, live tutor on screen (generic UI). Parent vibe: calm, focused.
+	VO: “At Cuemath, we build that in our 1-on-1 live classes.” OST: “Personalized Online Math Tutoring”
+	5
+	Tutor–child interaction: alternating shots—tutor asks, child responds with hand gestures; quick “think-aloud” moment.
+	VO: “So your child can explain the why.” OST: “EXPLAIN THE WHY”
+	6
+	Platform shots: simple UI cards animate in: “Live tutor” / “Guided practice” / “Explain your thinking” (keep it generic, no hard claims). Overlay of problem board + tutor pointer.
+	(No new VO — let it breathe) OST: “REAL UNDERSTANDING”
+	7
+	End plate: brand gradient + logo lockup + CTA button.
+	VO: “Make your child MathFit™. Book a free 1:1 trial.” OST: “BOOK A FREE 1:1 TRIAL”
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 2 - Before and After Story (NRI) 
+
+
+Time
+	Visual Direction (AI/Stock-easy)
+	Audio (VO) + On-screen Text
+	0–2s
+	Cold open (pale tone, face-first): Tight close-up on Arya’s face (9-10 year old NRI girl)—furrowed brow, eyes scanning a worksheet. Spotlight circle widens slightly to reveal the edge of the messy desk. Text types in: “MEET ARYA”.
+	VO: “Meet Arya.” OST: “MEET ARYA” SFX: soft paper-rustle
+	2–6s
+	Pale/desaturated, widen to context: Pull back to show the messy environment—worksheets stacked high, crumpled pages, scattered stationery. Arya flips a page, pauses, looks overwhelmed.
+	VO: “Six months ago, math meant hundreds of worksheets…” OST: “HUNDREDS OF WORKSHEETS”
+	6–9s
+	Still pale: Close-up of the problem page + Arya’s pencil hovering. She sighs, rubs forehead. Minimal overlay: faint “??” near the worksheet (optional).
+	VO: “…and she still felt confused.” OST: “STILL CONFUSED”
+	9–11s
+	Transition (pale → colorful): A clean color wash wipes across frame. The mess slides out/soft fades. Lighting warms. Desk becomes tidy.
+	VO: “Then she tried Cuemath.” OST: “THEN CUEMATH”
+	11–13s
+	Colorful: tutor appears + interaction: Same child at a brighter desk. Laptop/iPad clearly shows tutor video tile + digital whiteboard. Tutor waves; Arya waves back and sits up straighter.
+	VO: “With live 1:1 personalized learning—” OST: “LIVE 1:1” / “PERSONALIZED”
+	13–16s
+	Platform visuals (clear ‘click’ moment): Over-shoulder shot: tutor draws one strong visual on whiteboard (choose one: fraction bars / number line / blocks). Pointer circles the key idea.
+	VO: “—and visuals that actually make ideas click—” OST: “VISUALS THAT CLICK”
+	16–19s
+	Child speaks / tutor reinforces: Cut between Arya pointing at screen + explaining (think-aloud) → tutor nodding → tutor writes a short phrase on board (e.g., “This part = 1/2”).
+	VO: “…now she understands the concepts…” OST: “SHE GETS IT”
+	19–22s
+	Practice + confirmation: Close-up of Arya writing. Cut to screen: tutor gives thumbs-up. On whiteboard, a neat checkmark appears next to the solved step. Arya smiles.
+	VO: “…and enjoys math.” OST: “SHE ENJOYS MATH”
+	22–25s
+	End plate (clean + bright): Brand gradient + logo lockup + CTA button.
+	VO: “Book a free 1:1 trial.” OST: “BOOK A FREE 1:1 TRIAL”
+
+
+	Script 3: Before & After (Asian) 
+Time
+	Visual Direction (AI/Stock-easy)
+	Audio (VO) + On-screen Text
+	0–2s
+	Tight close-up on Mia's face (9–10-year-old girl), focused on a math worksheet. Spotlight widens to reveal the messy desk.
+	Text: “MEET MIA.” VO: "Meet Mia." OST: “MEET MIA” SFX: Soft paper rustling
+	2–6s
+	Camera pulls back to show a cluttered study area filled with worksheets, textbooks, and crumpled papers. Mia flips a page, sighs, looks overwhelmed.
+	VO: "Six months ago, math felt like an endless cycle of worksheets..." OST: "ENDLESS WORKSHEETS"
+	6–9s
+	Close-up of Mia’s pencil hovering over a problem, faint "??" symbol near the worksheet. She rubs her forehead.
+	VO: "...but she felt stuck, unable to grasp the deeper concepts." OST: "STILL CONFUSED"
+	9–11s
+	Transition from pale to vibrant tones. Mia's desk is tidied, symbolizing clarity. Mia looks engaged as she works.
+	VO: "Then, she discovered Cuemath." OST: "CUEMATH"
+	11–13s
+	Mia sits at a well-lit desk interacting with a tutor on her laptop. The tutor waves, Mia sits up straighter.
+	VO: "With live 1:1 classes, each lesson is personalized to her pace and needs." OST: "LIVE 1:1" / "PERSONALIZED"
+	13–16s
+	Over-shoulder shot showing Mia engaging with a visual aid (e.g., number lines or fraction bars).
+	VO: "With intuitive visuals, she gained a deeper understanding of the 'why' behind every problem." OST: "VISUALS THAT CLICK"
+	16–19s
+	Mia points at the screen, explaining her thought process to the tutor. Tutor writes a key idea on the board.
+	VO: "Now, Mia isn't just memorizing steps—she’s mastering math concepts." OST: "SHE MASTERS IT"
+	19–22s
+	Close-up of Mia solving problems confidently. The tutor gives a thumbs-up, and a checkmark appears on the screen.
+	VO: "Her confidence has soared—she now tackles problems with clarity and skill." OST: "CONFIDENT PROBLEM-SOLVER"
+	22–25s
+	Clean, bright screen with Cuemath's logo and CTA button, symbolizing academic success and growth.
+	VO: "Give your child the tools to excel. Book a free 1:1 trial today." OST: "BOOK A FREE 1:1 TRIAL"
+	
+
+
+Script 4: Futuristic
+
+
+Time
+	Visual (Action) — Production Ready
+	Audio (VO / SFX)
+	On-screen Text
+	0–02s
+	CAMERA (Transformation setup): Continuous 360° orbit, slow and smooth. Tight close-up of child (grade 5/6) focused on their face, scanning math problem. The child pauses, looks up, and returns focus to the notebook. Orbit stays tight on the child’s face—thinking is the hero.
+	VO: "When kids learn to solve, not memorize formulas..."
+	
+
+	02–04s
+	Orbit continues: Macro inserts: pencil hovering, child draws small diagram/box, writes step, quickly checks (finger follows line). Laptop remains secondary, out of focus.
+	VO: "...they become MathFit—clear thinkers, confident problem solvers." SFX: Light pencil tapping.
+	Bug (bottom corner): MathFit™ = clear thinkers, confident problem solvers
+	04–07s
+	TRANSFORMATION MOMENT (~180° orbit): Camera comes around, blur to match cut. Now, the child is an adult pilot in the same position, same posture. Lighting shifts from cool to warm. Pilot props (headset, flight plan, aviation pen, etc.) and a cockpit-style flight map on laptop screen.
+	VO (lift): "They build the skills to think critically and tackle challenges, now and in the future."
+	
+
+	07–10s
+	Orbit completes the 360° and gently settles. Adult pilot mirrors child’s confident expression. Hard cut to END SLATE and hold steady for readability (1.5–2s).
+	VO: "That's what turns today's practice into tomorrow's possibilities." Brand VO: “The future belongs to MathFit Minds—Confident problem solvers.”
+	End Slate: Cuemath MathFit logo Text: "The future belongs to MathFit Minds." “Book a Free 1:1 Class”
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 5: High School:
+
+
+VISUAL (Real Actor Footage)
+	AUDIO (Script)
+	TEXT OVERLAY
+	Scene 1 - Classroom: Student confidently solving problem on paper. Close-up shows: x² - 5x + 6 = 0 with work shown: (x-2)(x-3) = 0, answer: x = 2 or x = 3 ✓. Student looks satisfied. 
+Scene 2 - Home: Cut to same student at desk staring at: 2x² - 10x + 12 = 0 on homework. Frozen, confused, pencil hovering. Clear contrast.
+	"Your high schooler solves this Algebra problem easily. 
+
+
+
+
+
+But when the question changes slightly... they freeze."
+	
+
+	Student at home flipping through textbook, searching for exact example matching 2x² - 10x + 12 = 0. Close-up of finger scanning worked examples. Hunting for steps to copy.
+	"That's because they memorized the steps taught in school—but never understood the concept behind it."
+	"Memorized ≠ Understood"
+	Student with both problems visible (original x² - 5x + 6 = 0 and new 2x² - 10x + 12 = 0). Circling similarities, drawing arrows showing connections. Face shows understanding building.
+	"Understanding the why behind formulas? That's clear thinking. Without it, Algebra 1 and 2 stay challenging."
+	"Understanding Why = Clear Thinking"
+	1:1 tutoring scene: Tutor and student at table. Tutor pointing to both problems, showing the pattern (second equation is first × 2). Student's lightbulb moment. Natural teaching breakthrough.
+	"At Cuemath, a 1:1 tutor helps your child build strong conceptual understanding—so every problem makes sense, no matter how it’s phrased."
+	"Build Strong Conceptual Understanding"
+	Student at home working independently on new variation confidently. Tutor observing or student fully independent. "4.9★ Rated" badge appears.
+	"We don't just teach Algebra. We make kids MathFit."
+	"We Make Kids MathFit™"
+	Static end card: Cuemath logo + branding. Clean CTA.
+	"Book a free class and see for yourself."
+	PRIMARY: "Book Free Trial Class" Add SAT Offer
+	
+Script 6: MATH KANGAROO LISTICLE: "5 Things Parents Don't Know"
+Time
+	Section
+	On-Screen Text
+	Voiceover
+	Visual Description
+	Audio Notes
+	0-3s
+	HOOK
+	"5 things parents don't know about Math Kangaroo"
+	"Five things parents don't know about Math Kangaroo."
+	Animated title card, bold typography, white background with math pattern, large orange "5"
+	Music starts immediately, no delay, soft whoosh for animation
+	3-8s
+	#5
+	"#5" + "To Solve or to Skip?"
+	"Number five: Skipping is a strategy. If it’s taking too long, skip it and come back."
+	Split screen: Left = frantic scribbling, Right = methodical step-by-step work with green checkmark
+	Number emphasized, paper rustling sounds
+	8-13s
+	#4
+	"#4" + "Make use of Multiple Choice”
+	Number four: It’s multiple-choice—use it. Eliminate wrong options first, then solve.””
+	Close-up of Math Kangaroo practice problem (visual logic puzzle/patterns), camera pushes in
+	Clear punchy delivery, subtle puzzle sound effect
+	13-18s
+	#3
+	"#3" + "Practice tests alone aren't prep"
+	“Number three: Just doing practice tests isn’t enough. Your child needs to learn how to think through new problems.”
+	Mother and child at dining table, child working on workbook, mother looking concerned
+	"Number three" matches music beat, subtle home ambiance
+	18-23s
+	#2
+	"#2" + "Train by Question Type"
+	"Number two: Don’t practice randomly. Train by question-type— patterns, logic, number sense—then mix."
+	Tutor drawing on digital whiteboard
+	Emphasis on "two", subtle drawing sounds
+	23-28s
+	#1
+	"#1" + "Problem-solving is a skill you build"
+	“Number one: Problem-solving is a skill. Kids build it step-by-step with the right guidance.”
+	Child's "aha moment" close-up 
+	Music reaches emotional peak, subtle tutor encouragement
+	28-30s
+	CTA
+	"Build Math Kangaroo-ready thinking" + "Book a free trial"
+	“That’s what Cuemath does in 1-to-1 classes—we build the thinking behind the answers. Book a free trial.”
+	Clean end card with Cuemath logo, CTA button
+	Music resolves, hold for 2 seconds
+	
+
+
+
+
+
+
+
+High School SAT Prep Script
+Based on the blog: https://www.cuemath.com/blog/10-sat-prep-tips-to-boost-score/#SAT-PREP-TIP-1-understand-the-digital-sat
+Reference: https://www.youtube.com/watch?v=L3mc_8dmxm8
+
+
+Time
+	Visual
+	Audio (Script)
+	0–3s
+	Scene: Minimal 2D explainer. Split-screen: left = student doing SAT questions at a desk; right = score card repeating the same score (e.g., “1180 → 1180”). Add subtle loop animation (pencil tapping, clock tick). 
+	“Most SAT prep fails because students practice… and never fix the pattern.”
+	3–5s
+	Big bold kinetic typography: “FIX THE PATTERN” appears, then morphs into “FIX THE SCORE.”
+	“So here are 3 tips that actually move your score.”
+	5–11s
+	Tip 1 card: Title card: “1) DIGITAL SAT” with a simple adaptive meter (easy → harder). Show 3 mini icons: “accuracy first” (checkmark), “adaptive” (slider), “module” (two blocks). On-screen text: “Digital SAT = adaptive”
+	“One: Prep for the Digital SAT. It’s adaptive, so the goal is accuracy—not just doing more questions.”
+	11–18s
+	Tip 2 card: “2) ERROR LOG” as a simple table animating in: columns labeled “Mistake / Why / Fix”. Show one example row quickly filling with text. 
+	“Two: Keep an error log. Every miss gets: what went wrong, why, and the rule you’ll use next time.”
+	18–24s
+	Tip 3 card: “3) TWO-PASS STRATEGY” with a test page. Pass 1: quick checkmarks on easy questions. Pass 2: flagged questions highlighted.
+	“Three: Do the easy questions first. If one’s taking too long, circle it and skip—then come back when you’ve banked points.
+	24–30s
+	Tutor + student on screen, simple clean UI: “Free 1:1 Trial Class”
+	“Want a plan built around your patterns? Book a free 1:1 trial class with Cuemath and prep smarter.”
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Time
+	Visual direction (AI explainer)
+	VO 
+	0–5s
+	Hook sequence (fast micro-beats): 0–0.5s “MATH KANGAROO” kinetic slam + stopwatch pop. 0.5–2.5s simple-looking puzzle card + confident student avatar. 2.5–5s zoom out reveals countdown timer starts, student goes “uh oh.”
+	“Math Kangaroo isn’t a speed test. It’s a clear-thinking test.”
+	5–10s
+	Problem sequence: One tricky question card appears with a subtle “trap” icon. Timer bar drains. Easy questions stack up untouched. Quick hourglass/sand animation to show time slipping.
+	“One ‘easy-looking’ question can throw kids off… because they rush before they reason.”
+	10–24s
+	Solution sequence (structured stack): Roadmap wipes in labeled “Structured Prep.” Topic tiles light up (Patterns/Logic/Numbers/Geometry) with checkmarks (topic-wise drills). Drawer opens to reveal lots of varied cards (competition-style question bank). Transition to timed mock test screen: progress bar + timer; easy Qs checkmarked fast; a few flagged; then flagged highlighted (visual reinforcement of smart pacing).
+	“Cuemath’s Math Kangaroo Prep builds MathFit thinking: approach-first drills, a competition-style question bank, and mock tests that train kids to stay calm, logical, and confident—even under a timer.”
+	24–27s
+	Outcome snap: Icons pop in: lightning (speed), puzzle (logic), shield (confidence). Student avatar looks calm/ready; timer now feels “controlled.”
+	“So they don’t panic. They think clearly.”
+	27–30s
+	CTA end frame: Big CTA button + calendar pop-up + tap animation. Clean layout with whitespace; leave space for logo.
+	“Book a free 1:1 trial class now.”
+	
+
+	
+
+	
+
+	Alternative hooks:
+The real skill in Math Kangaroo? Thinking first.
+
+
+
+
+
+Script 1: The Definition (Brand Awareness)
+Goal: Establish MathFit™ as a premium category of cognitive development.
+Video Reference: https://www.youtube.com/shorts/ZO0WzeGZYx4
+https://www.youtube.com/shorts/KV-fKugeIoo
+Time
+	Dialogue / VO
+	Visual / Direction
+	0–4s
+	Text: “I’m AI. I’m transforming the future. Is your child prepared for it?”
+	On screen AI robotic-human face - talking head
+Reference:
+  
+	4–8s
+	VO: “In the AI age, what matters is how clearly kids think, how confidently they solve, and how deeply they understand”
+	—
+	8–14s
+	Critical Thinking: “I help children understand the ‘why’ behind every math step.”
+	Critical Thinking
+
+
+	14–20s
+	Logical Reasoning: “I train them to connect ideas and build solutions step-by-step.”
+	Logical Reasoning
+	20–26s
+	Speed & Accuracy: “I train them to solve with confidence, speed, and accuracy— even under time pressure.”
+	Speed & Accuracy
+	26–32s
+	VO: “When these skills develop together, a child becomes MathFit™.”
+	All three icons lock together into a shield-like form. Text: MathFit™ = Foundations + Thinking
+	32–38s
+	VO: “That’s what every Cuemath class builds—with expert tutors and 1:1 guidance.”
+	Screen shows Cuemath 1:1 live class UI. Tutor and student smiling/working.
+	38–45s
+	Text: Make Your Child MathFit™
+	CTA: Book a free trial. Clean brand visuals. Music resolves on a high, confident note.
+	
+
+
+
+
+
+Script 2: Republic Day
+
+
+We can keep the characters same for all our AI videos
+
+
+Time
+	Visual (Caricature)
+	Audio / VO
+	Storyboard idea/Shot breakdown
+	0–3s(Outcome Hook)
+	A cheerful Cuemath-style character confidently raises a hand. A thought bubble shows a neatly explained solution which we will put in as it needs to be mathematically correct.
+	“Imagine your child feeling confident in math.”
+	Reference for character and first frame:
+    
+	3–7s
+	Two contrasting caricatures appear briefly:• One overloaded with formulas (confused).• One calm, thinking step-by-step.
+	“That confidence doesn't come from memorizing formulas or solving thousands of worksheets.”
+	  
+
+	7–12s
+	Close-up: blocks labeled Why, Logic, Reasoning stack cleanly under the calm character.
+	“It comes from building strong math foundations”
+	
+
+	12–17s
+	1:1 classes with clean background
+OTS shoulder Cuemath character with tutor 
+	In every Cuemath 1:1 class, children are guided to think through the problems. 
+	
+
+	17–22s
+	Cuemath caricature tutor guides the character through a problem. 
+	So logic and reasoning grow naturally.
+
+
+	
+
+	22–26s
+	Tutor fades out. The character now solves independently. Blocks glow, align smoothly.
+	“When the foundation is strong, learning becomes effortless and independent.”
+	
+
+	26–30s(CTA)
+	Cuemath logo on clean background.
+	“Start with a free 1:1 Cuemath class.”
+	
+
+	
+
+
+
+
+
+
+
+
+
+
+
+Videos to shoot
+Script 1: Credibility
+
+
+Time
+	Visual
+	Audio (Script)
+	0–5s
+	Hook: Faculty to camera. Text overlay: Cuemath kids show a 24% Reasoning Improvement
+
+*Does Feedback on Talk Time Increase Student Engagement? Evidence from a Randomized Controlled Trial on a Math Tutoring Platform
+December, 2023
+Link to research paper: https://files.eric.ed.gov/fulltext/ED638947.pdf
+	“Cuemath students show 24% stronger reasoning skills. And this isn’t just us saying it — it’s backed by a Stanford-led study.”
+	5–15s
+	Core: Cut to B-roll of a student explaining a problem to a tutor.Text on screen:
+ Explain → Reason → Solve 
+	The study found something powerful—when kids show their thinking, reason step by step, and teach it back, understanding grows faster.
+	15–22s
+	Method: Faculty back to camera. Text on screen:
+ 
+	That’s the Cuemath way—we teach kids how to think, not just get the answers. That’s what builds lifelong math confidence.
+	22–26s
+	Show a tutor and a child solving together
+	– 
+	26–30s
+	CTA: Cuemath logo with "Book a Free Trial" button.
+	 “Book a free 1:1 class today and experience Cuemath firsthand.”
+	
+
+
+
+
+
+
+
+
+
+
+
+Script 2: The Parent’s Perspective (Revised for Brand Connect)
+Goal: Deeply integrate the MathFit™ identity into the 1:1 teaching philosophy.
+Time
+	Dialogue / VO
+	Visual / Direction
+	0–4s
+	Text: “A MathFit™ child doesn't just solve problems, they learn how to think.”
+	Child seated at laptop, looking at a complex geometry problem. Calm environment.
+	4–10s
+	VO: “In a Cuemath class, we don't just look for the right answer. We build the right math foundation.”
+	Wide shot of the room. It feels premium and focused. The tutor is waiting patiently on screen.
+	10–18s
+	Tutor: “Take your time, Aarav. What’s the logic behind the first step?”
+	AI Overlay: The word "Logic" glows faintly on the screen. The child begins to sketch on their pad.
+	18–25s
+	VO: “This is MathFit™ training. It’s 1:1 guidance that turns hesitation into reasoning.”
+Being MathFit means kids don’t just ace math grades - they build logic, confidence, and problem-solving skills that last a lifetime.
+	Close-up of the child’s work. As they write, the MathFit™ pillars (Logic, Speed, Thinking) appear as subtle watermarks.
+	25–32s
+	Inner Voice: “I’m not just doing math. I’m getting stronger at it.”
+	The child looks at the tutor and nods. The tutor gives a "thumbs up."
+	32–40s
+	VO: “Don't just get a tutor. Make your child MathFit™ with Cuemath.”
+	Visual: Split screen. On one side, the child’s focused face; on the other, the Cuemath logo.
+	40–45s
+	Text: Make Your Child MathFit™
+	CTA: Book a free trial. Strong, rhythmic brand sign-off.
+	
+
+
+
+
+
+
+
+Script 3:
+Scene
+	Dialogue / VO
+	Visual / Direction (Founder POV + Influencer Style)
+	1️⃣ Hook — Call Out Claims (0–5s)
+	“Do claims like ‘master math in a month’ or ‘4X faster’ really help your child understand math … or close their learning gaps for life?”
+	• Founder selfie-style shot, steady hand, warm daylight.• On-screen bold claim overlays appear one by one: — “4X Faster!” — “Master Math in 30 Days!” — “Guaranteed Speed!”• Founder gives a subtle “Really?” expression.• Simple home background (desk, plant, frame).
+	2️⃣ Cuemath Positioning (5–10s)
+	“At Cuemath, we build the math foundation first — because when a child truly understands the concepts, speed and marks follow naturally.”
+	• Soft B-roll: child erasing mistakes on worksheet → cuts to child on phone/tablet using Cuemath.• Visuals on screen: number line animation, shapes transforming, simple puzzles.• Parent watches quietly from side with approving smile.• Warm, documentary tone.
+	3️⃣ Trial Class (10–14s)
+	“When you book a free Cuemath trial class, your child experiences a real 1-on-1 class with us.”
+	• Close-up of phone screen tapping “Book Free 1-on-1 Trial Class.”• Quick UI flash: “Trial Confirmed.”• Child sitting with phone/tablet propped up; tutor video window visible.• Tutor greets warmly, child smiles nervously.
+	4️⃣ Tutor Match (14–18s)
+	“First, we match them with a tutor who’s the right fit for their needs..”
+	• Subtle animation: “Matching best tutor…” → “Tutor Assigned.”• Tutor profile card flashes briefly (smiling, friendly).• Parent watching from doorway, relaxed.
+	5️⃣ Diagnostic + Plan (18–23s)
+	“Then, the tutor identifies the child’s current level, gaps and strengths to understand how your child thinks in math — and builds a plan that’s 100% personalized.”
+	• Over-the-shoulder shot of phone/tablet showing diagnostic questions (patterns, reasoning puzzles).• Child thinking, tapping answers, nodding.• Quick UI moment: “Personalized Plan Created.”• Tutor explains something step-by-step on digital whiteboard.
+	6️⃣ The Shift (23–27s)
+	“And that’s when you see the shift — learning math actually becomes fun.”
+	• Child solving a puzzle confidently; little smile after it clicks.• Parent watches proudly, soft laugh.• Tutor gives thumbs-up on screen.• Warm golden-hour feel.
+	7️⃣ Confidence + CTA (27–32s)
+	“That’s why Cuemath kids don’t just score better — they grow into confident math thinkers for life. Book your trial today. 
+	• Montage: — Child solving independently. — Tutor encouraging warmly. — Parent nodding proudly.• Final frame: Cuemath logo + “Make Your Child MathFit”.• Bottom text: “Book a Free 1-on-1 Class.”
+	
+
+
+
+
+
+Rapid Fire kids:
+
+00:09 - Rapid Fire Round
+0:15: Who solves math faster? 
+0:17: Me.  
+0:21: Who gets stuck more? 
+0:24: No one, Cuemath classes are fun, amazing. 
+0:33: Math became easier when, when we joined Cuemath. 
+0:18: Who loves math puzzles more? 
+0:20: Me.
+0:36: When you don't understand a problem, does the teacher give the answer right away? 0:42: Help me find it. 
+0:43: How does she help you find it? 
+0:44: Give clues. 
+0:46: So online class or school math class? 
+0:49: Cuemath. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 3:
+Scene
+	Dialogue / VO
+	Visual / Direction (Founder POV + Influencer Style)
+	1️⃣ Hook — Call Out Claims (0–5s)
+	“Can you really trust the claims you see from math programs online? Anyone can say ‘4X faster’ or ‘master math in a month.’ But speed without understanding doesn’t hold up.”
+	• Founder selfie-style shot, steady hand, warm daylight.• On-screen bold claim overlays appear one by one: — “4X Faster!” — “Master Math in 30 Days!” — “Guaranteed Speed!”• Founder gives a subtle “Really?” expression.• Simple home background (desk, plant, frame).
+	2️⃣ Cuemath Positioning (5–10s)
+	“At Cuemath, we build the foundation first — because when a child truly understands the concepts, speed and marks follow naturally.”
+	• Soft B-roll: child erasing mistakes on worksheet → cuts to child on phone/tablet using Cuemath.• Visuals on screen: number line animation, shapes transforming, simple puzzles.• Parent watches quietly from side with approving smile.• Warm, documentary tone.
+	3️⃣ Trial Class (10–14s)
+	“When you book a Cuemath trial, your child experiences a real 1-on-1 class with us.”
+	• Close-up of phone screen tapping “Book Free 1-on-1 Trial Class.”• Quick UI flash: “Trial Confirmed.”• Child sitting with phone/tablet propped up; tutor video window visible.• Tutor greets warmly, child smiles nervously.
+	4️⃣ Tutor Match (14–18s)
+	“First, we match them with a tutor who’s the right fit.”
+	• Subtle animation: “Matching best tutor…” → “Tutor Assigned.”• Tutor profile card flashes briefly (smiling, friendly).• Parent watching from doorway, relaxed.
+	5️⃣ Diagnostic + Plan (18–23s)
+	“Then, the tutor runs a quick diagnostic to understand how your child thinks — and builds a plan that’s 100% personalized.”
+	• Over-the-shoulder shot of phone/tablet showing diagnostic questions (patterns, reasoning puzzles).• Child thinking, tapping answers, nodding.• Quick UI moment: “Personalized Plan Created.”• Tutor explains something step-by-step on digital whiteboard.
+	6️⃣ The Shift (23–27s)
+	“And that’s when you see the shift — learning math actually becomes fun.”
+	• Child solving a puzzle confidently; little smile after it clicks.• Parent watches proudly, soft laugh.• Tutor gives thumbs-up on screen.• Warm golden-hour feel.
+	7️⃣ Confidence + CTA (27–32s)
+	“That’s why Cuemath kids don’t just score better — they grow into confident math thinkers for life. Book your trial today. 
+	• Montage: — Child solving independently. — Tutor encouraging warmly. — Parent nodding proudly.• Final frame: Cuemath logo + “Make Your Child MathFit”.• Bottom text: “Book a Free 1-on-1 Class.”
+	Ref: https://www.instagram.com/p/DQuX3qaDCLH/
+Meme Format
+Viral hook: KBC https://youtube.com/shorts/bg49ADsVVj4?si=Ok13cgH2VlD6Qdue
+Magic transition - wow confetti transition
+Manan’s video: Manan 10 years video (9x16).mp4
+Drive link: Manan 10 years video
+Start with the viral video till “maths mein magic hai”
+Cut to confetti transition
+Then Manan saying: “It’s almost like a superpower” (0:11-0:12)
+0:01-0:11 Manan “So I believe, math is more than just a subject…. More clearly”
+0:13-0:37 Manan: “It helps you problem solve… Cuemath”
+________________
+
+
+
+
+Viral hook: https://www.instagram.com/p/DRHaq0eji-S/
+Manan’s Video: Manan perf ad 2.1 1-1 Captions.mp4
+Drive:Manan perf ad
+The "Perspective Shift" (Visual + Dialogue)
+This approach uses a direct response to the kid's "Math" comment to change the tone immediately.
+                                                                           * Hook (The Meme): Kid says "Math."
+                                                                           * Transition: A quick cut to a text overlay that says: "Math isn't the problem... the way it’s taught is."
+                                                                           * The Stitch: Cut immediately to the Cuemath footage. The voiceover starts: "At Cuemath, we don’t race to the answers. We take the time to explore, understand, and enjoy the process".
+                                                                           * Add bigger caption style supers
+
+
+                                                                           * Why it works: It validates the kid’s frustration but offers an immediate solution, making the "confidence" part of the video feel earned.
+Tab 6
+Script 1: Group vs 1:1
+
+
+Time
+	Audio / VO (BAB)
+	Visuals / Direction
+	0–5s
+	(Before/Hook): "In a group math class, your child gets a slice of attention. But are they actually thinking or just following along?"
+	The Tension: A crowded online "Zoom" style class. The child is looking at the screen, but their eyes are glazed over. 
+	5–12s
+	(Agitation): "When the teacher talks 90% of the time, kids become spectators. Doubts get buried, and 'math gaps' start to grow."
+	The Problem: Close-up of the child's notebook. They've copied a step incorrectly, but the group class has already moved to the next slide.
+	12–20s
+	(Bridge): "Cuemath changes the math. Our 1:1 sessions are built on the 'Explain-to-Learn' method. Here, your child is the one doing the talking."
+	The Shift: Smooth transition to a bright, focused 1:1 interface. The Cuemath Interactive Whiteboard is visible. The Talk-o-Meter (brand element) shows the child speaking.
+	20–28s
+	(Bridge/Feature): "With a dedicated math mentor and interactive tools, every logic gap is spotted—and corrected—the moment it happens."
+	The Interaction: The tutor circles a specific step on the shared whiteboard. The child’s face lights up with an "Aha!" moment.
+	28–35s
+	(After): "They don't just find the answer; they master the reasoning. That’s how a child becomes MathFit."
+	The Outcome: The child is now explaining the logic back to the tutor, gesturing with their hands. They look confident and "fit" to tackle the next challenge.
+	35–45s
+	(Push/CTA): "Stop being a spectator. Start thinking. Book your free 1:1 MathFit trial class today."
+	End Frame: Cuemath Book Your Free 1:1 Trial.
+	
+
+
+
+
+
+
+
+
+
+Script 2: Shoot with Manan
+LOC 1: Pedagogy + MathFit Definition Formula: Myth vs. Reality (Contrast)
+
+
+Time
+	Audio / VO (Founder to camera)
+	Visuals
+	0–5s
+	(Myth): "Most parents think a few 'silly mistakes' in 1st grade are just a phase. But research by NCBI shows that mathematics ability in preschool predicts math achievement up to age 15—they are the biggest predictors of high school achievement."
+	Founder speaking directly to camera. Research citation text appears as a clean overlay.
+	5–12s
+	(Reality): "The truth is, these gaps show up later as math anxiety and low confidence because the foundation was rushed to keep up with school”.
+	B roll of a child with a math book looking tensed, anxious. 
+	12–22s
+	(Transition): "At Cuemath, we don't just 'tutor' for the next test. We make your child MathFit by focusing on the 'why' behind the numbers."
+	Transition to a 1:1 screen recording showing a tutor and child collaborating on a digital whiteboard.
+	22–32s
+	"Our 1:1 live classes ensure your child isn't just memorizing steps to solve, but actually reasoning through problems ."
+	Close-up of the "Talk-o-Meter" or a visual math tool on the platform showing active student participation.
+	32–40s
+	"When the foundation is strong, math stops being a hurdle and becomes a superpower."
+	Child on screen smiles and explains a solution to the tutor. Founder gives a final encouraging look.
+	End
+	(CTA): "Build a foundation that lasts. Book your free 1:1 trial class today ."
+	CTA screen with Cuemath logo and "Book a Free Trial Class" button.
+	
+
+
+
+Early Math Skills Predict Later Achievement
+Study: Early Math Knowledge & High School Achievement
+Link: https://pmc.ncbi.nlm.nih.gov/articles/PMC4719158/
+This longitudinal research shows that mathematics ability in preschool predicts math achievement up to age 15, even after controlling for other skills and background factors.
+Early Numeracy Skills Predict Long-Term Math Success
+Research summary: The Role of Early Numeracy Skills in Predicting Long-Term Mathematics Achievement
+Accessible brief summary on ResearchGate (with DOI reference): https://www.researchgate.net/publication/394977588_The_Role_of_Early_Numeracy_Skills_in_Predicting_Long-Term_Mathematics_Achievement
+This study reinforces that early numeracy competencies are robust predictors of later math achievement, underscoring the importance of early foundational skills.
+Script 3: Shoot with Manan
+
+
+
+
+Time
+	Section
+	Audio / VO 
+	Visuals / Direction
+	0–5s
+	(Attention)
+	"New research shows that for U.S. students, math confidence actually predicts achievement more than just talent."
+	Founder to camera. Text overlay: Source: Springer, 2025.
+	5–12s
+	(Interest)
+	"But here’s the problem: as school gets harder, confidence drops because kids are taught to follow 'recipes' they don't understand. When the recipe changes on a test, they freeze."
+	B-roll: Split screen. Left: Child memorizing a page. Right: Child looking confused at a test.
+	12–20s
+	(Desire)
+	"At Cuemath, we don't just give answers. We build MathFit kids. By focusing on why math works, we turn that 'I can't do this' into an 'Oh, now I get it!' moment."
+	Visual: 1:1 screen. Child uses a virtual tool to move blocks/shapes. Child’s face lights up.
+	20–28s
+	(Desire)
+	"With the same expert tutor every week, your child gets a personalized roadmap that aligns perfectly with their school's curriculum. It’s not just about better grades—it’s about a child who feels genuinely smart."
+	Visual: Rapid cuts of "Clarity" markers: Logic, Reasoning, Number Sense.
+	28–35s
+	(Action)
+	"Don't wait for the next report card to fix the gaps. Book a free 1:1 trial class today and see the clarity happen in real-time."
+	CTA Screen: "Book Your Free 1:1 Trial." Logo + "Making Kids MathFit."
+	
+
+
+
+
+
+
+
+
+
+
+
+Script 4: AI-proofing kids
+
+
+
+
+Time
+	Audio / VO (Founder to camera)
+	Visuals 
+	0–3s
+	“With AI everywhere, getting answers is easy.”
+	Child at laptop. AI chat window. Answer appears instantly.
+	3–6s
+	“Homework gets done in seconds.”
+	Child copying answer. No excitement.
+	6–9s
+	“But here’s the problem.”
+	Founder looks directly at camera. Pause.
+	9–13s
+	“When asked why—most kids can’t explain it.”
+	
+
+	13–17s
+	“And that’s what school tests.”
+	Test paper. ‘Explain your steps’ highlighted.
+	17–21s
+	“Real learning isn’t about answers.”
+	Tutor and child in 1:1 class.
+	21–25s
+	“It’s about reasoning—step by step.”
+	Tutor guiding with cues, not writing answers.
+	25–29s
+	“That’s how strong foundations are built.”
+	Child explaining solution back confidently.
+	End
+	“Try a free Cuemath class.”
+	Logo + CTA.
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 5: UGC Testimonial style (K-2)
+
+
+
+
+Time
+	Visual
+	Audio / VO (UGC Style - Natural & Sincere)
+	0–6s
+	Parent selfie-style, walking in the house or kitchen.
+	"I used to watch my daughter do her math and notice something heartbreaking. Even when she knew the answer, she would hesitate."
+	6–12s
+	Cut to: Child erasing a correct answer, looking at the parent for validation.
+	"She was constantly second-guessing herself. She’d write the right answer, then erase it. It wasn't a math problem; it was a confidence problem."
+	12–20s
+	Parent back to camera, slightly closer.
+	"As a parent, you worry. If she’s doubting herself now in 1st grade, how is she going to feel when the math gets actually hard?"
+	20–30s
+	Transition: Screen recording of 1:1 Cuemath class. Child is pointing at a visual tool.
+	"That’s why we started Cuemath. Their 1:1 tutors don't just say 'Good job.' They ask, 'How did you get that?' They helped her to articulate her thinking."
+	30–40s
+	Over-the-shoulder: Child explaining a concept to the tutor on screen.
+	The tutor waited, gave her space, and let her find her own voice."
+	40–50s
+	Split screen: Child solving a problem quickly vs. Child smiling at the tutor.
+	"Now? She isn't just getting the answers right; she’s explaining them to me at the dinner table. That's the MathFit confidence we wanted."
+	50–55s
+	Parent to camera, holding the tablet/laptop.
+	"If your child is second-guessing their math, stop the cycle early. Book a free 1:1 trial class with Cuemath."
+	
+
+
+
+
+
+Script 6- Topicwise LOC
+
+
+
+
+Time
+	Visual
+	Audio / Dialogue
+	0–4s
+	Algebra equation fills the screen
+	“Ever wondered why kids freeze when letters enter math?”
+	4–8s
+	Child pauses mid-problem, confused
+Close-up of 2x + 3 = 7,
+	“It’s not the math…”
+	8–12s
+	Close-up of x, y highlighted
+	“…it’s not knowing what these stand for.”
+	12–16s
+	x transforms into a real object
+
+
+	“So we give letters a meaning first.”
+	16–20s
+	Tutor guiding, child answering
+	“The tutor breaks it down with questions.”
+	20–24s
+	Child nodding, writing confidently
+	“One step at a time.”
+	24–28s
+	Problem solved correctly
+	“That’s when confidence builds.”
+	28–30s
+	Cuemath screen + CTA
+	“Book a trial class today to see the difference.”
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Script 7- Exams approaching
+LOC 5: Topicwise Fix (Exam Prep Focus) Formula: The Checklist (Self-Selection)
+
+
+Time
+	Audio / VO
+	Visuals
+	0–5s
+	(Qualify): "With math exams approaching, ask yourself: Is your child still making 'silly mistakes' on easy problems? Are they freezing when a word problem looks slightly different from the textbook?"
+	Fast-paced text overlays: "Silly Mistakes?" "Word Problem Freeze?" "Exam Anxiety?" Cut to a child looking at a clock and a math paper.
+	5–12s
+	(Identify): "These aren't ability issues—they are signs of 'Testing Gaps.' Most kids practice, but they don't practice under pressure or with varied questions."
+	Split screen: Left side shows a child highlighting a textbook (Passive). Right side shows a Cuemath "On-Demand Quiz" timer ticking (Active).
+	12–22s
+	(Cure): "This is where you need to Test Your Skills. Cuemath provides regular tests at the end of every topic and on-demand quizzes tailored specifically to identify and fill your child's learning gaps."
+	Screen recording of the Cuemath platform: Showing a quiz interface with instant feedback.
+	22–32s
+	"It ensure your child is fully exam-ready. They learn to manage time, check for errors, and walk into the exam hall knowing exactly how to tackle any question."
+	Child in school, appearing for exam.
+	32–40s
+	(Action): "Don't leave the next report card to chance. Test their skills before the school does."
+	Founder or Tutor to camera: "Book a free diagnostic trial and see their exam-readiness today."
+	End
+	CTA: "Get Exam Ready. Book a Free 1:1 Trial."
+	CTA Screen with Cuemath logo and a mockup of a "Progress Report."
+	
+
+
+
+
+Script 8 - The Architecture of Thinking
+LOC 1 | Formula 6: Myth vs. Reality
+
+
+Section
+	Script Content
+	(Myth)
+	"A lot of parents think their child is just 'bad at math' because they struggle with homework or freeze during tests."
+	(Reality)
+	"But the truth is, it’s rarely the child—it’s how they’ve been taught to think. When math is reduced to memorizing formulas, it feels like a chore. But math isn't a list of rules; it’s the hidden logic that runs the world."
+	(Transition)
+	"Cuemath helps your child see that beauty. We don't just teach them to calculate; we make them MathFit. This means they learn to see patterns in nature, reason through complex problems systematically, and explain the 'why' behind every answer."
+	(Benefit)
+	"When a child understands the logic, the 'silly mistakes' disappear and are replaced by a quiet confidence that lasts a lifetime. They don't just excel at math; they excel at thinking."
+	(CTA)
+	"Change their math story and build a foundation for the future. Book a free 1:1 trial class today."
+	
+
+App Videos
+Script 1: "The Free, Fun Way to Get MathFit"
+Inspired by Duolingo's ad - https://youtu.be/P3ZTxke4AOU?si=FzmGAHUDWZyhEGb-
+VO Script:
+"The Cuemath App is a fun and effective way to become MathFit. With daily workouts that strengthen memory, speed, and reasoning, plus Arena challenges to compete with friends—Cuemath makes math practice a habit kids actually enjoy. Trusted by over 2.5 million students worldwide. Download Cuemath and help your child get MathFit today."
+Visual Breakdown:
+[0-3s] VO: "Cuemath is the fun and effective way to build math confidence."
+                                                                           * Animated kid character opens Cuemath app on tablet
+                                                                           * App icon zooms in, then reveals colorful home screen
+                                                                           * Kid's expression changes from neutral to excited
+[3-8s] VO: "With daily workouts that strengthen memory, speed, and reasoning, plus Arena challenges to compete with friends—"
+                                                                           * Quick-cut montage showing app features:
+                                                                           * [3-4s] MathGym workout screen - 5 exercises appearing as cards
+                                                                           * [4-5s] Memory drill - formula flashing, kid tapping correct answer
+                                                                           * [5-6s] Speed challenge - numbers flying, score increasing rapidly
+                                                                           * [6-7s] Arena mode - two animated kids on split screen competing in logic puzzle
+                                                                           * [7-8s] "You Won!" celebration animation, kid pumping fist
+[8-12s] VO: "Cuemath makes math practice a habit kids actually enjoy."
+                                                                           * Animated calendar showing streak building: Day 1, Day 2, Day 3... up to Day 7
+                                                                           * Fire emoji/streak indicator growing
+                                                                           * Different kids (diverse representation) on their devices, all engaged and smiling
+                                                                           * Parent looking over kid's shoulder, both smiling at progress report
+[12-16s] VO: "Trusted by over 2.5 million students worldwide."
+                                                                           * Animated globe with location pins lighting up across continents
+                                                                           * Number counter rapidly climbing: "2,500,000+ Students"
+                                                                           * Star rating appearing: "4.6★"
+                                                                           * Badge appearing: "100% Ad-Free"
+[16-20s] VO: "Download Cuemath and help your child get MathFit today."
+                                                                           * App icon centered on screen
+                                                                           * Bold "DOWNLOAD NOW" button pulses
+Script 2: "Help Your Child Get MathFit with Cuemath"
+Ref - New super Duolingo ad
+VO Script:
+"Help your child build real math confidence with the Cuemath App—the structured way to make math practice a daily habit. Join over 2.5 million families using daily workouts that strengthen foundational skills like memory, fluency, understanding, application, and reasoning. Your child can challenge peers in fun Arena battles, master multiplication tables through games, and develop problem-solving skills that matter. Whether you want better grades or lasting math confidence, Cuemath turns daily practice into progress you can see. Download Cuemath free and watch them get MathFit."
+Visual Breakdown:
+[0-3s] VO: "Help your child build real math confidence with Cuemath—the structured way to make math practice a daily habit."
+                                                                           * Animated parent watching kid struggle with homework at kitchen table (evening, stressed environment)
+                                                                           * Parent hands kid a tablet with Cuemath app open
+                                                                           * Kid's face transitions from frustrated to interested
+[3-8s] VO: "Join over 2.5 million families using daily workouts that strengthen foundational skills like memory, fluency, understanding, application, and reasoning."
+                                                                           * "2.5M+ Families" counter appearing
+                                                                           * MathGym workout screen showing 5 cards with clear labels appearing one by one:
+                                                                           * Text overlays briefly highlight each: "Memory • Fluency • Understanding • Application • Reasoning"
+[8-13s] VO: "Your child can challenge peers in fun Arena battles, master multiplication tables through games, and develop problem-solving skills that matter."
+                                                                           * Practice: Multiplication grid (1-20) with completed tables showing green checkmarks
+Text overlay: "100% Ad-Free & Safe"
+[13-17s] VO: "Whether you want better grades or lasting math confidence, Cuemath turns daily practice into progress you can see."
+                                                                           * Parent receiving notification on phone: "Weekly Progress Report"
+                                                                           * Opens to see detailed dashboard: improvement graphs across all 5 skills, completed workouts, time spent
+                                                                           * Text: "Track Real Progress"
+[17-20s] VO: "Download Cuemath free and watch them get MathFit."
+                                                                           * App icon appears centered with dumbbell (MathGym) icon
+                                                                           * "DOWNLOAD FOR FREE" button pulsing
+                                                                           * Text: "Cuemath - Making Kids MathFit™"
+                                                                           * "Start Free Today" badge
+
+
+
+
+Women's day
+
+
+
+
+
+
+
+
+Script 1: (Brand + Perf)
+
+
+
+
+Time
+	Visual
+	Voiceover (VO)
+	Super
+	00–05s
+	Wide Shot — A young girl (8-10 years old) stares intently at posters of a female astronaut and a structural engineer on her bedroom wall.
+	“When she dreams big…”
+	
+
+	05–10s
+	Close-Up — The same girl sits at a desk, looking defeated. She erases a math problem repeatedly, shoulders slumped.
+	“…why does she hesitate at math?”
+	
+
+	10–15s
+	Montage of girls of different backgrounds engaged in real-world activities related to math: - A girl solving a puzzle with focus. - Another girl building a robot with a group. - A third girl confidently raising her hand in a classroom discussion.
+	“The future is full of possibilities, but building the right mindset is key.”
+	“Math confidence starts early.”
+	15–22s
+	Action Shot — The girl is now in a classroom setting, confidently explaining a geometry concept to a peer using a whiteboard.
+	“There’s no such thing as ‘girls can’t do math.’”
+	
+
+	22–30s
+	Medium Shot — The girl is on a laptop. We see a Cuemath tutor smiling, using the interactive whiteboard to guide her (not giving the answer). The girl’s face lights up as she “gets it.”
+	“They just need the right tools and guidance…”
+	                                                                           1. Personalized Online Math Tutoring
+                                                                           2. Expert Math Coaches 
+	30–40s
+	Montage of diverse girls solving puzzles, building robots, and working with a focus on STEM activities.
+	“to solve any problem confidently.”
+	
+
+	40–50s
+	Logo Animation — The Cuemath logo scales in alongside the MathFit™ wordmark.
+	“This Women’s Day, build mathematical confidence, build a future-ready thinker.”
+	“Happy Women’s Day”
+	
+
+	
+
+	“Make your child MathFit™ with Cuemath.”
+	“Build mathematical confidence. Build future-ready thinkers.”
+	
+
+	
+
+	CTA: “Book a Free Trial Class.”
+	
+
+	
+
+	
+
+	
+
+	
+
+	Script 2 - Tutor angle 
+60 seconds | Parent-focused but still celebratory | Brand + Perf 
+________________
+
+
+Opening (Hook with outcome, not just tribute)
+Visual: Student hesitating → tutor guiding → student solving.
+On-screen text:
+Math confidence starts here.
+Manan’s VO:
+This Women’s Day, we celebrate the women of Cuemath —
+our tutors who’re making kids Mathfit.
+They don’t just teach math.
+They build belief.
+Every day, they turn
+“I’m not good at math…”
+into
+“I can do this.”
+“They run offices.
+They run households.
+And they’re coaching a generation of confident problem-solvers.”
+“To every woman at Cuemath, shaping young minds—
+Happy Women’s Day.”
+Brand VO: “Experience the difference a right tutor can make”.
+“Book a free 1:1 math class”
+End Frame:
+Cuemath Logo
+Book a Free Class
+
+
+
+
+Revised: 
+
+"This Women's Day, we celebrate the coaches behind every MathFit kid."
+"They take the time to truly know your child — their pace, their gaps, their goals."
+"They don't just explain — they guide, until your child can think for themselves."
+"And they stay. Term after term, because they're invested in your child's growth — not just their grades."
+"That's the kind of coach every child deserves. Especially in a world where thinking matters more than ever."
+"To every woman at Cuemath — thank you. Happy Women's Day."
+
+
+
+
+SCRIPT 3: "THE SHIFT"
+TIME-CODED SCRIPT
+Time: 0-3s Visual/Action: START ON THE WEIGHT: Medium shot of mother (Anjali, 42) at dining table, 7:00pm. Laptop open (work), child's homework scattered, phone face-up (notifications piling up). She's helping child with math while on muted Zoom call. Child asks question, she answers while typing. Her face: competent exhaustion. No chaos—just sustained effort.
+VO (Locked): "You've been managing math homework for years now."
+________________
+
+
+Time: 3-7s Visual/Action: THE DECISION: Close-up on her face. She stops, looks at child struggling, looks at her own work, looks at clock. Decision moment. She opens laptop, searches "math tutor," clicks Cuemath. Camera holds on her face as she reads—eyebrows lift slightly (interest, hope). Clicks "Book Trial."
+VO (Locked): "What if you... didn't have to?"
+________________
+
+
+Time: 7-13s Visual/Action: THE HANDOFF: Next day, same time (7:00pm). Child is in Cuemath session at table. Mother is at same laptop—but now working, fully focused. Headphones on. She's in her work meeting (camera sees her listening, nodding, typing). Child visible in background—solving with tutor, doesn't need her. Split focus shot: both working, parallel.
+VO (Locked): "With Cuemath, your child gets expert 1:1 tutoring—the same dedicated tutor building real understanding, every week—"
+________________
+
+
+Time: 13-19s Visual/Action: PARALLEL SUCCESS: Child closes laptop (session done), stands, stretches. Mother still working (meeting running late). Child doesn't interrupt—goes to kitchen, gets snack, comes back, does something else (reading, drawing). Independent. Mother glances over once—child gives thumbs up. She smiles, returns to meeting.
+VO (Locked): "while you focus on everything else you're managing."
+________________
+
+
+Time: 19-24s Visual/Action: THE CHECK-IN: Later (8:00pm), mother finishes meeting, closes laptop. She opens Cuemath app, checks today's progress: "Completed: Fractions unit. Next session: Monday 7pm." She nods, satisfied, closes app. Child is reading nearby. She joins him on couch—not to help, just to be there.
+VO (Locked): (Brief silence—let scene breathe)
+________________
+
+
+Time: 24-30s Visual/Action: End on her looking at child (who's absorbed in book), then looking at closed laptop (work done), then looking at clock (it's only 8:00pm—she has time). She picks up her own book. Sits back. First moment of rest we've seen. End card: "Your Time Back | Book a Free Class."
+VO (Locked): "This Women's Day, give yourself what you've earned: time."
+END CARD TEXT: "Book a Free Class | Making Kids MathFit™"
+
+
+Script 4 - ‘Strong Women Raise Strong Thinkers’
+SCENE 1 - KITCHEN, EVERYDAY MOMENT
+Visual/Action: START ON OBSERVATION: Mother (Priya, 38) at kitchen counter, problem-solving something practical - maybe fixing broken cabinet hinge with screwdriver, or figuring out how pieces fit. Working through it methodically. Child (10 years old, gender neutral) walks in, stops, watches her. She doesn't notice at first. Child observes: how she tries one way, pauses, tries different way, figures it out. Mother says to herself: "Okay, if I just..." Gets it. Small satisfied nod.
+VO (Locked): "Your child watches you solve problems every day."
+TRANSITION: Child still watching. Mother finally notices, smiles at child.
+________________
+
+
+SCENE 2 - LATER, HOMEWORK TABLE
+Visual/Action: THE PARALLEL: Child at table with math homework, stuck. Stares at problem. Mother walks by with laundry, sees child stuck. Pauses. Doesn't jump in immediately. Watches for a moment - child trying different approaches, getting frustrated. She sets laundry down, sits beside child (not hovering, observing).
+VO (Locked): "But when it comes to math, they freeze at."
+TRANSITION: Mother pulls out phone.
+________________
+
+
+SCENE 3 - CUEMATH SESSION, Transition
+Visual/Action: THE LEARNING: Child in Cuemath session. Tutor on screen: "What's your first step?" Child hesitant. Tutor waits. Child: "Um... maybe if I..." Tutor: "Good, try that." Child works through it, gets stuck. Tutor: "What else could you try?" Child thinks, tries different way. Gets it. Tutor: "You figured it out. That's thinking."
+VO (Locked): "With Cuemath, they get a dedicated tutor—the same expert every week—who teaches them how to think through problems—"
+TRANSITION: Multiple sessions passing (calendar pages, different days).
+________________
+
+
+SCENE 4 - HOMEWORK TABLE
+Visual/Action: THE PARALLEL COMPLETE: Same table. Child with different math homework. Gets stuck. But this time: pauses, tries one way, doesn't work, tries different way (mirroring mother's problem-solving). Thinks out loud quietly: "Okay, if I just..." Gets it. Small satisfied nod (same gesture as mother's in opening). Mother walking by sees this, stops. Watches for a beat. Pride on her face. Doesn't interrupt.
+VO (Locked): "step by step, building the clarity you already have."
+TRANSITION: She continues walking, smiling to herself.
+________________
+
+
+SCENE 5 - BOTH TOGETHER
+Visual/Action: Mother at counter, now working on something else (meal prep, organizing). Child nearby doing something independently (reading, drawing). Both problem-solvers. Camera pulls back to show them in same space - parallel. End card appears.
+VO (Locked): "Strong women raise strong thinkers.”
+END CARD TEXT: 
+Strong women raise strong thinkers.
+Book a Free 1:1 Class
+
+
+
+Script 5 - Gift Yourself Peace 
+
+
+Time
+	Visual / Action
+	VO (Locked)
+	0–3s
+	START ON MULTITASK: Fast-cut montage of a woman doing 3–4 things at once: laptop open (work tab), phone buzzing (school thread), stirring on the stove + lunchbox/form. Tight framing, slightly rushed energy.
+	“You do a lot—often all at once.”
+	3–6s
+	Pause + relief beat: She pauses mid-motion. Phone lights up with a Cuemath tutor message: “Ria’s all set for tomorrow’s math exam.” She reads it. Small exhale, shoulders drop. She sets the phone face-down. Pacing slows; sound design softens. Her face shifts from tense to calm.
+	“So this Women’s Day, gift yourself peace of mind.”
+	6–10s
+	Cut to child at a desk with a device. Transition from chaos → calm: cleaner frame, steady camera. Woman passes behind without being pulled in.
+	“With Cuemath, your child gets personalized attention from expert tutors in 1:1 live classes—”
+	10–16s
+	Show the 1:1 live class: tutor on screen + shared whiteboard. Child is speaking, explaining steps, solving in real time. Tutor prompts; child responds confidently.
+	“helping them become MathFit™: a confident, independent problem-solver.”
+	16–22s
+	Child continues independently for a beat (writes, checks, continues). Woman nearby doing something restful (tea / stretching / reading), not hovering.
+	(VO continues in next beat; let visuals breathe)
+	22–30s
+	Close-up: she later checks a simple progress update in the app, smiles, puts phone down. End on clean Cuemath end card with “Book a Free 1:1 Class” button-style graphic.
+	“And you get what you deserve: flexible schedules, clear progress reports, and your time back.”
+	
+
+
+
+Sonali
+Script 1 - Women’s Day (Brand + Perf)
+
+
+[Scene 1: Sonali Bendre sitting on a sofa, speaking directly to the camera.]
+Sonali Bendre (Direct to Camera):
+ "Women truly know how to balance it all—work, family, and shaping the future."
+[Scene 2: Quick cuts of 3 moms balancing their daily routines.]
+                                                                           1. Mom 1: In the kitchen, cooking dinner with her child. The child is helping by stirring or setting the table, while they chat about their day. The mom offers guidance with a smile.
+
+                                                                           2. Mom 2: In the living room, helping her child clean up. They’re picking up toys or organizing books together, with the mom guiding the child and sharing a moment of cooperation.
+
+                                                                           3. Mom 3: At a desk, solving a math problem with her child. The mom sits beside her child, encouraging them to think through the problem and offering gentle guidance, helping the child gain confidence in their learning.
+
+Narrator (Voiceover):
+ "And while we're keeping the world spinning at home, we're also raising kids for a world that's changing fast — kids who can think clearly and lead with confidence.""
+
+
+[Scene 3: A child pauses on a tough math problem — not panicking, but thinking. They try an approach, cross it out, and try again. Then the lightbulb moment — they get it.] 
+SB (VO): "Kids who don't freeze when things get hard…"
+[Scene 4: A child on the Cuemath platform in a 1:1 session — the tutor asks a guiding question on the interactive board, the child reasons through it out loud, moves pieces on the math canvas.] Make sure the platform UI is clearly visible — the collaborative board, the tutor's face, the child interacting. 
+SB (VO): "…who ask 'why' before they ask 'what's the answer'…"
+[Scene 5: Split screen or quick cut — the child from Scene 4 now confidently explaining their reasoning to a parent at the dinner table. The parent smiles.] 
+SB(VO): "…and who carry that confidence everywhere."
+[Scene 6: Sonali Bendre smiling, speaking directly to the camera.]
+Sonali Bendre: "This Women's Day, Cuemath celebrates every woman raising a child who thinks for themselves. Help your child become MathFit."
+[Scene 7: Quick cuts of children using MathFit, solving math problems with joy and confidence.]
+Narrator (Voiceover):
+ "Strong Thinkers Today, Confident Problem Solvers Tomorrow."
+[Logo and CTA on screen:]
+ "Book a free 1:1 math class with Cuemath."
+
+
+Projections 
+
+
+
+
+Metric
+	Projected Range
+	Benchmark Context
+	Hook Rate
+	8-12%
+	Seasonal avg: 4.4-4.6%. Sonali's cultural recognition in US NRI feed is the differentiator
+	CTR
+	0.7-0.9%
+	Account avg: 0.62%
+	CPL
+	6,500-8,500 INR
+	Brand-first structure limits pure conversion efficiency
+	NRI_QL Rate
+	18-23%
+	Testimonials on Leads_Conv: 22.7%
+	Signup Rate
+	45-55%
+	Slight discount vs. 58.9% benchmark due to brand format
+	Retargeting CPR
+	3,000-4,500 INR
+	Account retargeting range: 2,390-4,172 for top performers
+	Suggestions: Run on India Expats (Direct) + Indian Interests for TOF awareness. Deploy same cut as retargeting creative against engaged audiences (this is where it'll deliver best CPL). Go live 3-5 days before Women's Day, pull 2-3 days after. Produce a 15-20s perf cut from same footage — open on platform scene, Sonali at 5s, end card by 15s.
+
+
+Script 2 - Introducing Cuemath mom to mom. 
+Opening Hook (0-5s)
+ VO (Sonali’s voice, warm and engaging):
+"As mothers/parents, we want to make sure our kids are ready for the world. But math? That feels like a huge challenge."
+(Visual: Sonali Bendre sitting comfortably on the chair, speaking directly to the camera with a warm, relatable smile. She gives a playful shrug, signaling the universal struggle with math.)
+________________
+
+
+Problem (5-12s)
+ VO (Sonali’s voice, empathetic):
+ "No matter how hard we try, they just can’t seem to get past their current level."
+ (Visual: Cut to Sonali flipping through a math book with a mild sense of frustration. She sighs, then looks back at the camera. The lighting is soft, making the moment feel personal and relatable.)
+________________
+
+
+Solution (12-20s)
+ VO (Sonali’s voice, upbeat):
+"But with Cuemath’s 1:1 personalized online tutoring, you can help them get accelerated at school"
+(Visual: Cut to a child working on a tablet with Cuemath on-screen. The child is engaging with the tutor, actively solving a math problem. The tutor is guiding the child, making the session look engaging and interactive.)
+________________
+
+
+Benefit & RTBs (20-30s)
+ VO (Sonali’s voice, motivating):
+"The tutors don’t just teach math, but guide kids patiently to build a strong math foundation."
+(Visual: Key Product Shot — The focus is on the tutor’s screen, interacting with the child. The tutor is explaining a math concept, and the child is actively following along. The child looks confident and engaged as they solve the problem.)
+________________
+
+
+Pun Line (30-35s)
+ VO (Sonali’s voice, playful and confident):
+"All while learning how to think through tough problems calmly, like me."
+(Visual: Cut back to Sonali, now with a playful, cheeky smile. She winks at the camera, keeping the tone light-hearted and relatable.)
+________________
+
+
+Call to Action (35-40s)
+ VO (Sonali’s voice, motivating):
+"So, if you’re ready to see your child say, ‘Mom, I’ve got this!’ book a free trial with Cuemath today and make them MathFit for life."
+
+End plate: Make Your Child MathFit - A Confident Problem-Solver for Life
+Book a free 1:1 math class today
+
+________________
+
+
+
+
+Script 2 — Cuemath, Mom to Mom (V2) 
+Opening Hook (0-5s) Sonali (direct to camera, conversational): "Your child does fine in math at school. But do they actually understand it — or are they just getting through it?" 
+
+(Visual: Sonali at a kitchen counter or living room — not the same chair from Script 1. Casual, like she's talking to a friend. No shrug — just a knowing look that says "you know what I mean.")
+Problem (5-10s) Sonali (VO): "That's the thing, na? They pass the test, but ask them to explain why — and they freeze." 
+
+(Visual: Quick shot of a child doing homework, getting the right answer but looking uncertain. Maybe erasing something, second-guessing. Not dramatic — just that recognizable moment of fragile understanding.)
+Solution (10-18s) Sonali (VO): "Cuemath gives your child a dedicated tutor — same tutor, every class — who doesn't just teach math, but asks the right questions so your child discovers the answer themselves." 
+
+(Visual: Child on the Cuemath platform, 1:1 with tutor. The tutor asks something, the child pauses, thinks, then works through it on the interactive board. Show the collaborative canvas clearly.)
+Proof (18-25s) Sonali (VO): "It's personalized to their pace, aligned to what they're learning in school, and built around real understanding — not shortcuts." 
+
+(Visual: Quick cuts — the platform showing a personalized learning path, the child explaining a concept back to the tutor, the tutor nodding. The child looks engaged, not stressed.)
+Close (25-32s) Sonali (back on camera, warm): "When they understand math, they stop doubting themselves. And that confidence? It shows up everywhere." 
+(Visual: Cut to the same child from the homework scene, now at the dinner table, casually explaining something to a parent. Confident, relaxed.)
+CTA (32-37s) Sonali: "Book a free 1:1 math class. See the difference." 
+(End card: "Make Your Child MathFit™ — Book a free 1:1 math class")
+Projections: 
+
+
+
+
+Metric
+	Projected Range
+	Benchmark Context
+	Hook Rate
+	10-14%
+	Herocut avg: 9.9%. Question-based hook names a felt-but-unspoken tension
+	CTR
+	0.9-1.3%
+	Account avg: 0.62%. Problem-solution format is highest-performing pattern
+	CPL
+	5,000-7,500 INR
+	Confidence hooks: 5,000-8,000. Herocuts: 4,425
+	CVR
+	5-9%
+	Herocut CVR: 9.26%
+	NRI_QL Rate
+	20-25%
+	Foundation Rebuilder framing + "na?" naturally filters for NRI
+	Signup Rate
+	50-58%
+	Strong audience-message match
+	Retargeting CPR
+	2,500-4,000 INR
+	Top performers: Aveera at 2,848, Priyanshul at 4,172
+	Suggestions: Primary conversion workhorse — gets 65-70% of Sonali campaign budget. Tier 1 audiences: India Expats (Direct) + LAL_Enrolled on Leads_Conv. Tier 2: Indian Interests + LAL_PayU. Tier 3 (experimental): Int-Chinese with a clean English version (strip the "na?"). Cut 3-4 alternate hooks, rotate weekly. Create a 15-20s retargeting cut starting from the solution section. Do NOT run on Broad Audience, NRI-States, or CTWA.
+
+
+Script 2 - V3 Mom to mom with platform USP
+0-4s (Hook): Sonali (direct to camera, warm): "Your child does well in math. You've seen the report card. But let me ask you something."
+4-9s: Sonali: "Give them a problem they haven't seen before — something not from the textbook — and watch what happens."
+9-13s (The insight): Sonali: "They freeze. Not because they're not smart. But because they've only ever solved what's familiar."
+13-17s (Turn): Sonali: "And mom to mom — that worried me too. Because the real world doesn't give you problems you've practiced."
+17-27s (Product — Platform as hero): Sonali (VO): "That's what makes Cuemath different. Their platform is built to stretch how your child thinks — visual puzzles, live simulations, problems that don't look like anything in the textbook. Your child solves them right on screen, talking through every step." (Visual: The platform in action — interactive whiteboard showing a visual geometry simulation, drag-and-drop problems, the child manipulating objects on the math canvas. Different problem types — visual, logical, real-world. This should look nothing like a typical tutoring video call. It should feel like a smart, engaging tool that makes the child want to try.)
+27-33s (Proof): (No VO. Visual: Quick progression — same child across different sessions. First time, hesitant with an unfamiliar problem. Second time, curious, leaning in. Third time, solving confidently, almost enjoying the challenge. Each time a different kind of problem on the platform. The shift from "I've never seen this" to "Let me figure this out.")
+33-38s (Payoff): Sonali (back on camera): "That's MathFit. A child who sees a new problem and thinks 'let me figure this out' — not 'I haven't learned this.'"
+38-42s (CTA): Sonali: "Try a free class. See how your child handles a problem they've never seen before." (End card: Make Your Child MathFit™ — Book a free 1:1 math class)
+
+
+
+
+Script 3 - Personal Story 
+
+0–3s (Hook):
+(Sonali Bendre smiles cheekily, speaking directly to the camera in a playful tone)
+ “I used to hate math as a kid.”
+3–7s:
+ “It wasn’t because I was lazy—I just really didn’t get it.”
+7–11s:
+ “So I thought—‘maybe I’m just not a math person.’”
+11–14s (Reframe):
+ “Then I found Cuemath and thought… Why wasn’t I taught math like this?”
+ (Pause for impact)
+ “No panicking, no memorizing. 
+
+Cuemath doesn’t just teach math; it teaches them how to think—breaking things down step by step so they truly understand and can apply math in real life like pros. 
+
+Now that’s what I call being MathFit.”
+End Plate:
+Make Your Child MathFit With Cuemath.
+
+
+
+
+Script 3 — Personal Story (Perf) V2
+0-4s (Hook): Sonali (playful, direct): "I used to hate math as a kid." “For a long time, I thought I was not a math person”
+5-10s: Sonali: "Until I realised, I just didn’t have the right guidance. I was taught to memorize, not to understand”
+10-16s (Turn): Sonali (knowing look): "As a mom, I wanted to make sure that my child gets to learn math the right way. And I’m glad we found Cuemath. 
+16-28s (Product): Sonali (VO): "Cuemath ensures every child gets the guidance I never had — a dedicated tutor who doesn't say 'memorize this formula' but asks 'why does this work?' Not 'repeat after me' but 'show me how you'd solve it.'" (Visual: Child in Cuemath session. Tutor asks a question on the interactive board. Child reasons out loud, works through it. Not copying steps — thinking. Show the contrast between rote and real understanding.)
+28-31s (Proof): (No VO. Visual: Quick cuts — child explaining a concept back to the tutor, working through a new problem without hesitation. Tutor smiles. The warmth of a relationship, not just a session. Let the visuals breathe.)
+32-35s (Payoff) "That's how kids become MathFit — they don't just solve math problems, they learn to think clearly.
+CTA (35-38s): Sonali: "Book a free class."
+End card: Make Your Child MathFit™ - Stronger thinking. Better grades. Brighter Future.  — Book a free 1:1 math class) 
+
+
+Projections 
+Metric
+	Projected Range
+	Benchmark Context
+	Hook Rate
+	12-16%
+	"I used to hate math" is the strongest hook across all three scripts. Personal vulnerability from a celebrity is a genuine pattern interrupt — outperforms question-based hooks.
+	CTR
+	0.9-1.4%
+	Problem-solution structure with product by 11s. The personal story creates higher emotional investment than a standard question hook.
+	CPL
+	4,500-7,000 INR
+	Tightest script at 32s. Strong hook + fast product entry + clean close. Could approach Herocut efficiency (4,425).
+	CVR
+	6-10%
+	The "I had this problem → your child doesn't have to" arc drives higher urgency than a generic problem statement.
+	NRI_QL Rate
+	20-25%
+	"Not a math person" resonates deeply with NRI parents who grew up in rote learning systems. Natural self-selection.
+	Signup Rate
+	50-58%
+	Personalization Seeker segment — strong downstream fit. Parents who click on this message already want a tailored solution.
+	Retargeting CPR
+	2,200-3,800 INR
+	Shortest, most emotionally direct script. Should be the most efficient retargeting creative of the three.
+	Why this might be your best performer: It's the shortest script (32s vs 37s for Script 2), has the strongest hook, and the personal story creates an emotional investment that a standard problem-question can't match. The "I never had that, but your child can" close is a direct call to action disguised as a personal statement — it creates urgency without saying "hurry" or "limited spots."
+________________
+
+
+Suggestions:
+Primary audiences: Same as Script 2 — India Expats (Direct) + LAL_Enrolled on Leads_Conv. But test this head-to-head against Script 2, not alongside it. Both are perf creatives targeting NRI mothers — running both simultaneously on the same audiences splits the learning. Run them as A/B with equal budget for the first 7-10 days, then shift spend to the winner.
+The real test is hook rate vs. Script 2. If Script 3 pulls 12%+ and Script 2 sits at 10-11%, you have your answer. But also watch downstream — Script 2's Foundation Rebuilder framing might deliver higher NRI_QL even if Script 3 wins on hook. Measure on cost-per-signup, not just CPL.
+
+
+Final Sonali Bendre Scripts
+Film 1 - Personal Story + Tutor USP
+
+
+Time
+	VO 
+	Visual
+	Text Overlay
+	1–4s
+	"I used to hate math as a kid. 
+
+For a long time, I thought I was not a math person."
+	Sonali, direct to camera. 
+
+
+
+
+ Cut to a brief flash: young girl (8-9 yrs) staring blankly at a notebook full of formulas, pencil down.
+	"I hated math as a kid." (large, white, centred)
+	5–10s
+	"Until I realised, I just didn't have the right guidance. 
+
+I was taught to memorize, not to understand."
+	Return to Sonali. 
+
+
+
+Then cut: old-school classroom visual — teacher writing formulas on a blackboard, kids copying mechanically. No expression, no engagement.
+	
+
+	10–16sn
+	"As a mom, I wanted to make sure that my child gets to learn math the right way. And I'm glad we found Cuemath."
+	Return to Sonali. 
+	
+
+	16–22s
+	"Cuemath ensured my child got the guidance I never had — a dedicated tutor who doesn't say 'memorize this formula' but asks 'why does this work?'"
+	Child in a live 1:1 Cuemath session. Tutor on screen, warm and present. Interactive whiteboard visible — a geometry concept drawn out visually, not as a formula. Tutor points and asks. Child pauses. Thinks.
+	Text overlay, mid-screen: 
+Understanding > Memorization
+	22–28s
+	"Not 'repeat after me' but 'show me how you'd solve it.'"
+	The child starts reasoning out loud—moving objects on the math canvas and working through it step by step. We see the process, not just the answer. Tutor nods, doesn't interrupt.
+	Small overlay: 
+-Dedicated Tutors 
+-
+
+	28–31s
+	(No VO)
+	Quick cuts, no rushing: child explaining a concept back to the tutor — confidently, in their own words. A new problem appears. Child leans in rather than freezing. Tutor smiles. The warmth of a relationship, not just a session. Let the visuals breathe.
+	Trust badge fades in, bottom right: ⭐ Rated 4.9 · 9K+ parent reviews
+	32–35s
+	"That's how kids become MathFit — they don't just solve math problems, they learn to think clearly and confidently."
+	Sonali is back on camera. 
+	
+
+	35–38s
+	"Book a free class to make your child MathFit."
+	End card. Clean, white.
+	Make Your Child MathFit™ 
+Stronger thinking. Better grades. Brighter future. Book a free 1:1 math class →
+	
+
+
+
+
+
+Film 2 - 
+
+
+Refined Visual & Overlay Structure
+VO
+	Visual
+	Overlay
+	“In today’s world, calculation is easy. Even AI can do that.”
+	Sonali. Direct gaze. Calm authority.
+	
+
+	"And that’s exactly why I keep thinking… what skills really matter for our kids now?"
+	A child stares at a problem. He looks confused. 
+	Thinking Skills Win
+	"Because let’s be real—speed isn’t the superpower anymore.
+Clear thinking is the skill your child needs in the AI era.
+And that means reasoning through problems confidently.”
+	Cut to: The same child in a Cuemath class. Child working aloud with tutor. Close-up: child's face while thinking. Tutor observing, not giving answers.
+	Build Confidence Through Reasoning (single overlay, stays on screen)
+	(No VO)
+	Child explains solution to tutor (nodding, impressed). Cut to: Same child explaining to parent at home—parent's proud reaction.
+	—
+	"That's the transformation Cuemath builds — in every class."
+	Montage: Multiple kids in Cuemath sessions. Different faces, same confident explaining.
+	4.9 ★ on Trustpilot (subtle, bottom corner)
+	"From solving math questions…"
+	Child working through problem.
+	—
+	"…to becoming confident problem solvers for life."
+	Same child presenting project/explaining concept to family.
+	Confident Problem Solvers
+	“Book a free 1:1 math class with Cuemath to make your child MathFit, so they’re ready for the AI world… and whatever comes next.”
+	Sonali back on screen
+	
+
+	
+
+	End card. Clean, white.
+	Strong Math Today. 
+Confident Problem-Solver Tomorrow. 
+Book a free 1:1 math class →
+	
+
+
+
+
+
+
+
+Film 3 - Unfamiliar problems for advanced kids
+
+
+
+
+VO
+	Visual
+	Text Overlay
+	"Your child is doing well in math. But let me ask you something."
+	Sonali, direct to camera. 
+	“Unfamiliar Problems = Low Confidence”
+	"Give them a problem they haven't seen before — something that’s not from their textbook — and watch what happens."
+	Cut to: A parent gives a math problem to the child. The child looks confused and lost. The parent looks worried. 
+	On-screen problem text: "A snail climbs 3ft each day, slides back 2ft each night. How many days to climb 10ft?" — 
+
+	"They freeze. Not because they're not smart. 
+
+But because they've only solved problems that are familiar or taught in school."
+	Child stares at the problem. Not panicking — just stuck. The freeze is recognisable, not dramatic.
+
+
+Cut to Sonali
+	They Freeze — bold, white, mid-screen. Fades quickly.
+	"And mom to mom — that worried me a lot. Because the real world doesn't give you problems you've practiced."
+	Sonali continues
+	
+
+	"That’s why I love Cuemath. They don’t follow a fixed curriculum but build the program around your child."
+	Platform in action — interactive whiteboard showing a visual geometry simulation. Drag-and-drop elements. A child manipulating shapes on screen, not watching passively. Child is talking to the teacher - the talk meter shows 70% engagement. 
+	Overlay: Interactive Platform
+	“Every class is designed to stretch how kids think. They break problems down step by step, explain their approach and thinking, and solve live with their tutor."
+
+"And the platform makes that possible — interactive problems, real-world scenarios they actually solve. It's not passive watching. They're doing math, live, every class."
+	The child is writing on a pad, speaking out loud — we hear/see them reasoning, not just clicking answers. Different problem types visible: logical, visual, real-world scenario. The tutor is present but not leading — guiding.
+	
+
+	(No VO)
+	Three-beat progression — same child, different sessions: Beat 1: Unfamiliar problem. Hesitation visible. Beat 2: Curious lean-in. Trying something. Beat 3: Solves it. Not just correct — confident. Enjoying it. Each beat: different problem type on the platform. The shift is visible without being stated.
+	Minimal on-screen text for each beat — could be session numbers (Session 1 / Session 4 / Session 8) to show time progression without drama.
+
+
+Small badge: ⭐ Rated 4.9 · 9,000+ parent reviews
+	"That's MathFit. A child who sees a new problem and thinks 'let me figure this out”
+	Sonali back on camera. Back to warm and direct.
+	
+
+	"Book a free class to make your child MathFit."
+	End card. Clean, white.
+	Make Your Child MathFit™ - A Confident Problem-Solver 
+
+Book a free 1:1 math class 
+	
+
+Topic wise scripts
+SCRIPT 1: Math Kangaroo - Building Deep Thinkers for the AI Era
+Hook:
+Did you know Math Kangaroo bans calculators — and it’s completely intentional?
+Follow-up:
+The exam isn't just testing if your child can compute. It's testing whether they can think logically and approach math problems with clear understanding. 
+The Cuemath Connection:
+Cuemath's 1:1 tutoring builds exactly what Math Kangaroo rewards — number sense, pattern recognition, and reasoning without relying on tools. Your child's tutor guides the why behind every problem, not just the steps. That's MathFit™ thinking: the kind no tool can replace.
+CTA:
+Book a free trial to see how we prepare for Math Kangaroo.
+Sources:
+                                                                              * No-calculator rule verified: Math Kangaroo USA Official FAQ - "No calculators are allowed, just like our individual competition."
+                                                                              * AI era critical thinking value: Harvard Gazette - Is AI Dulling Our Minds? - "Some critical thinking skills will become more valuable because they cannot (yet) be outsourced to AI...the skills of discernment, evaluation, judgment, thoughtful planning, and reflection are even more crucial now than before."
+                                                                              * Over-reliance on AI erodes independent thinking: Microsoft Research - Impact of GenAI on Critical Thinking - "GenAI tools reduce the perceived effort of critical thinking while also encouraging over-reliance on AI, with confidence in the tool often diminishing independent problem-solving."
+                                                                              * Critical thinking as job-proof skill: PMC - Critical Thinking: Creating Job-Proof Skills - "The concept of 'job-proof skills' is introduced, highlighting the importance of critical thinking, problem-solving, empathy, ethics, and other human attributes that machines cannot replicate with the same standards and agility."
+                                                                              * Future workplace value: Jobs for the Future - Skills in the Age of AI - "The model finds growing prioritization of generalized professional skills like critical thinking and problem solving, and human skills like initiative, leadership, and communication in tandem with the growth of AI."
+________________
+
+
+SCRIPT 2: AMC 8 
+Hook:
+Most parents see the AMC 8 as just another middle school test. But it’s actually the first step toward acceptance at top STEM colleges like MIT or Stanford.
+Follow-up:
+The challenge is that school math focuses on repetitive procedures. But AMC8 tests non-routine problem solving—the ability to apply logic to scenarios a student has never encountered before.
+The Cuemath Connection:
+Cuemath's 1:1 tutoring builds exactly that. We make kids MathFit. Our tutors strengthen all four pillars: Fluency of basic concepts, Understanding the "why" behind formulae, Application in tackling real life problems, and Reasoning in spotting the patterns). Our tutors your child to think through the math, making them ready for competitions.
+CTA:
+Try a free class to see how we build AMC-ready thinkers.
+Sources:
+                                                                              * AMC 8 as foundation for AMC 10/12: Think Academy - AMC 8 vs AMC 10 - "Success here creates momentum and confidence for tackling AMC 10 and beyond...Qualifying for AIME through AMC 10 also creates eligibility for USAJMO."
+                                                                              * AIME qualification rates: AoPS Wiki - AMC Historical Results - "Still, at least the top 2.5% of AMC 10 participants and top 5% of AMC 12 participants are guaranteed to qualify for AIME."
+                                                                              * AMC 8 Honor Roll cutoffs: Ivy League Education Center - 2024 AMC 8 Scores - "Honor Roll of Distinction (Top 1%): Score of 22, Honor Roll of Certificate (Top 5%): Score of 18"
+                                                                              * AIME → elite summer programs: Wikipedia - Research Science Institute - "More than 4,000 applications are received each year, making RSI one of the most selective summer programs in the United States...100 students...are selected to participate." Also: Collegebase - MOP - "Programs like AwesomeMath, PROMYS, and Ross Mathematics Program cost $1,500-5,000 but provide intensive olympiad training."
+                                                                              * College admissions impact: Collegebase - USAMO Qualification - "MIT admissions data indicates that USAMO qualifiers enjoy acceptance rates exceeding 50%, compared to the overall acceptance rate below 7%. Similar advantages exist at Caltech, Harvard, Princeton, and Stanford."
+________________
+
+
+SCRIPT 3: Algebra & Geometry
+Hook:
+Your teenager can solve equations — but do they actually understand why the formula works?
+Visual: Teenager over notebook solving algebra equations
+Follow-up:
+That gap quietly catches up with them as they advance — in geometry, in calculus, and every time a problem looks slightly different than the textbook.
+Visual: Talking head video
+The Cuemath Connection:
+Cuemath's dedicated 1:1 tutors don't just give out the answers — they ask questions that help your child think through the logic and steps independently. That's how long-term understanding actually builds. And once it does, they don't just stay ahead at school, they're prepared for college.
+CTA:
+Book a free trial today to get ahead at school.
+Sources:
+                                                                              * MathFit™ Framework - Official Cuemath Documentation: The MathFit Framework PDF - From Cuemath's internal brand documentation (February 2026):
+
+                                                                                 * "MathFit encompasses four interconnected skills: Fluency (knowing facts, formulas, executing procedures), Understanding (the 'why' behind the 'what'), Application (tackling word problems and real-world situations), Reasoning (the heart of mathematical thinking - spotting patterns, making logical arguments, approaching new problems)."
+                                                                                 * "A MathFit child can approach a new problem and reason their way to a solution, even if they've never seen a similar type of problem before."
+                                                                                 * "These four abilities don't exist in isolation but reinforce each other. Understanding develops fluency in procedures...Reasoning skills help identify which procedures to apply."
+                                                                                 * Algebra as reasoning shift: Cuemath Marketing MathFit Document - "MathFit is not: speed tricks, finishing worksheets, memorizing formulas, racing to answers. MathFit is: reason clearly, see patterns, explain ideas in their own words, solve unfamiliar problems with confidence."
+
+
+
+Product + Topic
+International Board (IB India)
+[0–3s] HOOK VO: "[0–3s] HOOK VO: "IB math feels great — until the Middle Years Programme starts and the gaps show up." Visual: Kinetic text — "IB Math Feels Great…" → sharp cut → "Until MYP." 
+[3–8s] PAIN VO: "Primary Years Programme (PYP) builds curiosity. But without fluency underneath, Year 6 abstract thinking hits hard." Visual: Animated kid working confidently on a colourful PYP-style problem → cut to the same kid hesitating at a denser MYP-level equation. Visual contrast does the work.
+[8–13s] MECHANISM VO: "Cuemath's dedicated tutor builds fluency while keeping inquiry-based learning approach." Visual: Platform UI — tutor on video, guiding student through a multi-step problem on the whiteboard. Kinetic text: "Dedicated Tutor · Fluency + Inquiry."
+[13–17s] PROOF VO: "So when the Middle Years hit, they're not catching up — they're ready." Visual: Parent dashboard."
+[17–20s] CTA VO: "Book a free trial and build the right math foundation." 
+
+
+
+
+NAPLAN + SELECTIVE SCHOOL PREP, Australia
+[0–3s] HOOK 
+VO: "Is your child preparing for Australian Competitive Exams?
+Like NAPLAN or a Selective School test?" 
+Visual: Bold kinetic text animating on. Background blurred with child showing
+[3–9s] PRODUCT — HOW + WHAT TOPICS 
+VO: "With Cuemath, they get a dedicated maths tutor who builds numeracy skills, word problem reasoning, and the thinking skills these tests actually measure." 
+Visual: Laptop mockup showing Cuemath 1:1 session — tutor on video, student working through a multi-step word problem on interactive whiteboard. Kinetic text sequence: "Numeracy Fluency" → "Word Problem Reasoning" → "Thinking Skills."
+[9–13s] MECHANISM 
+VO: "Personalised lessons aligned to the Australian curriculum — from school maths to test-level challenge." 
+Visual: Platform UI — student progressing through problems, difficulty visibly increasing. Kinetic text: "Australian Curriculum Aligned · School to Test Ready."
+[13–20s] CTA + END CARD VO: "Book a free class." Visual: Cuemath branded end card. 
+
+
+MATH OLYMPIAD  Grade -5
+[0–3s] HOOK VO: "School math won't crack the Olympiad." Visual: Kinetic text — "School Math Won't Crack the Olympiad." Sharp, no logo in first frame.
+[3–8s] PAIN VO: "Textbooks teach procedures. Olympiads test what your child does when the procedure doesn't exist." Visual: Animated kid breezing through a school-style problem → cut to same kid pausing at an unfamiliar SOF IMO-style reasoning question. Visual contrast carries the beat. Kinetic text: "SOF IMO."
+[8–13s] MECHANISM VO: "Cuemath's dedicated tutor builds the logical reasoning, pattern thinking, and problem-solving that Olympiad questions actually demand." Visual: Platform UI — tutor on video, guiding student through a non-routine multi-step problem on the whiteboard. Kinetic text: "Logical Reasoning · Pattern Thinking · Problem-Solving."
+[13–17s] PROOF VO: "From CBSE and ICSE fundamentals to Olympiad-level depth — in one personalised plan." Kinetic text: "School to Olympiad · One Tutor · One Plan."
+[17–20s] CTA VO: "Book a free class." Visual: End card 
+
+
+
+
+STAAR Math Test (US only)
+[0–3s] HOOK VO: "STAAR math doesn't work like the math you grew up with." Visual: Kinetic text — "STAAR Math Doesn't Work Like the Math You Grew Up With."
+[3–8s] PAIN → PIVOT VO: "TEKS word problems look nothing like what you studied. Your child needs a tutor who knows this curriculum." Visual: Quick flash of a TEKS-style word problem on screen (unfamiliar framing) → cut to Cuemath platform entering. Kinetic text: "STAAR · Texas · Grades 3–8."
+[8–13s] MECHANISM VO: "Cuemath's dedicated Indian tutor builds word problem reasoning, multi-step thinking, and the data skills STAAR actually tests." Visual: Platform UI — Indian tutor on video, guiding student through a multi-step STAAR-style problem on the whiteboard. Kinetic text: "TEKS-Aligned · Word Problems · Multi-Step · Data Skills."
+[13–17s] PROOF VO: "So your child doesn't just approach grade level — they master it." 
+
+[17–20s] CTA VO: "Book a free trial and build the right math foundation." Visual: End card — "STAAR Math Prep — Book a Free Trial." Cuemath branding.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+MATH KANGAROO PREP — 20s Product Shot Film
+[0–3s] HOOK 
+VO: "Is your child preparing for Math Kangaroo 2027?"
+Visual: Bold kinetic text animating on screen over a subtle Math Kangaroo logo/graphic
+[3–12s] PRODUCT PROOF 
+VO: "With Cuemath, they solve competition-level prep with a dedicated tutor, get instant & specific feedback to fix weak concepts, and practice mock tests to master speed and accuracy.”
+[12–17s] OUTCOME 
+VO: "So they are Math Kangaroo ready and confident to ace any competition."
+Visual: Product screen showing progress/score improvement → kid reacting to a correct answer on screen (can be a UI animation or a brief stock clip)
+[17–20s] CTA + END CARD 
+VO: "Book a free trial."
+Visual: Cuemath branded end card with CTA button On-screen text: "Math Kangaroo Prep — Book a Free Trial"
+
+
+AMC 8 / STAAR PREP — 20s Product Shot Film
+THE HOOK 
+VO: "Is your child preparing for competitive math tests in the US, like AMC 8 or STAAR?" 
+Visual: Kinetic typography flashing AMC 8 & STAAR in bold black text over the signature yellow grid background from the creative.
+THE PRODUCT PROOF 
+VO: "Here’s how your child prepares with Cuemath: 
+#1 1:1 tutoring focused on complex reasoning and patterns.
+#2 Instant, specific feedback to master contest-style problems.
+#3 Real mock tests with timed drills for maximum speed and accuracy." 
+
+Visual: Fast, rhythmic cuts showing: The 1:1 video interface, A cursor highlighting a "Pattern" problem on screen & A digital timer counting down quickly.
+THE OUTCOME 
+VO: "So they are ready to ace their exams and confident to tackle any competition." 
+Visual: A "Progress Report" UI showing a score line trending upward → Transition to a brief clip of a student looking confident with their headphones on.
+CTA 
+VO: "Book a free trial today." Visual: Cuemath branded end card. 
+
+
+NAPLAN Review + Product Script 
+  
+               
+
+
+HOOK (0–3s)
+VO: "Ace NAPLAN 2027 — with 1:1 online maths tutoring."
+Visual: Cuemath logo top-left + headline text animating on.
+BEAT 1 — PROOF (3–7s)
+VO: "Here are real NAPLAN results from parents."
+Visual: Testimonial card #1 — Jay Chand, AU, 5 stars. Highlighted excerpt: "Top Exceeding band in NAPLAN."
+BEAT 2 — FEATURE + PROOF (7–12s)
+VO: "At Cuemath, your child gets a dedicated math tutor who knows them and gives them personalised attention"
+Visual: Brief platform shot (tutor + child on board) → Testimonial card #2 — Srikanth S., AU, 5 stars. Highlighted excerpt: "NAPLAN maths scores have improved significantly."
+BEAT 3 — FEATURE + PROOF (12–18s)
+VO: "Clear explanations for NAPLAN level questions that builds confidence for competitive maths."
+Visual: Testimonial card #3 — Priyabrata P., AU, 5 stars. Highlighted excerpt: "The leap in her Year 5 NAPLAN results was jaw-dropping."
+CLOSE (18–23s)
+VO: "Book a free class and start preparing for NAPLAN 2027."
+Visual: CTA card — "Book a Free Class"
+
+
+
+
+NAPLAN Product Script (Year 5)
+[0–3s]
+VO: "Is your child ready for NAPLAN 2027?"
+Visual: Kinetic text animating on — "Is Your Child Ready for NAPLAN 2027?" 
+[3–5s]
+VO: "With Cuemath, they get a dedicated maths tutor—"
+Visual: Laptop mockup on yellow bg showing Cuemath platform. Kinetic text: "Dedicated Maths Tutor."
+[5–9s]
+VO: "—who builds real numeracy fluency, with personalised lessons aligned to the Australian curriculum."
+Visual: Laptop mockup showing 1:1 session — tutor on video, numeracy problem on interactive whiteboard. Kinetic text swaps: "Personalised NAPLAN Lessons" → "Australian Curriculum Aligned."
+[9–13s]
+VO: "Stronger problem-solving."
+Visual: Laptop mockup showing platform UI — kid working through a multi-step problem, progress tracker visible. Kinetic text: "Build Numeracy Fluency & Problem-Solving."
+[13–17s]
+VO: "Deeper confidence."
+Visual: Laptop showing gamification reward screen / completion celebration. 
+[17–20s]
+VO: "Book a free class today."
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Trustpilot - Get Ahead at School
+
+
+Grade 6-7
+Market: US
+
+
+
+
+  
+           
+
+
+
+
+  
+
+
+
+
+
+Hook VO:
+Most middle schoolers pass math. But being ready for advanced — that's not the same thing." Visual: Show child with laptop, then “ But being ready for advanced” on text
+PART 1 (3–8s) VO: "Cuemath starts by mapping exactly where your child is. Not grade level but actual understanding." 
+Visual: Screen recording of LEAP showing a personalized curriculum being built — topics reordering based on the child's diagnosis. 
+
+PART 2 + PROOF (8–15s) VO: "A dedicated tutor works through every gap in a 1:1 online class  while pushing them ahead on what they're ready for." 
+Visual (11–15s): Trustpilot review overlay #1 appears (Swarna Kavi — "son moved from on par to doing advanced math"). Holds 2s, then transitions to review overlay #2 (Arun Kulangara — "more confident and successful in the AP course"). Platform UI stays visible underneath.
+OUTCOME (15–20s) VO: "That's how kids go from keeping up — to getting ahead." Visual: Platform progress screen showing a child's trajectory moving above grade level. Trustpilot overlay #3 (Milani — "daughter chose advanced maths in school as a challenge"). Fades into Cuemath end card.
+CTA (20–25s) VO: "See where your child stands. Book a free trial." Visual: Cuemath branded end card 
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SCRIPT 1 — OFFLINE VS ONLINE 20s | VO over platform
+Aus, Grade 3
+Hook [0–3s] 
+VO: "What if you didn't need to commute three times a week to give your child the right maths education to excel in school and life?" 
+Body [3–15s] VO: "With Cuemath, you get live 1:1 online maths tutoring that focuses on building a strong maths foundation. 
+
+Your child and their dedicated tutor, solve complex maths problems together on an interactive smartboard. The tutor helps them understand the why behind the formulas. And the best part? They study from the comfort of their home.
+
+Not just that, our tutors give them real-time feedback and you receive daily updates on their progress.”
+
+Visual: LEAP collaborative whiteboard — tutor drawing, child writing alongside. 
+Close [15–20s] VO: "Try a free class — see the difference." Text overlay: Cuemath logo + "Book a Free Trial" CTA Visual: End card — Cuemath makes kids MathFit™.
+________________
+
+
+SCRIPT 2 — PERSONALIZED VS GROUP 20s | Product Demo | VO over platform
+US, Aus 
+Grade 4
+Hook [0–3s] 
+VO: "Every child learns math differently. So why make them sit in a class of twenty where the tutor can't give your child individual attention?" 
+Visual: Generic classroom grid (blurred).
+Body [3–15s] 
+VO: "With Cuemath, your child gets a dedicated Indian math tutor who teaches them in a 1 on 1, online class. Someone who learns how your child thinks, and builds the entire curriculum around what they actually need. So they understand concepts deeply, ask questions freely, and get accelerated at school.
+
+"The best part? You get premium math learning at an affordable price.”
+
+Visual: LEAP screen showing personalized curriculum → tutor guiding a problem step-by-step on whiteboard 
+Close [15–20s] VO: "Book a free trial and see how it's different." Text overlay: Cuemath logo + "Book a Free Trial" CTA Visual: End card — Cuemath makes kids MathFit™.
+________________
+
+
+SCRIPT 3 — MathFit™ EXPLAINER: THE CHILD WHO DOESN'T FREEZE 20s VO over platform Outcome: Reasoning + Confidence
+Hook [0–3s] 
+VO: "What if your child could look at a math problem they've never seen before and know exactly how to approach it?" 
+Visual: Close-up of a challenging word problem appearing on LEAP whiteboard.
+Body [3–15s] VO: "That's a MathFit™ child. They reason, break it down step-by-step, find the pattern and think it through logically. Cuemath builds this in every class with a dedicated tutor — so your child becomes a clear thinker and a confident problem solver for life.” 
+
+Visual: Child working through the problem on whiteboard → tutor cue prompting "What do you notice?" → child marking steps → arriving at the answer independently.
+Close [15–20s] VO: "Book a free trial and make your child MathFit.
+
+
+________________
+
+
+SCRIPT 4 — MathFit™ EXPLAINER: THE CHILD WHO UNDERSTANDS WHY 20s | Product Demo | VO over platform Outcome: Understanding + Application
+Hook [0–3s] 
+VO: "Your child gets the right answer — but ask them why it works, and they go quiet." Visual: LEAP screen showing a completed problem → tutor prompt appears: "Can you explain how you got there?"
+Body [3–15s] VO: "A MathFit™ child doesn't just solve — they understand. They see how the math connects, explain it in their own words, and use it beyond the textbook. Cuemath's dedicated tutors build that depth every class — so your child doesn't just know the formula. They own it." Visual: Interactive simulation on LEAP showing fraction equivalence visually → child drawing a diagram on whiteboard → "Teach It Back" moment with Talk Meter active → cut to real-world word problem being solved.
+Close [15–20s] VO: "Try a free class — see how Cuemath makes kids MathFit." Text overlay: Cuemath logo + "Book a Free Trial" CTA Visual: End card — Cuemath makes kids MathFit™.
+
+
+
+
+
+
+For Anshul mam
+Script 2: The Parent’s Perspective (Revised for Brand Connect)
+Goal: Deeply integrate the MathFit™ identity into the 1:1 teaching philosophy.
+Time
+	Dialogue / VO
+	Visual / Direction
+	0–4s
+	Text: “A MathFit™ child doesn't just solve problems, they learn how to think.”
+	Child seated at laptop, looking at a complex geometry problem. Calm environment.
+	4–10s
+	VO: “In a Cuemath class, we don't just look for the right answer. We build the right math foundation.”
+	Wide shot of the room. It feels premium and focused. The tutor is waiting patiently on screen.
+	10–18s
+	Tutor: “Take your time, Aarav. What’s the logic behind the first step?”
+	AI Overlay: The word "Logic" glows faintly on the screen. The child begins to sketch on their pad.
+	18–25s
+	VO: “This is MathFit™ training. It’s 1:1 guidance that turns hesitation into reasoning.”
+Being MathFit means kids don’t just ace math grades - they build logic, confidence, and problem-solving skills that last a lifetime.
+	Close-up of the child’s work. As they write, the MathFit™ pillars (Logic, Speed, Thinking) appear as subtle watermarks.
+	25–32s
+	Inner Voice: “I’m not just doing math. I’m getting stronger at it.”
+	The child looks at the tutor and nods. The tutor gives a "thumbs up."
+	32–40s
+	VO: “Don't just get a tutor. Make your child MathFit™ with Cuemath.”
+	Visual: Split screen. On one side, the child’s focused face; on the other, the Cuemath logo.
+	40–45s
+	Text: Make Your Child MathFit™
+	CTA: Book a free trial. Strong, rhythmic brand sign-off.
+	
+
+
+
+
+
+Script 3:
+
+
+	
+
+	
+
+	Scene
+	Dialogue / VO
+	Visual / Direction (Founder POV + Influencer Style)
+	2️⃣ Cuemath Positioning (5–10s)
+	“At Cuemath, we build the math foundation first — because when a child truly understands the concepts, speed and marks follow naturally.”
+	• Soft B-roll: child erasing mistakes on worksheet → cuts to child on phone/tablet using Cuemath.• Visuals on screen: number line animation, shapes transforming, simple puzzles.• Parent watches quietly from side with approving smile.• Warm, documentary tone.
+	3️⃣ Trial Class (10–14s)
+	“When you book a free Cuemath trial class, your child experiences a real 1-on-1 class with us.”
+	• Close-up of phone screen tapping “Book Free 1-on-1 Trial Class.”• Quick UI flash: “Trial Confirmed.”• Child sitting with phone/tablet propped up; tutor video window visible.• Tutor greets warmly, child smiles nervously.
+	4️⃣ Tutor Match (14–18s)
+	“First, we match them with a tutor who’s the right fit for their needs..”
+	• Subtle animation: “Matching best tutor…” → “Tutor Assigned.”• Tutor profile card flashes briefly (smiling, friendly).• Parent watching from doorway, relaxed.
+	5️⃣ Diagnostic + Plan (18–23s)
+	“Then, the tutor identifies the child’s current level, gaps and strengths to understand how your child thinks in math — and builds a plan that’s 100% personalized.”
+	• Over-the-shoulder shot of phone/tablet showing diagnostic questions (patterns, reasoning puzzles).• Child thinking, tapping answers, nodding.• Quick UI moment: “Personalized Plan Created.”• Tutor explains something step-by-step on digital whiteboard.
+	6️⃣ The Shift (23–27s)
+	“And that’s when you see the shift — learning math actually becomes fun.”
+	• Child solving a puzzle confidently; little smile after it clicks.• Parent watches proudly, soft laugh.• Tutor gives thumbs-up on screen.• Warm golden-hour feel.
+	7️⃣ Confidence + CTA (27–32s)
+	“That’s why Cuemath kids don’t just score better — they grow into confident math thinkers for life. Book your trial today. 
+	• Montage: — Child solving independently. — Tutor encouraging warmly. — Parent nodding proudly.• Final frame: Cuemath logo + “Make Your Child MathFit”.• Bottom text: “Book a Free 1-on-1 Class.”
+	
+
+Brand Film
+Script 6: 20 Seconds
+Rote Learning
+
+
+
+
+Time
+	Visual (Action)
+	Dialogue / Sound
+	0:00–0:02
+	Bathroom / TOILET: Leo (12 yr old) sits on the toilet, staring blankly at the wall like he’s in a trance.
+	LEO (deadpan, rhythmic): “A-squared… plus two-A-b… plus b-squared…” (Subtle looping echo, like a broken record.)
+	0:02–0:04
+	Jump Cuts / SOFA: Leo hangs upside down, still chanting. Parent gives a strange look reaction.
+	LEO (louder): “A-SQUARED. PLUS. TWO-A-B. PLUS. B-SQUARED!”
+	0:04–0:06
+	GARDEN: Leo dramatically pours a huge bucket of water onto a tiny cactus.
+	SFX: Water splash hit.
+LEO (louder): “A-SQUARED. PLUS. TWO-A-B. PLUS. B-SQUARED!”
+	0:06–0:08
+	Leo holds a confused tabby cat by its front paws. Cat dangles, unimpressed.
+	LEO (urgent, pleading): “A-squared plus two-A-b plus b-squared, Whiskers! DO YOU GET IT?” CAT: “Meow.”
+	0:08–0:10
+	Living Room: Dad tries to watch TV. Leo stands inches from his face, blocking the screen.
+	LEO (whisper-intense): “A-squared… plus two-A-b… plus b-squared…”
+	0:10–0:15
+	Dining Table: Leo’s face is almost covered by a math book—only his eyes visible. Whip pan as he finally says it properly (first time).
+	LEO (first time full line): “(A plus b) whole squared… equals A-squared plus two-A-b plus b-squared.”
+	0:15–0:17
+	Laptop Turn: Dad spins the laptop toward Leo. Cuemath logo pops. Cuemath tutor appears. Show the algebraic formula simulation. 
+	TEACHER (warm, clear): “Hi Leo! ….see how it expands.”
+	0:17–0:20
+	Cuemath Session: Leo drags algebra tiles: (A^2) tile, two (Ab) rectangles, and (b^2) tile into a perfect square. They click into place. Music lifts. Leo’s face shifts to “aha.”
+	VO: “Memorizing formulas isn’t understanding.” 
+
+“MathFit/Cuemath kids understand the ‘why’ behind the ‘what’.”
+	0:20–0:22 (End Frame)
+	End slate: Cuemath lockup. Clean premium background.
+	VO/CTA: “Make your child MathFit with Cuemath.”
+	0:22–0:24 (End Frame)
+	End slate continues (steady).
+	VO/CTA: “Book a free class”
