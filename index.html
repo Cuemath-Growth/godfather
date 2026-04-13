@@ -9547,7 +9547,7 @@ function renderMetricTicker() {
           <div class="grid grid-cols-4 gap-3 mt-2 pt-2 border-t border-gray-100">
             ${getFlowFilter() === 'pla'
               ? `<div><span class="font-bold">Trials Booked:</span> ${crm.ts.toLocaleString()} (${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
-            <div><span class="font-bold">NRI:</span> ${crm.nri.toLocaleString()}</div>`
+            <div><span class="font-bold">QL\u2192TD%:</span> ${crm.ql > 0 ? (crm.td/crm.ql*100).toFixed(1) : 0}%</div>`
               : `<div><span class="font-bold">NRI:</span> ${crm.nri.toLocaleString()} (${crm.ql > 0 ? (crm.nri/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
             <div><span class="font-bold">Asian:</span> ${(crm.asian||0).toLocaleString()}</div>`}
             <div><span class="font-bold">Invalid:</span> ${invalidPct}%${parseFloat(invalidPct) > 10 ? ' <span class="text-accent-red font-bold">⚠ High</span>' : ''}</div>
