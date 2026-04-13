@@ -39,6 +39,16 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 
 **Validation:** Switch All/BAU/PLA. Verify Dashboard, Performance, Tagger, Insights all respect toggle. Verify BAU-only numbers match pre-change numbers exactly.
 
+### Phase 1.5: Critical Fixes — COMPLETE (Apr 14)
+
+- [x] 1.6 **PLA end-to-end data pipeline** — Sheet switch to 175i57-..., pla_ac_dump (286 leads), pla_ac_cost (137 Eval rows), normalizeAdName em dash fix, Eval campaign support
+- [x] 1.7 **PLA QL = all leads** — 484/560 had empty qualified_bucket. BAU logic discarded 86%.
+- [x] 1.8 **PLA TQL = Trials Booked** — trial_request non-empty. All 4 TQL paths updated.
+- [x] 1.9 **Dashboard KPIs → getMarketMetrics** — Meta API spend incomplete for India (3.6%) and PLA (~20%). Switched to costData (source of truth) universally.
+- [x] 1.10 **Trend arrow noise** — Suppress near-zero prior ("new" badge), cap >200% (multiplier format), remove "→ flat".
+- [x] 1.11 **PLA KPI card swap** — 4th card = "Trials Booked" with booking rate (was Enrolled/CAC).
+- [x] 1.12 **PLA insight adaptation** — Wrong Audience suppressed, NRI scoring → QL→TD%, gap analysis, detail line, tooltips.
+
 ---
 
 ## Phase 2: Segwise-Level Visualizations

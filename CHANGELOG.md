@@ -4,7 +4,29 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
-## Phase 1: BAU vs PLA Split (2026-04-14)
+## Phase 1.5: Critical Fixes (2026-04-14, commit dc51434)
+
+### 1.10: Dashboard KPIs → getMarketMetrics (universal)
+- **ROOT CAUSE** of India CPTD ₹167: Dashboard used getPortfolioMetrics (Meta API spend) — India has only 3.6% coverage (₹73.8K vs ₹20.1L in cost tab)
+- Switched `renderMetricTicker` and `renderLensAggregateMetrics` to `getMarketMetrics` universally
+- getMarketMetrics uses costData (source of truth) + CRM direct counts — complete for all markets
+- getPortfolioMetrics reserved for per-ad analysis (Tagger, Sentinel, Pause Now)
+
+### 1.11: Trend arrows — suppress noise
+- Near-zero prior (< 10% of current) → "new" badge instead of ↑495%
+- Change < 3% → no badge at all (was "→ flat")
+- > 200% → multiplier format ("2.1x", "5x") instead of raw percentage
+- > 500% → integer multiplier ("5x", "10x")
+
+### 1.12: PLA 4th KPI card — Trials Booked
+- PLA: 4th card = "Trials Booked" with booking rate sub-text
+- BAU: 4th card = "Enrolled" with CAC (unchanged)
+- TL;DR: PLA shows TB count + booking rate, BAU shows enrolled + CAC
+- Prior period includes `ts` for TB trend computation
+
+---
+
+## Phase 1: BAU vs PLA Split (2026-04-14, commit bb32532)
 
 ### 1.9: PLA QL definition — all leads are QLs
 - **ROOT CAUSE** of 39 QLs vs 593 in summary doc: 484/560 PLA leads have empty `qualified_bucket` (no sales team qualifying them)

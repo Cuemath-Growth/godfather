@@ -201,13 +201,13 @@ Examples:
 
 ---
 
-## Sheet 9: PLA Campaign Data (Supplementary CRM + Cost)
-**Source:** `1lGAv3K_RFEwcKthjzPiy4x3zlOA010lH_73f46lJ5A8`
-**Added:** 2026-04-08
+## Sheet 9: PLA Dashboard (CRM + Cost — PLA & Eval campaigns)
+**Source:** `175i57-b0PSvDjCYHn8w4_wH5df8CipxIIQiy3o7VifA`
+**Switched:** 2026-04-14 (was `1lGAv3K_...`, now reads from user's PLA Dashboard sheet)
+**PLA = automated signup flow (no sales call). Includes PLA + Eval campaigns.**
 
-### pla_dump tab (gid=452403394)
-**Structure:** Lead-level CRM data for PLA campaigns, ~716 active rows (50K grid but mostly empty)
-**Filter:** `Ethnicity_Check === '1'` or `created_on` non-empty
+### pla_dump tab (gid=513970383) — 736 rows
+**Structure:** Lead-level CRM data for PLA campaigns
 **Key columns:**
 | Column | Maps to | Notes |
 |--------|---------|-------|
@@ -215,27 +215,46 @@ Examples:
 | utm_source | (derives medium) | dc_fb_m=meta, dc_sem_m=google |
 | utm_medium | (actually ad set name) | NOT the real medium — Cuemath UTM quirk |
 | utm_campaign | mx_utm_campaign | Hyphens normalized to underscores |
-| utm_content | mx_utm_adcontent | Ad-level attribution (81% filled) |
+| utm_content | mx_utm_adcontent | Ad-level attribution. Has placement suffix + " – Copy" from Meta |
 | ip_region | country_bucket | US-CANADA→US, IND-SUB→India, INDIA-MIDDLE-EAST→MEA, APAC-AUS-NZ→AUS, EUROPE-UK→UK |
-| prospectid | prospectid | Dedup key |
-| qualified_bucket | qls | Non-empty + not UNQUALIFIED-* = QL |
+| prospectid | prospectid | Dedup key (fallback: student_service_id) |
+| qualified_bucket | — | **NOT used for PLA QL.** 484/560 meta leads have empty qualified_bucket. |
+| trial_request | _trialBooked | Non-empty = trial booked. **PLA TQL = Trials Booked.** |
+| trial_scheduled | trials_sch | '1' or '0' (later stage than trial_request) |
 | trial_done | trials_done | '1' or '0' |
 | paid_on | paid_date | Date |
 | payments | paid | >0 = paid |
-| Auto_ethnicity | ethnicity | "NRI / Non Native English Speaker" = NRI (exact match with isNRIEthnicity) |
+| Auto_ethnicity | ethnicity | "NRI / Non Native English Speaker" = NRI |
 
-### cost tab (gid=33117864)
-**Structure:** Daily spend rows, 1,038 rows
+**PLA QL definition:** ALL meta leads are QLs (self-serve signup = qualified by action). Unlike BAU where sales team qualifies.
+**PLA TQL definition:** Trials Booked (trial_request non-empty). NOT NRI-based. Shows onboarding funnel dropout.
+**Verified counts (all-time meta):** 560 QLs, 516 TB, 161 TS, 84 TD
+
+### pla_ac_dump tab (gid=517360086) — 286 rows
+**Structure:** Same as pla_dump but MISSING `utm_term` column. Contains additional PLA + Eval leads.
+**Dedup:** By prospectid OR student_service_id against pla_dump + existing leadsData.
+
+### cost tab (gid=1179073084) — 1,051 rows
+**Structure:** Daily spend rows
 **Key columns:** month, day, region, country_segment, landing_type, campaign_name, medium, amount_spent, impressions, link_clicks
-**Mediums:** meta (819), google (219) — only meta rows pass Godfather filter
-**Landing types:** PLA (892), Eval (146)
-**Date range:** 2025-12-04 to 2026-04-06
+**Landing types:** PLA (majority), Eval (minority)
 **Dedup:** By normalized campaign_name + day against existing costData
+
+### pla_ac_cost tab (gid=2088928644) — 137 rows
+**Structure:** Same as cost tab. Contains Eval campaign costs (`_Eval_` in campaign name).
+
+### PLA Dashboard tab (gid=739731267) — pre-computed funnel
+**Structure:** Summary pivot with cohort months as columns. Ethnicity/grade filters. Shows QL→TB→TC→TM→TD funnel.
+**NOT directly consumed by code** — raw pla_dump/pla_ac_dump are used instead.
 
 ### Integration
 - Fetched via `fetchPLAData(apiKey)` after `fetchSheetData()` at boot
+- Reads all 4 data tabs (pla_dump, pla_ac_dump, cost, pla_ac_cost)
 - Appends to global `leadsData[]` and `costData[]` with deduplication
-- All downstream functions work unchanged
+- All PLA leads get `_source: 'pla'` and `_trialBooked: '1'/'0'`
+- All PLA cost rows get `_source: 'pla'`
+- Eval campaigns (`_eval_` in name) treated same as PLA for flow filtering
+- `normalizeAdName()` handles em dashes + spaces in PLA UTM content (fixed Apr 14)
 
 ---
 
