@@ -25,19 +25,17 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 
 ---
 
-## Phase 1: BAU vs PLA Split
+## Phase 1: BAU vs PLA Split — COMPLETE (Apr 14)
 
 **Goal:** PLA is 50% of US campaigns and invisible. Make it a first-class data dimension.
 
 **Why:** PLA (automated, no sales call) has fundamentally different funnel dynamics than BAU (sales-led). Mixing them produces misleading CPTD numbers. The summary doc tracks them separately (Section 2 vs Section 7). Godfather should too.
 
-| # | Task | Details | Risk | Lines to Touch |
-|---|------|---------|------|---------------|
-| 1.1 | **Global BAU/PLA filter toggle** | 3-way toggle in global filter bar: All / BAU / PLA. Filters leadsData by `_source` field. | MEDIUM | Global filter bar HTML (~line 195), onGlobalFilterChange() |
-| 1.2 | **Remove hardcoded PLA exclusion** | Line ~13654 actively excludes PLA from all analysis. Make it respect the toggle instead. | HIGH — core change | ~13654, verify all downstream |
-| 1.3 | **PLA funnel card on Dashboard** | New card showing PLA-specific funnel: QL→TB→TC→TM→TD with actual vs target conversion rates (from summary doc Section 7). | LOW — additive | Dashboard HTML, new render function |
-| 1.4 | **BAU vs PLA comparison table** | Side-by-side: BAU CPTD / PLA CPTD / BAU QL→TD% / PLA QL→TD%. Per market. | LOW — additive | Dashboard or Performance tab |
-| 1.5 | **PLA timeout metric** | TB→TC timeout rate as a KPI when PLA filter active. THE #1 PLA problem (96% timeouts). | LOW — additive | New KPI card |
+- [x] 1.1 **Global BAU/PLA filter toggle** — 3-way pill toggle (All/BAU/PLA) in global filter bar. `getFlowFilter()`, `setFlowFilter()`, `_isPLACampaignName()`, `_filterLeadsByFlow()`, `_filterCostByFlow()`.
+- [x] 1.2 **Flow filter wired into all data paths** — All 10 metric primitives, getAdPerformanceDaily, getAdPerformance, getPortfolioMetrics, getOracleMetrics, getCampaignBreakdown, getAdBreakdown, getAdCampaignBreakdown, WoW CRM, trend charts.
+- [x] 1.3 **PLA funnel card** — Timeout Rate, TS→TD%, Spend Share in `renderBauPlaComparison()`.
+- [x] 1.4 **BAU vs PLA comparison table** — 9 metrics side-by-side (Spend, QL, TS, TD, Enrolled, CPTD, QL→TD%, QL→TS%, CAC) with colored deltas.
+- [x] 1.5 **PLA timeout metric** — (QL - TS) / QL, color-coded severity.
 
 **Validation:** Switch All/BAU/PLA. Verify Dashboard, Performance, Tagger, Insights all respect toggle. Verify BAU-only numbers match pre-change numbers exactly.
 

@@ -201,6 +201,12 @@
           <option value="MEA">MEA</option>
           <option value="UK">UK</option>
         </select>
+        <div class="h-3 w-px bg-gray-200 shrink-0"></div>
+        <div id="flowFilterGroup" class="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 shrink-0">
+          <button onclick="setFlowFilter('all')" data-flow="all" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-accent-purple bg-white shadow-sm transition">All</button>
+          <button onclick="setFlowFilter('bau')" data-flow="bau" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">BAU</button>
+          <button onclick="setFlowFilter('pla')" data-flow="pla" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">PLA</button>
+        </div>
         <span id="dataDateRange" class="text-[9px] text-text-muted shrink-0" style="display:none"></span>
         <div class="ml-auto flex items-center gap-1 shrink-0">
           <span class="text-[9px] text-text-muted whitespace-nowrap" id="dataTimestamp"></span>
@@ -292,7 +298,7 @@
           <div class="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[9px] text-gray-400 sticky top-0 bg-white/95 backdrop-blur-sm z-10 py-2 -mx-1 px-2 border-b border-gray-100">
             <span><strong class="text-gray-500">CPTD</strong> = Spend ÷ Trial Dones</span>
             <span><strong class="text-gray-500">CPQL</strong> = Spend ÷ Qualified Leads</span>
-            <span><strong class="text-gray-500">TQL</strong> = True QLs (US: NRI only)</span>
+            <span><strong class="text-gray-500">TQL</strong> = True QLs (BAU: NRI/board, PLA: Trials Booked)</span>
             <span><strong class="text-gray-500">QL→TD%</strong> = Trial Done ÷ QL</span>
             <span><strong class="text-gray-500">CAC</strong> = Spend ÷ Enrolled</span>
             <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span> On track</span>
@@ -305,6 +311,9 @@
             <div id="metricTicker"></div>
             <div id="funnelTable" class="mt-4"></div>
           </div>
+
+          <!-- BAU vs PLA Comparison -->
+          <div class="mb-6 hidden" id="bauPlaSection"></div>
 
           <!-- Week-over-Week Digest -->
           <div class="mb-6" id="wowSection"></div>
@@ -1486,7 +1495,7 @@
                 <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[9px] text-gray-400">
                   <span><strong class="text-gray-500">CPTD</strong> = Spend ÷ Trial Dones</span>
                   <span><strong class="text-gray-500">CPQL</strong> = Spend ÷ QLs</span>
-                  <span><strong class="text-gray-500">TQL</strong> = True QLs (US: NRI only)</span>
+                  <span><strong class="text-gray-500">TQL</strong> = True QLs (BAU: NRI/board, PLA: Trials Booked)</span>
                   <span><strong class="text-gray-500">QL→TD%</strong> = Trial Done ÷ QL</span>
                   <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> On track</span>
                   <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block"></span> Watch</span>
@@ -1991,12 +2000,13 @@ const GODFATHER_TAXONOMY = {
     campaign_audience: {
       label: 'Audience', type: 'parsed', color: 'orange',
       description: 'Target audience + onboarding flow from campaign name. Format: "Audience (Flow)" where Flow = BAU or PLA.',
-      values: ['Influencer (BAU)', 'Influencer (PLA)', 'Vernacular (BAU)', 'NRI (BAU)', 'NRI (PLA)', 'Chinese (PLA)', 'K-2 (PLA)', 'High School (BAU)', 'Creative Testing (BAU)', 'Creative Testing (PLA)', 'Lookalike (BAU)', 'Lookalike (PLA)', 'HNI (BAU)', 'Retargeting (BAU)', 'Interest (BAU)', 'Interest (PLA)', 'Broad (BAU)', 'Broad (PLA)', 'Geo (BAU)', 'General (BAU)', 'General (PLA)'],
+      values: ['Influencer (BAU)', 'Influencer (PLA)', 'Vernacular (BAU)', 'NRI (BAU)', 'NRI (PLA)', 'Chinese (PLA)', 'K-2 (PLA)', 'High School (BAU)', 'Creative Testing (BAU)', 'Creative Testing (PLA)', 'Lookalike (BAU)', 'Lookalike (PLA)', 'HNI (BAU)', 'Retargeting (BAU)', 'Interest (BAU)', 'Interest (PLA)', 'Broad (BAU)', 'Broad (PLA)', 'Geo (BAU)', 'General (BAU)', 'General (PLA)', 'Eval (PLA)'],
       parse: function(campaignName) {
         const camp = (campaignName || '').toLowerCase();
-        // Detect flow: PLA = automated (no AC), BAU = sales-led
+        // Detect flow: PLA/Eval = automated (no sales call), BAU = sales-led
         const isPLA = camp.includes('_pla_') || camp.includes('_pla ') || camp.endsWith('_pla');
-        const flow = isPLA ? 'PLA' : 'BAU';
+        const isEval = camp.includes('_eval_') || camp.includes('_eval ') || camp.endsWith('_eval');
+        const flow = (isPLA || isEval) ? 'PLA' : 'BAU';
         // Detect audience (priority order)
         let audience = 'General';
         // Creator-name campaigns (March_Sahar, March_Preethi, etc.)
@@ -4460,8 +4470,10 @@ async function fetchSheetData(sheetUrl, apiKey) {
   return { leads: leadsData.length, cost: costData.length };
 }
 
-// ── PLA Data Layer: supplementary CRM + cost from PLA-specific sheet ──
-const PLA_SHEET_ID = '1lGAv3K_RFEwcKthjzPiy4x3zlOA010lH_73f46lJ5A8';
+// ── PLA Data Layer: supplementary CRM + cost from PLA Dashboard sheet ──
+// Source: 175i57-... has pla_dump, pla_ac_dump, cost, pla_ac_cost tabs
+// PLA = automated signup flow (no sales call). Includes PLA and Eval campaigns.
+const PLA_SHEET_ID = '175i57-b0PSvDjCYHn8w4_wH5df8CipxIIQiy3o7VifA';
 const INDIA_CRM_SHEET_ID = '1oTXE1PzAeE0_NP95KXzuL3LS8aCtKurgIFYIPmPUBIA';
 
 function normalizePLALead(r) {
@@ -4470,9 +4482,12 @@ function normalizePLALead(r) {
   const isMeta = src.includes('fb') || src === 'instagram';
   if (!isMeta) return null; // Godfather is Meta-only
 
-  // qualified_bucket: non-empty AND not UNQUALIFIED = QL
+  // PLA QL definition: every PLA lead is a QL (self-serve signup = qualified by action).
+  // Unlike BAU where sales team qualifies, PLA has no qualification gate.
+  // Most PLA leads have empty qualified_bucket (484/560) — BAU logic would discard them.
   const qb = (r.qualified_bucket || '').trim();
-  const isQL = qb && !qb.toUpperCase().startsWith('UNQUALIFIED');
+  const isUnqualified = qb.toUpperCase().startsWith('UNQUALIFIED');
+  const isQL = !isUnqualified; // PLA: all leads are QLs unless explicitly UNQUALIFIED
 
   // ip_region mapping: US-CANADA→US, IND-SUB→India, INDIA-MIDDLE-EAST→MEA, APAC-AUS-NZ→AUS, EUROPE-UK→UK
   const regionMap = { 'US-CANADA': 'US', 'IND-SUB': 'India', 'INDIA-MIDDLE-EAST': 'MEA', 'APAC-AUS-NZ': 'AUS', 'EUROPE-UK': 'UK' };
@@ -4497,25 +4512,31 @@ function normalizePLALead(r) {
     mx_utm_term: r.utm_term || '',
     mx_utm_medium: 'meta',
     utm_medium: 'meta',
-    prospectid: r.prospectid || '',
+    prospectid: r.prospectid || r.student_service_id || '',
     net_booking: r.net_booking || '',
-    _source: 'pla'
+    _source: 'pla',
+    _trialBooked: (r.trial_request || '').trim() ? '1' : '0'
   };
 }
 
 async function fetchPLAData(apiKey) {
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${PLA_SHEET_ID}/values`;
-  const [leadsRes, costRes] = await Promise.all([
+  // Fetch all 4 PLA tabs: pla_dump + pla_ac_dump (leads), cost + pla_ac_cost (cost)
+  const [leadsRes, acLeadsRes, costRes, acCostRes] = await Promise.all([
     fetch(`${base}/pla_dump?key=${apiKey}`),
-    fetch(`${base}/cost?key=${apiKey}`)
+    fetch(`${base}/pla_ac_dump?key=${apiKey}`),
+    fetch(`${base}/cost?key=${apiKey}`),
+    fetch(`${base}/pla_ac_cost?key=${apiKey}`)
   ]);
-  if (!leadsRes.ok || !costRes.ok) {
-    console.warn('PLA fetch failed:', !leadsRes.ok ? leadsRes.status : costRes.status);
+  if (!leadsRes.ok) {
+    console.warn('PLA fetch failed:', leadsRes.status);
     return { leads: 0, cost: 0 };
   }
 
   const leadsJson = await leadsRes.json();
-  const costJson = await costRes.json();
+  const acLeadsJson = acLeadsRes.ok ? await acLeadsRes.json() : { values: [] };
+  const costJson = costRes.ok ? await costRes.json() : { values: [] };
+  const acCostJson = acCostRes.ok ? await acCostRes.json() : { values: [] };
 
   // --- Build ad_id → ad_name lookup from metaAdData (loaded earlier in boot) ---
   const adIdToName = {};
@@ -4525,10 +4546,18 @@ async function fetchPLAData(apiKey) {
   console.log(`PLA: ad_id→ad_name lookup built from ${Object.keys(adIdToName).length} meta ads`);
 
   // --- PLA Leads: normalize, filter meta-only, deduplicate ---
+  // Combine pla_dump + pla_ac_dump (pla_ac_dump may lack utm_term column — normalizePLALead handles missing fields)
   const rawPLA = parseSheetValues(leadsJson.values).filter(r => r.created_on && r.created_on.length > 0);
+  const rawAC = parseSheetValues(acLeadsJson.values || []).filter(r => r.created_on && r.created_on.length > 0);
+  const allPLALeads = [...rawPLA, ...rawAC];
+
+  // Dedup by prospectid OR student_service_id (some PLA leads have empty prospectid)
   const existingPids = new Set(leadsData.map(r => r.prospectid).filter(Boolean));
+  const existingSids = new Set();
+  leadsData.forEach(r => { if (r._sid) existingSids.add(r._sid); });
+
   let added = 0, skippedDup = 0, skippedNonMeta = 0, adIdResolved = 0;
-  rawPLA.forEach(r => {
+  allPLALeads.forEach(r => {
     const normalized = normalizePLALead(r);
     if (!normalized) { skippedNonMeta++; return; }
     // Resolve numeric utm_content (ad ID) to actual ad name for CRM→Meta matching
@@ -4537,17 +4566,26 @@ async function fetchPLAData(apiKey) {
       normalized.mx_utm_adcontent = adIdToName[rawContent];
       adIdResolved++;
     }
+    // Dedup: prefer prospectid, fallback to student_service_id
     const pid = normalized.prospectid;
+    const sid = r.student_service_id || '';
     if (pid && existingPids.has(pid)) { skippedDup++; return; }
+    if (!pid && sid && existingSids.has(sid)) { skippedDup++; return; }
     if (pid) existingPids.add(pid);
+    if (sid) existingSids.add(sid);
+    normalized._sid = sid; // track for dedup
     leadsData.push(normalized);
     added++;
   });
-  console.log(`PLA leads: ${rawPLA.length} raw → ${added} added, ${skippedDup} dup, ${skippedNonMeta} non-meta, ${adIdResolved} ad IDs resolved to names`);
+  console.log(`PLA leads: ${rawPLA.length} pla_dump + ${rawAC.length} pla_ac_dump → ${added} added, ${skippedDup} dup, ${skippedNonMeta} non-meta, ${adIdResolved} ad IDs resolved`);
 
   // --- PLA Cost: normalize, filter meta-only, deduplicate by campaign+day ---
-  const rawCost = parseSheetValues(costJson.values);
-  const metaCost = rawCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
+  // Combine cost + pla_ac_cost (pla_ac_cost has Eval campaigns)
+  const allCostRows = [
+    ...parseSheetValues(costJson.values || []),
+    ...parseSheetValues(acCostJson.values || [])
+  ];
+  const metaCost = allCostRows.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
   const existingCostKeys = new Set(costData.map(r => (r.campaign_name || '').toLowerCase().replace(/-/g, '_') + '|' + (r.day || '')));
   let costAdded = 0, costSkipped = 0;
   metaCost.forEach(r => {
@@ -4558,7 +4596,7 @@ async function fetchPLAData(apiKey) {
     costData.push({ ...r, campaign_name: normCamp, _source: 'pla' });
     costAdded++;
   });
-  console.log(`PLA cost: ${rawCost.length} raw → ${metaCost.length} meta → ${costAdded} added, ${costSkipped} duplicate`);
+  console.log(`PLA cost: ${allCostRows.length} raw → ${metaCost.length} meta → ${costAdded} added, ${costSkipped} duplicate`);
 
   return { leads: added, cost: costAdded };
 }
@@ -5089,7 +5127,7 @@ function filterCostByMarket(data, market) {
 
 // costData is meta-only (filtered at source). No medium check needed.
 function getSpend(market, startDate, endDate) {
-  let rows = filterCostByMarket(costData, market);
+  let rows = filterCostByMarket(_filterCostByFlow(costData), market);
   rows = rows.filter(r => {
     const day = r.day || '';
     if (startDate && day < startDate) return false;
@@ -5100,7 +5138,7 @@ function getSpend(market, startDate, endDate) {
 }
 
 function getQL(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
@@ -5110,14 +5148,17 @@ function getQL(market, startDate, endDate) {
 }
 
 function getTQL(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   rows = rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
     if (endDate && d > endDate) return false;
     return String(r.qls) === '1';
   });
-  // Market-specific TQL definitions
+  // PLA: TQL = Trials Booked (leads who booked a trial via self-serve flow).
+  // The drop from QL→TQL shows onboarding funnel dropout.
+  if (getFlowFilter() === 'pla') return rows.filter(r => r._trialBooked === '1').length;
+  // BAU: Market-specific TQL definitions
   const isNRI = isNRIEthnicity;
   const isTQLBoard = r => ['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim());
   if (market === 'US') return rows.filter(isNRI).length;
@@ -5135,7 +5176,7 @@ function getTQL(market, startDate, endDate) {
 }
 
 function getTD_snapshot(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.trial_done_date || '';
     if (startDate && d < startDate) return false;
@@ -5145,7 +5186,7 @@ function getTD_snapshot(market, startDate, endDate) {
 }
 
 function getTD_cohort(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
@@ -5156,7 +5197,7 @@ function getTD_cohort(market, startDate, endDate) {
 
 // TS uses lead_created_date (cohort-based) — same population as QL, so TS ≤ QL
 function getTS(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
@@ -5166,7 +5207,7 @@ function getTS(market, startDate, endDate) {
 }
 
 function getEnrolled(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.paid_date || '';
     if (startDate && d < startDate) return false;
@@ -5177,7 +5218,7 @@ function getEnrolled(market, startDate, endDate) {
 
 
 function getInvalid(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
@@ -5187,7 +5228,7 @@ function getInvalid(market, startDate, endDate) {
 }
 
 function getNRI(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
@@ -5198,7 +5239,7 @@ function getNRI(market, startDate, endDate) {
 }
 
 function getAsian(market, startDate, endDate) {
-  let rows = filterLeadsByMarket(leadsData, market);
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
     const d = r.lead_created_date || '';
     if (startDate && d < startDate) return false;
@@ -5291,7 +5332,8 @@ let _dailyCache = { key: '', data: [] }; // cache for getAdPerformanceDaily
 function getAdPerformanceDaily(market, startDate, endDate) {
   const start = startDate || COST_DATA_START || '';
   const end = endDate || new Date().toISOString().slice(0, 10);
-  const cacheKey = `daily|${market||'all'}|${start}|${end}`;
+  const _flow = getFlowFilter();
+  const cacheKey = `daily|${market||'all'}|${start}|${end}|${_flow}`;
   if (_dailyCache.key === cacheKey && _dailyCache.data.length) return _dailyCache.data;
 
   // Step 1: Meta API — daily spend per ad (keyed by normalizedAdName + date)
@@ -5300,6 +5342,12 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const d = r.date || '';
     if (start && d < start) return;
     if (end && d > end) return;
+    // BAU/PLA flow filter on Meta API data (by campaign name)
+    if (_flow !== 'all') {
+      const _isPLA = _isPLACampaignName(r.campaign_name);
+      if (_flow === 'pla' && !_isPLA) return;
+      if (_flow === 'bau' && _isPLA) return;
+    }
     const normName = normalizeAdName(r.ad_name);
     if (!normName) return;
     const key = normName + '|' + d;
@@ -5314,7 +5362,8 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   // Also build utm_term alias map for the join
   const crmDaily = {}; // key: "normName|date" → { ql, nri, td, paid, invalid }
   const termAlias = {}; // normTerm → normAdcontent
-  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
+  const _dailyFlowLeads = _filterLeadsByFlow(leadsData);
+  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(_dailyFlowLeads, market) : _dailyFlowLeads;
   filteredLeads.forEach(r => {
     const d = r.lead_created_date || '';
     if (start && d < start) return;
@@ -5327,13 +5376,16 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     c.total++;
     if (String(r.qls) === '1') {
       c.ql++;
-      // Per-market TQL: US/Canada=NRI, India/MEA=IB/IGCSE board, others=all QLs
-      const _cb = (r.country_bucket || '').trim().toLowerCase();
-      const _isUSCan = _cb === 'us' || _cb === 'usa' || _cb === 'canada';
-      const _isIBMkt = _cb === 'india' || _cb === 'in' || _cb === 'asia' || _cb === 'me' || _cb === 'mea';
-      if (_isUSCan) { if (isNRIEthnicity(r)) c.tql++; }
-      else if (_isIBMkt) { if (['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim())) c.tql++; }
-      else { c.tql++; } // APAC, UK, AUS — all QLs qualify
+      // PLA: TQL = Trials Booked (_trialBooked). BAU: per-market TQL.
+      if (_flow === 'pla') { if (r._trialBooked === '1') c.tql++; }
+      else {
+        const _cb = (r.country_bucket || '').trim().toLowerCase();
+        const _isUSCan = _cb === 'us' || _cb === 'usa' || _cb === 'canada';
+        const _isIBMkt = _cb === 'india' || _cb === 'in' || _cb === 'asia' || _cb === 'me' || _cb === 'mea';
+        if (_isUSCan) { if (isNRIEthnicity(r)) c.tql++; }
+        else if (_isIBMkt) { if (['IB', 'IGCSE'].includes((r['board (ME)'] || r['board'] || '').trim())) c.tql++; }
+        else { c.tql++; }
+      }
     }
     if (isNRIEthnicity(r)) c.nri++;
     if (String(r.trials_done) === '1') c.td++;
@@ -5469,7 +5521,8 @@ function getAdPerformance(market, startDate, endDate, opts) {
   const end = endDate || new Date().toISOString().slice(0, 10);
   const includeNonLP = opts?.includeNonLP || false;
 
-  const cacheKey = `${market||'all'}|${start}|${end}|${includeNonLP?'all':'lp'}`;
+  const _perfFlow = getFlowFilter();
+  const cacheKey = `${market||'all'}|${start}|${end}|${includeNonLP?'all':'lp'}|${_perfFlow}`;
   if (_adPerfCache.key === cacheKey && _adPerfCache.data.length) return _adPerfCache.data;
 
   // Aggregate daily rows by ad name
@@ -5590,7 +5643,8 @@ function getPortfolioMetrics(market, from, to) {
   const attrPaid = perf.reduce((s, r) => s + (r['Paid'] || 0), 0);
 
   // Unattributed CRM leads (no ad name → can't be matched to any Meta ad)
-  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(leadsData, market) : leadsData;
+  const _flowLeads = _filterLeadsByFlow(leadsData);
+  const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(_flowLeads, market) : _flowLeads;
   let unQL = 0, unNRI = 0, unTD = 0, unPaid = 0;
   filteredLeads.forEach(r => {
     const d = r.lead_created_date || '';
@@ -5609,20 +5663,18 @@ function getPortfolioMetrics(market, from, to) {
   const totalTD = attrTD + unTD;
   const totalPaid = attrPaid + unPaid;
 
-  // TQL: use proper per-market logic from getTQL() — not the broken "US ? NRI : QL" shortcut
-  // US/Canada = NRI only; India/MEA = IB/IGCSE boards only; AUS/UK/APAC = all QLs
+  // TQL: PLA = all QLs (broad appeal). BAU = market-specific.
   let totalTQL;
-  if (market === 'US' || market === 'Canada') {
+  if (getFlowFilter() === 'pla') {
+    // PLA: TQL = Trials Booked. Use getTQL which counts _trialBooked leads.
+    totalTQL = typeof getTQL === 'function' ? getTQL(market, _from, _to) : totalQL;
+  } else if (market === 'US' || market === 'Canada') {
     totalTQL = totalNRI;
   } else if (market === 'India' || market === 'ME' || market === 'MEA') {
-    // For India/MEA, TQL = IB/IGCSE board leads only — use getTQL for accuracy
     totalTQL = typeof getTQL === 'function' ? getTQL(market, _from, _to) : totalQL;
   } else if (market && market !== 'all') {
-    // AUS, UK, APAC — all QLs qualify
     totalTQL = totalQL;
   } else {
-    // All Geo — apply TQL/QL ratio from leadsData to portfolio QL
-    // (getTQL counts from all leadsData which is larger than portfolio's attrQL + unQL)
     const crmQL = getQL('all', _from, _to);
     const crmTQL = getTQL('all', _from, _to);
     totalTQL = crmQL > 0 ? Math.round(totalQL * (crmTQL / crmQL)) : 0;
@@ -5678,7 +5730,7 @@ function getCampaignSpend(campaignName, market, startDate, endDate) {
 function _metaCostForCampaign(campaignName, market, startDate, endDate) {
   const key = normalizeAdName(campaignName);
   if (!key) return null; // null = unmatched, distinct from 0 = matched but zero spend
-  const rows = filterCostByMarket(costData, market).filter(r => {
+  const rows = filterCostByMarket(_filterCostByFlow(costData), market).filter(r => {
     if ((r.medium || '').trim().toLowerCase() !== 'meta') return false;
     if (normalizeAdName(r.campaign_name) !== key) return false;
     const day = r.day || '';
@@ -5691,7 +5743,7 @@ function _metaCostForCampaign(campaignName, market, startDate, endDate) {
 }
 
 function getCampaignBreakdown(market, startDate, endDate) {
-  let leads = filterLeadsByMarket(leadsData, market);
+  let leads = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   const campaigns = {};
   leads.forEach(r => {
     const camp = (r.mx_utm_campaign || '').trim();
@@ -5732,7 +5784,7 @@ function getCampaignBreakdown(market, startDate, endDate) {
 // unreliable below campaign aggregate.
 // CPTD shown as reference only where TD > 0.
 function getAdBreakdown(market, startDate, endDate) {
-  let leads = filterLeadsByMarket(leadsData, market);
+  let leads = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   const ads = {};
   leads.forEach(r => {
     const ad = (r.mx_utm_adcontent || '').trim();
@@ -5781,12 +5833,15 @@ function getAdBreakdown(market, startDate, endDate) {
 }
 
 // ── Ad name normalization — CRM mx_utm_adcontent has placement suffixes + underscores,
-// Meta ad_name uses hyphens. Normalize both for matching. ──
+// Meta ad_name uses hyphens. PLA UTMs also contain em dashes (–) and spaces.
+// Normalize all separators for matching. ──
 const _PLACEMENT_SUFFIX_RE = /_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds|mobile_feed|mobile_reels)_(ig|fb|an)$/i;
 function normalizeAdName(s) {
   return (s || '').toLowerCase().trim()
-    .replace(_PLACEMENT_SUFFIX_RE, '')
-    .replace(/-/g, '_');
+    .replace(_PLACEMENT_SUFFIX_RE, '')  // strip Meta placement suffix
+    .replace(/[-\u2013\u2014\s]+/g, '_')  // hyphens, en/em dashes, spaces → underscore
+    .replace(/_+/g, '_')               // collapse multiple underscores
+    .replace(/^_|_$/g, '');             // trim leading/trailing underscores
 }
 
 // ── Ad+Campaign breakdown — unit of analysis is ad within a campaign ──
@@ -5797,7 +5852,7 @@ function getAdCampaignBreakdown(market, startDate, endDate) {
 
   // Step 1: Full funnel metrics per ad+campaign from leadsData
   const qlMap = {};
-  filterLeadsByMarket(leadsData, market).forEach(r => {
+  filterLeadsByMarket(_filterLeadsByFlow(leadsData), market).forEach(r => {
     const d = r.lead_created_date || '';
     if (d < start || d > end) return;
     const adKey = normalizeAdName(r.mx_utm_adcontent);
@@ -6456,7 +6511,7 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   const spend = getSpend(geoFilter || 'all', fromDate, toDate);
 
   // CRM funnel — uses filterLeadsByMarket (single geo filter path)
-  const geoFiltered = filterLeadsByMarket(leadsData || [], geoFilter || 'all');
+  const geoFiltered = filterLeadsByMarket(_filterLeadsByFlow(leadsData || []), geoFilter || 'all');
   const inRange = (date, f, t) => date && (!f || date >= f) && (!t || date <= t);
 
   // QL filtered by lead_created_date
@@ -6467,9 +6522,10 @@ function getOracleMetrics(fromDate, toDate, geoFilter) {
   const invalid = qlFiltered.filter(r => parseNumber(r['invalid'] || 0) > 0).length;
   const ts = qlFiltered.filter(r => parseNumber(r['trials_sch'] || 0) > 0).length;
 
-  // TQL: market-aware board filtering (same logic as getCRMPortfolioTotals)
+  // TQL: PLA = Trials Booked (_trialBooked field). BAU = market-specific.
   let tql;
-  if (geoFilter === 'US' || geoFilter === 'Canada') { tql = nri; }
+  if (getFlowFilter() === 'pla') { tql = qlFiltered.filter(r => r._trialBooked === '1').length; }
+  else if (geoFilter === 'US' || geoFilter === 'Canada') { tql = nri; }
   else if (geoFilter === 'India') { tql = qlFiltered.filter(r => INDIA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
   else if (geoFilter === 'MEA' || geoFilter === 'ME') { tql = qlFiltered.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length; }
   else if (geoFilter === 'all') {
@@ -6672,6 +6728,52 @@ async function fullRefresh() {
   btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Data';
 }
 
+// ── BAU / PLA flow filter ──
+// PLA = automated (no sales call). BAU = sales-led. Mixing them produces misleading CPTD.
+function getFlowFilter() {
+  return document.querySelector('.flow-btn.text-accent-purple')?.dataset?.flow || 'all';
+}
+
+function setFlowFilter(flow) {
+  document.querySelectorAll('.flow-btn').forEach(b => {
+    const isActive = b.dataset.flow === flow;
+    b.classList.toggle('text-accent-purple', isActive);
+    b.classList.toggle('bg-white', isActive);
+    b.classList.toggle('shadow-sm', isActive);
+    b.classList.toggle('text-text-muted', !isActive);
+  });
+  onGlobalFilterChange();
+}
+
+// Detect PLA from campaign name string (same logic as _isLPCampaign's isPLA check)
+// Detect PLA/Eval (automated, non-BAU) from campaign name.
+// PLA = automated signup flow. Eval = MathFit evaluation flow. Both are non-sales-led.
+function _isPLACampaignName(name) {
+  const camp = (name || '').toLowerCase();
+  // PLA campaigns: _pla_ / pla_ / _pla (end)
+  if (camp.includes('_pla_') || camp.includes('pla_') || camp.includes('_pla ') || camp.endsWith('_pla')) return true;
+  // Eval campaigns: _eval_ / eval_ / _eval (end)
+  if (camp.includes('_eval_') || camp.includes('eval_') || camp.includes('_eval ') || camp.endsWith('_eval')) return true;
+  return false;
+}
+
+// Filter leadsData by BAU/PLA flow. PLA leads have _source='pla'.
+function _filterLeadsByFlow(data) {
+  const flow = getFlowFilter();
+  if (flow === 'all') return data;
+  if (flow === 'pla') return data.filter(r => r._source === 'pla');
+  return data.filter(r => r._source !== 'pla'); // BAU = everything except PLA
+}
+
+// Filter costData by BAU/PLA flow. Uses both _source and campaign name detection
+// because main cost tab rows don't have _source even if the campaign is PLA.
+function _filterCostByFlow(data) {
+  const flow = getFlowFilter();
+  if (flow === 'all') return data;
+  if (flow === 'pla') return data.filter(r => r._source === 'pla' || _isPLACampaignName(r.campaign_name));
+  return data.filter(r => r._source !== 'pla' && !_isPLACampaignName(r.campaign_name));
+}
+
 // Sync geo filter across all tabs so numbers are consistent
 // All dropdowns now use same values: all, US, APAC, India, UK, AUS, MEA
 function syncGeoFilter(sourceId) {
@@ -6735,6 +6837,7 @@ function onDashboardFilterChange() {
   state.analysis = null;
   try { renderPipeline(); } catch(e) { console.error('renderPipeline:', e); }
   try { renderMetricTicker(); } catch(e) { console.error('renderMetricTicker:', e); }
+  try { renderBauPlaComparison(); } catch(e) { console.error('renderBauPlaComparison:', e); }
   try { renderOracleModules(); } catch(e) { console.error('renderOracleModules:', e); }
   try { renderOracleActions(); } catch(e) { console.error('renderOracleActions:', e); }
   try { renderOracleCardsV2(); } catch(e) { console.error('renderOracleCardsV2:', e); }
@@ -7805,6 +7908,142 @@ function renderDayByDay() {
   container.innerHTML = html;
 }
 
+// ── BAU vs PLA Comparison — shows side-by-side when flow=All, PLA funnel when flow=PLA ──
+function renderBauPlaComparison() {
+  const section = document.getElementById('bauPlaSection');
+  if (!section) return;
+  if (!leadsData.length) { section.classList.add('hidden'); return; }
+
+  const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const { from, to } = getGlobalDateRange();
+  const market = dashCountry || 'all';
+
+  // Check if PLA data exists for this market
+  const plaLeads = leadsData.filter(r => r._source === 'pla');
+  const plaLeadsMarket = market && market !== 'all' ? filterLeadsByMarket(plaLeads, market) : plaLeads;
+  if (!plaLeadsMarket.length) { section.classList.add('hidden'); return; }
+
+  section.classList.remove('hidden');
+
+  // Compute BAU metrics (temporarily override flow filter by computing directly)
+  const bauLeads = leadsData.filter(r => r._source !== 'pla');
+  const bauCost = costData.filter(r => r._source !== 'pla' && !_isPLACampaignName(r.campaign_name));
+  const plaCost = costData.filter(r => r._source === 'pla' || _isPLACampaignName(r.campaign_name));
+
+  function _getMetrics(leads, cost, isPLA) {
+    const fLeads = market && market !== 'all' ? filterLeadsByMarket(leads, market) : leads;
+    const fCost = market && market !== 'all' ? filterCostByMarket(cost, market) : cost;
+    const spend = fCost.filter(r => {
+      const d = r.day || '';
+      return (!from || d >= from) && (!to || d <= to);
+    }).reduce((s, r) => s + (parseFloat(r.amount_spent) || 0), 0);
+    const inRange = (d) => d && (!from || d >= from) && (!to || d <= to);
+    const qlLeads = fLeads.filter(r => inRange(r.lead_created_date) && String(r.qls) === '1');
+    const ql = qlLeads.length;
+    // PLA: TQL = Trials Booked (trial_request non-empty). BAU: TQL = NRI (simplified for comparison)
+    const tql = isPLA
+      ? qlLeads.filter(r => r._trialBooked === '1').length
+      : qlLeads.filter(r => isNRIEthnicity(r)).length;
+    const ts = fLeads.filter(r => inRange(r.lead_created_date) && String(r.trials_sch) === '1').length;
+    const td = fLeads.filter(r => inRange(r.trial_done_date) && String(r.trials_done) === '1').length;
+    const paid = fLeads.filter(r => inRange(r.paid_date) && String(r.paid) === '1').length;
+    const nri = qlLeads.filter(r => isNRIEthnicity(r)).length;
+    return {
+      spend, ql, tql, ts, td, paid, nri,
+      cptd: td > 0 && spend > 0 ? spend / td : null,
+      cptql: tql > 0 && spend > 0 ? spend / tql : null,
+      cac: paid > 0 && spend > 0 ? spend / paid : null,
+      qlTdPct: ql > 0 ? (td / ql * 100) : 0,
+      tqlTdPct: tql > 0 ? (td / tql * 100) : 0,
+      qlTqlPct: ql > 0 ? (tql / ql * 100) : 0,
+    };
+  }
+
+  const bau = _getMetrics(bauLeads, bauCost, false);
+  const pla = _getMetrics(plaLeads, plaCost, true);
+
+  const fmtC = v => v ? formatCurrency(v) : '\u2014';
+  const fmtP = v => v > 0 ? v.toFixed(1) + '%' : '\u2014';
+  const fmtN = v => v > 0 ? Math.round(v).toLocaleString() : '0';
+  const better = (a, b, lower) => {
+    if (!a || !b) return '';
+    return lower ? (a < b ? 'text-green-600' : a > b ? 'text-red-600' : '') : (a > b ? 'text-green-600' : a < b ? 'text-red-600' : '');
+  };
+  const deltaPct = (a, b) => b ? `${((a - b) / b * 100).toFixed(0)}%` : '';
+  const deltaPP = (a, b) => `${(a - b).toFixed(1)}pp`;
+
+  let html = `<div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center"><span class="text-indigo-600 text-[10px] font-black">B|P</span></div>
+        <h3 class="text-sm font-bold">BAU vs PLA Comparison</h3>
+      </div>
+      <span class="text-[10px] text-text-muted">${dashCountry === 'all' ? 'All Markets' : dashCountry}</span>
+    </div>`;
+
+  // Side-by-side table with PLA-specific funnel labels
+  html += `<div class="p-4"><table class="w-full text-xs">
+    <thead><tr class="text-[10px] text-text-muted uppercase tracking-wider">
+      <th class="text-left py-2 font-bold">Metric</th>
+      <th class="text-right py-2 font-bold">BAU</th>
+      <th class="text-right py-2 font-bold">PLA</th>
+      <th class="text-right py-2 font-bold">Delta</th>
+    </tr></thead>
+    <tbody>`;
+
+  const rows = [
+    { label: 'Spend', bau: fmtC(bau.spend), pla: fmtC(pla.spend), delta: '' },
+    { label: 'QLs', bau: fmtN(bau.ql), pla: fmtN(pla.ql), delta: '' },
+    { label: '<span title="BAU: NRI QLs (US). PLA: Trials Booked.">TQLs</span>', bau: `${fmtN(bau.tql)} <span class="text-[9px] text-text-muted">NRI</span>`, pla: `${fmtN(pla.tql)} <span class="text-[9px] text-text-muted">TB</span>`, delta: '' },
+    { label: 'Trial Done', bau: fmtN(bau.td), pla: fmtN(pla.td), delta: '' },
+    { label: 'Enrolled', bau: fmtN(bau.paid), pla: fmtN(pla.paid), delta: '' },
+    { label: 'CPTQL', bau: fmtC(bau.cptql), pla: fmtC(pla.cptql), delta: bau.cptql && pla.cptql ? `<span class="${better(pla.cptql, bau.cptql, true)}">${deltaPct(pla.cptql, bau.cptql)}</span>` : '' },
+    { label: 'CPTD', bau: fmtC(bau.cptd), pla: fmtC(pla.cptd), delta: bau.cptd && pla.cptd ? `<span class="${better(pla.cptd, bau.cptd, true)}">${deltaPct(pla.cptd, bau.cptd)}</span>` : '' },
+    { label: 'QL\u2192TQL%', bau: fmtP(bau.qlTqlPct), pla: fmtP(pla.qlTqlPct), delta: bau.qlTqlPct > 0 && pla.qlTqlPct > 0 ? `<span class="${better(pla.qlTqlPct, bau.qlTqlPct, false)}">${deltaPP(pla.qlTqlPct, bau.qlTqlPct)}</span>` : '' },
+    { label: 'TQL\u2192TD%', bau: fmtP(bau.tqlTdPct), pla: fmtP(pla.tqlTdPct), delta: bau.tqlTdPct > 0 && pla.tqlTdPct > 0 ? `<span class="${better(pla.tqlTdPct, bau.tqlTdPct, false)}">${deltaPP(pla.tqlTdPct, bau.tqlTdPct)}</span>` : '' },
+    { label: 'CAC', bau: fmtC(bau.cac), pla: fmtC(pla.cac), delta: bau.cac && pla.cac ? `<span class="${better(pla.cac, bau.cac, true)}">${deltaPct(pla.cac, bau.cac)}</span>` : '' },
+  ];
+
+  rows.forEach(r => {
+    html += `<tr class="border-t border-gray-50">
+      <td class="py-2 font-semibold text-text-secondary">${r.label}</td>
+      <td class="py-2 text-right font-mono">${r.bau}</td>
+      <td class="py-2 text-right font-mono">${r.pla}</td>
+      <td class="py-2 text-right font-semibold">${r.delta}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+
+  // PLA Funnel Cards — QL→TB dropout, TB→TD conversion, spend share
+  const plaBookingDrop = pla.ql > 0 ? ((1 - pla.tql / pla.ql) * 100) : 0;
+  const dropColor = plaBookingDrop > 30 ? 'text-red-600 bg-red-50 border-red-200' : plaBookingDrop > 15 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-green-600 bg-green-50 border-green-200';
+  const tbTdPct = pla.tql > 0 ? (pla.td / pla.tql * 100) : 0;
+
+  html += `<div class="px-4 pb-4">
+    <div class="grid grid-cols-3 gap-3">
+      <div class="rounded-lg border ${dropColor} p-3 text-center">
+        <p class="text-[10px] uppercase font-bold tracking-wider opacity-70">QL\u2192TB Dropout</p>
+        <p class="text-2xl font-black">${plaBookingDrop > 0 ? plaBookingDrop.toFixed(1) + '%' : '\u2014'}</p>
+        <p class="text-[10px] mt-0.5">${fmtN(pla.ql - pla.tql)} of ${fmtN(pla.ql)} never booked</p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-center">
+        <p class="text-[10px] uppercase font-bold tracking-wider text-text-muted">TB\u2192TD%</p>
+        <p class="text-2xl font-black">${fmtP(tbTdPct)}</p>
+        <p class="text-[10px] text-text-muted mt-0.5">${fmtN(pla.td)} of ${fmtN(pla.tql)} booked \u2192 done</p>
+      </div>
+      <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-center">
+        <p class="text-[10px] uppercase font-bold tracking-wider text-text-muted">PLA Spend Share</p>
+        <p class="text-2xl font-black">${bau.spend + pla.spend > 0 ? (pla.spend / (bau.spend + pla.spend) * 100).toFixed(0) + '%' : '\u2014'}</p>
+        <p class="text-[10px] text-text-muted mt-0.5">${fmtC(pla.spend)} of ${fmtC(bau.spend + pla.spend)}</p>
+      </div>
+    </div>
+  </div>`;
+
+  html += '</div>';
+  section.innerHTML = html;
+}
+
 // ── WoW Digest — this week vs last week at portfolio level ──
 function renderWoWDigest() {
   const el = document.getElementById('wowSection');
@@ -7820,7 +8059,7 @@ function renderWoWDigest() {
 
   // Respect dashboard geo filter
   const geo = document.getElementById('dashboardCountryFilter')?.value || 'all';
-  const dailyMeta = filterCostByMarket(costData, geo);
+  const dailyMeta = filterCostByMarket(_filterCostByFlow(costData), geo);
   const tw = dailyMeta.filter(r => r.day >= twStr && r.day <= todayStr);
   const lw = dailyMeta.filter(r => r.day >= lwStr && r.day < twStr);
 
@@ -7828,8 +8067,8 @@ function renderWoWDigest() {
   const twSpend = sum(tw, 'amount_spent') || sum(tw, 'spend');
   const lwSpend = sum(lw, 'amount_spent') || sum(lw, 'spend');
 
-  // Get TDs/QLs from CRM data — respect geo filter
-  const crmData = filterLeadsByMarket(leadsData || [], geo);
+  // Get TDs/QLs from CRM data — respect geo + flow filter
+  const crmData = filterLeadsByMarket(_filterLeadsByFlow(leadsData || []), geo);
   const twCRM = crmData.filter(r => {
     const d = r.trial_done_date || r.lead_created_date || '';
     return d >= twStr && d <= todayStr;
@@ -8201,7 +8440,9 @@ function renderOracleCardsV2() {
     });
 
   // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
-  const wrongAudience = adCampData
+  // SKIP for PLA: PLA targets broad audience, low NRI% is expected and correct
+  const _flowForSignals = getFlowFilter();
+  const wrongAudience = _flowForSignals === 'pla' ? [] : adCampData
     .filter(a => a.market === 'US' && a.spend >= 20000 && a.ql >= 15 && a.nriPct < 0.30 && !isPaused(a.adName))
     .sort((a, b) => a.nriPct - b.nriPct)
     .slice(0, 3)
@@ -8330,8 +8571,11 @@ function renderOracleCardsV2() {
       if (a.tql >= 10) { score += 0.2; signals.push(`${a.tql} TQLs`); }
       else if (a.tql >= 5) signals.push(`${a.tql} TQLs`);
 
-      // Right audience (US: NRI%)
-      if (a.market === 'US' && a.nriPct > avgNriPct && a.nri >= 3) {
+      // Right audience: BAU = NRI% (US). PLA = booking rate (broad audience, NRI irrelevant).
+      if (_flowForSignals === 'pla') {
+        // PLA: reward high booking rate (trial_request filled → _trialBooked on matched leads)
+        if (a.qlToTdPct > 0.1 && a.td >= 2) { score += 0.3; signals.push(`${Math.round(a.qlToTdPct * 100)}% QL\u2192TD`); }
+      } else if (a.market === 'US' && a.nriPct > avgNriPct && a.nri >= 3) {
         score += 0.3;
         signals.push(`${Math.round(a.nriPct * 100)}% NRI`);
       }
@@ -9052,8 +9296,11 @@ function renderMetricTicker() {
   }
 
   // Use getPortfolioMetrics when available (clean data layer), fallback to getMarketMetrics (legacy)
+  // PLA OVERRIDE: getPortfolioMetrics depends on CRM→Meta join which is lossy for PLA
+  // (~20% of PLA leads match Meta ads). Use getMarketMetrics for PLA (counts directly from CRM).
   const market = dashCountry || 'all';
-  const _usePortfolio = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
+  const _isPLAFlow = getFlowFilter() === 'pla';
+  const _usePortfolio = !_isPLAFlow && typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
   const pm = _usePortfolio ? getPortfolioMetrics(market, from, to) : null;
   // Wire metrics that getPortfolioMetrics doesn't compute
   const _portfolioTS = _usePortfolio ? getTS(market, from, to) : 0;
@@ -9111,6 +9358,7 @@ function renderMetricTicker() {
     if (dashCountry === 'all') {
       ['US','India','AUS','MEA','UK'].forEach(g => {
         const gm = _usePortfolio ? getPortfolioMetrics(g, from, to) : getMarketMetrics(g, from || undefined, to || undefined);
+        // PLA uses getMarketMetrics (via _usePortfolio=false) so this path already works
         if ((gm.td || 0) >= 5 && gm.spend > 0) {
           const gc = gm.spend / gm.td;
           if (gc < bestCptd) { bestCptd = gc; bestGeo = g; }
@@ -9276,10 +9524,13 @@ function renderMetricTicker() {
         </div>
         <!-- Detail row (expandable) -->
         <details class="text-[10px] text-text-muted">
-          <summary class="cursor-pointer hover:text-text-primary font-medium">Detail: NRI ${crm.nri.toLocaleString()} · Asian ${(crm.asian||0).toLocaleString()} · Invalid ${invalidPct}% · CAC ${cac > 0 ? formatCurrency(cac) : '—'}</summary>
+          <summary class="cursor-pointer hover:text-text-primary font-medium">Detail: ${getFlowFilter() === 'pla' ? `TB ${crm.ts.toLocaleString()} · TB rate ${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}%` : `NRI ${crm.nri.toLocaleString()} · Asian ${(crm.asian||0).toLocaleString()}`} · Invalid ${invalidPct}% · CAC ${cac > 0 ? formatCurrency(cac) : '—'}</summary>
           <div class="grid grid-cols-4 gap-3 mt-2 pt-2 border-t border-gray-100">
-            <div><span class="font-bold">NRI:</span> ${crm.nri.toLocaleString()} (${crm.ql > 0 ? (crm.nri/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
-            <div><span class="font-bold">Asian:</span> ${(crm.asian||0).toLocaleString()}</div>
+            ${getFlowFilter() === 'pla'
+              ? `<div><span class="font-bold">Trials Booked:</span> ${crm.ts.toLocaleString()} (${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
+            <div><span class="font-bold">NRI:</span> ${crm.nri.toLocaleString()}</div>`
+              : `<div><span class="font-bold">NRI:</span> ${crm.nri.toLocaleString()} (${crm.ql > 0 ? (crm.nri/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
+            <div><span class="font-bold">Asian:</span> ${(crm.asian||0).toLocaleString()}</div>`}
             <div><span class="font-bold">Invalid:</span> ${invalidPct}%${parseFloat(invalidPct) > 10 ? ' <span class="text-accent-red font-bold">⚠ High</span>' : ''}</div>
             <div><span class="font-bold">CAC:</span> ${cac > 0 ? formatCurrency(cac) : '—'}</div>
           </div>
@@ -11937,7 +12188,7 @@ const METRIC_TOOLTIPS = {
   'CTR': 'Click-Through Rate — Clicks ÷ Impressions',
   'Click→QL%': 'What % of clicks become qualified leads',
   'CPQL': 'Cost Per Qualified Lead — Spend ÷ QL signups',
-  'TQL': 'True Qualified Lead — US: NRI only, other geos: all QL',
+  'TQL': 'True Qualified Lead — BAU: NRI (US) / board (India/MEA) / all QL (others). PLA: Trials Booked.',
   'CPTQL': 'Cost Per True Qualified Lead — Spend ÷ TQL',
   'CPTD': 'Cost Per Trial Done — Spend ÷ completed trials',
   'QL→TS%': 'Trial scheduling rate — % of leads that schedule a trial',
@@ -12023,7 +12274,7 @@ function computeSparklineData(metric, geo, days) {
 
   // Daily spend from costData (already meta-filtered at source)
   const dailySpend = {};
-  filterCostByMarket(costData, geo || 'all').forEach(r => {
+  filterCostByMarket(_filterCostByFlow(costData), geo || 'all').forEach(r => {
     const d = r.day || '';
     if (!d || d < cutoffStr) return;
     if (!dailySpend[d]) dailySpend[d] = 0;
@@ -12032,7 +12283,7 @@ function computeSparklineData(metric, geo, days) {
 
   // Daily funnel from leadsData (Section 2) — uses filterLeadsByMarket for geo handling
   const dailyQL = {}, dailyTD = {}, dailyPaid = {};
-  filterLeadsByMarket(leadsData, geo || 'all').forEach(r => {
+  filterLeadsByMarket(_filterLeadsByFlow(leadsData), geo || 'all').forEach(r => {
     const qd = (r.lead_created_date || '').slice(0, 10);
     const td_d = (r.trial_done_date || '').slice(0, 10);
     const pd = (r.paid_date || '').slice(0, 10);
@@ -13483,7 +13734,7 @@ function renderLensAggregateMetrics() {
   const fromDate = document.getElementById('dashboardDateFrom')?.value || '';
   const toDate = document.getElementById('dashboardDateTo')?.value || '';
   const _market = resolvedGeo === 'all' ? null : resolvedGeo;
-  const _usePM = typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
+  const _usePM = getFlowFilter() !== 'pla' && typeof getPortfolioMetrics === 'function' && metaAdData.length > 0;
   const m = _usePM ? (() => { const p = getPortfolioMetrics(_market, fromDate, toDate); return { spend: p.spend, ql: p.ql, tql: p.tql, td: p.td, enrolled: p.paid, cptql: p.cptql, cptd: p.cptd, cac: p.cac }; })() : getMarketMetrics(_market, fromDate, toDate);
   if (!m || m.spend === 0) return;
   const srcLabel = fromDate && toDate ? `${fromDate} to ${toDate}` : 'All time';
@@ -13503,7 +13754,7 @@ function renderLensAggregateMetrics() {
 
   const html = [
     metricCard('Meta Spend', m.spend > 0 ? formatCurrency(m.spend) : '\u2014', ''),
-    metricCard('TQLs', (m.tql||0) > 0 ? Math.round(m.tql).toString() : '\u2014', m.nri > 0 ? `${Math.round(m.nri)} NRI` : ''),
+    metricCard('TQLs', (m.tql||0) > 0 ? Math.round(m.tql).toString() : '\u2014', getFlowFilter() === 'pla' ? 'Trials Booked' : (m.nri > 0 ? `${Math.round(m.nri)} NRI` : '')),
     metricCard('CPTQL', ((m.tql||0) === 0 && (m.td||0) > 0) ? '\u2014' : ((m.cptql||0) > 0 ? formatCurrency(m.cptql) : '\u2014'), ''),
     metricCard('TDs', m.td > 0 ? Math.round(m.td).toString() : '\u2014', (m.ql_td_pct||0) > 0 ? `QL→TD ${(m.ql_td_pct*100).toFixed(1)}%` : ''),
     metricCard('CPTD', (m.cptd||0) > 0 ? formatCurrency(m.cptd) : '\u2014', ''),
@@ -13672,10 +13923,11 @@ function _isLPCampaign(c) {
   const camp = ((c['Campaign name'] || c['campaign name'] || c.campaign || '') + ' ' + (c['Ad name'] || c['ad name'] || c.adName || '')).toLowerCase();
   // CHECK NEGATIVE FIRST — instant form signals override LP signals
   // (campaigns like "LEAP_BAU_Signup_LP" contain both "leap" AND "signup" — leap wins)
-  // PLA campaigns have their own CRM data (pla_dump) so they pass through
+  // PLA + Eval campaigns have their own CRM data (pla_dump / pla_ac_dump) so they pass through
   const isPLA = camp.includes('_pla_') || camp.includes('pla_') || camp.includes('_pla ') || camp.endsWith('_pla');
-  if (!isPLA && (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('instant') || camp.includes('on_facebook'))) return false;
-  if (isPLA) return true;
+  const isEval = camp.includes('_eval_') || camp.includes('eval_') || camp.includes('_eval ') || camp.endsWith('_eval');
+  if (!isPLA && !isEval && (camp.includes('leap') || camp.includes('leadgen') || camp.includes('lead_gen') || camp.includes('lead-gen') || camp.includes('instant') || camp.includes('on_facebook'))) return false;
+  if (isPLA || isEval) return true;
   // Positive signals: campaign runs on a landing page
   if (camp.includes('signup') || camp.includes('_lp_') || camp.includes('_lp-') || camp.includes('-lp_') || camp.endsWith('_lp') || camp.endsWith('-lp') || camp.includes('_fop') || camp.includes('lpfop')) return true;
   // Default: no LP signal = assume instant form — exclude to avoid unmatchable CRM numbers
@@ -16448,7 +16700,7 @@ function renderAudienceMap() {
     // Detect audiences with no creatives in this geo
     const geoCreatives = data.filter(c => extractMarket(c) === geo);
     const geoAuds = new Set(geoCreatives.map(c => c.tags?.campaign_audience).filter(a => a && a !== 'Unknown'));
-    if (!geoAuds.has('NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'No NRI-targeted creatives', severity: 'high' });
+    if (getFlowFilter() !== 'pla' && !geoAuds.has('NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'No NRI-targeted creatives', severity: 'high' });
     if (!geoAuds.has('Broad/Advantage+') && !geoAuds.has('General') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'Broad/General audience untapped', severity: 'medium' });
   });
   // Forge undeployed creatives
@@ -18944,7 +19196,7 @@ function renderInfluLeaderboard(filteredCreators) {
       <th class="text-right px-2 py-2.5 font-bold text-text-muted">Ad Sets</th>
       <th class="text-right px-2 py-2.5 font-bold text-text-muted">Ads</th>
       <th class="text-right px-2 py-2.5 font-bold text-text-muted">Spend</th>
-      <th class="text-right px-2 py-2.5 font-bold text-text-muted" title="True Qualified Leads (US=NRI, others=QL)">TQLs</th>
+      <th class="text-right px-2 py-2.5 font-bold text-text-muted" title="True Qualified Leads (BAU: NRI/board, PLA: Trials Booked)">TQLs</th>
       <th class="text-right px-2 py-2.5 font-bold text-text-muted" title="Cost Per TQL — Spend ÷ TQLs">CPTQL</th>
       <th class="text-right px-2 py-2.5 font-bold text-text-muted">TDs</th>
       <th class="text-right px-2 py-2.5 font-bold text-text-muted" title="Cost Per Trial Done">CPTD</th>

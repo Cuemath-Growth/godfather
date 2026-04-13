@@ -4,6 +4,65 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 1: BAU vs PLA Split (2026-04-14)
+
+### 1.9: PLA QL definition — all leads are QLs
+- **ROOT CAUSE** of 39 QLs vs 593 in summary doc: 484/560 PLA leads have empty `qualified_bucket` (no sales team qualifying them)
+- BAU logic: `qb && !qb.startsWith('UNQUALIFIED')` → empty = NOT QL → discards 86% of PLA leads
+- PLA logic: every lead entering the self-serve flow IS a QL by definition (qualified by action, not by sales)
+- Fix: `normalizePLALead` now sets `isQL = !isUnqualified` (all except explicitly UNQUALIFIED)
+- Verified: 447 Meta Q1 PLA leads + ~146 Google = 593 (matches summary doc)
+
+### 1.6: normalizeAdName — em dash/space fix
+- **ROOT CAUSE** of PLA showing 0 TDs: PLA UTM content has em dashes (–) and spaces that weren't normalized, so CRM leads couldn't match Meta ad names
+- `normalizeAdName()` now replaces hyphens, en dashes (U+2013), em dashes (U+2014), and spaces with underscores, then collapses + trims
+- Before: `amayra_testimonial_041225 – copy` (didn't match `amayra_testimonial_041225_copy`)
+- After: `amayra_testimonial_041225_copy` (matches correctly)
+- Improves CRM→Meta matching for ALL campaigns, not just PLA
+
+### 1.7: PLA data source switch to 175i57-...
+- **PLA_SHEET_ID** changed from `1lGAv3K_...` to `175i57-b0PSvDjCYHn8w4_wH5df8CipxIIQiy3o7VifA` (user's shared PLA Dashboard sheet)
+- Now fetches 4 tabs: `pla_dump`, `pla_ac_dump` (286 additional leads), `cost`, `pla_ac_cost` (137 Eval campaign cost rows)
+- Dedup by prospectid OR student_service_id (some PLA leads have empty prospectid)
+- `normalizePLALead` now uses `student_service_id` as prospectid fallback
+
+### 1.8: Eval campaign support
+- `_isPLACampaignName()` now also matches `_eval_` / `eval_` patterns (Eval = MathFit evaluation flow, also automated/non-BAU)
+- `_isLPCampaign()` also updated — Eval campaigns pass through like PLA (they have own CRM data)
+- GODFATHER_TAXONOMY `campaign_audience.parse()` detects Eval flow as PLA
+- Added `Eval (PLA)` to campaign_audience values list
+
+### 1.1: Global BAU/PLA filter toggle
+- **3-way toggle** (All / BAU / PLA) added to global filter bar after geo dropdown
+- `getFlowFilter()`, `setFlowFilter(flow)` — reads/writes toggle state
+- `_isPLACampaignName(name)` — detects PLA from campaign name (`_pla_` patterns)
+- `_filterLeadsByFlow(data)` — filters leadsData by `_source` field (pla vs non-pla)
+- `_filterCostByFlow(data)` — filters costData by `_source` AND campaign name detection
+- Toggle triggers `onGlobalFilterChange()` → all views re-render with new filter
+
+### 1.2: Flow filter wired into all data paths
+- **10 metric primitives** (getSpend, getQL, getTQL, getTD_snapshot, getTD_cohort, getTS, getEnrolled, getInvalid, getNRI, getAsian): now call `_filterLeadsByFlow(leadsData)` / `_filterCostByFlow(costData)` before market filtering
+- **getPortfolioMetrics()**: unattributed CRM leads filtered by flow
+- **getOracleMetrics()**: CRM funnel filtered by flow
+- **getAdPerformanceDaily()**: Meta API data filtered by campaign name; CRM data filtered by `_filterLeadsByFlow`; cache key includes flow
+- **getAdPerformance()**: cache key includes flow
+- PLA campaigns still pass `_isLPCampaign()` gate (they have own CRM data) — no behavior change there
+
+### 1.3: PLA funnel card on Dashboard
+- 3 KPI cards in `renderBauPlaComparison()`: PLA Timeout Rate, PLA TS→TD%, PLA Spend Share
+- Color-coded: red >90% timeout, amber >70%, green otherwise
+
+### 1.4: BAU vs PLA comparison table
+- Side-by-side table: Spend, QLs, TS, TD, Enrolled, CPTD, QL→TD%, QL→TS%, CAC
+- Delta column with directional coloring (green=better, red=worse)
+- Auto-hides when no PLA data exists for selected market
+
+### 1.5: PLA timeout metric
+- Timeout rate = (QL - TS) / QL — the #1 PLA problem (leads who never book a trial)
+- Integrated into 1.3 card grid
+
+---
+
 ## Phase 0: Hygiene Sweep (2026-04-13)
 
 ### Fix 0.1: Reusable table sort
