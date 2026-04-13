@@ -49,6 +49,19 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 - [x] 1.11 **PLA KPI card swap** — 4th card = "Trials Booked" with booking rate (was Enrolled/CAC).
 - [x] 1.12 **PLA insight adaptation** — Wrong Audience suppressed, NRI scoring → QL→TD%, gap analysis, detail line, tooltips.
 
+### Phase 1.8: Parser Fixes — Pending
+
+**Why:** Media plan audit (Apr 14) revealed 5 campaigns misclassified by `campaign_audience` parser + 1 missing market. Phase 2 viz will show wrong data without these.
+
+**Source:** Google Sheet `1q_mScP2PfbP-cCMzcLyq1YyDkaNes2rFV4GvmWFc15g` (gid=1196222360) — full media plan with all campaigns × targeting params.
+
+- [ ] 1.13 **Parser: add `k-8`/`k_8` → K-8 audience** — `USA_FB_Leads_Conv_K-8_*` falls to General (BAU). Campaign launched 04/14.
+- [ ] 1.14 **Parser: add EU market detection** — `ANZ-EU_*` campaigns misclassify as AUS. Add `/ANZ[-_]EU/i` check before ANZ catch-all in `matchMarketFromText()`. Map to new `EU` market value.
+- [ ] 1.15 **Parser: add missing audience keywords** — `parenting` → Interest, `bollywood` → Interest, `premium`/`job-titles`/`income` → HNI, `razorpay` → Lookalike. Affects 5 campaigns across ANZ + India + US.
+- [ ] 1.16 **Parser: `Broad_and_NRI_Filters_PLA` — accept inaccuracy** — Campaign name contains both `nri` AND `broad`. All 10 ad sets get NRI (PLA). Accepted: NRI is dominant signal, campaign_audience is campaign-level by design. Document in code comment.
+
+**Validation:** Run all media plan campaign names through parser, verify no more General fallbacks except truly generic campaigns.
+
 ---
 
 ## Phase 2: Segwise-Level Visualizations
@@ -66,6 +79,20 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 
 **Validation:** Charts render for US (most data), India (new data), AUS/MEA (less data). Small markets degrade gracefully ("insufficient data").
 
+### Phase 2b: Targeting Data Layer
+
+**Goal:** Connect the media plan (what audiences we target) to creative performance (what works). This data layer powers Make More, Library, and Create upgrades in Phase 3.
+
+**Source:** Media plan audit (Apr 14) — Google Sheet `1q_mScP2PfbP-cCMzcLyq1YyDkaNes2rFV4GvmWFc15g` (gid=1196222360). 100+ campaigns across US/India/ANZ/UK/EU, Meta/Google/Bing/Taboola.
+
+| # | Task | Details | Priority |
+|---|------|---------|----------|
+| 2.7 | **Audience cluster performance aggregator** | New function `getAudiencePerformance(market, from, to)`. Groups all tagger data by `campaign_audience`. Returns per-cluster: TD count, CPTD, QL-TD%, T-P%, spend, trend (WoW), best 3 creatives (by CPTD), worst 3 creatives. Refreshes on date/geo/flow change. This is the engine behind 3.8-3.13. | P0 |
+| 2.8 | **Targeting reference config** | Static JSON `TARGETING_CONFIG` embedded in index.html. Maps each `campaign_audience` value → `{ age, gender, interests, exclusions, vernacular, lp_type, typical_campaigns[], typical_adsets[] }`. Populated from media plan sheet. Updated manually when new campaigns launch (~monthly). Not a live fetch — the plan changes slowly. | P0 |
+| 2.9 | **Creative Leaderboard: audience column** | Add `campaign_audience` as sortable/filterable column to Phase 2.1 leaderboard. Each creative row shows which targeting cluster it ran in. Clicking filters leaderboard to that cluster. | P1 — after 2.1 |
+
+**Validation:** `getAudiencePerformance('US')` returns correct clusters matching manual media plan analysis (Expats ~₹34K CPTD, LAL Enrolled ~₹39K, Influencer Postboost ~₹43K). TARGETING_CONFIG covers all non-General campaign_audience values.
+
 ---
 
 ## Phase 3: Intelligence Wiring
@@ -81,6 +108,28 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 | 3.5 | **Budget pace indicator** | Spend Optimizer (Data Skill 2) | Dashboard card: "US spend this month: ₹X of ₹Y planned (Z% through month, W% budget used). On pace / Ahead / Behind." Uses monthly plan from summary doc. |
 | 3.6 | **Tag value filter in Data Table** | Tagger QA (Creative Skill 1) | Value-level dropdown in Data Table (not just category). "Show only Testimonial" or "Show only NRI (BAU)." |
 | 3.7 | **Unhide Oracle hidden modules** | Anomaly Spotter (Data Skill 4) | Cross-Signal Patterns, Anomaly Alerts modules exist in hidden divs (line 392). Integrate into Oracle tab layout. Requires Oracle tab redesign. |
+
+### Phase 3b: Targeting Intelligence (Make More + Library + Create)
+
+**Goal:** Connect audience targeting data to creative production. Content team sees what works for each audience, gets deployment-ready suggestions, and Haiku generates copy informed by actual performance.
+
+**Depends on:** Phase 2b (2.7 aggregator + 2.8 config)
+
+| # | Task | What Changes | Details |
+|---|------|-------------|---------|
+| 3.8 | **Make More: audience-clustered recommendations** | Sentinel → Make More (lines 8546-8664) | Replace current "top 8 by score" with audience-grouped cards. For each cluster with sufficient data: show best performer + thumbnail, cluster CPTD vs portfolio avg (colored delta), specific format/theme recommendation ("Make 2 more NRI-contextual statics"), which clusters are saturated vs starving. Cap at top 5 clusters. Dead clusters (CPTD >2x portfolio, <2 TD) get "Kill" label. |
+| 3.9 | **Make More: deployment suggestion** | Per recommendation card | Each "make more" card includes actual campaign/ad set name from TARGETING_CONFIG: "Deploy in `USA_FB_Leads_Conv_Expats_NRI_Audience_Signup_LP_250326`". Content team knows exactly where the creative will run. Also show targeting params (age, interests) so they know who'll see it. |
+| 3.10 | **Library: audience suitability pills** | Library cards (lines 17227-17412) | Per creative card, show which audiences it's suited for. Logic: (a) look up which `campaign_audience` it ran in from tagger data, (b) grade performance — **A** if CPTD < cluster median AND TD >= 3, **B** if within 1.5x median, **C** otherwise. Show as colored pills on card: `Expats A` `LAL B`. Creatives with no performance data show `campaign_audience` without grade. |
+| 3.11 | **Library: audience filter dropdown** | Library filters (line 1201-1206) | New dropdown alongside Format and Geo filters. Values from `campaign_audience` taxonomy (non-empty only). Filters to creatives that ran in or are suited for that audience. "Show me everything that works for Telugu audiences." |
+| 3.12 | **Create: audience performance context injection** | Create → Haiku system prompt (lines 10842-11199) | When audience pill selected, auto-inject into `buildSystemPrompt()`: (a) top 3 performers for this audience + their tag combos (hook, format, pain_benefit), (b) worst 3 (what to avoid), (c) targeting params from TARGETING_CONFIG (age, gender, interests, vernacular), (d) cluster CPTD + TD + T-P%. Haiku generates copy informed by what actually converts for that specific audience. |
+| 3.13 | **Create: performance sidebar** | Create tab UI | When audience pill selected, show mini-card beside brief form: cluster name, CPTD (colored), TD count, T-P%, best creative name + format, performance trend arrow. Content team sees the data before they write. Zero clicks — auto-populates on pill selection. |
+
+**Validation:** 
+- Make More shows different recommendations for US vs India (different top clusters).
+- Make More in PLA mode shows PLA-specific clusters (Broad PLA, Chinese PLA).
+- Library filter by "Expats" returns only creatives that ran in Expats campaigns.
+- Create system prompt for "NRI" audience includes Expats performance data + targeting params.
+- Switching audience pill in Create updates sidebar immediately.
 
 **Validation:** Every element updates on geo change. Clipboard copy produces clean text. Funnel matches summary doc baseline.
 
@@ -101,13 +150,17 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 
 ## Estimated Effort
 
-| Phase | Sessions | Hours | Dependencies |
-|-------|----------|-------|-------------|
-| Phase 1: BAU/PLA | 1 | ~2 | None |
-| Phase 2: Segwise Viz | 1-2 | ~3-4 | Phase 0 sort (done) |
-| Phase 3: Intelligence | 1 | ~2 | Phase 1 (funnel needs PLA), Phase 2 (sparklines) |
-| Phase 4: Export | 1 | ~1-2 | Phase 2+3 (content to export) |
-| **Total** | **4-5** | **~8-10** | |
+| Phase | Sessions | Hours | Dependencies | Status |
+|-------|----------|-------|-------------|--------|
+| Phase 0: Hygiene | 1 | ~2 | None | **DONE** |
+| Phase 1: BAU/PLA + Critical Fixes | 1.5 | ~3 | None | **DONE** |
+| Phase 1.8: Parser Fixes | 0.25 | ~0.5 | Media plan audit | Pending |
+| Phase 2: Segwise Viz (2.1-2.6) | 1-2 | ~3-4 | Phase 0 sort (done) | Pending |
+| Phase 2b: Targeting Data Layer (2.7-2.9) | 0.5 | ~1 | Phase 1.8 | Pending |
+| Phase 3: Intelligence (3.1-3.7) | 1 | ~2 | Phase 1 (done), Phase 2 | Pending |
+| Phase 3b: Targeting Intel (3.8-3.13) | 1 | ~2 | Phase 2b | Pending |
+| Phase 4: Export | 1 | ~1-2 | Phase 2+3 | Pending |
+| **Total** | **~7-8** | **~14-17** | | |
 
 ---
 
@@ -127,3 +180,6 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 | BAU vs PLA split | No | **Yes (Phase 1)** |
 | Cross-market transfer | No | **Yes (Creative Skill 6)** |
 | Copy generation | Beta | **Yes — Haiku + 9 production skills** |
+| **Audience→Creative mapping** | **No** | **Yes — Make More shows what to create for each targeting cluster, with deployment campaign (Phase 3b)** |
+| **Creative→Audience suitability** | **No** | **Yes — Library tags each creative with audience fit grade A/B/C (Phase 3b)** |
+| **Audience-aware generation** | **No** | **Yes — Haiku knows what converts for each audience before generating (Phase 3b)** |

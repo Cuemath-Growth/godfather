@@ -200,6 +200,7 @@
           <option value="AUS">AUS</option>
           <option value="MEA">MEA</option>
           <option value="UK">UK</option>
+          <option value="EU">EU</option>
         </select>
         <div class="h-3 w-px bg-gray-200 shrink-0"></div>
         <div id="flowFilterGroup" class="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 shrink-0">
@@ -2000,7 +2001,7 @@ const GODFATHER_TAXONOMY = {
     campaign_audience: {
       label: 'Audience', type: 'parsed', color: 'orange',
       description: 'Target audience + onboarding flow from campaign name. Format: "Audience (Flow)" where Flow = BAU or PLA.',
-      values: ['Influencer (BAU)', 'Influencer (PLA)', 'Vernacular (BAU)', 'NRI (BAU)', 'NRI (PLA)', 'Chinese (PLA)', 'K-2 (PLA)', 'High School (BAU)', 'Creative Testing (BAU)', 'Creative Testing (PLA)', 'Lookalike (BAU)', 'Lookalike (PLA)', 'HNI (BAU)', 'Retargeting (BAU)', 'Interest (BAU)', 'Interest (PLA)', 'Broad (BAU)', 'Broad (PLA)', 'Geo (BAU)', 'General (BAU)', 'General (PLA)', 'Eval (PLA)'],
+      values: ['Influencer (BAU)', 'Influencer (PLA)', 'Vernacular (BAU)', 'Vernacular (PLA)', 'NRI (BAU)', 'NRI (PLA)', 'Chinese (BAU)', 'Chinese (PLA)', 'K-2 (BAU)', 'K-2 (PLA)', 'K-8 (BAU)', 'K-8 (PLA)', 'High School (BAU)', 'High School (PLA)', 'Creative Testing (BAU)', 'Creative Testing (PLA)', 'Lookalike (BAU)', 'Lookalike (PLA)', 'HNI (BAU)', 'HNI (PLA)', 'Retargeting (BAU)', 'Interest (BAU)', 'Interest (PLA)', 'Broad (BAU)', 'Broad (PLA)', 'Geo (BAU)', 'Geo (PLA)', 'General (BAU)', 'General (PLA)', 'Eval (PLA)'],
       parse: function(campaignName) {
         const camp = (campaignName || '').toLowerCase();
         // Detect flow: PLA/Eval = automated (no sales call), BAU = sales-led
@@ -2016,14 +2017,16 @@ const GODFATHER_TAXONOMY = {
         else if (camp.includes('nri') || camp.includes('expat') || camp.includes('indian') || camp.includes('desi')) audience = 'NRI';
         else if (camp.includes('chinese')) audience = 'Chinese';
         else if (camp.includes('k-2') || camp.includes('k_2')) audience = 'K-2';
+        else if (camp.includes('k-8') || camp.includes('k_8')) audience = 'K-8'; // 1.13: new grade-band campaign (Apr 14)
         else if (camp.includes('high-school') || camp.includes('high_school')) audience = 'High School';
         else if (camp.includes('ctf')) audience = 'Creative Testing';
-        else if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('lookalike')) audience = 'Lookalike';
-        else if (camp.includes('hni')) audience = 'HNI';
+        else if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('razorpay') || camp.includes('lookalike')) audience = 'Lookalike'; // 1.15: added razorpay as LAL seed
+        else if (camp.includes('hni') || camp.includes('premium') || camp.includes('job-titles') || camp.includes('job_titles') || camp.includes('+income')) audience = 'HNI'; // 1.15: India premium campaigns
         else if (camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt')) audience = 'Retargeting';
-        else if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment')) audience = 'Interest';
+        else if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment') || camp.includes('parenting') || camp.includes('bollywood')) audience = 'Interest'; // 1.15: parenting + bollywood
         else if (camp.includes('advantage') || camp.includes('broad')) audience = 'Broad';
         else if (camp.includes('zipcode') || camp.includes('pincode') || camp.includes('location') || camp.includes('cities')) audience = 'Geo';
+        // 1.16: Broad_and_NRI_Filters_PLA contains both 'nri' and 'broad' — NRI wins by priority (line 2016). Accepted: NRI is dominant signal for this compound campaign.
         return `${audience} (${flow})`;
       }
     }
@@ -7619,7 +7622,7 @@ function renderOracleActions() {
   // ── SECTION 5: MARKET HEALTH (date-filtered from perf tracker + CRM) ──
   const marketList = document.getElementById('oracleMarketHealthList');
   if (!marketList) return; // DOM element not rendered yet
-  const mhGeos = ['US','India','AUS','MEA','UK','APAC'];
+  const mhGeos = ['US','India','AUS','MEA','UK','EU','APAC'];
   const mhFrom = document.getElementById('dashboardDateFrom')?.value || '';
   const mhTo = document.getElementById('dashboardDateTo')?.value || '';
   let mhHtml = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">';
@@ -11781,7 +11784,7 @@ function getLibraryContext(brief) {
   if (!CREATIVE_ASSETS || !CREATIVE_ASSETS.length) return '';
 
   const market = brief.market || '';
-  const geoMap = { 'US': 'US', 'India': 'India', 'AUS': 'AUS', 'MEA': 'MEA', 'APAC': 'APAC', 'UK': 'UK' };
+  const geoMap = { 'US': 'US', 'India': 'India', 'AUS': 'AUS', 'MEA': 'MEA', 'APAC': 'APAC', 'UK': 'UK', 'EU': 'EU' };
   const geo = geoMap[market] || '';
 
   // Find Library assets matching this geo
@@ -12106,6 +12109,12 @@ const SENTINEL_THRESHOLDS = {
     cpql:  { green: 10000, amber: 15000 },
     cpnri: { green: 10000, amber: 15000 },
     cptd:  { green: 30000, amber: 45000 },
+    ql_td_pct: { green: 35, amber: 25 }
+  },
+  EU: { // 1.14: new market — uses UK-like thresholds (closest European reference)
+    cpql:  { green: 10000, amber: 15000 },
+    cpnri: { green: 15000, amber: 20000 },
+    cptd:  { green: 35000, amber: 50000 },
     ql_td_pct: { green: 35, amber: 25 }
   }
 };
@@ -15768,6 +15777,7 @@ function extractMarket(c) {
 function matchMarketFromText(text) {
   // ANZ sub-geos must match BEFORE generic ANZ (which = Australia)
   if (/ANZ[-_]UK/i.test(text) || /\bUK\b/.test(text) || text.includes('UNITED KINGDOM')) return 'UK';
+  if (/ANZ[-_]EU/i.test(text) || /\bEU[_\s-]/.test(text) || text.includes('EUROPE')) return 'EU'; // 1.14: EU market detection
   if (/ANZ[-_]NZ/i.test(text) || text.includes('NEW ZEALAND')) return 'APAC';
   if (/ANZ[-_]SG/i.test(text) || text.includes('SINGAPORE')) return 'APAC';
   if (text.includes('ANZ') || /\bAUS\b/.test(text) || text.includes('AUSTRALIA') || text.includes('NAPLAN') || text.includes('SELECTIVE')) return 'AUS';
@@ -15951,7 +15961,7 @@ function generateCreativeBriefs() {
   if (!briefs.length) { section.classList.add('hidden'); return; }
 
   section.classList.remove('hidden');
-  const GEO_BADGE = { US: 'purple', AUS: 'green', India: 'pink', MEA: 'orange', APAC: 'blue' };
+  const GEO_BADGE = { US: 'purple', AUS: 'green', India: 'pink', MEA: 'orange', APAC: 'blue', EU: 'teal', UK: 'red' };
   const prioStyles = { high: 'bg-accent-red-light text-red-700', medium: 'bg-accent-orange-light text-amber-700', low: 'bg-surface-tertiary text-text-muted' };
 
   container.innerHTML = briefs.map(b => `
@@ -17233,7 +17243,7 @@ function renderLibrary() {
   const loading = document.getElementById('libraryLoading');
   const summaryLine = document.getElementById('librarySummaryLine');
   if (loading) loading.classList.add('hidden');
-  const GEO_BADGE = {US:'purple',AUS:'green',MEA:'orange',APAC:'blue',India:'pink'};
+  const GEO_BADGE = {US:'purple',AUS:'green',MEA:'orange',APAC:'blue',India:'pink',EU:'teal',UK:'red'};
 
   const useSheet = state._librarySheet && state._librarySheet.length > 0;
   let sheetCards = useSheet ? state._librarySheet.map(normalizeLibraryRow).filter(c => c.name) : [];

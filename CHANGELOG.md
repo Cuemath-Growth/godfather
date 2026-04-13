@@ -4,6 +4,34 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 1.8: Parser Fixes (2026-04-14)
+
+**Source:** Media plan audit — Google Sheet `1q_mScP2PfbP-cCMzcLyq1YyDkaNes2rFV4GvmWFc15g` (gid=1196222360). 100+ campaigns traced through parser, 5 misclassifications found.
+
+### 1.13: campaign_audience parser — K-8 grade band
+- Added `k-8`/`k_8` → K-8 audience. `USA_FB_Leads_Conv_K-8_*` was falling to General (BAU).
+
+### 1.14: matchMarketFromText — EU market
+- Added `/ANZ[-_]EU/i` and `/\bEU[_\s-]/` detection BEFORE ANZ catch-all.
+- `ANZ-EU_*` campaigns were misclassifying as AUS.
+- Added EU to: geo filter dropdown, GEO_BADGE (teal), SENTINEL_THRESHOLDS (UK-like), geoMap, mhGeos.
+
+### 1.15: campaign_audience parser — missing keywords
+- `parenting` → Interest (ANZ Parenting PLA campaign)
+- `bollywood` → Interest (ANZ Bollywood LeadGen campaign)
+- `premium`/`job-titles`/`job_titles`/`+income` → HNI (India premium campaigns)
+- `razorpay` → Lookalike (new US LAL seed source)
+- Values list updated with all flow combinations (K-8, Vernacular PLA, Chinese BAU, etc.)
+
+### 1.16: Broad_and_NRI_Filters_PLA — documented accepted inaccuracy
+- Campaign contains both `nri` and `broad`. All 10 ad sets get NRI (PLA).
+- Accepted: NRI is dominant signal, campaign_audience is campaign-level by design.
+- Added code comment documenting the decision.
+
+**Validation:** 13/13 test cases pass — all previously broken campaigns now correct, no regressions on existing campaigns.
+
+---
+
 ## Phase 1.5: Critical Fixes + Sweeps (2026-04-14, commits dc51434 → 65f3b3e)
 
 ### Sweep: Trend noise in ALL 5 comparison systems (71223ea)
