@@ -8085,11 +8085,21 @@ function renderWoWDigest() {
   if (twSpend < 1000 && lwSpend < 1000) { el.innerHTML = ''; return; }
 
   const pct = (tw, lw) => lw > 0 ? ((tw - lw) / lw * 100) : (tw > 0 ? 100 : 0);
-  const arrow = (v) => v > 5 ? '↑' : v < -5 ? '↓' : '→';
+  const arrow = (v) => v > 5 ? '\u2191' : v < -5 ? '\u2193' : '';
   const color = (v, invert) => {
+    if (Math.abs(v) < 5) return 'text-text-muted';
     const good = invert ? v < -5 : v > 5;
     const bad = invert ? v > 5 : v < -5;
     return good ? 'text-accent-green' : bad ? 'text-accent-red' : 'text-text-muted';
+  };
+  // Format WoW %: cap at 200%, suppress near-zero prior
+  const fmtWoW = (tw, lw, p, invert) => {
+    if (!lw && !tw) return '\u2014';
+    if (!lw || lw === 0) return tw > 0 ? 'new' : '\u2014';
+    if (Math.abs(lw) < Math.abs(tw) * 0.1) return 'new';
+    if (Math.abs(p) < 5) return '';
+    const label = Math.abs(p) > 200 ? (Math.abs(p)/100).toFixed(1)+'x' : Math.abs(p).toFixed(0)+'%';
+    return `${arrow(invert ? -p : p)} ${label}`;
   };
 
   const spendPct = pct(twSpend, lwSpend);
@@ -8111,22 +8121,22 @@ function renderWoWDigest() {
       <div>
         <p class="text-[9px] text-text-muted uppercase font-bold">Spend</p>
         <p class="text-lg font-black">${formatCurrency(twSpend)}</p>
-        <p class="text-[10px] font-semibold ${color(spendPct, false)}">${arrow(spendPct)} ${Math.abs(spendPct).toFixed(0)}% vs ${formatCurrency(lwSpend)}</p>
+        <p class="text-[10px] font-semibold ${color(spendPct, false)}">${fmtWoW(twSpend, lwSpend, spendPct, false)}${lwSpend > 0 ? ' vs ' + formatCurrency(lwSpend) : ''}</p>
       </div>
       <div>
         <p class="text-[9px] text-text-muted uppercase font-bold">QLs</p>
         <p class="text-lg font-black">${twQL}</p>
-        <p class="text-[10px] font-semibold ${color(qlPct, false)}">${arrow(qlPct)} ${Math.abs(qlPct).toFixed(0)}% vs ${lwQL}</p>
+        <p class="text-[10px] font-semibold ${color(qlPct, false)}">${fmtWoW(twQL, lwQL, qlPct, false)}${lwQL > 0 ? ' vs ' + lwQL : ''}</p>
       </div>
       <div>
         <p class="text-[9px] text-text-muted uppercase font-bold">TDs</p>
         <p class="text-lg font-black">${twTD}</p>
-        <p class="text-[10px] font-semibold ${color(tdPct, false)}">${arrow(tdPct)} ${Math.abs(tdPct).toFixed(0)}% vs ${lwTD}</p>
+        <p class="text-[10px] font-semibold ${color(tdPct, false)}">${fmtWoW(twTD, lwTD, tdPct, false)}${lwTD > 0 ? ' vs ' + lwTD : ''}</p>
       </div>
       <div>
         <p class="text-[9px] text-text-muted uppercase font-bold">CPTD</p>
-        <p class="text-lg font-black">${twCPTD > 0 ? formatCurrency(twCPTD) : '—'}</p>
-        <p class="text-[10px] font-semibold ${color(cptdPct, true)}">${twCPTD > 0 && lwCPTD > 0 ? arrow(-cptdPct) + ' ' + Math.abs(cptdPct).toFixed(0) + '% vs ' + formatCurrency(lwCPTD) : '—'}</p>
+        <p class="text-lg font-black">${twCPTD > 0 ? formatCurrency(twCPTD) : '\u2014'}</p>
+        <p class="text-[10px] font-semibold ${color(cptdPct, true)}">${twCPTD > 0 && lwCPTD > 0 ? fmtWoW(twCPTD, lwCPTD, cptdPct, true) + ' vs ' + formatCurrency(lwCPTD) : '\u2014'}</p>
       </div>
     </div>
     ${_buildWoWWhy(tw, lw, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD, twQL, lwQL, twCPTD, lwCPTD)}
@@ -9590,11 +9600,14 @@ function renderMetricTicker() {
     const recent = periodAvg(recentDates);
     const prev = periodAvg(prevDates);
     if (!prev || !recent) return { arrow: '', title: '' };
+    // Suppress noise: near-zero prior → meaningless huge percentages
+    if (Math.abs(prev) < Math.abs(recent) * 0.1) return { arrow: '', title: 'New (no meaningful prior data)' };
     const pctChange = ((recent - prev) / prev) * 100;
     // For cost metrics, lower is better: negative change = improving
-    if (Math.abs(pctChange) < 5) return { arrow: ' →', title: `Stable (${pctChange > 0 ? '+' : ''}${pctChange.toFixed(1)}% vs prior period)` };
-    if (pctChange < 0) return { arrow: ' ↑', title: `Improving (${pctChange.toFixed(1)}% vs prior period)` };
-    return { arrow: ' ↓', title: `Worsening (+${pctChange.toFixed(1)}% vs prior period)` };
+    if (Math.abs(pctChange) < 5) return { arrow: '', title: '' }; // <5% = not actionable
+    const pctLabel = Math.abs(pctChange) > 200 ? (Math.abs(pctChange)/100).toFixed(1) + 'x' : Math.abs(pctChange).toFixed(0) + '%';
+    if (pctChange < 0) return { arrow: ' \u2191', title: `Improving (${pctLabel} vs prior period)` };
+    return { arrow: ' \u2193', title: `Worsening (${pctLabel} vs prior period)` };
   }
 
   const cpqlTrend = calcTrend(c => {
@@ -14398,11 +14411,13 @@ function renderCreativeReview() {
     // Comparison arrows vs portfolio average — label visible, not just tooltip
     const cmp = (val, bench, lower) => {
       if (!bench || !val) return '';
+      if (Math.abs(bench) < Math.abs(val) * 0.05) return ''; // near-zero bench = noise
       const pct = ((val - bench) / bench * 100);
+      if (Math.abs(pct) < 5) return '';  // <5% = not meaningful
       const vs = 'vs avg';
-      if (Math.abs(pct) < 5) return `<span class="text-gray-400 text-[8px]">≈ ${vs}</span>`;
-      if (lower) return pct < 0 ? `<span class="text-green-600 text-[8px]">▼${Math.abs(pct).toFixed(0)}% ${vs}</span>` : `<span class="text-red-500 text-[8px]">▲${pct.toFixed(0)}% ${vs}</span>`;
-      return pct > 0 ? `<span class="text-green-600 text-[8px]">▲${pct.toFixed(0)}% ${vs}</span>` : `<span class="text-red-500 text-[8px]">▼${Math.abs(pct).toFixed(0)}% ${vs}</span>`;
+      const label = Math.abs(pct) > 200 ? (Math.abs(pct)/100).toFixed(1) + 'x' : Math.abs(pct).toFixed(0) + '%';
+      if (lower) return pct < 0 ? `<span class="text-green-600 text-[8px]">\u25BC${label} ${vs}</span>` : `<span class="text-red-500 text-[8px]">\u25B2${label} ${vs}</span>`;
+      return pct > 0 ? `<span class="text-green-600 text-[8px]">\u25B2${label} ${vs}</span>` : `<span class="text-red-500 text-[8px]">\u25BC${label} ${vs}</span>`;
     };
 
     return `<div class="border rounded-xl p-3 ${vColors[v.color]} transition hover:shadow-md">
@@ -17787,7 +17802,7 @@ function renderSentinelNarrative() {
     if (_trend && _trend.drivers.length) {
       html += `<div class="pt-3 mt-3 border-t border-gray-100">
         <p class="font-semibold text-accent-purple mb-2 flex items-center gap-1.5">
-          ${URGENCY.info.icon} CPTD ${_trend.direction} ${Math.abs(_trend.pctChange).toFixed(0)}% (${formatCurrency(_trend.priorCPTD)} → ${formatCurrency(_trend.recentCPTD)})
+          ${URGENCY.info.icon} CPTD ${_trend.direction} ${Math.abs(_trend.pctChange) > 200 ? (Math.abs(_trend.pctChange)/100).toFixed(1)+'x' : Math.abs(_trend.pctChange).toFixed(0)+'%'} (${formatCurrency(_trend.priorCPTD)} \u2192 ${formatCurrency(_trend.recentCPTD)})
         </p>
         <div class="space-y-1">
           ${_trend.drivers.map(d => `<p class="text-[11px]"><strong>${d.dimension}:</strong> ${d.evidence}</p>`).join('')}
