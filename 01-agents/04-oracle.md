@@ -241,8 +241,8 @@ oracle_digest.json additions:
       "recommended_audience": "NRI Expat US",
       "recommended_campaign": "US_Tutoring_NRI_Awareness",
       "recommended_ad_set": "NRI_Lookalike_180d",
-      "tag": { "hook": "H-MATH", "format": "F-VIDEO", 
-        "frame": "PB-INDIAN" },
+      "tag": { "hook": "Feature-Driven", "creative_type": "Video", 
+        "pain_benefit": "Tutor Quality" },
       "confidence": "high",
       "rationale": "Matches winning signal profile from Lens 
         Feb US analysis. NRI + math-anchor = top CPTD combo."
@@ -272,7 +272,7 @@ oracle_digest.json additions:
     },
     "track_b_india_performance": {
       "top_converting_pattern": {
-        "hook": "H-MATH",
+        "hook": "Feature-Driven",
         "creator_type": "educator-adjacent",
         "language": "Telugu",
         "cpql": 12449,

@@ -51,8 +51,9 @@ Google RSA headline = 30 chars. Google RSA description = 90 chars. Meta headline
 These ensure output quality and analytical integrity.
 
 ### G-09: ICP Content Must Be Distinctly Different
-If you swap the ICP label (Foundation Builder / Personalization Seeker / Accelerator) and the copy still feels right, it's too generic. Each segment must have visibly different language, pain points, and benefit frames.
+If you swap the ICP label (Foundation Rebuilder / Personalization Seeker / Confidence Builder / Accelerator) and the copy still feels right, it's too generic. Each segment must have visibly different language, pain points, and benefit frames.
 > **Origin:** LP content review — three ICP sections used near-identical language with only the header changed.
+> **Note:** These are brand copy personas from ICP research (used by Forge for copy generation). In the Godfather dashboard, audience is tracked via the `campaign_audience` taxonomy field: NRI, Broad, PLA, Influencer, Vernacular, etc.
 
 ### G-10: USP Blocks Are Intent-Specific Per Ad Group
 USP headlines in Google RSA are tailored to the ad group's search intent, not generic across all groups. A "Tutoring" ad group USP is different from an "Olympiad Prep" ad group USP.

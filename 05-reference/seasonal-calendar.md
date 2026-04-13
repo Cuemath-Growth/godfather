@@ -7,7 +7,7 @@ This calendar drives contextual awareness for all agents. Sentinel uses it to ex
 ## How to Use This Calendar
 
 - **Forge:** When generating copy, check if a seasonal moment is within 2–4 weeks. If yes, offer a seasonal angle alongside the evergreen angle.
-- **Lens:** Tag any creative that references a seasonal event with `H-EVENT` and the specific event code.
+- **Lens:** Tag any creative that references a seasonal event with the relevant `hook` value (e.g., Fear/Urgency for deadline-driven events, Offer/Price for seasonal promotions) and note the specific event in the creative's context.
 - **Oracle:** Flag upcoming windows in the pipeline status: "NAPLAN prep window opens in 3 weeks — no AU creatives in rotation."
 
 ---

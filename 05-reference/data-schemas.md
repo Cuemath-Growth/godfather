@@ -44,14 +44,14 @@ Lead → Qualified Lead (QL) → NRI Filter → Trial Signup (TS) → Trial Done
 **Key columns:** day, medium, country_segment, region, spend
 **Filter:** `medium = 'meta'` (code filters in JS after fetch)
 **Usage:** Oracle date picker auto-sets range from this data. Spend validation against tagger data.
-**Status:** NEEDS VERIFICATION — column names assumed, not confirmed against actual sheet.
+**Status:** FLAGGED Mar 28 — verify against current code — column names assumed, not confirmed against actual sheet.
 
 ---
 
 ## Sheet 3: CRM Leads
 **Source:** `1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs`
 **GID:** 2057861499
-**Server-side filter:** `select * where G='meta'` (column G = utm_medium, NEEDS VERIFICATION)
+**Server-side filter:** `select * where G='meta'` (column G = utm_medium, FLAGGED Mar 28 — verify against current code)
 **Key columns (from reference export gid=1527899395):**
 | Column | Usage |
 |--------|-------|
@@ -178,7 +178,7 @@ Example: `USA_FB_Leads_Conv_Int_Influencer_Advantage_ShortForm_LP_Signup_060126`
 
 **Influencer identification:**
 - Campaign name contains "Influencer" or "Influ" → US influencer campaign
-- India: campaign name does NOT contain "Influencer" — uses F-INFLU format tag from tagger
+- India: campaign name does NOT contain "Influencer" — uses talent_type="Influencer" tag from tagger + ground truth roster matching
 - Ad name also checked for "influencer" or "postboost" keywords
 
 **Creator name in ad name:**
@@ -239,7 +239,7 @@ Examples:
 
 ---
 
-## NEEDS VERIFICATION (Tomorrow)
+## FLAGGED Mar 28 — verify against current code (Tomorrow)
 1. Perf Tracker Daily (gid=827992753) — actual column names and structure
 2. CRM column G = utm_medium assumption
 3. getCRMPortfolioTotals() column name mapping against actual CRM sheet

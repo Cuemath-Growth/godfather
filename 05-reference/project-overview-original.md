@@ -1,5 +1,7 @@
 # Godfather — Project Overview
 
+> **Note (April 2026):** This is the original project overview from March 2026. Some technical details are outdated — the app is a single-file HTML (index.html) with vanilla JS + Tailwind CDN, NOT Next.js. AI uses Claude Haiku, NOT Sonnet. Image gen uses Gemini, NOT Banana Pro. For current architecture, see CHANGELOG.md and 01-agents/00-agent-architecture.md.
+
 ## What is Godfather?
 
 Godfather is Cuemath's proprietary AI-powered creative audit, performance intelligence, and content generation platform. Built exclusively for the performance marketing team across India, US, Australia, and MEA.

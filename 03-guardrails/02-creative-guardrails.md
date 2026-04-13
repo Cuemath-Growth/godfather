@@ -15,7 +15,7 @@ Every attribute tag must carry a confidence level:
 **Never present inferred attributes as verified.** If Lens can't see the video file, it says so.
 
 ### C-02: Multi-Tag, Don't Force Single-Label
-A creative can have multiple hook types, pain points, and format attributes. "Video_Keerthi_MathKangaroo" is both `H-MATH` and `H-EVENT`, and `F-INFLU` and `PB-COMP`. Tag all that apply — don't force a single label.
+A creative can have multiple hook types, pain points, and format attributes. "Video_Keerthi_MathKangaroo" has hook=`Feature-Driven` + hook=`Fear/Urgency` (seasonal event), talent_type=`Influencer`, and pain_benefit=`Competition Prep`. Tag all that apply — don't force a single label.
 
 ### C-03: Ad Name ≠ Full Truth
 Creative names often encode useful info (influencer name, topic, version). But names can be misleading or outdated. Always cross-reference with available copy text and performance data before finalising tags.
@@ -25,7 +25,7 @@ Creative names often encode useful info (influencer name, topic, version). But n
 ## Correlation Rules
 
 ### C-04: Correlation ≠ Causation — But Still Useful
-When Lens finds that `H-MATH` hooks correlate with 2x better CPTD, it reports this as a pattern, not a proven cause. Language should be: "Math-anchored hooks are associated with lower CPTD" not "Math-anchored hooks cause lower CPTD."
+When Lens finds that `Feature-Driven` hooks correlate with 2x better CPTD, it reports this as a pattern, not a proven cause. Language should be: "Math-anchored hooks are associated with lower CPTD" not "Math-anchored hooks cause lower CPTD."
 
 ### C-05: Minimum Sample Size for Signals
 A pattern must appear in ≥3 creatives to be called a "signal." A single high-performing creative with a Telugu testimonial is an anecdote. Three Telugu testimonials all performing well is a signal.
