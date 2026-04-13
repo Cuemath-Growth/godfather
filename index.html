@@ -5586,8 +5586,8 @@ function getPortfolioMetrics(market, from, to) {
     const d = r.lead_created_date || '';
     if (_from && d < _from) return;
     if (_to && d > _to) return;
-    const adName = (r.mx_utm_adcontent || '').trim();
-    if (adName.length > 5) return; // has ad name → already counted in attributed
+    if (r._source === 'india_crm') { /* India CRM UTM scheme differs from Meta API names — count as unattributed */ }
+    else { const adName = (r.mx_utm_adcontent || '').trim(); if (adName.length > 5) return; } // has ad name → already counted in attributed
     if (String(r.qls) === '1') unQL++;
     if (String(r.qls) === '1' && isNRIEthnicity(r)) unNRI++;
     if (String(r.trials_done) === '1') unTD++;
