@@ -24,7 +24,7 @@ Godfather is **not** four independent tools sharing a UI. It's an **agent mesh**
      └──────┬──────┘ └────┬────┘ └───────┬──────┘
             │              │              │
      Meta Ads API    Creative Assets   Claude API
-     Google Ads API  + Sentinel data   + Banana Pro
+     Google Ads API  + Sentinel data   + Gemini
      CSV upload                        + Lens insights
 ```
 

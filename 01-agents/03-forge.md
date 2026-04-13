@@ -55,7 +55,7 @@ Three script types:
 - CTA card with button mock
 
 ### 3. AI Image Generation
-Uses Banana Pro API to generate static ad images.
+Uses Gemini API to generate static ad images.
 
 **Supported formats:**
 | Format | Use Case |
@@ -183,11 +183,11 @@ Forge writes `forge_output.json` for each generation:
 
 ## Skills Invoked
 
-- [[02-skills/copy-generation|Copy Generation]] — headline banks, body copy, CTA
-- [[02-skills/script-writing|Script Writing]] — influencer, performance, AI scripts
-- [[02-skills/image-prompting|Image Prompting]] — Banana Pro prompt engineering
-- [[02-skills/brief-interpretation|Brief Interpretation]] — extract brief details from freeform input
-- [[02-skills/channel-adaptation|Channel Adaptation]] — format copy for Meta vs Google vs Bing specs
+- [[02-skills/production-skills/copy-generation|Copy Generation]] — headline banks, body copy, CTA
+- [[02-skills/production-skills/script-writing|Script Writing]] — influencer, performance, AI scripts
+- [[02-skills/production-skills/image-prompting|Image Prompting]] — Gemini prompt engineering
+- [[02-skills/production-skills/brief-interpretation|Brief Interpretation]] — extract brief details from freeform input
+- [[02-skills/production-skills/channel-adaptation|Channel Adaptation]] — format copy for Meta vs Google vs Bing specs
 
 ---
 

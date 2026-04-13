@@ -331,9 +331,9 @@ oracle_digest.json additions:
 
 ## Skills Invoked
 
-- [[02-skills/cross-signal-synthesis]] — combine multi-agent outputs
-- [[02-skills/prioritisation]] — rank by impact × confidence
-- [[02-skills/action-formatting]] — executable recommendations
+- [[02-skills/data-intelligence-skills]] — combine multi-agent outputs
+- [[02-skills/data-intelligence-skills]] — rank by impact × confidence
+- [[02-skills/data-intelligence-skills]] — executable recommendations
 - [[02-skills/influencer-pattern-recognition]] — NEW
 - [[02-skills/geo-breakdown]] — NEW
 
@@ -342,6 +342,5 @@ oracle_digest.json additions:
 ## See Also
 
 - [[01-agents/00-agent-architecture]]
-- [[04-workflows/00-orchestration]]
-- [[05-reference/influencer-track-a-us]]  ← NEW
-- [[05-reference/influencer-track-b-india]]  ← NEW
+- [[01-agents/00-agent-architecture]] — orchestration
+- See Creators tab in Godfather for influencer Track A (US) and Track B (India)

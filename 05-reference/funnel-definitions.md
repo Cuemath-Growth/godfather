@@ -81,8 +81,19 @@ Paid stage: T2P% (trial-to-paid), Revenue, ROAS, CAC measured
 | CPNRI | < ₹800 | ₹800–₹1,200 | > ₹1,200 |
 | CPTD | < ₹3,000 | ₹3k–₹5k | > ₹5,000 |
 
-### Australia & MEA
-> Thresholds to be calibrated after first data import for these geos.
+### Australia Market
+| Metric | Green (Good) | Amber (Okay) | Red (Bad) |
+|---|---|---|---|
+| CPQL | < ₹10,000 | ₹10k–₹15k | > ₹15,000 |
+| CPTD | < ₹30,000 | ₹30k–₹45k | > ₹45,000 |
+| QL→TD% | > 35% | 25%–35% | < 25% |
+
+### MEA Market
+| Metric | Green (Good) | Amber (Okay) | Red (Bad) |
+|---|---|---|---|
+| CPQL | < ₹8,000 | ₹8k–₹10k | > ₹10,000 |
+| CPTD | < ₹25,000 | ₹25k–₹35k | > ₹35,000 |
+| QL→TD% | > 35% | 25%–35% | < 25% |
 
 ---
 
