@@ -4,6 +4,55 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 2: Segwise-Level Visualizations (2026-04-14)
+
+### 2.1 + 2.2 + 2.3: Creative Leaderboard tab
+- New "Leaderboard" sub-tab in Tagger with 3 sections:
+  - Ranked table with campaign-level verdicts (Scale/Working/Kill/Pause) using aggregate CPTD
+  - Two hierarchy views: Campaign → Ad Set (expand), Ad Set → Ad (expand with thumbnails + tag attribution)
+  - Portfolio Composition: 7 horizontal bar charts per taxonomy field, colored by avg CPTD (green/amber/red)
+  - Spend Allocation: 4 spend-by-tag bar charts
+- PLA/BAU view adaptation: BAU shows QL→TD%, PLA shows Booking Rate
+- Audience filter dropdown (populated from campaign_audience values)
+- "Show All 14 Fields" toggle for tag distributions
+
+### 2.4: Fatigue Sparklines
+- `_buildFatigueSparkline()` renders 30-day rolling CPTD sparkline per fatigued creative
+- Inserted into Decay tab creative cards alongside CPQL metrics
+
+### 2.7: Audience Performance Aggregator
+- `getAudiencePerformance()` groups tagger data by campaign_audience
+- Returns per-cluster: spend, TD, QL, CPTD, QL→TD%, T→P%, best/worst 3 creatives
+
+### 2.8: TARGETING_CONFIG
+- Static JSON with 13 audience cluster entries from media plan audit
+- Maps campaign_audience values to targeting params (age, gender, interests, geo, campaigns)
+
+### Decision #1: Campaign-level verdicts
+- Leaderboard ranks campaigns (not ads) with aggregate verdicts via market-aware thresholds
+
+### Decision #2: Two hierarchy views
+- Campaign → Ad Set and Ad Set → Ad with expand/collapse (not 3-way flat toggle)
+
+### Decision #3: Combos show QL + CPTQL + spend
+- Added totalQL, totalSpend, totalTD to combo data collection
+- Each winning/losing combo card now shows: QLs, CPTQL, total spend
+
+### Decision #5: Market-specific triggers
+- `computeMarketTriggers` in Creative Review landing
+- Per-market alert cards: kills (high spend/0 TD), scale signals, CPTD threshold breaches
+- Color-coded: green (positive), amber (alert), red (critical)
+
+### Decision #6: Global search
+- Search input in Tagger header (magnifying glass icon)
+- Filters ALL sub-tabs by matching ad name, campaign name, or ad set name
+- Wired into `getFilteredTaggerData()` so all rendering functions respect it
+
+### EU market added to tagger geo filter
+- Alongside parser fix from Phase 1.8
+
+---
+
 ## Phase 1.8: Parser Fixes (2026-04-14)
 
 **Source:** Media plan audit — Google Sheet `1q_mScP2PfbP-cCMzcLyq1YyDkaNes2rFV4GvmWFc15g` (gid=1196222360). 100+ campaigns traced through parser, 5 misclassifications found.

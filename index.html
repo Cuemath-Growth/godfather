@@ -914,10 +914,17 @@
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="heatmap" onclick="switchTaggerTab('heatmap')">Heatmap</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="combos" onclick="switchTaggerTab('combos')">Combos</button>
               <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="grid" onclick="switchTaggerTab('grid')">Grid</button>
+              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="leaderboard" onclick="switchTaggerTab('leaderboard')">Leaderboard</button>
             </div>
-            <select id="taggerFilterCountry" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
-              <option value="all">All Countries</option><option value="US">US</option><option value="India">India</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
-            </select>
+            <div class="flex items-center gap-2">
+              <div class="relative">
+                <input id="taggerSearch" type="text" placeholder="Search creatives, campaigns..." class="px-3 py-1.5 pl-7 border border-gray-200 rounded-lg text-xs w-52 bg-surface-secondary" oninput="onTaggerSearch(this.value)"/>
+                <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <select id="taggerFilterCountry" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onTaggerCountryChange()">
+                <option value="all">All Countries</option><option value="US">US</option><option value="India">India</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="EU">EU</option><option value="APAC">APAC</option>
+              </select>
+            </div>
           </div>
 
           <!-- Metric legend bar -->
@@ -1073,6 +1080,40 @@
             </div>
             <div id="taggerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
             <div id="taggerGridPager" class="flex items-center justify-between px-1 py-3 text-xs"></div>
+          </div>
+
+          <!-- Tab: Leaderboard (2.1 + 2.2 + 2.3) -->
+          <div id="taggerTab-leaderboard" class="tagger-tab hidden">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-3">
+                <h3 class="text-sm font-bold">Creative Leaderboard</h3>
+                <div class="flex items-center gap-0.5 bg-surface-tertiary rounded-lg p-0.5">
+                  <button data-lb-level="campaign" onclick="setLBLevel('campaign')" class="lb-level-btn px-2.5 py-1 rounded-md text-[10px] font-bold text-accent-purple bg-white shadow-sm transition">Campaign → Ad Set</button>
+                  <button data-lb-level="adset" onclick="setLBLevel('adset')" class="lb-level-btn px-2.5 py-1 rounded-md text-[10px] font-bold text-text-muted hover:text-text-primary transition">Ad Set → Ad</button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <select id="leaderboardSort" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="renderLeaderboard()">
+                  <option value="spend_desc">Highest Spend</option>
+                  <option value="cptd_asc">Best CPTD</option>
+                  <option value="td_desc">Most TDs</option>
+                  <option value="ql_desc">Most QLs</option>
+                </select>
+                <select id="leaderboardAudFilter" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="renderLeaderboard()">
+                  <option value="all">All Audiences</option>
+                </select>
+              </div>
+            </div>
+            <div id="leaderboardContent" class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden mb-6">
+              <p class="text-xs text-text-muted text-center py-8">Load data to see campaigns ranked by performance.</p>
+            </div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold">Portfolio Composition</h3>
+              <button id="tagDistToggle" class="text-[10px] text-accent-purple font-semibold" onclick="toggleTagDistributions()">Show All 14 Fields</button>
+            </div>
+            <div id="tagDistributions" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
+            <h3 class="text-sm font-bold mb-3">Spend Allocation by Tag</h3>
+            <div id="spendByTag" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
           </div>
         </div>
       </div>
@@ -12119,6 +12160,45 @@ const SENTINEL_THRESHOLDS = {
   }
 };
 
+// Phase 2.8: Targeting reference config from media plan audit (Apr 14)
+const TARGETING_CONFIG = {
+  'NRI (BAU)': { age:'35-55', gender:'M&F', interests:['Expats','India-Expats','NRI Audience'], geo:['US','AUS','UK','EU'], campaigns:['USA_FB_Leads_Conv_Expats_*','ANZ_FB_Leads_Conv_Expats-India_*'] },
+  'Lookalike (BAU)': { age:'35-55', gender:'M&F', interests:['PayU LAL','LAL Enrolled','Razorpay NRI'], geo:['US','AUS','UK'], campaigns:['USA_FB_Leads_Conv_LAL_*','USA_FB_Leads_Conv_PayU_*','USA_FB_Leads_Conv_Razorpay_*'] },
+  'Vernacular (BAU)': { age:'35-55', gender:'M&F', interests:['Advantage+ / Expats (language-filtered)'], vernacular:['Telugu','Gujarati','Tamil'], geo:['US'], campaigns:['USA_FB_Leads_Conv_Telugu_*','USA_FB_Leads_Conv_Gujarati_*'] },
+  'Influencer (BAU)': { age:'35-55', gender:'M&F', interests:['Advantage+ / Parents / LAL Enrolled'], geo:['US','India'], campaigns:['USA_FB_Leads_Conv_Influencer_*'] },
+  'Chinese (PLA)': { age:'34-55', gender:'M&F', interests:['Chinese Interests','Chinese Expats'], vernacular:['Chinese','English'], geo:['US'], campaigns:['USA_FB_Leads_Chinese_PLA_*'] },
+  'K-2 (BAU)': { age:'32-40', gender:'M&F', interests:['Kids-Interest'], geo:['US'], campaigns:['USA_FB_Leads_Conv_K-2_*'] },
+  'K-8 (BAU)': { age:'35-45', gender:'M&F', interests:['Kids-Interest'], geo:['US'], campaigns:['USA_FB_Leads_Conv_K-8_*'] },
+  'High School (BAU)': { age:'40-60', gender:'M&F', interests:['Expats'], geo:['US'], campaigns:['USA_FB_Leads_Conv_Expats_High_School_*'] },
+  'HNI (BAU)': { age:'38-50', gender:'M&F', interests:['Premium + Top 10% Income','C-Suite Job Titles'], geo:['India'], campaigns:['Ind_FB_Premium+Parents+Income_*','Ind_FB_Job-Titles_*'] },
+  'Interest (BAU)': { age:'38-55', gender:'M&F', interests:['Parents (All)','Indian Companies','Parenting','Engaged Shoppers'], geo:['US','India','AUS'], campaigns:['ANZ_FB_Leads_Conv_int-Parents_*','ANZ_FB_Leads_Conv_int4C_*'] },
+  'Geo (BAU)': { age:'35-55', gender:'M&F', interests:['NRI Zipcodes — Temple/Gurudwara/School Clusters','IB/IGCSE Pincodes'], geo:['US','India'], campaigns:['USA_FB_Leads_Conv_NRI_Zipcodes_*','Ind_FB_Pincodes-IB/IGCSE_*'] },
+  'NRI (PLA)': { age:'35-55', gender:'M&F', interests:['Educational Technology','Broad + NRI Filters'], geo:['US'], campaigns:['USA_FB_Leads_Broad_and_NRI_Filters_PLA_*'] },
+  'Broad (PLA)': { age:'35-55', gender:'M&F', interests:['Educational Technology'], geo:['US'], campaigns:['USA_FB_Leads_Broad_PLA_*'] }
+};
+
+// Phase 2.7: Audience cluster performance aggregator
+function getAudiencePerformance(market, from, to) {
+  const data = getFilteredTaggerData();
+  const clusters = {};
+  data.forEach(c => {
+    const aud = c.tags?.campaign_audience || GODFATHER_TAXONOMY.fields.campaign_audience.parse(c['Campaign name']||c['campaign name']||'');
+    if (!clusters[aud]) clusters[aud] = [];
+    clusters[aud].push(c);
+  });
+  return Object.entries(clusters).map(([aud, ads]) => {
+    const agg = aggregateTaggerRows(ads);
+    const cptd = agg.td >= 1 ? agg.spend / agg.td : null;
+    const qlTd = agg.ql > 0 ? (agg.td / agg.ql * 100) : null;
+    const tPay = agg.td > 0 ? (agg.paid / agg.td * 100) : null;
+    // Best/worst 3 by CPTD
+    const withCPTD = ads.filter(c => parseNumber(c['TD']||0) > 0).map(c => ({c, cptd: parseNumber(c['Spent']||0)/parseNumber(c['TD']||1)})).sort((a,b) => a.cptd - b.cptd);
+    const best3 = withCPTD.slice(0, 3).map(x => x.c);
+    const worst3 = withCPTD.slice(-3).reverse().map(x => x.c);
+    return { audience: aud, count: ads.length, spend: agg.spend, td: agg.td, ql: agg.ql, paid: agg.paid, cptd, qlTd, tPay, best3, worst3, config: TARGETING_CONFIG[aud] || null };
+  }).sort((a, b) => (a.cptd || Infinity) - (b.cptd || Infinity));
+}
+
 function scoreMetric(value, thresholds, inverted) {
   if (!thresholds || value == null || value === undefined) return 'gray';
   if (inverted) {
@@ -14063,7 +14143,18 @@ function getFilteredTaggerData(filterElId, minSpend) {
   const { from, to } = getGlobalDateRange();
   const market = country === 'all' ? null : country;
   const threshold = minSpend !== undefined ? minSpend : LENS_MIN_SPEND;
-  return getAdPerformance(market, from || null, to || null, { includeNonLP: true }).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
+  let result = getAdPerformance(market, from || null, to || null, { includeNonLP: true }).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
+  // Global search filter (Phase 2 — search box in Tagger header)
+  const q = state._taggerSearchQuery;
+  if (q) {
+    result = result.filter(c => {
+      const ad = (c['Ad name']||c['ad name']||'').toLowerCase();
+      const camp = (c['Campaign name']||c['campaign name']||'').toLowerCase();
+      const adset = (c['Ad set name']||c['ad set name']||'').toLowerCase();
+      return ad.includes(q) || camp.includes(q) || adset.includes(q);
+    });
+  }
+  return result;
 }
 
 function _updateTaggerThresholdNote(countryVal) {
@@ -14106,6 +14197,7 @@ function renderActiveTaggerTab(tab) {
   else if (tab === 'heatmap') renderTaggerHeatmap();
   else if (tab === 'combos') renderTagCombos();
   else if (tab === 'grid') renderCreativeGrid();
+  else if (tab === 'leaderboard') renderLeaderboard();
 }
 function renderPager(containerId, page, totalItems, onPageChange) {
   const el = document.getElementById(containerId); if (!el) return;
@@ -14470,7 +14562,39 @@ function renderCreativeReview() {
   const portfolioCTR = totalImp > 0 ? (totalClicks/totalImp*100) : 0;
   const portfolioCPTD = totalTD > 0 ? totalSpend/totalTD : 0;
 
-  let html = `
+  // ── SECTION 0: Market Triggers (Phase 2, Decision #5) ──
+  const _triggerGeos = ['US','India','AUS','MEA','UK','EU'];
+  const triggers = [];
+  _triggerGeos.forEach(g => {
+    const gData = data.filter(c => extractMarket(c) === g);
+    if (gData.length < 3) return;
+    const gAgg = aggregateTaggerRows(gData);
+    const gTh = SENTINEL_THRESHOLDS[g] || SENTINEL_THRESHOLDS['US'];
+    // Kills: creatives with high spend + 0 TDs
+    const kills = gData.filter(c => parseNumber(c['Spent']||0) > (gTh.cptd?.green||35000)*1.5 && parseNumber(c['TD']||0) === 0);
+    if (kills.length >= 2) triggers.push({ market: g, severity: 'critical', text: `${kills.length} creatives burnt ${formatCurrency(kills.reduce((s,c)=>s+parseNumber(c['Spent']||0),0))} with 0 TDs`, action: 'Pause immediately' });
+    // Scale: creatives hitting scale this period
+    const scalable = gData.filter(c => { const v = getCreativeVerdict(c); return v.key === 'scale'; });
+    if (scalable.length >= 2) triggers.push({ market: g, severity: 'positive', text: `${scalable.length} creatives at Scale — proven CPTD below ${formatCurrency(gTh.cptd?.green||35000)}`, action: 'Increase budget' });
+    // CPTD above threshold
+    if (gAgg.cptd > (gTh.cptd?.amber||50000) && gAgg.td >= 3) triggers.push({ market: g, severity: 'alert', text: `Portfolio CPTD ${formatCurrency(gAgg.cptd)} exceeds ${formatCurrency(gTh.cptd?.amber||50000)} threshold`, action: 'Review spend allocation' });
+  });
+
+  let triggersHtml = '';
+  if (triggers.length) {
+    const severityStyles = { critical: 'bg-red-50 border-red-200 text-red-800', alert: 'bg-amber-50 border-amber-200 text-amber-800', positive: 'bg-green-50 border-green-200 text-green-800' };
+    const severityIcons = { critical: '🔴', alert: '🟡', positive: '🟢' };
+    triggersHtml = `<div class="mb-5"><h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">Market Alerts</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-2">`;
+    triggers.forEach(t => {
+      triggersHtml += `<div class="p-2.5 rounded-lg border ${severityStyles[t.severity]}">
+        <div class="flex items-center gap-2"><span>${severityIcons[t.severity]}</span><span class="text-[10px] font-bold">${t.market}</span><span class="text-[10px]">${t.text}</span></div>
+        <p class="text-[9px] mt-1 opacity-70">→ ${t.action}</p>
+      </div>`;
+    });
+    triggersHtml += '</div></div>';
+  }
+
+  let html = triggersHtml + `
     <div class="mb-6">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-bold">Creative Performance — ${periodLabel}</h3>
@@ -15328,10 +15452,13 @@ function renderTagCombos() {
       const spend = parseNumber(c['Spent']||c['spent']||0);
       const td = parseNumber(c['TD']||c['td']||0);
       const ql = parseNumber(c['QL']||c['ql']||0);
-      if (!pairPerf[key]) pairPerf[key] = { catA, catB, tagA:a, tagB:b, cptdValues:[], cpqlValues:[], count:0 };
+      if (!pairPerf[key]) pairPerf[key] = { catA, catB, tagA:a, tagB:b, cptdValues:[], cpqlValues:[], count:0, totalQL:0, totalSpend:0, totalTD:0 };
       if (td > 0 && spend > 0) pairPerf[key].cptdValues.push(spend / td);
       if (ql > 0 && spend > 0) pairPerf[key].cpqlValues.push(spend / ql);
       pairPerf[key].count++;
+      pairPerf[key].totalQL += ql;
+      pairPerf[key].totalSpend += spend;
+      pairPerf[key].totalTD += td;
     });
     Object.entries(pairPerf).forEach(([key, v]) => {
       if (v.count >= 2) {
@@ -15506,7 +15633,12 @@ function renderTagCombos() {
             <span class="text-[9px] text-text-muted ml-1">${c.metricLabel} · ${c.count} ads</span>
           </div>
         </div>
-        ${ex ? `<div class="flex items-center gap-1.5 mt-1.5">${ex.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-text-muted truncate" title="${ex.name}">Best: ${ex.name}</p></div>` : ''}
+        <div class="flex items-center gap-3 mt-1 text-[9px] text-text-muted">
+          <span><strong>${c.totalQL}</strong> QLs</span>
+          <span>CPTQL <strong>${c.totalQL > 0 ? formatCurrency(c.totalSpend / c.totalQL) : '—'}</strong></span>
+          <span>Spend <strong>${formatCurrency(c.totalSpend)}</strong></span>
+        </div>
+        ${ex ? `<div class="flex items-center gap-1.5 mt-1">${ex.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-text-muted truncate" title="${ex.name}">Best: ${ex.name}</p></div>` : ''}
       </div>`;
     });
     html += '</div></div>';
@@ -15532,7 +15664,12 @@ function renderTagCombos() {
             <span class="text-[9px] text-text-muted ml-1">${c.metricLabel} · ${c.count} ads</span>
           </div>
         </div>
-        <div class="flex items-center gap-1.5 mt-1.5">${ex?.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<span class="text-[10px] text-text-muted">${ratio >= 2 ? Math.round(ratio) + 'x more expensive than #1 winner' : Math.round((ratio - 1) * 100) + '% more expensive than #1 winner'}${ex ? ` · e.g. ${ex.name}` : ''}</span></div>
+        <div class="flex items-center gap-3 mt-1 text-[9px] text-text-muted">
+          <span><strong>${c.totalQL}</strong> QLs</span>
+          <span>CPTQL <strong>${c.totalQL > 0 ? formatCurrency(c.totalSpend / c.totalQL) : '—'}</strong></span>
+          <span>Spend <strong>${formatCurrency(c.totalSpend)}</strong></span>
+        </div>
+        <div class="flex items-center gap-1.5 mt-1">${ex?.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<span class="text-[10px] text-text-muted">${ratio >= 2 ? Math.round(ratio) + 'x more expensive than #1 winner' : Math.round((ratio - 1) * 100) + '% more expensive than #1 winner'}${ex ? ` · e.g. ${ex.name}` : ''}</span></div>
       </div>`;
     });
     html += '</div></div></div>';
@@ -15746,6 +15883,433 @@ if (state.taggerData.length) {
     document.getElementById('taggerExportBtn').style.display = '';
     document.getElementById('taggerBackupBtn').style.display = '';
   }, 100);
+}
+
+// ==================== LEADERBOARD (Phase 2.1 + 2.2 + 2.3) ====================
+
+state._lbLevel = 'campaign'; // 'campaign' or 'adset'
+state._leaderboardShowAllFields = false;
+state._taggerSearchQuery = '';
+
+function setLBLevel(level) {
+  state._lbLevel = level;
+  document.querySelectorAll('.lb-level-btn').forEach(b => {
+    const active = b.dataset.lbLevel === level;
+    b.classList.toggle('text-accent-purple', active);
+    b.classList.toggle('bg-white', active);
+    b.classList.toggle('shadow-sm', active);
+    b.classList.toggle('text-text-muted', !active);
+  });
+  renderLeaderboard();
+}
+
+function onTaggerSearch(query) {
+  state._taggerSearchQuery = (query || '').trim().toLowerCase();
+  const activeTab = document.querySelector('[data-tagger-tab].active')?.dataset.taggerTab || 'review';
+  renderActiveTaggerTab(activeTab);
+}
+
+function _applyTaggerSearch(data) {
+  const q = state._taggerSearchQuery;
+  if (!q) return data;
+  return data.filter(c => {
+    const ad = (c['Ad name']||c['ad name']||'').toLowerCase();
+    const camp = (c['Campaign name']||c['campaign name']||'').toLowerCase();
+    const adset = (c['Ad set name']||c['ad set name']||'').toLowerCase();
+    return ad.includes(q) || camp.includes(q) || adset.includes(q);
+  });
+}
+
+// Tag attribution engine: find which tags differentiate top creatives from portfolio
+function computeTagAttribution(allCreatives, topCreatives) {
+  const ATTR_FIELDS = ['hook','content_format','pain_benefit','production_style','talent_type','campaign_audience','cta_type','headline_theme','visual_style','emotional_tone','language','offer_present','creative_type'];
+  const totalCount = allCreatives.length;
+  if (totalCount < 5) return topCreatives.map(c => ({ creative: c, topTags: [] }));
+
+  // Portfolio-wide tag value frequencies
+  const portfolioRates = {};
+  ATTR_FIELDS.forEach(field => {
+    const counts = {};
+    allCreatives.forEach(c => {
+      const val = c.tags?.[field];
+      if (val && val !== 'Unknown' && val !== 'N/A' && val !== 'null') counts[val] = (counts[val]||0) + 1;
+    });
+    Object.entries(counts).forEach(([val, n]) => { portfolioRates[field+'|'+val] = n / totalCount; });
+  });
+
+  // Top-cohort rates
+  const topCount = topCreatives.length;
+  const topRates = {};
+  ATTR_FIELDS.forEach(field => {
+    const counts = {};
+    topCreatives.forEach(c => {
+      const val = c.tags?.[field];
+      if (val && val !== 'Unknown' && val !== 'N/A') counts[val] = (counts[val]||0) + 1;
+    });
+    Object.entries(counts).forEach(([val, n]) => { topRates[field+'|'+val] = n / topCount; });
+  });
+
+  // Per-creative: rank tags by lift
+  return topCreatives.map(c => {
+    const tags = c.tags || {};
+    const scored = [];
+    ATTR_FIELDS.forEach(field => {
+      const val = tags[field];
+      if (!val || val === 'Unknown' || val === 'N/A') return;
+      const key = field + '|' + val;
+      const pRate = portfolioRates[key] || 0;
+      if (pRate > 0.7 || pRate < 0.03) return; // too common or too rare
+      const tRate = topRates[key] || 0;
+      const lift = pRate > 0 ? tRate / pRate : 1;
+      scored.push({ field, val, lift, color: GODFATHER_TAXONOMY.getColor(field) });
+    });
+    scored.sort((a, b) => b.lift - a.lift);
+    return { creative: c, topTags: scored.slice(0, 3) };
+  });
+}
+
+function renderLeaderboard() {
+  const container = document.getElementById('leaderboardContent');
+  if (!container) return;
+  let data = getFilteredTaggerData();
+  if (!data.length) { container.innerHTML = '<p class="text-xs text-text-muted text-center py-8">No data available. Load tagger data or widen filters.</p>'; renderTagDistributions([]); renderSpendByTag([]); return; }
+
+  const geo = document.getElementById('taggerFilterCountry')?.value || 'all';
+  const th = SENTINEL_THRESHOLDS[geo === 'all' ? 'US' : geo] || SENTINEL_THRESHOLDS['US'];
+  const flow = typeof getFlowFilter === 'function' ? getFlowFilter() : 'all';
+  const isPLA = flow === 'pla';
+  const sortBy = document.getElementById('leaderboardSort')?.value || 'spend_desc';
+  const audFilter = document.getElementById('leaderboardAudFilter')?.value || 'all';
+  const level = state._lbLevel || 'campaign';
+
+  // Populate audience filter dropdown (rebuild on each render for accuracy)
+  const audSelect = document.getElementById('leaderboardAudFilter');
+  if (audSelect) {
+    const curVal = audSelect.value;
+    const auds = new Set(data.map(c => (c.tags?.campaign_audience || GODFATHER_TAXONOMY.fields.campaign_audience.parse(c['Campaign name']||c['campaign name']||''))).filter(a => a && !a.startsWith('General')));
+    const opts = '<option value="all">All Audiences</option>' + [...auds].sort().map(a => `<option value="${a}"${a === curVal ? ' selected' : ''}>${a}</option>`).join('');
+    audSelect.innerHTML = opts;
+  }
+
+  // Apply audience filter
+  if (audFilter !== 'all') {
+    data = data.filter(c => {
+      const aud = c.tags?.campaign_audience || GODFATHER_TAXONOMY.fields.campaign_audience.parse(c['Campaign name']||c['campaign name']||'');
+      return aud === audFilter;
+    });
+  }
+
+  // Build hierarchy
+  const hierarchy = {};
+  data.forEach(c => {
+    const campaign = c['Campaign name'] || c['campaign name'] || 'Unknown Campaign';
+    const adSet = c['Ad set name'] || c['ad set name'] || 'Unknown Ad Set';
+    if (!hierarchy[campaign]) hierarchy[campaign] = {};
+    if (!hierarchy[campaign][adSet]) hierarchy[campaign][adSet] = [];
+    hierarchy[campaign][adSet].push(c);
+  });
+
+  // Sortable aggregate helper
+  function sortGroups(groups) {
+    return groups.sort((a, b) => {
+      if (sortBy === 'cptd_asc') return (a.agg.cptd||999999) - (b.agg.cptd||999999);
+      if (sortBy === 'td_desc') return b.agg.td - a.agg.td;
+      if (sortBy === 'ql_desc') return b.agg.ql - a.agg.ql;
+      return b.agg.spend - a.agg.spend;
+    });
+  }
+
+  function cptdColor(val) {
+    if (!val || val <= 0) return 'text-text-muted';
+    return val <= th.cptd.green ? 'text-green-600' : val <= th.cptd.amber ? 'text-amber-600' : 'text-red-600';
+  }
+
+  // Insight function (local reference to avoid scope issues)
+  function verdict(agg) {
+    const spend = agg.spend||0, td = agg.td||0, ql = agg.ql||0, cptd = agg.cptd||0, ctr = agg.ctr||0;
+    const cptdGreen = th.cptd?.green || 35000;
+    const s = (base) => Math.round(base * cptdGreen / 50000);
+    if (spend < s(3000)) return { text: 'Too early', color: 'text-gray-400', bg: 'bg-gray-100' };
+    if (td >= 3 && cptd <= cptdGreen) return { text: 'Scale', color: 'text-green-700', bg: 'bg-green-100' };
+    if (td >= 1 && cptd <= (th.cptd?.amber||50000)) return { text: 'Working', color: 'text-green-600', bg: 'bg-green-50' };
+    if (spend > s(50000) && td === 0) return { text: 'Kill', color: 'text-red-700', bg: 'bg-red-100' };
+    if (spend > s(20000) && td === 0 && ql <= 2) return { text: 'Pause', color: 'text-red-600', bg: 'bg-red-50' };
+    if (spend > s(15000) && ql >= 5 && td === 0) return { text: 'Funnel break', color: 'text-amber-700', bg: 'bg-amber-100' };
+    if (spend > s(20000) && ctr < 0.5) return { text: 'Fatigued', color: 'text-amber-600', bg: 'bg-amber-50' };
+    if (ql >= 3) return { text: 'Promising', color: 'text-blue-600', bg: 'bg-blue-50' };
+    return { text: 'Monitoring', color: 'text-gray-400', bg: 'bg-gray-100' };
+  }
+
+  let html = '<div class="overflow-x-auto"><table class="w-full text-xs">';
+
+  // Column headers adapt to BAU vs PLA
+  html += '<thead><tr class="bg-surface-tertiary border-b border-gray-200">';
+  html += '<th class="text-left px-3 py-2.5 font-bold text-text-muted text-[10px]" style="width:28%">Name</th>';
+  html += '<th class="text-center px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:8%">Verdict</th>';
+  html += '<th class="text-right px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:9%">Spend</th>';
+  html += '<th class="text-right px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:5%">QL</th>';
+  html += '<th class="text-right px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:5%">TD</th>';
+  html += '<th class="text-right px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:9%">CPTD</th>';
+  html += isPLA
+    ? '<th class="text-right px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:8%">Book Rate</th>'
+    : '<th class="text-right px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:8%">QL→TD%</th>';
+  html += '<th class="text-left px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:10%">Audience</th>';
+  if (level === 'adset') html += '<th class="text-left px-2 py-2.5 font-bold text-text-muted text-[10px]" style="width:18%">Top Tags</th>';
+  html += '</tr></thead><tbody id="lbBody">';
+
+  if (level === 'campaign') {
+    // Campaign → Ad Set view
+    const campaigns = Object.entries(hierarchy).map(([name, adSets]) => {
+      const allAds = [];
+      Object.values(adSets).forEach(ads => allAds.push(...ads));
+      return { name, adSets, ads: allAds, agg: aggregateTaggerRows(allAds) };
+    });
+    const sorted = sortGroups(campaigns).slice(0, 30);
+
+    sorted.forEach((camp, ci) => {
+      const v = verdict(camp.agg);
+      const cptd = camp.agg.cptd;
+      const aud = _dominantAudience(camp.ads);
+      const qlTd = camp.agg.ql > 0 ? (camp.agg.td / camp.agg.ql * 100) : 0;
+      const gid = 'lb_c_' + ci;
+
+      html += `<tr class="bg-surface-tertiary/50 cursor-pointer hover:bg-surface-tertiary border-b border-gray-100 lb-group-row" onclick="toggleLBGroup('${gid}')">
+        <td class="px-3 py-2.5 font-bold" style="max-width:300px"><div class="flex items-center gap-1.5"><span class="text-[10px] text-text-muted lb-arrow" data-group="${gid}">&#9654;</span><span class="truncate" title="${camp.name}">${shortAdName(camp.name)}</span><span class="text-[10px] text-text-muted">(${Object.keys(camp.adSets).length} ad sets)</span></div></td>
+        <td class="text-center px-2 py-2.5"><span class="text-[9px] px-2 py-0.5 rounded-full font-bold ${v.color} ${v.bg}">${v.text}</span></td>
+        <td class="text-right px-2 py-2.5 font-semibold">${formatCurrency(camp.agg.spend)}</td>
+        <td class="text-right px-2 py-2.5">${camp.agg.ql}</td>
+        <td class="text-right px-2 py-2.5">${Math.round(camp.agg.td)}</td>
+        <td class="text-right px-2 py-2.5 font-bold ${cptdColor(cptd)}">${cptd > 0 ? formatCurrency(cptd) : '—'}</td>
+        <td class="text-right px-2 py-2.5">${qlTd > 0 ? qlTd.toFixed(1)+'%' : '—'}</td>
+        <td class="px-2 py-2.5"><span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-orange-light text-amber-700 font-medium">${aud}</span></td>
+      </tr>`;
+
+      // Child ad sets (hidden)
+      Object.entries(camp.adSets).forEach(([asName, ads]) => {
+        const asAgg = aggregateTaggerRows(ads);
+        const asV = verdict(asAgg);
+        const asCptd = asAgg.cptd;
+        const asQlTd = asAgg.ql > 0 ? (asAgg.td / asAgg.ql * 100) : 0;
+        html += `<tr class="hidden lb-child border-b border-gray-50 hover:bg-surface-secondary/30" data-parent="${gid}">
+          <td class="px-3 py-2 pl-8" style="max-width:300px"><span class="truncate text-text-secondary" title="${asName}">${shortAdName(asName)}</span> <span class="text-[10px] text-text-muted">(${ads.length})</span></td>
+          <td class="text-center px-2 py-2"><span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium ${asV.color} ${asV.bg}">${asV.text}</span></td>
+          <td class="text-right px-2 py-2">${formatCurrency(asAgg.spend)}</td>
+          <td class="text-right px-2 py-2">${asAgg.ql}</td>
+          <td class="text-right px-2 py-2">${Math.round(asAgg.td)}</td>
+          <td class="text-right px-2 py-2 font-bold ${cptdColor(asCptd)}">${asCptd > 0 ? formatCurrency(asCptd) : '—'}</td>
+          <td class="text-right px-2 py-2">${asQlTd > 0 ? asQlTd.toFixed(1)+'%' : '—'}</td>
+          <td class="px-2 py-2"></td>
+        </tr>`;
+      });
+    });
+  } else {
+    // Ad Set → Ad view
+    const adSetMap = {};
+    data.forEach(c => {
+      const adSet = c['Ad set name'] || c['ad set name'] || 'Unknown Ad Set';
+      if (!adSetMap[adSet]) adSetMap[adSet] = [];
+      adSetMap[adSet].push(c);
+    });
+    const adSets = Object.entries(adSetMap).map(([name, ads]) => ({ name, ads, agg: aggregateTaggerRows(ads) }));
+    const sorted = sortGroups(adSets).slice(0, 40);
+
+    // For element attribution on ad rows
+    const attributed = computeTagAttribution(data, data.filter(c => parseNumber(c['TD']||0) > 0).sort((a,b) => {
+      const aCptd = parseNumber(a['Spent']||0) / parseNumber(a['TD']||1);
+      const bCptd = parseNumber(b['Spent']||0) / parseNumber(b['TD']||1);
+      return aCptd - bCptd;
+    }).slice(0, 20));
+    const attrMap = {};
+    attributed.forEach(a => { attrMap[a.creative['Ad name']||a.creative['ad name']] = a.topTags; });
+
+    sorted.forEach((as, ai) => {
+      const v = verdict(as.agg);
+      const cptd = as.agg.cptd;
+      const aud = _dominantAudience(as.ads);
+      const qlTd = as.agg.ql > 0 ? (as.agg.td / as.agg.ql * 100) : 0;
+      const gid = 'lb_as_' + ai;
+
+      html += `<tr class="bg-surface-tertiary/50 cursor-pointer hover:bg-surface-tertiary border-b border-gray-100 lb-group-row" onclick="toggleLBGroup('${gid}')">
+        <td class="px-3 py-2.5 font-bold" style="max-width:300px"><div class="flex items-center gap-1.5"><span class="text-[10px] text-text-muted lb-arrow" data-group="${gid}">&#9654;</span><span class="truncate" title="${as.name}">${shortAdName(as.name)}</span><span class="text-[10px] text-text-muted">(${as.ads.length} ads)</span></div></td>
+        <td class="text-center px-2 py-2.5"><span class="text-[9px] px-2 py-0.5 rounded-full font-bold ${v.color} ${v.bg}">${v.text}</span></td>
+        <td class="text-right px-2 py-2.5 font-semibold">${formatCurrency(as.agg.spend)}</td>
+        <td class="text-right px-2 py-2.5">${as.agg.ql}</td>
+        <td class="text-right px-2 py-2.5">${Math.round(as.agg.td)}</td>
+        <td class="text-right px-2 py-2.5 font-bold ${cptdColor(cptd)}">${cptd > 0 ? formatCurrency(cptd) : '—'}</td>
+        <td class="text-right px-2 py-2.5">${qlTd > 0 ? qlTd.toFixed(1)+'%' : '—'}</td>
+        <td class="px-2 py-2.5"><span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-orange-light text-amber-700 font-medium">${aud}</span></td>
+        <td class="px-2 py-2.5"></td>
+      </tr>`;
+
+      // Child ads (hidden)
+      as.ads.sort((a,b) => parseNumber(b['Spent']||0) - parseNumber(a['Spent']||0)).forEach(c => {
+        const adName = c['Ad name']||c['ad name']||'';
+        const spend = parseNumber(c['Spent']||0);
+        const td = parseNumber(c['TD']||0);
+        const adCptd = td > 0 ? spend / td : 0;
+        const adV = typeof getCreativeVerdict === 'function' ? getCreativeVerdict(c) : verdict({spend,td,ql:parseNumber(c['QL']||0),cptd:adCptd,ctr:0});
+        const thumb = c.thumbnail_url || c.image_url || '';
+        const tags = attrMap[adName] || [];
+        const tagPills = tags.map(t => {
+          const tc = TAG_COLORS[t.color] || TAG_COLORS.purple;
+          return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(t.val)}</span>`;
+        }).join(' ');
+
+        html += `<tr class="hidden lb-child border-b border-gray-50 hover:bg-surface-secondary/30" data-parent="${gid}">
+          <td class="px-3 py-2 pl-8"><div class="flex items-center gap-2">${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'"/>` : ''}<span class="truncate" title="${adName}">${shortAdName(adName)}</span></div></td>
+          <td class="text-center px-2 py-2"><span class="text-[9px] px-1.5 py-0.5 rounded-full font-medium ${adV.color} ${adV.bg||''}">${adV.label||adV.text}</span></td>
+          <td class="text-right px-2 py-2">${formatCurrency(spend)}</td>
+          <td class="text-right px-2 py-2">${parseNumber(c['QL']||0)}</td>
+          <td class="text-right px-2 py-2">${td}</td>
+          <td class="text-right px-2 py-2 font-bold ${cptdColor(adCptd)}">${adCptd > 0 ? formatCurrency(adCptd) : '—'}</td>
+          <td class="text-right px-2 py-2">${td > 0 && parseNumber(c['QL']||0) > 0 ? (td/parseNumber(c['QL']||1)*100).toFixed(1)+'%' : '—'}</td>
+          <td class="px-2 py-2"></td>
+          <td class="px-2 py-2"><div class="flex flex-wrap gap-1">${tagPills}</div></td>
+        </tr>`;
+      });
+    });
+  }
+
+  html += '</tbody></table></div>';
+  html += `<div class="px-3 py-2 text-[10px] text-text-muted border-t border-gray-100">${data.length} creatives · ${Object.keys(hierarchy).length} campaigns · sorted by ${sortBy.replace('_',' ')}</div>`;
+  container.innerHTML = html;
+
+  // Render distributions below
+  renderTagDistributions(data);
+  renderSpendByTag(data);
+}
+
+function toggleLBGroup(groupId) {
+  const children = document.querySelectorAll(`.lb-child[data-parent="${groupId}"]`);
+  const arrow = document.querySelector(`.lb-arrow[data-group="${groupId}"]`);
+  const isOpen = children.length && !children[0].classList.contains('hidden');
+  children.forEach(c => c.classList.toggle('hidden', isOpen));
+  if (arrow) arrow.innerHTML = isOpen ? '&#9654;' : '&#9660;';
+}
+
+function _dominantAudience(ads) {
+  const counts = {};
+  ads.forEach(c => {
+    const aud = c.tags?.campaign_audience || GODFATHER_TAXONOMY.fields.campaign_audience.parse(c['Campaign name']||c['campaign name']||'');
+    if (aud) counts[aud] = (counts[aud]||0) + 1;
+  });
+  let best = 'General', bestN = 0;
+  Object.entries(counts).forEach(([k, n]) => { if (n > bestN) { best = k; bestN = n; } });
+  return best;
+}
+
+function renderTagDistributions(data) {
+  const container = document.getElementById('tagDistributions');
+  if (!container) return;
+  if (!data || !data.length) data = getFilteredTaggerData();
+  if (!data.length) { container.innerHTML = ''; return; }
+
+  const DEFAULT_FIELDS = ['hook','content_format','pain_benefit','production_style','talent_type','campaign_audience','cta_type'];
+  const ALL_FIELDS = Object.keys(GODFATHER_TAXONOMY.fields).filter(f => f !== 'talent_name');
+  const fields = state._leaderboardShowAllFields ? ALL_FIELDS : DEFAULT_FIELDS;
+  const totalCount = data.length;
+  const geo = document.getElementById('taggerFilterCountry')?.value || 'all';
+  const th = SENTINEL_THRESHOLDS[geo === 'all' ? 'US' : geo] || SENTINEL_THRESHOLDS['US'];
+
+  let html = '';
+  fields.forEach(field => {
+    const catInfo = GODFATHER_TAXONOMY.fields[field];
+    if (!catInfo) return;
+    const tc = TAG_COLORS[catInfo.color] || TAG_COLORS.purple;
+
+    const valuePerf = {};
+    data.forEach(c => {
+      const val = c.tags?.[field];
+      if (!val || val === 'Unknown' || val === 'N/A' || val === 'null') return;
+      if (!valuePerf[val]) valuePerf[val] = { count: 0, spend: 0, td: 0 };
+      valuePerf[val].count++;
+      valuePerf[val].spend += parseNumber(c['Spent']||0);
+      valuePerf[val].td += parseNumber(c['TD']||0);
+    });
+
+    const entries = Object.entries(valuePerf).sort((a,b) => b[1].count - a[1].count);
+    if (!entries.length) return;
+
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
+      <h4 class="text-xs font-bold mb-3 flex items-center gap-2"><span class="${tc.bg} ${tc.text} text-[9px] px-1.5 py-0.5 rounded font-medium">${catInfo.label}</span><span class="text-text-muted font-normal">${entries.length} values</span></h4>
+      <div class="space-y-1.5">`;
+
+    entries.forEach(([val, perf]) => {
+      const pct = totalCount > 0 ? (perf.count / totalCount * 100) : 0;
+      const avgCPTD = perf.td >= 3 ? perf.spend / perf.td : null;
+      let barColor = '#9CA3AF';
+      if (avgCPTD !== null) barColor = avgCPTD <= th.cptd.green ? '#10B981' : avgCPTD <= th.cptd.amber ? '#F59E0B' : '#EF4444';
+      const cptdLabel = avgCPTD !== null ? formatCurrency(avgCPTD) : '—';
+
+      html += `<div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium w-28 truncate" title="${val}">${typeof tagLabel==='function'?tagLabel(val):val}</span>
+        <div class="flex-1 bg-surface-tertiary rounded-full h-3">
+          <div class="h-3 rounded-full transition-all" style="width:${Math.max(pct,2)}%;background:${barColor}"></div>
+        </div>
+        <span class="text-[10px] text-text-muted w-10 text-right">${Math.round(pct)}%</span>
+        <span class="text-[10px] font-semibold w-16 text-right" style="color:${barColor}">${cptdLabel}</span>
+      </div>`;
+    });
+
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleTagDistributions() {
+  state._leaderboardShowAllFields = !state._leaderboardShowAllFields;
+  const btn = document.getElementById('tagDistToggle');
+  if (btn) btn.textContent = state._leaderboardShowAllFields ? 'Show Core 7 Only' : 'Show All 14 Fields';
+  renderTagDistributions();
+}
+
+function renderSpendByTag(data) {
+  const container = document.getElementById('spendByTag');
+  if (!container) return;
+  if (!data || !data.length) data = getFilteredTaggerData();
+  if (!data.length) { container.innerHTML = ''; return; }
+
+  const FIELDS = ['hook','content_format','pain_benefit','campaign_audience'];
+  const totalSpend = data.reduce((s, c) => s + parseNumber(c['Spent']||0), 0);
+
+  let html = '';
+  FIELDS.forEach(field => {
+    const catInfo = GODFATHER_TAXONOMY.fields[field];
+    if (!catInfo) return;
+    const tc = TAG_COLORS[catInfo.color] || TAG_COLORS.purple;
+
+    const valueSpend = {};
+    data.forEach(c => {
+      const val = c.tags?.[field];
+      if (!val || val === 'Unknown' || val === 'N/A') return;
+      valueSpend[val] = (valueSpend[val] || 0) + parseNumber(c['Spent']||0);
+    });
+
+    const entries = Object.entries(valueSpend).sort((a,b) => b[1] - a[1]);
+    if (!entries.length) return;
+    const maxSpend = entries[0][1];
+
+    html += `<div class="bg-white rounded-xl border border-gray-200/80 p-4">
+      <h4 class="text-xs font-bold mb-3"><span class="${tc.bg} ${tc.text} text-[9px] px-1.5 py-0.5 rounded font-medium">${catInfo.label}</span> <span class="text-text-muted font-normal">Spend Allocation</span></h4>
+      <div class="space-y-1.5">`;
+
+    entries.forEach(([val, spend]) => {
+      const pct = totalSpend > 0 ? (spend / totalSpend * 100) : 0;
+      const barW = maxSpend > 0 ? (spend / maxSpend * 100) : 0;
+      html += `<div class="flex items-center gap-2">
+        <span class="text-[10px] font-medium w-28 truncate">${typeof tagLabel==='function'?tagLabel(val):val}</span>
+        <div class="flex-1 bg-surface-tertiary rounded-full h-3">
+          <div class="h-3 rounded-full bg-accent-purple/50" style="width:${Math.max(barW,2)}%"></div>
+        </div>
+        <span class="text-[10px] font-semibold w-16 text-right">${formatCurrency(spend)}</span>
+        <span class="text-[10px] text-text-muted w-10 text-right">${Math.round(pct)}%</span>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
 }
 
 // ==================== CREATIVE INTELLIGENCE ENGINE ====================
@@ -16524,6 +17088,32 @@ function clearFormula() {
 }
 
 // ---- Fatigue Tracker ----
+// Phase 2.4: Per-creative CPTD sparkline for fatigue detection
+function _buildFatigueSparkline(adName, geo) {
+  if (typeof computeSparklineData !== 'function') return '';
+  try {
+    // Use the existing sparkline engine but filter to this specific ad
+    // Build from daily ad performance if available
+    const daily = typeof getAdPerformanceDaily === 'function' ? getAdPerformanceDaily(geo === 'all' ? null : geo, null, null) : [];
+    const norm = normalizeAdName(adName);
+    const now = new Date();
+    const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 30);
+    const cutoffStr = cutoff.toISOString().split('T')[0];
+    const adDaily = daily.filter(r => normalizeAdName(r.ad_name||r.adName||'') === norm && (r.date||'') >= cutoffStr).sort((a,b) => (a.date||'').localeCompare(b.date||''));
+    if (adDaily.length < 3) return '';
+    // 5-day rolling CPTD
+    const pts = [];
+    for (let i = 0; i < adDaily.length; i++) {
+      const start = Math.max(0, i - 4);
+      let rSpend = 0, rTD = 0;
+      for (let j = start; j <= i; j++) { rSpend += (adDaily[j].spend||0); rTD += (adDaily[j].td||0); }
+      if (rTD > 0) pts.push({ value: rSpend / rTD });
+    }
+    if (pts.length < 3) return '';
+    return generateSparklineSVG(pts, { width: 80, height: 20, lowerBetter: true });
+  } catch(e) { return ''; }
+}
+
 function renderDecayTracker() {
   const container = document.getElementById('ciDecayContainer');
   const countryFilter = document.getElementById('ciFilterCountry')?.value || 'all';
@@ -16603,7 +17193,7 @@ function renderDecayTracker() {
       html += `<div class="bg-white border border-red-100 rounded-xl p-4 flex items-center justify-between">
         <div class="flex items-center gap-3">${fThumb ? `<img src="${fThumb}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px] shrink-0 border border-gray-200">Ad</div>'}<div><p class="text-xs font-semibold">${shortAdName(c.name)}</p>
         <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => GODFATHER_TAXONOMY.fields[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div></div>
-        <div class="text-right shrink-0 ml-4"><p class="text-xs font-bold text-accent-red">${formatCurrency(c.cpql)} CPQL</p><p class="text-[10px] text-text-muted">CPQL +${overAvg}% vs avg | ${formatCurrency(c.spend)} spent</p>${recBadge}</div></div>`;
+        <div class="flex items-center gap-3 shrink-0 ml-4"><div>${_buildFatigueSparkline(c.name, countryFilter)}</div><div class="text-right"><p class="text-xs font-bold text-accent-red">${formatCurrency(c.cpql)} CPQL</p><p class="text-[10px] text-text-muted">CPQL +${overAvg}% vs avg | ${formatCurrency(c.spend)} spent</p>${recBadge}</div></div></div>`;
     });
     html += '</div>';
   } else html += '<p class="text-xs text-accent-green font-medium">No fatigued creatives detected.</p>';

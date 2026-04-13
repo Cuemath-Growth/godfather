@@ -55,27 +55,33 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 
 **Source:** Google Sheet `1q_mScP2PfbP-cCMzcLyq1YyDkaNes2rFV4GvmWFc15g` (gid=1196222360) — full media plan with all campaigns × targeting params.
 
-- [ ] 1.13 **Parser: add `k-8`/`k_8` → K-8 audience** — `USA_FB_Leads_Conv_K-8_*` falls to General (BAU). Campaign launched 04/14.
-- [ ] 1.14 **Parser: add EU market detection** — `ANZ-EU_*` campaigns misclassify as AUS. Add `/ANZ[-_]EU/i` check before ANZ catch-all in `matchMarketFromText()`. Map to new `EU` market value.
-- [ ] 1.15 **Parser: add missing audience keywords** — `parenting` → Interest, `bollywood` → Interest, `premium`/`job-titles`/`income` → HNI, `razorpay` → Lookalike. Affects 5 campaigns across ANZ + India + US.
-- [ ] 1.16 **Parser: `Broad_and_NRI_Filters_PLA` — accept inaccuracy** — Campaign name contains both `nri` AND `broad`. All 10 ad sets get NRI (PLA). Accepted: NRI is dominant signal, campaign_audience is campaign-level by design. Document in code comment.
+- [x] 1.13 **Parser: add `k-8`/`k_8` → K-8 audience** — `USA_FB_Leads_Conv_K-8_*` falls to General (BAU). Campaign launched 04/14.
+- [x] 1.14 **Parser: add EU market detection** — `ANZ-EU_*` campaigns misclassify as AUS. Add `/ANZ[-_]EU/i` check before ANZ catch-all in `matchMarketFromText()`. Map to new `EU` market value.
+- [x] 1.15 **Parser: add missing audience keywords** — `parenting` → Interest, `bollywood` → Interest, `premium`/`job-titles`/`income` → HNI, `razorpay` → Lookalike. Affects 5 campaigns across ANZ + India + US.
+- [x] 1.16 **Parser: `Broad_and_NRI_Filters_PLA` — accept inaccuracy** — Campaign name contains both `nri` AND `broad`. All 10 ad sets get NRI (PLA). Accepted: NRI is dominant signal, campaign_audience is campaign-level by design. Document in code comment.
 
 **Validation:** Run all media plan campaign names through parser, verify no more General fallbacks except truly generic campaigns.
 
 ---
 
-## Phase 2: Segwise-Level Visualizations
+## Phase 2: Segwise-Level Visualizations — COMPLETE (Apr 14)
 
 **Goal:** The charts that make Godfather look and feel like Segwise for Meta. These are what the Segwise email shows.
 
-| # | Task | Details | Priority |
-|---|------|---------|----------|
-| 2.1 | **Creative Leaderboard** | New Tagger sub-tab: top 20 creatives by spend. Each row: thumbnail, name, spend, CPTD, verdict, TOP 3 differentiating tag values (element attribution). Sortable. | P0 — THIS is Segwise |
-| 2.2 | **Tag Distribution Bar Charts** | Per taxonomy field: horizontal bar chart showing % of creatives with each value. Color by avg CPTD (green=good, red=bad). E.g., "Hook: Outcome First 42% (₹28K), Problem/Pain 23% (₹35K)..." | P0 — portfolio composition |
-| 2.3 | **Spend by Tag Value** | Bar chart: total spend allocated to each tag value. "₹1.2Cr on Outcome First, ₹80L on Testimonial format." | P1 — budget intelligence |
-| 2.4 | **Creative Fatigue Sparklines** | In Decay tab: per-creative mini sparkline showing 30-day CPTD trend. Currently shows "fatigued" badge but no visual timeline. | P1 — visual fatigue |
-| 2.5 | **True 2D Heatmap** | Selectable X×Y axes (Hook × Audience, Format × Production). Cell color = CPTD. Cell size = spend. Clickable cells drill into creatives. | P2 — advanced |
-| 2.6 | **Tag Performance Trend** | Line chart: CPTD by tag value over 4-week periods. Shows whether a tag pattern is fatiguing across the portfolio. | P2 — temporal |
+- [x] 2.1 **Creative Leaderboard** — New Tagger sub-tab with campaign-level verdicts, two hierarchy views (Campaign→AdSet, AdSet→Ad), element attribution via lift scoring, PLA/BAU metric swap.
+- [x] 2.2 **Tag Distribution Bar Charts** — 7 default fields (expandable to 14), horizontal bars colored by avg CPTD vs market thresholds.
+- [x] 2.3 **Spend by Tag Value** — 4-field spend allocation bars (hook, format, benefit, audience).
+- [x] 2.4 **Creative Fatigue Sparklines** — `_buildFatigueSparkline()` renders 30-day rolling CPTD per fatigued creative in Decay tab.
+- [ ] 2.5 **True 2D Heatmap** — Deferred to next session (P2).
+- [ ] 2.6 **Tag Performance Trend** — Deferred to next session (P2).
+
+**Additional decisions implemented:**
+- [x] Decision #1: Campaign-level verdicts via aggregate CPTD + market-aware thresholds
+- [x] Decision #2: Two hierarchy views with expand/collapse (not 3-way flat toggle)
+- [x] Decision #3: Combos show QLs + CPTQL + total spend on every card
+- [x] Decision #4: PLA/BAU purpose-built views (metric columns swap per flow)
+- [x] Decision #5: Market-specific triggers in Creative Review (kills, scale signals, threshold breaches)
+- [x] Decision #6: Global search across all Tagger sub-tabs via `getFilteredTaggerData()`
 
 **Validation:** Charts render for US (most data), India (new data), AUS/MEA (less data). Small markets degrade gracefully ("insufficient data").
 
@@ -87,9 +93,9 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 
 | # | Task | Details | Priority |
 |---|------|---------|----------|
-| 2.7 | **Audience cluster performance aggregator** | New function `getAudiencePerformance(market, from, to)`. Groups all tagger data by `campaign_audience`. Returns per-cluster: TD count, CPTD, QL-TD%, T-P%, spend, trend (WoW), best 3 creatives (by CPTD), worst 3 creatives. Refreshes on date/geo/flow change. This is the engine behind 3.8-3.13. | P0 |
-| 2.8 | **Targeting reference config** | Static JSON `TARGETING_CONFIG` embedded in index.html. Maps each `campaign_audience` value → `{ age, gender, interests, exclusions, vernacular, lp_type, typical_campaigns[], typical_adsets[] }`. Populated from media plan sheet. Updated manually when new campaigns launch (~monthly). Not a live fetch — the plan changes slowly. | P0 |
-| 2.9 | **Creative Leaderboard: audience column** | Add `campaign_audience` as sortable/filterable column to Phase 2.1 leaderboard. Each creative row shows which targeting cluster it ran in. Clicking filters leaderboard to that cluster. | P1 — after 2.1 |
+- [x] 2.7 **Audience cluster performance aggregator** — `getAudiencePerformance()` groups by `campaign_audience`, returns per-cluster aggregates + best/worst 3.
+- [x] 2.8 **Targeting reference config** — `TARGETING_CONFIG` with 13 entries from media plan audit (age, gender, interests, geo, campaigns).
+- [x] 2.9 **Creative Leaderboard: audience column** — Audience pills on campaign rows + audience filter dropdown.
 
 **Validation:** `getAudiencePerformance('US')` returns correct clusters matching manual media plan analysis (Expats ~₹34K CPTD, LAL Enrolled ~₹39K, Influencer Postboost ~₹43K). TARGETING_CONFIG covers all non-General campaign_audience values.
 
@@ -154,9 +160,9 @@ All shipped. 11 commits (4082b0d → b25b6f8).
 |-------|----------|-------|-------------|--------|
 | Phase 0: Hygiene | 1 | ~2 | None | **DONE** |
 | Phase 1: BAU/PLA + Critical Fixes | 1.5 | ~3 | None | **DONE** |
-| Phase 1.8: Parser Fixes | 0.25 | ~0.5 | Media plan audit | Pending |
-| Phase 2: Segwise Viz (2.1-2.6) | 1-2 | ~3-4 | Phase 0 sort (done) | Pending |
-| Phase 2b: Targeting Data Layer (2.7-2.9) | 0.5 | ~1 | Phase 1.8 | Pending |
+| Phase 1.8: Parser Fixes | 0.25 | ~0.5 | Media plan audit | **DONE** |
+| Phase 2: Segwise Viz (2.1-2.4 + 6 decisions) | 1 | ~3 | Phase 1.8 | **DONE** (2.5-2.6 deferred) |
+| Phase 2b: Targeting Data Layer (2.7-2.9) | 0.25 | ~0.5 | Phase 1.8 | **DONE** |
 | Phase 3: Intelligence (3.1-3.7) | 1 | ~2 | Phase 1 (done), Phase 2 | Pending |
 | Phase 3b: Targeting Intel (3.8-3.13) | 1 | ~2 | Phase 2b | Pending |
 | Phase 4: Export | 1 | ~1-2 | Phase 2+3 | Pending |
