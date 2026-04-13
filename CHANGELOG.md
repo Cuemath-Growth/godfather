@@ -4,6 +4,71 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 0: Hygiene Sweep (2026-04-13)
+
+### Fix 0.1: Reusable table sort
+- **`_colSort()` utility** (~line 18107): DOM-based sort for flat tables. Parses numeric values (strips ₹, commas, L, K, Cr, %). Toggles ascending/descending. Adds ▲/▼ arrow to active column header.
+- Applied to: sentinelTop5, sentinelBottom5, sentinelTableBody, taggerTableBody (4 tables, ~28 sortable columns)
+- Headers get `cursor-pointer hover:text-text-primary` + `onclick="_colSort(...)"`
+- Resets on data refresh (render functions rebuild tbody)
+
+### Fix 0.2: shortAdName on group rows
+- Sentinel `renderAggRow` (~line 17692): replaced `label.substring(0,57)+'...'` with `shortAdName(label)`
+- Tagger `renderTaggerGroupRow` (~line 14670): replaced `label.substring(0,52)+'...'` with `shortAdName(label)`
+- Campaign/AdSet group rows now show clean names instead of raw Meta UTM strings
+
+### Fix 0.3: Library geo filter unhidden
+- Removed `style="display:none"` from `#libraryFilter` select (~line 1192)
+- Users can now filter Library by market (US, India, AUS, MEA, APAC, UK)
+
+### Fix 0.4: _perfInsight market-aware spend thresholds
+- Performance `_perfInsight` (~line 17655) and Tagger group insight (~line 14679): spend thresholds now scale proportionally to market's CPTD green threshold
+- US: unchanged (base). India: thresholds ~17x lower. AUS/MEA/UK: proportional.
+- Formula: `threshold = base * (market_cptd_green / 50000)`
+
+### Fix 0.5: Grid empty state
+- `renderCreativeGrid()` (~line 15323): added "No creatives match the current filters" message when grid is empty
+
+### Fix 0.6: Top 5/Bottom 5 header tooltips
+- Added `title=""` attributes to Spend, CTR, TDs, Insight headers on both Top 5 and Bottom 5 tables
+
+### Fix 0.7: Creators sort dropdown
+- Added `#influencerSort` select with 5 options: Best CPTD, Highest Spend, Most TDs, Most TQLs, Best CPTQL
+- Wired into `renderInfluLeaderboard()` sort logic (~line 18608)
+
+### Fix 0.8: Hidden Oracle modules — DEFERRED
+- Modules 1/3/4/5/6/7 render to hidden divs (line 392). Marked "legacy compat containers."
+- Unhiding requires Oracle tab layout redesign. Deferred to Phase 3.
+
+---
+
+## India CRM Integration (2026-04-13)
+
+### New Data Source
+- **India CRM connected**: `1oTXE1PzAeE0_NP95KXzuL3LS8aCtKurgIFYIPmPUBIA` (leads tab)
+- `INDIA_CRM_SHEET_ID` constant added (~line 4454)
+- `normalizeIndiaLead()` (~line 4566): Normalizes India CRM columns to match international schema
+  - Overrides `country_bucket` from "Asia" to "India" (filterLeadsByMarket needs this)
+  - Swaps UTM columns: India's `mx_utm_medium` = campaign name, `mx_utm_campaign` = ad/adset name
+  - Maps `board` → `board (ME)` for IB/IGCSE TQL filtering
+  - Sets `ethnicity: ''` (NRI not applicable to India)
+  - Tags `_source: 'india_crm'`
+- `fetchIndiaCRM()` (~line 4632): Pulls leads tab, filters to Meta-only, deduplicates by prospectid, merges into leadsData[]
+- India cost NOT pulled (already in main cost tab)
+- Chained into boot flow (after PLA) and Refresh Data flow
+
+### Bug Fixes
+- **India added to ALL geo dropdowns**: dashboardCountryFilter, sentinelGeo, taggerFilterCountry, ciFilterCountry, influencerGeo, libraryFilter, briefMarket, settingsDefaultMarket
+- **Tagger pilot filter**: Added India case — matches `IND_`, `_IND_`, `INDIA`, `CBSE`, `ICSE` campaign prefixes
+
+### Known Limitations
+- India CRM sheet currently only has April 1-10 data (not full Q1)
+- `board` column is ALL "others" in current data — India TQL will be 0 until IB/IGCSE leads appear
+- `mx_utm_adcontent` not available in India CRM — India leads won't match to individual Meta ads for creative attribution
+- `getAdCampaignBreakdown()` line ~5823 still treats India TQL as all QLs (needs per-lead board tracking to fix)
+
+---
+
 ## Tagger Tab — Godmode Sweep (2026-04-09)
 
 ### Layout Fixes (post-screenshot review)
