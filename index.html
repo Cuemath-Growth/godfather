@@ -14145,7 +14145,8 @@ function getFilteredTaggerData(filterElId, minSpend) {
   const threshold = minSpend !== undefined ? minSpend : LENS_MIN_SPEND;
   let result = getAdPerformance(market, from || null, to || null, { includeNonLP: true }).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
   // Global search filter (Phase 2 — search box in Tagger header)
-  const q = state._taggerSearchQuery;
+  // Only apply to Tagger tab callers (default filterElId), not CI tab callers ('ciFilterCountry')
+  const q = (!filterElId || filterElId === 'taggerFilterCountry') ? state._taggerSearchQuery : '';
   if (q) {
     result = result.filter(c => {
       const ad = (c['Ad name']||c['ad name']||'').toLowerCase();
