@@ -82,6 +82,15 @@ Every design decision with FULL specificity. Read this BEFORE building anything.
 
 ---
 
+## Winning Formula (Apr 14, 2026)
+
+- **Aspirational, not validated.** `computeWinningFormula()` picks the best tag per category (lowest CPQL) independently. The 4-tag "formula" (hook + tone + benefit + CTA) may never co-occur in any real creative.
+- **This is intentional.** The formula is a creative brief suggestion: "these individual tags work best — try combining them." It's a hypothesis to test, not a proven combo.
+- **Combo validation lives separately.** The Combos tab (`renderTagCombos()`) validates actual tag PAIRS that co-occur with performance data. The Winning Formula is complementary — broader hypothesis, less validated.
+- **If combo validation is needed:** Add a post-computation step that checks whether the formula's tags appear together in ≥1 creative. If yes, show "Proven combo." If not, show "Untested — try this."
+
+---
+
 ## Combos & Thresholds (Apr 5, 2026)
 
 - US/India: min 3 creatives, 5 TDs, ₹50K spend

@@ -4586,7 +4586,8 @@ async function fetchPLAData(apiKey) {
   // Dedup by prospectid OR student_service_id (some PLA leads have empty prospectid)
   const existingPids = new Set(leadsData.map(r => r.prospectid).filter(Boolean));
   const existingSids = new Set();
-  leadsData.forEach(r => { if (r._sid) existingSids.add(r._sid); });
+  // Pre-populate _sid on BAU leads so PLA dedup can match by student_service_id
+  leadsData.forEach(r => { if (!r._sid) r._sid = r.student_service_id || ''; if (r._sid) existingSids.add(r._sid); });
 
   let added = 0, skippedDup = 0, skippedNonMeta = 0, adIdResolved = 0;
   allPLALeads.forEach(r => {
@@ -8577,7 +8578,7 @@ function renderOracleCardsV2() {
 
   // ── MAKE MORE: multi-signal — efficient + right audience + converting ──
   const makeMoreList = document.getElementById('oracleMakeMoreList');
-  const portfolioCPTQL = _pm0 ? (_pm0.cptql || Infinity) : (getQL() > 0 ? getSpend() / getQL() : Infinity);
+  const portfolioCPTQL = _mm0 ? (_mm0.cptql || Infinity) : (getQL() > 0 ? getSpend() / getQL() : Infinity);
   const avgNriPct = (() => { const us = adCampData.filter(a => a.market === 'US' && a.ql >= 3); return us.length ? us.reduce((s, a) => s + a.nriPct, 0) / us.length : 0.5; })();
   const avgQlToTd = (() => { const withTd = adCampData.filter(a => a.ql >= 5); return withTd.length ? withTd.reduce((s, a) => s + a.qlToTdPct, 0) / withTd.length : 0.1; })();
 
@@ -8593,7 +8594,7 @@ function renderOracleCardsV2() {
       if (a.spend !== null && a.cptql !== null) {
         // Must pass ABSOLUTE threshold (green zone) — ₹15K CPTQL is never "make more" worthy
         const mkt = a.market || geo || 'US';
-        const th = (SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US']).cpnri || { amber: 15000 };
+        const th = (SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US']).cpql || { amber: 15000 };
         if (a.cptql >= th.amber) return false; // above amber = red zone, never recommend
         return a.cptql < portfolioCPTQL * 1.2; // within portfolio efficiency
       }
@@ -8656,7 +8657,7 @@ function renderOracleCardsV2() {
       const isDone = action?.status === 'done';
       const opacity = isDone ? 'opacity-50' : '';
       const _mmMkt = c.market || geo || 'US';
-      const _mmTh = (SENTINEL_THRESHOLDS[_mmMkt] || SENTINEL_THRESHOLDS['US']).cpnri || { green: 10000, amber: 15000 };
+      const _mmTh = (SENTINEL_THRESHOLDS[_mmMkt] || SENTINEL_THRESHOLDS['US']).cpql || { green: 10000, amber: 15000 };
       const cpqlColor = (c.cptql !== null && c.cptql <= _mmTh.green) ? 'green' : (c.cptql !== null && c.cptql <= _mmTh.amber) ? 'orange' : 'red';
       const esc = s => s.replace(/'/g, "\\'");
       const geoTag = c.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold shrink-0">${c.market}</span>` : '';
