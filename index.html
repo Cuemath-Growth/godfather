@@ -7958,6 +7958,8 @@ function renderBauPlaComparison() {
   const section = document.getElementById('bauPlaSection');
   if (!section) return;
   if (!leadsData.length) { section.classList.add('hidden'); return; }
+  // Only show side-by-side comparison when flow=All — no point comparing when already filtered
+  if (getFlowFilter() !== 'all') { section.classList.add('hidden'); return; }
 
   const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
   const { from, to } = getGlobalDateRange();
@@ -8498,9 +8500,10 @@ function renderOracleCardsV2() {
 
   // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
   // SKIP for PLA: PLA targets broad audience, low NRI% is expected and correct
+  // Must check EACH AD's campaign name (not global flow toggle) because flow=All shows both BAU+PLA
   const _flowForSignals = getFlowFilter();
   const wrongAudience = _flowForSignals === 'pla' ? [] : adCampData
-    .filter(a => a.market === 'US' && a.spend >= 20000 && a.ql >= 15 && a.nriPct < 0.30 && !isPaused(a.adName))
+    .filter(a => !_isPLACampaignName(a.campaignName) && a.market === 'US' && a.spend >= 20000 && a.ql >= 15 && a.nriPct < 0.30 && !isPaused(a.adName))
     .sort((a, b) => a.nriPct - b.nriPct)
     .slice(0, 3)
     .map(a => ({ ...a, name: a.adName, _type: 'audience', _priority: 2,
