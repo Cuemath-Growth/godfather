@@ -961,18 +961,6 @@
                 </div>
                 <div class="flex-1"></div>
                 <div id="taggerVerdictSummary" class="flex items-center gap-2 text-[10px]"></div>
-                <button onclick="retagCreatives(true, 50)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100" title="Tag up to 50 untagged creatives (pilot validation)">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  Pilot 50
-                </button>
-                <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-primary rounded-lg" title="Tags all new/untagged creatives">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                  Tag All New
-                </button>
-                <button onclick="retagCreatives(true)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100" title="Re-tag ALL creatives from scratch (ignores cache, uses API credits)">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  Re-tag All
-                </button>
               </div>
               <!-- Row 2: Dropdown filters -->
               <div class="flex items-center gap-2 flex-wrap">
@@ -14561,24 +14549,36 @@ function renderCreativeReview() {
   const totalClicks = data.reduce((s,c) => s + parseNumber(c['Clicks']||0), 0);
   const totalImp = data.reduce((s,c) => s + parseNumber(c['Impressions']||0), 0);
   const portfolioCTR = totalImp > 0 ? (totalClicks/totalImp*100) : 0;
-  const portfolioCPTD = totalTD > 0 ? totalSpend/totalTD : 0;
+  // CPTD from converters only (creatives with TD > 0) — avoids inflation from 0-TD creatives
+  const _converters = data.filter(c => parseNumber(c['TD']||0) > 0);
+  const _convSpend = _converters.reduce((s,c) => s + parseNumber(c['Spent']||0), 0);
+  const portfolioCPTD = totalTD > 0 ? _convSpend/totalTD : 0;
 
   // ── SECTION 0: Market Triggers (Phase 2, Decision #5) ──
+  // NOTE: Tagger data only matches ~70-80% of CRM leads to specific ads.
+  // Portfolio CPTD from tagger aggregation is ALWAYS higher than CRM-based portfolio CPTD.
+  // So we compute CPTD only from creatives that have TD > 0 (proven converters), not all creatives.
   const _triggerGeos = ['US','India','AUS','MEA','UK','EU'];
   const triggers = [];
   _triggerGeos.forEach(g => {
     const gData = data.filter(c => extractMarket(c) === g);
-    if (gData.length < 3) return;
-    const gAgg = aggregateTaggerRows(gData);
+    if (gData.length < 5) return;
     const gTh = SENTINEL_THRESHOLDS[g] || SENTINEL_THRESHOLDS['US'];
-    // Kills: creatives with high spend + 0 TDs
-    const kills = gData.filter(c => parseNumber(c['Spent']||0) > (gTh.cptd?.green||35000)*1.5 && parseNumber(c['TD']||0) === 0);
+    const cptdGreen = gTh.cptd?.green || 35000;
+    // Compute CPTD only from creatives WITH conversions (avoids 0-TD inflation)
+    const withTD = gData.filter(c => parseNumber(c['TD']||0) > 0);
+    const tdSpend = withTD.reduce((s,c) => s + parseNumber(c['Spent']||0), 0);
+    const tdCount = withTD.reduce((s,c) => s + parseNumber(c['TD']||0), 0);
+    const gCPTD = tdCount > 0 ? tdSpend / tdCount : 0;
+    // Kills: only flag creatives with SIGNIFICANT spend (3x CPTD green) + 0 TDs
+    const killThreshold = cptdGreen * 3;
+    const kills = gData.filter(c => parseNumber(c['Spent']||0) > killThreshold && parseNumber(c['TD']||0) === 0);
     if (kills.length >= 2) triggers.push({ market: g, severity: 'critical', text: `${kills.length} creatives burnt ${formatCurrency(kills.reduce((s,c)=>s+parseNumber(c['Spent']||0),0))} with 0 TDs`, action: 'Pause immediately' });
     // Scale: creatives hitting scale this period
     const scalable = gData.filter(c => { const v = getCreativeVerdict(c); return v.key === 'scale'; });
-    if (scalable.length >= 2) triggers.push({ market: g, severity: 'positive', text: `${scalable.length} creatives at Scale — proven CPTD below ${formatCurrency(gTh.cptd?.green||35000)}`, action: 'Increase budget' });
-    // CPTD above threshold
-    if (gAgg.cptd > (gTh.cptd?.amber||50000) && gAgg.td >= 3) triggers.push({ market: g, severity: 'alert', text: `Portfolio CPTD ${formatCurrency(gAgg.cptd)} exceeds ${formatCurrency(gTh.cptd?.amber||50000)} threshold`, action: 'Review spend allocation' });
+    if (scalable.length >= 2) triggers.push({ market: g, severity: 'positive', text: `${scalable.length} creatives at Scale — proven CPTD below ${formatCurrency(cptdGreen)}`, action: 'Increase budget' });
+    // CPTD above threshold — using converter-only CPTD, not all-creative CPTD
+    if (gCPTD > (gTh.cptd?.amber||50000) && tdCount >= 5) triggers.push({ market: g, severity: 'alert', text: `Converter CPTD ${formatCurrency(gCPTD)} exceeds ${formatCurrency(gTh.cptd?.amber||50000)} threshold`, action: 'Review spend allocation' });
   });
 
   let triggersHtml = '';
