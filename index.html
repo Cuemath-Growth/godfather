@@ -14549,10 +14549,7 @@ function renderCreativeReview() {
   const totalClicks = data.reduce((s,c) => s + parseNumber(c['Clicks']||0), 0);
   const totalImp = data.reduce((s,c) => s + parseNumber(c['Impressions']||0), 0);
   const portfolioCTR = totalImp > 0 ? (totalClicks/totalImp*100) : 0;
-  // CPTD from converters only (creatives with TD > 0) — avoids inflation from 0-TD creatives
-  const _converters = data.filter(c => parseNumber(c['TD']||0) > 0);
-  const _convSpend = _converters.reduce((s,c) => s + parseNumber(c['Spent']||0), 0);
-  const portfolioCPTD = totalTD > 0 ? _convSpend/totalTD : 0;
+  const portfolioCPTD = totalTD > 0 ? totalSpend/totalTD : 0;
 
   // ── SECTION 0: Market Triggers (Phase 2, Decision #5) ──
   // NOTE: Tagger data only matches ~70-80% of CRM leads to specific ads.
