@@ -5871,6 +5871,7 @@ function getAdBreakdown(market, startDate, endDate) {
 const _PLACEMENT_SUFFIX_RE = /_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds|mobile_feed|mobile_reels)_(ig|fb|an)$/i;
 function normalizeAdName(s) {
   return (s || '').toLowerCase().trim()
+    .replace(/\s*[\u2013\u2014–-]\s*copy\s*\d*\s*$/i, '')  // strip " – Copy", " – Copy 2", etc. (Meta duplicate suffix)
     .replace(_PLACEMENT_SUFFIX_RE, '')  // strip Meta placement suffix
     .replace(/[-\u2013\u2014\s]+/g, '_')  // hyphens, en/em dashes, spaces → underscore
     .replace(/_+/g, '_')               // collapse multiple underscores
