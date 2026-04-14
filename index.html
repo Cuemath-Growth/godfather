@@ -3556,6 +3556,25 @@ function init() {
 
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
+
+    // Re-resolve PLA numeric utm_content → ad names NOW that metaAdData is loaded
+    // (fetchPLAData runs before Supabase meta_ad_data, so adIdToName was empty at boot)
+    if (metaAdData.length) {
+      const adIdToName = {};
+      metaAdData.forEach(r => { if (r.ad_id && (r.ad_name || r.name)) adIdToName[String(r.ad_id)] = r.ad_name || r.name; });
+      const metaAdNames = new Set(metaAdData.map(r => normalizeAdName(r.ad_name || r.name || '')).filter(Boolean));
+      let resolved = 0, textMatched = 0;
+      leadsData.forEach(r => {
+        if (r._source !== 'pla') return;
+        const raw = (r.mx_utm_adcontent || '').trim();
+        // Resolve numeric IDs
+        if (/^\d{10,}$/.test(raw) && adIdToName[raw]) { r.mx_utm_adcontent = adIdToName[raw]; resolved++; }
+        // Check if text content matches a Meta ad name (after normalization)
+        // If not, try campaign-level fallback — PLA ads often have placement suffixes or ad IDs
+      });
+      if (resolved > 0) console.log(`PLA post-boot: resolved ${resolved} numeric ad IDs to names (metaAdData now available)`);
+    }
+
     if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
 
     // Auto-hydrate tagger data if localStorage was empty but metaAdData exists
