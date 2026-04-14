@@ -4610,7 +4610,18 @@ async function fetchPLAData(apiKey) {
     leadsData.push(normalized);
     added++;
   });
+  // Diagnostic: PLA utm_content analysis for CRM→Meta matching
+  const plaLeadsInData = leadsData.filter(r => r._source === 'pla');
+  const plaAdContents = plaLeadsInData.map(r => r.mx_utm_adcontent || '');
+  const emptyContent = plaAdContents.filter(c => !c.trim()).length;
+  const numericContent = plaAdContents.filter(c => /^\d{10,}$/.test(c.trim())).length;
+  const textContent = plaAdContents.filter(c => c.trim() && !/^\d{10,}$/.test(c.trim())).length;
+  // Check how many PLA ad contents match a Meta ad name after normalization
+  const metaAdNames = new Set((metaAdData || []).map(r => normalizeAdName(r.ad_name || r.name || '')).filter(Boolean));
+  const matchable = plaAdContents.filter(c => c.trim() && metaAdNames.has(normalizeAdName(c))).length;
   console.log(`PLA leads: ${rawPLA.length} pla_dump + ${rawAC.length} pla_ac_dump → ${added} added, ${skippedDup} dup, ${skippedNonMeta} non-meta, ${adIdResolved} ad IDs resolved`);
+  console.log(`PLA CRM→Meta matching: ${plaLeadsInData.length} leads | utm_content: ${emptyContent} empty, ${numericContent} numeric, ${textContent} text | ${matchable} matchable to Meta ad names (${metaAdNames.size} known ads)`);
+  if (textContent > 0) console.log('PLA sample utm_contents:', plaAdContents.filter(c => c.trim() && !/^\d{10,}$/.test(c)).slice(0, 5));
 
   // --- PLA Cost: normalize, filter meta-only, deduplicate by campaign+day ---
   // Combine cost + pla_ac_cost (pla_ac_cost has Eval campaigns)
