@@ -5641,7 +5641,8 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   Object.entries(crmDaily).forEach(([key, c]) => {
     if (claimedCRM.has(key)) return;
     if (c.ql === 0) return;
-    if (!_isLPCampaign({ campaign: c.campaign, adName: c.adName })) return;
+    // Allow CRM-only rows for PLA + instant form campaigns now that UTM matching works
+    if (!_isLPCampaign({ campaign: c.campaign, adName: c.adName }) && !_isPLACampaignName(c.campaign) && !c.adName) return;
     const mkt = c.market || matchMarketFromText(' ' + c.campaign.toUpperCase() + ' ');
     const adMarket = mkt === 'Unknown' ? '' : mkt;
     // Market hierarchy: same as Meta rows above
@@ -5719,8 +5720,10 @@ function getAdPerformance(market, startDate, endDate, opts) {
   Object.entries(adMap).forEach(([key, a]) => {
     // Skip: no leads AND no significant spend
     if (a.ql === 0 && a.spend < 5000) return;
-    // Instant form campaigns — CRM can't attribute leads, data unreliable
-    if (!_isLPCampaign(a)) {
+    // Instant form campaigns — historically CRM couldn't attribute leads (numeric ad IDs).
+    // Now with ad ID + suffix matching (Apr 2026 UTM fix), matching works for instant forms too.
+    // Only zero CRM if the campaign is non-LP AND has no actual CRM matches.
+    if (!_isLPCampaign(a) && !a.hasCRM) {
       if (!includeNonLP) return;
       a.ql = 0; a.nri = 0; a.tql = 0; a.td = 0; a.paid = 0; // Zero CRM — keep spend/clicks
     }
