@@ -14043,7 +14043,7 @@ function showTaggerResults() {
   renderTaggerInsights();
   renderActiveTaggerTab();
   // Auto-run Sentinel on new data — use clean data layer when available
-  const _sentinelData = metaAdData.length > 0 ? getAdPerformance(null, null, null) : sanitizeTaggerData(state.taggerData || []).filter(c => _isLPCampaign(c));
+  const _sentinelData = metaAdData.length > 0 ? getAdPerformance(null, null, null, { includeNonLP: true }) : sanitizeTaggerData(state.taggerData || []);
   if (_sentinelData.length) {
     state.sentinelOutput = runSentinelAnalysis(_sentinelData, 'US');
     saveState('sentinelOutput', state.sentinelOutput);
@@ -14134,7 +14134,7 @@ function getGlobalFilteredTaggerData(geoElId, formatFilter) {
   const country = document.getElementById(geoElId || 'dashboardCountryFilter')?.value || 'all';
   const { from, to } = getGlobalDateRange();
   const market = country === 'all' ? null : country;
-  let data = getAdPerformance(market, from || null, to || null);
+  let data = getAdPerformance(market, from || null, to || null, { includeNonLP: true });
   if (formatFilter && formatFilter !== 'all') {
     data = data.filter(c => {
       const t = (c['Creative type']||c['creative type']||'').toLowerCase();
