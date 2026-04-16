@@ -5476,9 +5476,10 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   });
 
   // Step 2: CRM — daily leads per ad (keyed by normalizedAdName + lead_created_date)
-  // Also build utm_term alias map for the join
+  // Also build utm_term alias map and ad ID index for the join
   const crmDaily = {}; // key: "normName|date" → { ql, nri, td, paid, invalid }
   const termAlias = {}; // normTerm → normAdcontent
+  const _adIdToCRM = {}; // adId → { date → normName } — for ad ID matching
   const _dailyFlowLeads = _filterLeadsByFlow(leadsData);
   const filteredLeads = market && market !== 'all' ? filterLeadsByMarket(_dailyFlowLeads, market) : _dailyFlowLeads;
   filteredLeads.forEach(r => {
@@ -5514,14 +5515,29 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     if (String(r.trials_done) === '1') c.td++;
     if (String(r.paid) === '1') c.paid++;
     if (String(r.invalid) === '1') c.invalid++;
-    // Register utm_term alias
+    // Register utm_term alias (when term differs from resolved adcontent)
     const termNorm = normalizeAdName(r.mx_utm_term || '');
     if (termNorm && termNorm !== normName && termNorm.length > 30 && !/^\d+$/.test(termNorm)) {
       termAlias[termNorm] = normName;
     }
+    // Register ad ID → CRM key mapping for direct ad_id matching
+    if (r._origAdId) {
+      if (!_adIdToCRM[r._origAdId]) _adIdToCRM[r._origAdId] = {};
+      if (!_adIdToCRM[r._origAdId][d]) _adIdToCRM[r._origAdId][d] = normName;
+    }
   });
   // Clamp TD ≤ QL, Paid ≤ TD per daily row
   Object.values(crmDaily).forEach(c => { c.td = Math.min(c.td, c.ql); c.paid = Math.min(c.paid, c.td); });
+
+  // Step 2b: Build suffix index — CRM short creative names as suffixes of Meta full ad names
+  // PLA/instant forms leads have short mx_utm_term (e.g. "Static_Jasmine_Testimonial_060126")
+  // while Meta API has full ad name (e.g. "USA_FB_Leads_Broad_PLA_..._Static_Jasmine_Testimonial_060126")
+  const crmSuffixMap = {}; // short normName → { normName, minLen }
+  Object.values(crmDaily).forEach(c => {
+    if (c.normName.length >= 15 && c.normName.length <= 120) {
+      crmSuffixMap[c.normName] = true;
+    }
+  });
 
   // Step 3: Build creative signature index for fuzzy matching
   // Meta ads often have short creative-only names (e.g. "Static_W-Ch-Strong-Foundations_230226")
@@ -5563,11 +5579,32 @@ function getAdPerformanceDaily(market, startDate, endDate) {
       crm = crmDaily[aliasKey];
       claimedCRM.add(aliasKey);
     }
-    // Match 3: DISABLED — creative signature matching caused cross-contamination.
-    // Multiple ad versions share the same creative name (e.g. "Master-Algebra_180226"
-    // vs "Master-Algebra_190226"). Stripping dates collapsed them, attributing leads
-    // from one version to another's spend → unreliable CPTQL.
-    // TODO: Re-enable with version-aware matching (same creative + same campaign).
+    // Match 3: ad ID match — CRM leads from instant forms/PLA have _origAdId = numeric Facebook ad ID
+    // Meta daily data has ad_id. This is the most reliable match for new-style UTMs.
+    if (!crm && m.ad_id) {
+      const adIdCRM = _adIdToCRM[m.ad_id]?.[d];
+      if (adIdCRM) {
+        const idKey = adIdCRM + '|' + d;
+        if (crmDaily[idKey] && !claimedCRM.has(idKey)) {
+          crm = crmDaily[idKey];
+          claimedCRM.add(idKey);
+        }
+      }
+    }
+    // Match 4: suffix match — CRM has short creative name (from utm_term), Meta has full ad name
+    // e.g. CRM: "static_jasmine_testimonial_060126", Meta: "usa_fb_leads_broad_pla_..._static_jasmine_testimonial_060126"
+    if (!crm) {
+      for (const suffix in crmSuffixMap) {
+        if (m.normName.length > suffix.length && m.normName.endsWith(suffix)) {
+          const sfxKey = suffix + '|' + d;
+          if (crmDaily[sfxKey] && !claimedCRM.has(sfxKey)) {
+            crm = crmDaily[sfxKey];
+            claimedCRM.add(sfxKey);
+            break;
+          }
+        }
+      }
+    }
 
     // Derive market from campaign name first (handles AUS/MEA/UK sub-markets within ROW account)
     const campaignMarket = matchMarketFromText(' ' + m.campaign.toUpperCase() + ' ');
