@@ -5591,12 +5591,23 @@ function getAdPerformanceDaily(market, startDate, endDate) {
         }
       }
     }
-    // Match 4: suffix match — CRM has short creative name (from utm_term), Meta has full ad name
-    // e.g. CRM: "static_jasmine_testimonial_060126", Meta: "usa_fb_leads_broad_pla_..._static_jasmine_testimonial_060126"
+    // Match 4: suffix match — bidirectional
+    // Case A: CRM has short name (utm_term), Meta has full path → meta.endsWith(crm)
+    // Case B: Meta has short name (creative only), CRM has full path (adset+creative) → crm.endsWith(meta)
     if (!crm) {
-      for (const suffix in crmSuffixMap) {
-        if (m.normName.length > suffix.length && m.normName.endsWith(suffix)) {
-          const sfxKey = suffix + '|' + d;
+      for (const crmNorm in crmSuffixMap) {
+        // Case A: Meta name ends with CRM name (CRM is shorter)
+        if (m.normName.length > crmNorm.length && m.normName.endsWith(crmNorm)) {
+          const sfxKey = crmNorm + '|' + d;
+          if (crmDaily[sfxKey] && !claimedCRM.has(sfxKey)) {
+            crm = crmDaily[sfxKey];
+            claimedCRM.add(sfxKey);
+            break;
+          }
+        }
+        // Case B: CRM name ends with Meta name (Meta is shorter — old-style adcontent has adset prefix)
+        if (crmNorm.length > m.normName.length && crmNorm.endsWith(m.normName)) {
+          const sfxKey = crmNorm + '|' + d;
           if (crmDaily[sfxKey] && !claimedCRM.has(sfxKey)) {
             crm = crmDaily[sfxKey];
             claimedCRM.add(sfxKey);
