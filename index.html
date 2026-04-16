@@ -5680,7 +5680,9 @@ function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; }
 function getAdPerformance(market, startDate, endDate, opts) {
   const start = startDate || COST_DATA_START || '';
   const end = endDate || new Date().toISOString().slice(0, 10);
-  const includeNonLP = opts?.includeNonLP || false;
+  // includeNonLP defaults to true (Apr 2026 UTM fix: instant forms now matchable via ad ID + suffix).
+  // Non-LP ads without CRM matches are kept with zeroed CRM — user sees spend + "no CRM link".
+  const includeNonLP = opts?.includeNonLP !== undefined ? opts.includeNonLP : true;
 
   const _perfFlow = getFlowFilter();
   const cacheKey = `${market||'all'}|${start}|${end}|${includeNonLP?'all':'lp'}|${_perfFlow}`;
@@ -5781,8 +5783,9 @@ function getAdPerformance(market, startDate, endDate, opts) {
   const metaCount = results.filter(r => r._spendSource === 'meta_insights').length;
   const prorated = results.filter(r => r._spendSource === 'campaign_prorated').length;
   const noSpend = results.filter(r => !r._spendSource).length;
-  const _lpFilterCount = Object.values(adMap).filter(a => !_isLPCampaign(a) && a.spend >= 5000).length;
-  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads (${_lpFilterCount} instant-form excluded) | ${metaCount} meta, ${prorated} prorated, ${noSpend} no_spend | aggregated from ${daily.length} daily rows`);
+  const _nonLPCount = Object.values(adMap).filter(a => !_isLPCampaign(a) && a.spend >= 5000).length;
+  const _nonLPMatched = Object.values(adMap).filter(a => !_isLPCampaign(a) && a.hasCRM && a.spend >= 5000).length;
+  console.log(`getAdPerformance(${market||'all'}, ${start}, ${end}): ${results.length} ads | ${_nonLPCount} instant-form (${_nonLPMatched} CRM-matched) | ${metaCount} meta, ${prorated} prorated, ${noSpend} no_spend | aggregated from ${daily.length} daily rows`);
 
   results.sort((a, b) => (b['Spent'] || 0) - (a['Spent'] || 0));
 
