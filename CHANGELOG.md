@@ -4,6 +4,27 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Data Pipeline Fix: UTM Nomenclature + Column Ranges (2026-04-16)
+
+### Ad Name Resolution (fixes ~50% of April 2026 CRM→Meta matching gap)
+- **Root cause**: PLA/instant forms leads have numeric Facebook ad IDs in `mx_utm_adcontent` (e.g., "120239274237860278") instead of ad names. The real ad name is in `mx_utm_term`.
+- Boot-time resolution now runs on ALL leads (was PLA-only): resolves numeric ad IDs from `mx_utm_term` first, then `metaAdData` ad_id→name lookup.
+- April 2026: 409 of 821 Meta leads (49%) had numeric ad IDs. These were previously unmatched.
+
+### PLA Lead Tagging
+- PLA leads from main Perf Tracker sheet now tagged with `_source: 'pla'` + `_trialBooked` based on campaign name detection (`_isPLACampaignName` on `mx_utm_medium`).
+- `_filterLeadsByFlow` upgraded: now checks both `_source` AND campaign name (like `_filterCostByFlow` already did).
+
+### Column Range Expansion
+- **Leads tab**: `leads!A:BG` → `leads!A:BW` (59→75 columns). `board (ME)` column was at position 73, OUTSIDE the old range. This caused India/MEA TQL=0.
+- **Cost tab**: `cost!A:H` → `cost!A:O` (8→15 columns). `type` column was inserted at position G, pushing `amount_spent` to position I, OUTSIDE the old range.
+
+### Daily Matching Fallback
+- `getAdPerformanceDaily` CRM keying: falls back to `mx_utm_term` when `mx_utm_adcontent` is numeric/empty.
+- Unattributed lead detection: pure numeric ad IDs no longer falsely counted as "attributed."
+
+---
+
 ## Phase 2: Segwise-Level Visualizations (2026-04-14)
 
 ### 2.1 + 2.2 + 2.3: Creative Leaderboard tab

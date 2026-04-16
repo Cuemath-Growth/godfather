@@ -3557,22 +3557,49 @@ function init() {
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
 
-    // Re-resolve PLA numeric utm_content → ad names NOW that metaAdData is loaded
-    // (fetchPLAData runs before Supabase meta_ad_data, so adIdToName was empty at boot)
-    if (metaAdData.length) {
+    // Resolve ad names + tag PLA leads across ALL leadsData
+    // UTM nomenclature (Apr 2026+): utm_medium=campaign, utm_campaign=adset, utm_term=ad name
+    // Old leads: mx_utm_adcontent has ad name (text). New leads: mx_utm_adcontent has numeric
+    // Facebook ad ID, and mx_utm_term has the actual ad name.
+    {
       const adIdToName = {};
-      metaAdData.forEach(r => { if (r.ad_id && (r.ad_name || r.name)) adIdToName[String(r.ad_id)] = r.ad_name || r.name; });
-      const metaAdNames = new Set(metaAdData.map(r => normalizeAdName(r.ad_name || r.name || '')).filter(Boolean));
-      let resolved = 0, textMatched = 0;
+      if (metaAdData.length) {
+        metaAdData.forEach(r => { if (r.ad_id && (r.ad_name || r.name)) adIdToName[String(r.ad_id)] = r.ad_name || r.name; });
+      }
+      let termUsed = 0, adIdResolved = 0, plaTagged = 0;
       leadsData.forEach(r => {
-        if (r._source !== 'pla') return;
-        const raw = (r.mx_utm_adcontent || '').trim();
-        // Resolve numeric IDs
-        if (/^\d{10,}$/.test(raw) && adIdToName[raw]) { r.mx_utm_adcontent = adIdToName[raw]; resolved++; }
-        // Check if text content matches a Meta ad name (after normalization)
-        // If not, try campaign-level fallback — PLA ads often have placement suffixes or ad IDs
+        const adContent = (r.mx_utm_adcontent || '').trim();
+        const term = (r.mx_utm_term || '').trim();
+        const isNumericContent = /^\d{10,}$/.test(adContent);
+
+        // 1. Resolve ad name: when adcontent is a numeric ad ID, use utm_term or metaAdData lookup
+        if (isNumericContent) {
+          if (term && !/^\d+$/.test(term)) {
+            // utm_term has the actual ad name (new UTM scheme) — use it
+            r._origAdId = adContent; // preserve for diagnostics
+            r.mx_utm_adcontent = term.replace(/-/g, '_');
+            termUsed++;
+          } else if (adIdToName[adContent]) {
+            // Resolve numeric ad ID via metaAdData lookup
+            r._origAdId = adContent;
+            r.mx_utm_adcontent = adIdToName[adContent];
+            adIdResolved++;
+          }
+        }
+
+        // 2. Tag PLA leads from main sheet (they bypass normalizePLALead)
+        // Check campaign name in mx_utm_medium (per UTM nomenclature: utm_medium = campaign name)
+        if (!r._source) {
+          const campName = r.mx_utm_medium || r.mx_utm_campaign || '';
+          if (_isPLACampaignName(campName)) {
+            r._source = 'pla';
+            // PLA TQL = Trials Booked. Best available proxy from main sheet is trials_sch.
+            r._trialBooked = String(r.trials_sch) === '1' ? '1' : '0';
+            plaTagged++;
+          }
+        }
       });
-      if (resolved > 0) console.log(`PLA post-boot: resolved ${resolved} numeric ad IDs to names (metaAdData now available)`);
+      console.log(`Post-boot ad resolve: ${termUsed} from utm_term, ${adIdResolved} from ad ID lookup, ${plaTagged} PLA-tagged from main sheet`);
     }
 
     if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
@@ -4475,8 +4502,8 @@ async function fetchSheetData(sheetUrl, apiKey) {
 
   const base = `https://sheets.googleapis.com/v4/spreadsheets/${id}/values`;
   const [leadsRes, costRes] = await Promise.all([
-    fetch(`${base}/leads!A:BG?key=${apiKey}`),
-    fetch(`${base}/cost!A:H?key=${apiKey}`)
+    fetch(`${base}/leads!A:BW?key=${apiKey}`),
+    fetch(`${base}/cost!A:O?key=${apiKey}`)
   ]);
 
   if (!leadsRes.ok) {
@@ -5431,10 +5458,16 @@ function getAdPerformanceDaily(market, startDate, endDate) {
     const d = r.lead_created_date || '';
     if (start && d < start) return;
     if (end && d > end) return;
-    const normName = normalizeAdName(r.mx_utm_adcontent);
+    // Best ad name: boot resolution should have already resolved numeric IDs,
+    // but fall back to mx_utm_term if mx_utm_adcontent is still numeric/empty
+    let adName = r.mx_utm_adcontent || '';
+    if ((!adName || /^\d{10,}$/.test(adName.trim())) && r.mx_utm_term && !/^\d+$/.test(r.mx_utm_term)) {
+      adName = r.mx_utm_term.replace(/-/g, '_');
+    }
+    const normName = normalizeAdName(adName);
     if (!normName) return;
     const key = normName + '|' + d;
-    if (!crmDaily[key]) crmDaily[key] = { date: d, normName, adName: r.mx_utm_adcontent, campaign: r.mx_utm_campaign || '', market: r.country_bucket || '', ql: 0, nri: 0, tql: 0, td: 0, paid: 0, invalid: 0, total: 0 };
+    if (!crmDaily[key]) crmDaily[key] = { date: d, normName, adName: adName, campaign: r.mx_utm_campaign || '', market: r.country_bucket || '', ql: 0, nri: 0, tql: 0, td: 0, paid: 0, invalid: 0, total: 0 };
     const c = crmDaily[key];
     c.total++;
     if (String(r.qls) === '1') {
@@ -5714,7 +5747,7 @@ function getPortfolioMetrics(market, from, to) {
     if (_from && d < _from) return;
     if (_to && d > _to) return;
     if (r._source === 'india_crm') { /* India CRM UTM scheme differs from Meta API names — count as unattributed */ }
-    else { const adName = (r.mx_utm_adcontent || '').trim(); if (adName.length > 5) return; } // has ad name → already counted in attributed
+    else { const adName = (r.mx_utm_adcontent || '').trim(); if (adName.length > 5 && !/^\d{10,}$/.test(adName)) return; } // has ad name (non-numeric) → already counted in attributed
     if (String(r.qls) === '1') unQL++;
     if (String(r.qls) === '1' && isNRIEthnicity(r)) unNRI++;
     if (String(r.trials_done) === '1') unTD++;
@@ -6821,12 +6854,13 @@ function _isPLACampaignName(name) {
   return false;
 }
 
-// Filter leadsData by BAU/PLA flow. PLA leads have _source='pla'.
+// Filter leadsData by BAU/PLA flow. Uses both _source and campaign name detection
+// because main CRM sheet PLA leads may not always have _source='pla'.
 function _filterLeadsByFlow(data) {
   const flow = getFlowFilter();
   if (flow === 'all') return data;
-  if (flow === 'pla') return data.filter(r => r._source === 'pla');
-  return data.filter(r => r._source !== 'pla'); // BAU = everything except PLA
+  if (flow === 'pla') return data.filter(r => r._source === 'pla' || _isPLACampaignName(r.mx_utm_medium || r.mx_utm_campaign));
+  return data.filter(r => r._source !== 'pla' && !_isPLACampaignName(r.mx_utm_medium || r.mx_utm_campaign)); // BAU = everything except PLA
 }
 
 // Filter costData by BAU/PLA flow. Uses both _source and campaign name detection

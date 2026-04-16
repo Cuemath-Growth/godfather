@@ -51,8 +51,17 @@ Lead → Qualified Lead (QL) → NRI Filter → Trial Signup (TS) → Trial Done
 ## Sheet 3: CRM Leads
 **Source:** `1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs`
 **GID:** 2057861499
-**Server-side filter:** `select * where G='meta'` (column G = utm_medium, FLAGGED Mar 28 — verify against current code)
-**Key columns (from reference export gid=1527899395):**
+**Fetch range:** `leads!A:BW` (75 columns — expanded Apr 16, 2026 to include `board (ME)` at col 73)
+**Client-side filter:** `utm_medium === 'meta'` (column H)
+**As of Apr 2026:** Sheet now includes PLA + instant forms data. 10,738 rows total, 1,296 in April 2026.
+
+**UTM Nomenclature (confirmed Apr 16, 2026):**
+For Meta campaigns: `utm_medium` = Campaign Name, `utm_campaign` = Ad Set, `utm_term` = Ad Name.
+- Old leads (pre-2026): `mx_utm_adcontent` = ad name (text with placement suffix). `mx_utm_term` = empty.
+- New leads (PLA/instant forms): `mx_utm_adcontent` = **numeric Facebook ad ID**. `mx_utm_term` = ad name.
+- Boot-time resolution: numeric ad IDs → resolved to ad names from `mx_utm_term` or `metaAdData` lookup.
+
+**Key columns (verified Apr 16, 2026 against actual sheet):**
 | Column | Usage |
 |--------|-------|
 | lead_created_date | Date filtering for QLs |
