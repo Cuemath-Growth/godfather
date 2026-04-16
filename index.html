@@ -3566,17 +3566,20 @@ function init() {
       if (metaAdData.length) {
         metaAdData.forEach(r => { if (r.ad_id && (r.ad_name || r.name)) adIdToName[String(r.ad_id)] = r.ad_name || r.name; });
       }
-      let termUsed = 0, adIdResolved = 0, plaTagged = 0;
+      let termUsed = 0, adIdResolved = 0, emptyFilled = 0, plaTagged = 0;
       leadsData.forEach(r => {
         const adContent = (r.mx_utm_adcontent || '').trim();
         const term = (r.mx_utm_term || '').trim();
         const isNumericContent = /^\d{10,}$/.test(adContent);
+        const isEmptyContent = !adContent || adContent.length < 5;
+        const hasTextTerm = term && term.length >= 10 && !/^\d+$/.test(term);
 
-        // 1. Resolve ad name: when adcontent is a numeric ad ID, use utm_term or metaAdData lookup
+        // 1. Resolve ad name from best available source
+        // Covers: numeric ad IDs (instant forms/PLA), empty adcontent, all regions/campaigns
         if (isNumericContent) {
-          if (term && !/^\d+$/.test(term)) {
+          if (hasTextTerm) {
             // utm_term has the actual ad name (new UTM scheme) — use it
-            r._origAdId = adContent; // preserve for diagnostics
+            r._origAdId = adContent;
             r.mx_utm_adcontent = term.replace(/-/g, '_');
             termUsed++;
           } else if (adIdToName[adContent]) {
@@ -3585,21 +3588,25 @@ function init() {
             r.mx_utm_adcontent = adIdToName[adContent];
             adIdResolved++;
           }
+        } else if (isEmptyContent && hasTextTerm) {
+          // Empty adcontent but term has ad name — backfill
+          r.mx_utm_adcontent = term.replace(/-/g, '_');
+          emptyFilled++;
         }
 
         // 2. Tag PLA leads from main sheet (they bypass normalizePLALead)
         // Check campaign name in mx_utm_medium (per UTM nomenclature: utm_medium = campaign name)
+        // Applies to all regions: US, AUS, MEA, UK, India — any lead with PLA/Eval campaign
         if (!r._source) {
           const campName = r.mx_utm_medium || r.mx_utm_campaign || '';
           if (_isPLACampaignName(campName)) {
             r._source = 'pla';
-            // PLA TQL = Trials Booked. Best available proxy from main sheet is trials_sch.
             r._trialBooked = String(r.trials_sch) === '1' ? '1' : '0';
             plaTagged++;
           }
         }
       });
-      console.log(`Post-boot ad resolve: ${termUsed} from utm_term, ${adIdResolved} from ad ID lookup, ${plaTagged} PLA-tagged from main sheet`);
+      console.log(`Post-boot ad resolve: ${termUsed} from utm_term, ${adIdResolved} from ad ID lookup, ${emptyFilled} empty backfilled, ${plaTagged} PLA-tagged | total leadsData: ${leadsData.length}`);
     }
 
     if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
@@ -4724,10 +4731,11 @@ function normalizeIndiaLead(r) {
     'board (ME)': r.board || '', // India uses "board" column, map to board (ME) for TQL logic
     board: r.board || '',
     // Column swap: India mx_utm_medium = campaign name, mx_utm_campaign = ad/adset name
+    // Per UTM nomenclature: utm_medium=campaign, utm_campaign=adset, utm_term=ad name (if available)
     mx_utm_campaign: (r.mx_utm_medium || '').replace(/-/g, '_'),
     mx_utm_adcontent: (r.mx_utm_campaign || r.adset || '').replace(/-/g, '_'),
-    mx_utm_term: '',
-    mx_utm_medium: 'meta',
+    mx_utm_term: r.mx_utm_term || r.utm_term || '',
+    mx_utm_medium: (r.mx_utm_medium || '').replace(/-/g, '_'), // preserve campaign name for PLA detection
     utm_medium: 'meta',
     prospectid: r.prospectid || '',
     net_booking: r.net_booking || '',
@@ -6168,9 +6176,14 @@ function mergeCRMWithMeta() {
 
   // ── STEP 1: BUILD AD-LEVEL INDEX FROM CRM ──
   // Index CRM leads by normalized mx_utm_adcontent tokens for direct creative matching
+  // Falls back to mx_utm_term if adcontent is numeric/empty (post-boot resolution handles most cases)
   const crmByAdContent = {}; // key: normalized adcontent → array of CRM leads
   rows.forEach(r => {
-    const adContent = r['mx_utm_adcontent'] || '';
+    let adContent = r['mx_utm_adcontent'] || '';
+    // Fallback: if adcontent is numeric or empty, try mx_utm_term
+    if ((!adContent || adContent.length < 10 || /^\d{10,}$/.test(adContent.trim())) && r['mx_utm_term'] && r['mx_utm_term'].length >= 10 && !/^\d+$/.test(r['mx_utm_term'])) {
+      adContent = r['mx_utm_term'].replace(/-/g, '_');
+    }
     if (!adContent || adContent.length < 10) return;
     const tokens = extractTokens(adContent);
     const key = tokens.sort().join('|');
