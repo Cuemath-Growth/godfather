@@ -4642,7 +4642,11 @@ async function fetchPLAData(apiKey) {
   // Pre-populate _sid on BAU leads so PLA dedup can match by student_service_id
   leadsData.forEach(r => { if (!r._sid) r._sid = r.student_service_id || ''; if (r._sid) existingSids.add(r._sid); });
 
-  let added = 0, skippedDup = 0, skippedNonMeta = 0, adIdResolved = 0;
+  // Build prospectid → index map for enrichment of duplicates
+  const pidToIndex = {};
+  leadsData.forEach((r, i) => { if (r.prospectid) pidToIndex[r.prospectid] = i; });
+
+  let added = 0, skippedDup = 0, enriched = 0, skippedNonMeta = 0, adIdResolved = 0;
   allPLALeads.forEach(r => {
     const normalized = normalizePLALead(r);
     if (!normalized) { skippedNonMeta++; return; }
@@ -4655,9 +4659,23 @@ async function fetchPLAData(apiKey) {
     // Dedup: prefer prospectid, fallback to student_service_id
     const pid = normalized.prospectid;
     const sid = r.student_service_id || '';
-    if (pid && existingPids.has(pid)) { skippedDup++; return; }
+    if (pid && existingPids.has(pid)) {
+      // Lead already exists from main sheet — ENRICH it with PLA-specific fields
+      // Main sheet lacks trial_request. PLA sheet has it → accurate _trialBooked.
+      const existing = leadsData[pidToIndex[pid]];
+      if (existing) {
+        existing._source = 'pla';
+        existing._trialBooked = normalized._trialBooked; // from trial_request (accurate)
+        // Backfill ad name from PLA sheet if main sheet had numeric ID
+        if ((!existing.mx_utm_adcontent || /^\d{10,}$/.test(existing.mx_utm_adcontent.trim())) && normalized.mx_utm_adcontent && !/^\d{10,}$/.test(normalized.mx_utm_adcontent.trim())) {
+          existing.mx_utm_adcontent = normalized.mx_utm_adcontent;
+        }
+        enriched++;
+      }
+      skippedDup++; return;
+    }
     if (!pid && sid && existingSids.has(sid)) { skippedDup++; return; }
-    if (pid) existingPids.add(pid);
+    if (pid) { existingPids.add(pid); pidToIndex[pid] = leadsData.length; }
     if (sid) existingSids.add(sid);
     normalized._sid = sid; // track for dedup
     leadsData.push(normalized);
@@ -4672,7 +4690,8 @@ async function fetchPLAData(apiKey) {
   // Check how many PLA ad contents match a Meta ad name after normalization
   const metaAdNames = new Set((metaAdData || []).map(r => normalizeAdName(r.ad_name || r.name || '')).filter(Boolean));
   const matchable = plaAdContents.filter(c => c.trim() && metaAdNames.has(normalizeAdName(c))).length;
-  console.log(`PLA leads: ${rawPLA.length} pla_dump + ${rawAC.length} pla_ac_dump → ${added} added, ${skippedDup} dup, ${skippedNonMeta} non-meta, ${adIdResolved} ad IDs resolved`);
+  console.log(`PLA raw: ${rawPLA.length} pla_dump + ${rawAC.length} pla_ac_dump`);
+  console.log(`PLA leads: ${added} added, ${skippedDup} dup (${enriched} enriched with _trialBooked), ${skippedNonMeta} non-meta, ${adIdResolved} ad IDs resolved`);
   console.log(`PLA CRM→Meta matching: ${plaLeadsInData.length} leads | utm_content: ${emptyContent} empty, ${numericContent} numeric, ${textContent} text | ${matchable} matchable to Meta ad names (${metaAdNames.size} known ads)`);
   if (textContent > 0) console.log('PLA sample utm_contents:', plaAdContents.filter(c => c.trim() && !/^\d{10,}$/.test(c)).slice(0, 5));
 
@@ -8032,14 +8051,16 @@ function renderBauPlaComparison() {
   const market = dashCountry || 'all';
 
   // Check if PLA data exists for this market
-  const plaLeads = leadsData.filter(r => r._source === 'pla');
+  // PLA detection: _source OR campaign name (consistent with _filterLeadsByFlow/_filterCostByFlow)
+  const _isPLALead = r => r._source === 'pla' || _isPLACampaignName(r.mx_utm_medium || r.mx_utm_campaign);
+  const plaLeads = leadsData.filter(_isPLALead);
   const plaLeadsMarket = market && market !== 'all' ? filterLeadsByMarket(plaLeads, market) : plaLeads;
   if (!plaLeadsMarket.length) { section.classList.add('hidden'); return; }
 
   section.classList.remove('hidden');
 
   // Compute BAU metrics (temporarily override flow filter by computing directly)
-  const bauLeads = leadsData.filter(r => r._source !== 'pla');
+  const bauLeads = leadsData.filter(r => !_isPLALead(r));
   const bauCost = costData.filter(r => r._source !== 'pla' && !_isPLACampaignName(r.campaign_name));
   const plaCost = costData.filter(r => r._source === 'pla' || _isPLACampaignName(r.campaign_name));
 
