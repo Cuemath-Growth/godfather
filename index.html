@@ -1062,7 +1062,13 @@
           <div id="taggerTab-combos" class="tagger-tab hidden">
             <!-- Tag Performance Insights (headline card block) — moved here from Creative Review -->
             <div class="mb-5">
-              <h3 class="text-base font-bold mb-1">Tag Performance Insights</h3>
+              <div class="flex items-center justify-between mb-1">
+                <h3 class="text-base font-bold">Tag Performance Insights</h3>
+                <button onclick="openTagReference()" class="flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold rounded-lg border border-gray-200 bg-white hover:bg-surface-tertiary text-text-secondary" title="Show definition + example creative for every tag value">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  Tag reference
+                </button>
+              </div>
               <p class="text-xs text-text-secondary mb-3">Best and worst tag values per category, by CPTD across all tagged creatives in the current filter.</p>
               <div id="taggerInsights" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
             </div>
@@ -2065,7 +2071,7 @@ const GODFATHER_TAXONOMY = {
         const isEval = camp.includes('_eval_') || camp.includes('eval_') || camp.includes('_eval ') || camp.endsWith('_eval');
         const flow = (isPLA || isEval) ? 'PLA' : 'BAU';
         // Detect audience (priority order)
-        let audience = 'General';
+        let audience = null;
         // Creator-name campaigns (March_Sahar, March_Preethi, etc.)
         if (/^(march|april|may|june|july|aug|sep|oct|nov|dec|jan|feb)_/i.test(camp)) audience = 'Influencer';
         else if (camp.includes('influencer') || camp.includes('postboost')) audience = 'Influencer';
@@ -2082,7 +2088,23 @@ const GODFATHER_TAXONOMY = {
         else if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment') || camp.includes('parenting') || camp.includes('bollywood')) audience = 'Interest'; // 1.15: parenting + bollywood
         else if (camp.includes('advantage') || camp.includes('broad')) audience = 'Broad';
         else if (camp.includes('zipcode') || camp.includes('pincode') || camp.includes('location') || camp.includes('cities')) audience = 'Geo';
-        // 1.16: Broad_and_NRI_Filters_PLA contains both 'nri' and 'broad' — NRI wins by priority (line 2016). Accepted: NRI is dominant signal for this compound campaign.
+        // 1.16: Broad_and_NRI_Filters_PLA contains both 'nri' and 'broad' — NRI wins by priority. Accepted: NRI is dominant signal for this compound campaign.
+
+        // Phase 2.5b: kill "General" fallback. When no keyword matches, return the raw
+        // campaign name (truncated) so the user sees what targeting is actually active,
+        // not a meaningless bucket. Also log to console so new keywords can be added.
+        if (!audience) {
+          try {
+            const _unc = window.__unclassifiedCampaigns || (window.__unclassifiedCampaigns = new Set());
+            if (campaignName && !_unc.has(campaignName)) {
+              _unc.add(campaignName);
+              if (_unc.size <= 25) console.log('[campaign_audience] unclassified:', campaignName);
+            }
+          } catch(_) {}
+          // Use a stable short form: first 40 chars of campaign name + flow tag
+          const shortCamp = (campaignName || 'Unknown').slice(0, 40);
+          return `${shortCamp} (${flow}, unclassified)`;
+        }
         return `${audience} (${flow})`;
       }
     }
@@ -7680,9 +7702,13 @@ function renderOracleActions() {
 
   if (audRows.length) {
     let html = '<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">';
+    const _fallbackMkt = document.getElementById('dashboardCountryFilter')?.value || 'US';
+    const _fallbackTh = SENTINEL_THRESHOLDS[_fallbackMkt === 'all' ? 'US' : _fallbackMkt] || SENTINEL_THRESHOLDS['US'];
+    const _fbGreen = _fallbackTh.cptd?.green || 35000;
+    const _fbAmber = _fallbackTh.cptd?.amber || 50000;
     audRows.slice(0, 6).forEach(r => {
       const metric = r.cptd ? formatCurrency(r.cptd) + ' CPTD' : r.cpql ? formatCurrency(r.cpql) + ' CPQL' : '\u2014';
-      const metricColor = r.cptd ? (r.cptd < 40000 ? 'text-accent-green' : r.cptd < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-primary';
+      const metricColor = r.cptd ? (r.cptd < _fbGreen ? 'text-accent-green' : r.cptd < _fbAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-primary';
       html += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 shadow-sm">
         <div class="flex items-center justify-between mb-2">
           <h4 class="text-sm font-bold">${r.aud}</h4>
@@ -8753,6 +8779,7 @@ function renderOracleCardsV2() {
   // Include all ads — CRM-matched and Meta-only. Mark unmatched so UI can flag them.
   const adCampData = rawPerf.map(r => ({
     adName: r['Ad name'], campaignName: r['Campaign name'],
+    adSetName: r['Ad set name'] || r['ad set name'] || '',
     displayName: stripCampaignPrefix(r['Ad name']),
     campaignContext: stripCampaignPrefix(r['Campaign name']),
     market: r._market || '',
@@ -8763,6 +8790,9 @@ function renderOracleCardsV2() {
     qlToTdPct: (r['QL-TD%'] || 0) / 100,
     invalidPct: (r['Invalid%'] || 0) / 100,
     cptql: r['CPTQL'], cptd: r['CPTD'],
+    thumbnail_url: r.thumbnail_url || '',
+    image_url: r.image_url || '',
+    tags: r.tags || {},
     _spendSource: r._spendSource,
     _hasCRM: r._hasCRM,
   }));
@@ -8770,10 +8800,33 @@ function renderOracleCardsV2() {
   const _mm0 = getMarketMetrics(market || 'all', from, to);
   const avgCPTQL = _mm0.cptql || (getQL() > 0 ? getSpend() / getQL() : 20000);
 
+  // Liveness signal: an ad is considered RUNNING only if it spent money in the last 7 days.
+  // This catches the case where metaCreatives lookup fails (name mismatch) — we still filter
+  // out ads that Meta has stopped serving, based on daily spend activity.
+  const _livenessSet = new Set();
+  _dailyData.forEach(r => {
+    if ((r.spend || 0) > 0 && r.date >= _twStr) _livenessSet.add(normalizeAdName(r.ad_name));
+  });
+
+  // Returns TRUE if ad is paused/deleted/archived/not-running for ANY reason.
+  // Honors all Meta effective_status states, plus a last-7-days spend check as safety net.
   const isPaused = (adName) => {
     const key = normalizeAdName(adName);
     const creative = metaCreatives.find(c => normalizeAdName(c.name) === key);
-    return creative && (creative.status === 'PAUSED' || creative.status === 'paused');
+    if (creative) {
+      const stat = String(creative.status || '').toUpperCase();
+      // Any state that means "not actively serving"
+      const notServing = new Set([
+        'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED',
+        'ARCHIVED', 'DELETED',
+        'DISAPPROVED', 'WITH_ISSUES', 'PENDING_REVIEW', 'PENDING_BILLING_INFO',
+        'IN_PROCESS'
+      ]);
+      if (notServing.has(stat)) return true;
+    }
+    // Fallback — no Meta match OR Meta says ACTIVE but daily data shows no recent spend
+    if (!_livenessSet.has(key)) return true;
+    return false;
   };
 
   // ── SIGNAL 1: Budget burns — spending ₹15K+ with zero QLs ──
@@ -8792,19 +8845,32 @@ function renderOracleCardsV2() {
         _why: why };
     });
 
-  // ── SIGNAL 2: CPTQL too high — 2x+ market average ──
+  // ── SIGNAL 2: CPTQL too high — above ad's own market amber OR 2x+ the overall avg ──
+  // Uses per-market thresholds so "bad CPTQL" means the same thing regardless of dashboard filter.
   const cptqlLeaks = adCampData
-    .filter(a => a.spend !== null && a.tql >= 5 && a.cptql !== null && a.cptql > avgCPTQL * 2 && !isPaused(a.adName))
-    .sort((a, b) => b.spend - a.spend) // sort by spend (biggest waste first, not worst CPTQL)
+    .filter(a => {
+      if (a.spend === null || a.tql < 5 || a.cptql === null || isPaused(a.adName)) return false;
+      const adMkt = a.market || 'US';
+      const adMktAmber = (SENTINEL_THRESHOLDS[adMkt] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000;
+      // Flag if above the ad's own market amber, OR above 2x the current-filter portfolio avg.
+      return a.cptql > adMktAmber || a.cptql > avgCPTQL * 2;
+    })
+    .sort((a, b) => b.spend - a.spend)
     .slice(0, 5)
     .map(a => {
       const wt = _getWeeklyTrend(a.adName);
       const trendStr = wt ? ` · ${wt.label} ${wt.twQL}QL this wk vs ${wt.lwQL} last` : '';
-      const multiplier = Math.round(a.cptql / avgCPTQL);
-      const mktLabel = a.market || 'portfolio';
-      const why = `CPTQL ${formatCurrency(a.cptql)} is ${multiplier}\u00D7 the ${mktLabel} average (${formatCurrency(avgCPTQL)}). Spend is delivering TQLs but at a cost that wipes out any downstream enrollment margin.`;
+      const adMkt = a.market || 'US';
+      const adMktTh = SENTINEL_THRESHOLDS[adMkt] || SENTINEL_THRESHOLDS['US'];
+      const adMktAmber = adMktTh.cpql?.amber || 15000;
+      const adMktGreen = adMktTh.cpql?.green || 10000;
+      const aboveAmber = a.cptql > adMktAmber;
+      const multiplier = avgCPTQL > 0 ? Math.round(a.cptql / avgCPTQL) : 0;
+      const why = aboveAmber
+        ? `CPTQL ${formatCurrency(a.cptql)} exceeds the ${adMkt} amber threshold of ${formatCurrency(adMktAmber)} (green is ${formatCurrency(adMktGreen)}). Costs too much per qualified lead \u2014 any downstream enrollment margin is already gone.`
+        : `CPTQL ${formatCurrency(a.cptql)} is ${multiplier}\u00D7 the portfolio average (${formatCurrency(avgCPTQL)}). Delivering TQLs but at a cost that wipes out margin.`;
       return { ...a, name: a.adName, _type: 'cptql', _priority: 2, _trend: wt,
-        _signal: `CPTQL ${formatCurrency(a.cptql)} (${multiplier}x avg) \u00B7 ${a.tql} TQLs${trendStr}`,
+        _signal: `CPTQL ${formatCurrency(a.cptql)}${aboveAmber ? ' (above ' + adMkt + ' amber)' : ' (' + multiplier + 'x avg)'} \u00B7 ${a.tql} TQLs${trendStr}`,
         _why: why };
     });
 
@@ -8853,25 +8919,55 @@ function renderOracleCardsV2() {
       _why: `${Math.round(a.invalidPct * 100)}% of this ad's leads are marked invalid (bots, junk forms, disposable emails). The creative is attracting pattern-matchers who auto-submit forms \u2014 usually a hook or offer that implies "easy money" / low-commitment signup.` }));
 
   // ── SIGNAL 6: Fatigue — declining CPM / CTR / spend efficiency over time ──
+  // Phase 4: for fatigued ads that were previously TIER-1 winners, label as "Refresh"
+  // instead of "Kill" — the creative direction worked, it just wore out. Brief a variant,
+  // don't pause the pattern entirely.
   const seenNames = new Set([...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds].map(a => normalizeAdName(a.name)));
+  const _adByName = {};
+  adCampData.forEach(a => { _adByName[normalizeAdName(a.adName)] = a; });
   const fatigueAds = detectFatigue()
     .filter(f => f.stage >= 2 && !seenNames.has(normalizeAdName(f.ad_name)))
     .slice(0, 4)
     .map(f => {
+      const fullAd = _adByName[normalizeAdName(f.ad_name)] || null;
+      const historicalTier = fullAd ? _classifyWinner(fullAd) : null;
+      const wasWinner = historicalTier === 'tier1' || historicalTier === 'tier2';
       const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
-      const why = `${stageText} \u2014 ${f.signals.join('; ')}. Audience has seen this creative too many times; refresh the visual and hook before it drags down the account\'s learning phase.`;
+      const why = wasWinner
+        ? `${stageText} \u2014 but this ad was a ${historicalTier === 'tier1' ? 'proven' : 'emerging'} winner (CPTD ${fullAd?.cptd ? formatCurrency(fullAd.cptd) : '\u2014'}, ${fullAd?.td || 0} TDs). ${f.signals.join('; ')}. The CREATIVE PATTERN works \u2014 refresh visual/hook, keep same audience + format, DON'T kill.`
+        : `${stageText} \u2014 ${f.signals.join('; ')}. Audience has seen this creative too many times; refresh the visual and hook before it drags down the account's learning phase.`;
       return {
-        name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0, market: '',
-        _type: 'fatigue', _priority: f.stage === 3 ? 0 : 1,
-        _signal: f.signals.join(' \u00B7 ') + (f.stage === 3 ? ' \u00B7 URGENT' : ''),
-        _why: why
+        ...(fullAd || {}),
+        name: f.ad_name,
+        spend: fullAd?.spend || (f.daily_spend * 3),
+        ql: fullAd?.ql || 0,
+        td: fullAd?.td || 0,
+        market: fullAd?.market || '',
+        _type: wasWinner ? 'refresh' : 'fatigue',
+        _priority: f.stage === 3 ? 0 : 1,
+        _signal: (wasWinner ? 'Proven winner fatiguing \u00B7 ' : '') + f.signals.join(' \u00B7 ') + (f.stage === 3 ? ' \u00B7 URGENT' : ''),
+        _why: why,
+        _wasWinner: wasWinner,
+        _historicalTier: historicalTier
       };
     });
 
   // Combine + sort: priority 0 (urgent fatigue) → 1 (burns, early fatigue) → 2 (leaks/audience/funnel)
-  const pauseAds = [...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds, ...fatigueAds]
-    .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0))
-    .slice(0, 10);
+  let pauseAds = [...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds, ...fatigueAds]
+    .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0));
+  // Phase 5: when country filter = all, cap at 2 per market so every geo surfaces; else top 10
+  if (!market || market === 'all') {
+    const byMkt = {};
+    const capped = [];
+    pauseAds.forEach(a => {
+      const mk = a.market || '_unknown';
+      if (!byMkt[mk]) byMkt[mk] = 0;
+      if (byMkt[mk] < 2) { capped.push(a); byMkt[mk]++; }
+    });
+    pauseAds = capped.slice(0, 14); // soft total cap
+  } else {
+    pauseAds = pauseAds.slice(0, 10);
+  }
 
   const visiblePause = pauseAds.filter(a => isItemVisible('pause:' + a.name));
   const badge = document.getElementById('pauseNowBadge');
@@ -8886,12 +8982,13 @@ function renderOracleCardsV2() {
       const opacity = isDone ? 'opacity-50' : '';
       const isTopOffender = idx === 0 && !isDone;
       const isFatigue = a._type === 'fatigue';
+      const isRefresh = a._type === 'refresh';
       const isBurn = a._type === 'burn';
       const isUrgent = (isFatigue && a._priority === 0) || isBurn;
-      const isWarn = a._type === 'audience' || a._type === 'funnel' || a._type === 'spam';
-      const cardBg = isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200';
-      const metricColor = isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted';
-      const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED' }[a._type] || '';
+      const isWarn = a._type === 'audience' || a._type === 'funnel' || a._type === 'spam' || isRefresh;
+      const cardBg = isRefresh ? 'bg-blue-50 border-blue-200' : (isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200');
+      const metricColor = isRefresh ? 'text-blue-700' : (isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted');
+      const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED', refresh: 'REFRESH · was a winner' }[a._type] || '';
       // Fix numeric ad IDs: if displayName is all digits (>15 chars), fall back to campaign or adset
       let displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
       if (/^\d{10,}/.test(displayName)) displayName = a.campaignContext || a.adName?.slice(0, 40) || displayName;
@@ -8902,7 +8999,7 @@ function renderOracleCardsV2() {
         <div class="flex items-center gap-3">
           ${thumbHtml}
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
+            <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isRefresh ? 'bg-blue-100 text-blue-700' : isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
             ${campCtx ? `<p class="text-[11px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
             <p class="text-xs ${metricColor} mt-0.5">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
             ${a._why ? `<p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : ''}
@@ -8924,12 +9021,234 @@ function renderOracleCardsV2() {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 90 days).</p>';
   }
 
-  // ── MAKE MORE: audience-clustered recommendations + deployment suggestions ──
-  // Phase 3.8 + 3.9 — group by campaign_audience cluster, show best performer + deployment campaign.
+  // ── MAKE MORE: ad-level winners with audience-adjacency suggestions ──
+  // Rebuilt in Phase 3 — per user: surface winning individual ads (not clusters),
+  // pair each with an adjacent-audience recommendation based on tag-pattern match.
   const makeMoreList = document.getElementById('oracleMakeMoreList');
-  const portfolioCPTD = _mm0 ? (_mm0.cptd || Infinity) : Infinity;
-  const portfolioSpend = _mm0 ? (_mm0.spend || 0) : 0;
-  _renderMakeMoreClusters(makeMoreList, market || 'all', portfolioCPTD, portfolioSpend);
+  const pausedAdNames = new Set(pauseAds.map(a => normalizeAdName(a.name)));
+  _renderMakeMoreAds(makeMoreList, adCampData, pausedAdNames, market);
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 3 · Make More rebuild — ad-level with tag-pattern adjacency
+// ────────────────────────────────────────────────────────────────────────────
+
+// Curated audience families for Stage 2 fallback. Each key maps to a prioritized list
+// of "cousin" audiences where a winning creative pattern is likely to transfer. Order
+// matters — first entry is the strongest adjacency.
+const AUDIENCE_FAMILIES = {
+  'NRI (BAU)':         ['Lookalike (BAU)', 'NRI (PLA)', 'Geo (BAU)'],
+  'Lookalike (BAU)':   ['NRI (BAU)', 'Influencer (BAU)', 'Lookalike (PLA)'],
+  'NRI (PLA)':         ['NRI (BAU)', 'Broad (PLA)'],
+  'Broad (PLA)':       ['NRI (PLA)', 'Chinese (PLA)'],
+  'Chinese (PLA)':     ['Broad (PLA)', 'NRI (PLA)'],
+  'Vernacular (BAU)':  ['Interest (BAU)', 'NRI (BAU)'],
+  'Vernacular (PLA)':  ['Broad (PLA)', 'NRI (PLA)'],
+  'Influencer (BAU)':  ['NRI (BAU)', 'Lookalike (BAU)'],
+  'HNI (BAU)':         ['Interest (BAU)', 'Geo (BAU)'],
+  'Interest (BAU)':    ['Broad (BAU)', 'HNI (BAU)', 'Parents (BAU)'],
+  'Broad (BAU)':       ['Interest (BAU)', 'Broad (PLA)'],
+  'Geo (BAU)':         ['HNI (BAU)', 'NRI (BAU)'],
+  'K-2 (BAU)':         ['K-8 (BAU)'],
+  'K-8 (BAU)':         ['K-2 (BAU)', 'High School (BAU)'],
+  'High School (BAU)': ['K-8 (BAU)', 'Competition (BAU)'],
+  'Creative Testing (BAU)': ['Broad (BAU)', 'Interest (BAU)'],
+  'Retargeting (BAU)': ['Lookalike (BAU)']
+};
+
+// Classify an ad against its own market's thresholds. Returns 'tier1' | 'tier2' | null.
+function _classifyWinner(ad) {
+  const mkt = ad.market || 'US';
+  const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
+  const cptdGreen = th.cptd?.green || 35000;
+  const cptdAmber = th.cptd?.amber || 50000;
+  const cpqlGreen = th.cpql?.green || 10000;
+  const td = ad.td || 0;
+  const cptd = ad.cptd;
+  const cptql = ad.cptql;
+  // Tier 1: statistically reliable (TD >= 3) AND in market green zone
+  if (td >= 3 && cptd !== null && cptd !== undefined && cptd <= cptdGreen) return 'tier1';
+  // Tier 2: emerging winner — one-plus TDs under amber AND CPTQL already in green
+  if (td >= 1 && cptd !== null && cptd !== undefined && cptd <= cptdAmber && cptql !== null && cptql !== undefined && cptql <= cpqlGreen) return 'tier2';
+  return null;
+}
+
+// Build a one-liner explaining why this ad worked using its tag pattern + metrics.
+function _winnerWhy(ad) {
+  const tags = ad.tags || {};
+  const bits = [];
+  if (tags.content_format) bits.push(tags.content_format);
+  if (tags.hook) bits.push(`${tagLabel(tags.hook)} hook`);
+  if (tags.pain_benefit) bits.push(tagLabel(tags.pain_benefit));
+  const pattern = bits.length ? bits.join(' + ') : 'this creative pattern';
+  const audLabel = tags.campaign_audience || 'the current audience';
+  const metric = ad.td >= 3
+    ? `${ad.td} TDs at ${formatCurrency(ad.cptd)} CPTD`
+    : `${ad.td} TD${ad.td===1?'':'s'} at ${formatCurrency(ad.cptd)} CPTD (low-volume early signal)`;
+  return `${pattern} is working on ${audLabel} — ${metric}.`;
+}
+
+// Stage 1 tag-pattern adjacency → Stage 2 curated family fallback.
+// Returns null if no suggestion can be made.
+function _findAdjacentAudience(winner, allWinners) {
+  const hook = winner.tags?.hook;
+  const pain = winner.tags?.pain_benefit;
+  const currentAud = winner.tags?.campaign_audience;
+
+  // Stage 1: find audiences where the SAME hook + pain pattern already has winners.
+  if (hook && pain && currentAud) {
+    const byAud = {};
+    allWinners.forEach(w => {
+      if (w === winner) return;
+      const aud = w.tags?.campaign_audience;
+      if (!aud || aud === currentAud) return;
+      if (w.tags?.hook !== hook || w.tags?.pain_benefit !== pain) return;
+      if (!byAud[aud]) byAud[aud] = { count: 0, cptdSum: 0, ads: [] };
+      byAud[aud].count++;
+      byAud[aud].cptdSum += w.cptd || 0;
+      byAud[aud].ads.push(w);
+    });
+    const ranked = Object.entries(byAud).filter(([,v]) => v.count >= 2).sort((a,b) => (a[1].cptdSum/a[1].count) - (b[1].cptdSum/b[1].count));
+    if (ranked.length) {
+      const [aud, stats] = ranked[0];
+      const avgCPTD = stats.cptdSum / stats.count;
+      return {
+        audience: aud,
+        source: 'tag-pattern-match',
+        reason: `Your ${tagLabel(hook)} + ${tagLabel(pain)} pattern already has ${stats.count} winner${stats.count>1?'s':''} in ${aud} (avg ${formatCurrency(avgCPTD)} CPTD). Test this ad's variant there.`
+      };
+    }
+  }
+
+  // Stage 2: curated family map
+  if (currentAud && AUDIENCE_FAMILIES[currentAud]?.length) {
+    for (const candidate of AUDIENCE_FAMILIES[currentAud]) {
+      const cfg = TARGETING_CONFIG[candidate];
+      if (!cfg) continue;
+      // Check if this candidate already has lots of winners with this pattern — skip if saturated
+      const sharedInterest = cfg.interests?.slice(0, 2).join(', ') || '';
+      return {
+        audience: candidate,
+        source: 'audience-family',
+        reason: `${candidate} shares demographic targeting${sharedInterest ? ` (${sharedInterest})` : ''}. Test this winning pattern there.`
+      };
+    }
+  }
+  return null;
+}
+
+function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
+  if (!container) return;
+  const flow = (typeof getFlowFilter === 'function') ? getFlowFilter() : 'all';
+
+  // 1. Classify all ads
+  const winners = [];
+  adCampData.forEach(a => {
+    if (pausedAdNames.has(normalizeAdName(a.adName))) return;
+    const tier = _classifyWinner(a);
+    if (!tier) return;
+    // Respect flow filter: exclude PLA winners in BAU view and vice versa
+    if (flow === 'bau' && /\(PLA\)/i.test(a.tags?.campaign_audience || '')) return;
+    if (flow === 'pla' && !/\(PLA\)/i.test(a.tags?.campaign_audience || '')) return;
+    winners.push({ ...a, _tier: tier });
+  });
+
+  if (!winners.length) {
+    container.innerHTML = '<p class="text-xs text-text-muted py-3">No winning ads yet (need TD \u2265 3 with CPTD below market green, or TD \u2265 1 with CPTQL in green). Give recent tests 3\u20137 more days to mature.</p>';
+    const makeBadge = document.getElementById('makeMoreBadge');
+    if (makeBadge) makeBadge.textContent = '';
+    return;
+  }
+
+  // 2. Rank — Tier 1 first, CPTD asc within tier
+  winners.sort((a, b) => {
+    if (a._tier !== b._tier) return a._tier === 'tier1' ? -1 : 1;
+    return (a.cptd || Infinity) - (b.cptd || Infinity);
+  });
+
+  // 3. When "all" — 2 per market; else top 5
+  let pick = [];
+  if (!market || market === 'all') {
+    const byMkt = {};
+    winners.forEach(w => {
+      const mk = w.market || 'US';
+      if (!byMkt[mk]) byMkt[mk] = [];
+      if (byMkt[mk].length < 2) byMkt[mk].push(w);
+    });
+    pick = Object.values(byMkt).flat();
+  } else {
+    pick = winners.slice(0, 5);
+  }
+  const visible = pick.filter(w => isItemVisible('make:ad:' + w.adName));
+  const makeBadge = document.getElementById('makeMoreBadge');
+  if (makeBadge) makeBadge.textContent = visible.length > 0 ? `${visible.length} winner${visible.length>1?'s':''}` : '';
+
+  if (!visible.length) {
+    container.innerHTML = '<p class="text-xs text-text-muted py-3">All winners for this period have been actioned or dismissed.</p>';
+    return;
+  }
+
+  // 4. Render
+  const esc = s => String(s || '').replace(/'/g, "\\'");
+  let html = '<div class="space-y-3">';
+  visible.forEach(w => {
+    const itemId = 'make:ad:' + w.adName;
+    const action = (typeof getOracleAction === 'function') ? getOracleAction(itemId) : null;
+    const isDone = action?.status === 'done';
+    const opacity = isDone ? 'opacity-50' : '';
+    const thumb = w.thumbnail_url || w.image_url || '';
+    const mkt = w.market || 'US';
+    const mktTh = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
+    const cptdColor = w.cptd && w.cptd <= (mktTh.cptd?.green||35000) ? 'green' : w.cptd && w.cptd <= (mktTh.cptd?.amber||50000) ? 'orange' : 'red';
+    const currentAud = w.tags?.campaign_audience || '';
+    const audFmt = _formatAudience(currentAud);
+    const tierBadge = w._tier === 'tier1'
+      ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-bold">PROVEN</span>'
+      : '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">EMERGING</span>';
+    const why = _winnerWhy(w);
+    const adj = _findAdjacentAudience(w, winners);
+    const adjCfg = adj ? TARGETING_CONFIG[adj.audience] : null;
+    const adjSubtitle = adjCfg ? [
+      adjCfg.age ? `Age ${adjCfg.age}` : '',
+      adjCfg.interests?.length ? adjCfg.interests.slice(0,2).join(', ') : '',
+      adjCfg.geo?.length ? adjCfg.geo.join('/') : ''
+    ].filter(Boolean).join(' \u00B7 ') : '';
+
+    html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${esc(w.displayName || w.adName)}">
+      <div class="flex items-start gap-3">
+        ${thumb ? `<img src="${thumb}" class="w-14 h-14 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-14 h-14 rounded-lg bg-surface-tertiary shrink-0"></div>'}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-sm font-semibold truncate" title="${esc(w.adName)}">${w.displayName || w.adName}</p>
+            ${tierBadge}
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
+          </div>
+          ${currentAud ? `<p class="text-[11px] text-text-muted mt-0.5" title="${esc(audFmt.tooltip)}">Running on <strong>${currentAud}</strong>${audFmt.subtitleLines[0] ? ' \u00B7 ' + audFmt.subtitleLines[0] : ''}</p>` : ''}
+          <p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="text-base font-bold text-accent-${cptdColor}">${w.cptd ? formatCurrency(w.cptd) : '\u2014'}</p>
+          <p class="text-[9px] text-text-muted">CPTD<br>${w.td || 0} TDs \u00B7 ${w.ql || 0} QLs</p>
+        </div>
+      </div>
+      ${adj ? `<div class="mt-3 pt-3 border-t border-gray-100 bg-accent-purple-light/20 -mx-4 -mb-4 px-4 pb-3 pt-2 rounded-b-xl">
+        <p class="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">\u2192 Also try on: ${adj.audience}</p>
+        ${adjSubtitle ? `<p class="text-[10px] text-text-muted mb-1">${adjSubtitle}</p>` : ''}
+        <p class="text-[10px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${adj.reason}</p>
+        ${adjCfg?.campaigns?.[0] ? `<div class="mt-1.5 flex items-center gap-2">
+          <code class="text-[10px] bg-white px-2 py-1 rounded font-mono text-text-primary truncate flex-1 border border-gray-200" title="${esc(adjCfg.campaigns[0])}">${adjCfg.campaigns[0]}</code>
+          <button onclick="navigator.clipboard.writeText('${esc(adjCfg.campaigns[0])}');this.textContent='Copied'" class="text-[10px] px-2 py-1 rounded bg-accent-purple text-white font-bold hover:bg-purple-700 shrink-0">Copy</button>
+        </div>` : ''}
+      </div>` : ''}
+      ${!isDone ? `<div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1.5">
+        <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+        <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+        <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+      </div>` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>`}
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 // Phase 3.8 + 3.9 — Make More clusters with deployment suggestions.
@@ -9015,10 +9334,15 @@ function _renderMakeMoreClusters(container, market, portfolioCPTD, portfolioSpen
       ? `${recVerb} ${dominantFmt.toLowerCase()}s for ${c.audience}`
       : `${recVerb} for ${c.audience}`;
 
-    // Cluster CPTD vs portfolio
-    const cptdColor = c.cptd ? (portfolioCPTDFinite && c.cptd <= portfolioCPTDFinite * 0.8 ? 'green' : portfolioCPTDFinite && c.cptd <= portfolioCPTDFinite * 1.2 ? 'orange' : 'red') : 'gray';
-    const deltaPct = (portfolioCPTDFinite && c.cptd) ? Math.round((c.cptd / portfolioCPTDFinite - 1) * 100) : null;
-    const deltaTxt = deltaPct == null ? '' : (deltaPct === 0 ? 'on portfolio avg' : (deltaPct < 0 ? `${Math.abs(deltaPct)}% below avg` : `${deltaPct}% above avg`));
+    // Cluster CPTD vs cluster's PRIMARY market threshold (not portfolio blend).
+    // TARGETING_CONFIG.geo[0] = primary market for this audience. Fallback to dashboard country.
+    const primaryMkt = (c.config?.geo?.[0]) || (market !== 'all' ? market : 'US');
+    const mktTh = SENTINEL_THRESHOLDS[primaryMkt] || SENTINEL_THRESHOLDS['US'];
+    const mktGreen = mktTh.cptd?.green || 35000;
+    const mktAmber = mktTh.cptd?.amber || 50000;
+    const cptdColor = c.cptd ? (c.cptd <= mktGreen ? 'green' : c.cptd <= mktAmber ? 'orange' : 'red') : 'gray';
+    const deltaPct = (mktGreen && c.cptd) ? Math.round((c.cptd / mktGreen - 1) * 100) : null;
+    const deltaTxt = deltaPct == null ? '' : (deltaPct <= 0 ? `${Math.abs(deltaPct)}% below ${primaryMkt} green` : `${deltaPct}% above ${primaryMkt} green`);
 
     // Why — explain the status label using the numbers we already have
     const sharePct = Math.round(c._spendShare * 100);
@@ -9030,16 +9354,22 @@ function _renderMakeMoreClusters(container, market, portfolioCPTD, portfolioSpen
       return `${c.count} ads, ${Math.round(c.td)} TDs, CPTD ${c.cptd ? formatCurrency(c.cptd) : '\u2014'}${deltaTxt ? ' (' + deltaTxt + ')' : ''}. Monitor; not enough signal yet to scale or kill.`;
     })();
 
+    const audFmt = _formatAudience(c.audience);
+    const subtitleHtml = audFmt.subtitleLines.length
+      ? `<div class="mt-1 space-y-0.5">${audFmt.subtitleLines.map(l => `<p class="text-[10px] text-text-muted leading-snug">${l}</p>`).join('')}</div>`
+      : '';
     html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${esc(c.audience)}">
-      <div class="flex items-center gap-3 mb-2">
+      <div class="flex items-start gap-3 mb-2">
         ${bestThumb}
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <p class="text-sm font-bold">${c.audience}</p>
+            <p class="text-sm font-bold" title="${esc(audFmt.tooltip)}">${audFmt.label}</p>
             <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${c._labelCls}">${c._label}</span>
             <span class="text-[10px] text-text-muted">${c.count} ads · ${Math.round(c._spendShare*100)}% of spend</span>
+            ${audFmt.unclassified ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold" title="No TARGETING_CONFIG entry yet">unclassified</span>' : ''}
           </div>
-          <p class="text-[11px] text-accent-purple mt-0.5"><span class="font-bold">\u2192 Action:</span> ${fmtRec}</p>
+          ${subtitleHtml}
+          <p class="text-[11px] text-accent-purple mt-1.5"><span class="font-bold">\u2192 Action:</span> ${fmtRec}</p>
           ${bestDisplay ? `<p class="text-[10px] text-text-muted truncate mt-0.5" title="${esc(bestName)}">Best: ${bestDisplay}${bestFmt ? ` (${bestFmt})` : ''}${bestCPTD ? ` \u2014 ${formatCurrency(bestCPTD)} CPTD` : ''}</p>` : ''}
         </div>
         <div class="text-right shrink-0">
@@ -9053,13 +9383,10 @@ function _renderMakeMoreClusters(container, market, portfolioCPTD, portfolioSpen
         <div><span class="font-bold text-text-primary">${Math.round(c.td)}</span> TDs</div>
         <div><span class="font-bold text-text-primary">${c.qlTd != null ? c.qlTd.toFixed(1) + '%' : '\u2014'}</span> QL\u2192TD</div>
       </div>
-      ${deployCampaign || targetingBits ? `<div class="mt-2 pt-2 border-t border-gray-100">
-        <p class="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">Deploy in</p>
-        ${deployCampaign ? `<div class="flex items-center gap-2">
-          <code class="text-[10px] bg-surface-tertiary px-2 py-1 rounded font-mono text-text-primary truncate flex-1" title="${esc(deployCampaign)}">${deployCampaign}</code>
-          <button onclick="navigator.clipboard.writeText('${esc(deployCampaign)}');this.textContent='Copied'" class="text-[10px] px-2 py-1 rounded bg-accent-purple text-white font-bold hover:bg-purple-700 shrink-0">Copy</button>
-        </div>` : ''}
-        ${targetingBits ? `<p class="text-[10px] text-text-muted mt-1">${targetingBits}</p>` : ''}
+      ${deployCampaign ? `<div class="mt-2 pt-2 border-t border-gray-100 flex items-center gap-2">
+        <span class="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Deploy in</span>
+        <code class="text-[10px] bg-surface-tertiary px-2 py-1 rounded font-mono text-text-primary truncate flex-1" title="${esc(deployCampaign)}">${deployCampaign}</code>
+        <button onclick="navigator.clipboard.writeText('${esc(deployCampaign)}');this.textContent='Copied'" class="text-[10px] px-2 py-1 rounded bg-accent-purple text-white font-bold hover:bg-purple-700 shrink-0">Copy</button>
       </div>` : ''}
       ${!isDone ? `<div class="mt-2 pt-2 border-t border-gray-100">
         <div class="flex items-center gap-1.5">
@@ -12506,6 +12833,190 @@ const TARGETING_CONFIG = {
   'Broad (PLA)': { age:'35-55', gender:'M&F', interests:['Educational Technology'], geo:['US'], campaigns:['USA_FB_Leads_Broad_PLA_*'] }
 };
 
+// Per-value tag definitions. Phase 2.5c — authored as a first pass; intended to be edited
+// by the content team over time. Each definition: one-sentence description; aimed at
+// disambiguating tags that share words across categories (e.g. "Testimonial" is a format,
+// not a hook; "Authority" is a hook AND a tone — different meanings).
+const TAG_DEFINITIONS = {
+  hook: {
+    'Outcome First':    'Opens by naming the result the parent wants ("Your child will think like a mathematician"). Leads with payoff, not feature.',
+    'Problem/Pain':     'Opens with a problem the parent already worries about ("Stuck on word problems?"). Hooks via shared frustration.',
+    'Question':         'Opens with a direct question to the viewer ("How do you teach a kid to love math?"). Pulls via curiosity + implied challenge.',
+    'Social Proof':     'Opens with someone else\'s result or endorsement ("10,000 parents chose Cuemath"). Credibility via crowd.',
+    'Fear/Urgency':     'Opens with loss-aversion or time pressure ("Don\'t let math anxiety follow them to high school"). Risky hook — use sparingly.',
+    'Curiosity':        'Opens with a puzzle or surprising claim ("Most kids learn math backwards"). Pulls via "tell me more."',
+    'Recommendation':   'Opens as a suggestion from a trusted voice ("If your child struggles with math, try this"). Gentle, advisor tone.',
+    'Offer/Price':      'Opens with a discount, trial, or price claim. Transactional — performs well in PLA, rarely in BAU brand work.',
+    'Authority':        'Opens with credentials, rankings, or expert framing ("India\'s top math program"). Authority-signal first.',
+    'Feature-Driven':   'Opens by describing the product or methodology ("1-on-1 live sessions with trained math tutors"). Feature-first — typically underperforms outcome-first.'
+  },
+  pain_benefit: {
+    'Confidence':               'Child\'s self-belief in math. The internal shift from "I\'m bad at math" to "I can figure this out."',
+    'Grades & School':          'Academic performance — test scores, homework, teacher feedback. External/measurable.',
+    'Tutor Quality':            'Credentials, training, or ratio of the teacher. Trust in who\'s teaching.',
+    'Personalization':          'Adapted to the child\'s level and pace; not a one-size-fits-all classroom.',
+    'Thinking vs Calculating':  'Teaching problem-solving and reasoning, not rote calculation. The "why" behind the math.',
+    'Fun & Engagement':         'Child enjoys learning; doesn\'t dread sessions. Emotional experience of the class.',
+    'Competition Prep':         'Preparation for SAT, Olympiad, IB/IGCSE, entrance exams. Goal-directed.',
+    'Foundation Building':      'Strengthening core concepts (fractions, algebra basics) a child missed earlier.',
+    'Parent Peace of Mind':     'Parent\'s relief — homework is handled, child is progressing without parental nagging.'
+  },
+  emotional_tone: {
+    'Confident':    'Matter-of-fact, assured delivery. "This works, here\'s why."',
+    'Aspirational': 'Forward-looking, painting a better future. "Your child could do this."',
+    'Empathetic':   'Acknowledges parent\'s struggle, meets them where they are. "We know it\'s hard."',
+    'Urgent':       'Time-pressure or loss-framing in delivery. "Don\'t wait until exam season."',
+    'Warm':         'Friendly, human, soft. Conversational rather than transactional.',
+    'Playful':      'Humorous or light — often used with Fun & Engagement pain point.',
+    'Authoritative':'Expert, institutional voice. "Our research shows..."',
+    'Inspirational':'Motivating, call-to-higher-purpose. Often used in brand (not perf) work.'
+  },
+  content_format: {
+    'Testimonial':      'A real parent, student, or both speaking to camera about their own experience. Authenticity is the point.',
+    'Talking Head':     'Host, expert, or creator speaking directly to camera. Not their own experience — they\'re explaining or recommending.',
+    'Product Demo':     'Shows the product in use — screen recording of class, student working through a problem, etc.',
+    'Tutorial':         'Teaches a concept in the ad itself (mini-lesson). Value-delivery format.',
+    'Comparison':       'Before/after or us-vs-them structure. Explicit contrast.',
+    'Skit/Story':       'Narrative or scripted scene with characters. "Show, don\'t tell" approach.',
+    'Graphic Explainer':'Animated or motion graphics carry the message; voiceover supports. Text + visuals drive comprehension.',
+    'Slideshow':        'Static images cut together with captions/music. Low-production, often UGC-feeling.'
+  },
+  talent_type: {
+    'Parent':        'A parent is the primary on-screen figure (speaking, reacting, or featured).',
+    'Tutor':         'A Cuemath tutor or instructor is the primary on-screen figure.',
+    'Child':         'A student/child is the primary on-screen figure.',
+    'Influencer':    'A known creator (non-parent, non-tutor) is the primary on-screen figure.',
+    'Voiceover Only':'Audio-only narration; no primary on-screen talent.',
+    'None':          'No person on screen — motion graphics, text, or product UI only.'
+  },
+  production_style: {
+    'UGC':            'User-generated / phone-shot look. Often vertical, handheld, informal.',
+    'Studio':         'Controlled lighting, multi-camera, professional framing.',
+    'Animated':       'Fully animated — characters or motion graphics with no live-action.',
+    'AI Generated':   'Content produced with AI tools (synthesized voice, generated visuals). Ad name typically contains "AI".',
+    'Static Graphic': 'Non-animated image + text only. Billboards, banners, infographics.',
+    'Screen Recording':'Literal capture of a device screen — class session, app flow, etc.'
+  },
+  creative_type: {
+    'Static': 'Single image; no motion.',
+    'Video':  'Any moving content — reel, story, animation, slideshow.'
+  },
+  language: {
+    'English':   'Ad\'s primary language is English.',
+    'Hindi':     'Ad\'s primary language is Hindi (Devanagari or Romanized).',
+    'Telugu':    'Ad\'s primary language is Telugu.',
+    'Tamil':     'Ad\'s primary language is Tamil.',
+    'Gujarati':  'Ad\'s primary language is Gujarati.',
+    'Malayalam': 'Ad\'s primary language is Malayalam.',
+    'Other':     'Any other language (Bengali, Marathi, Kannada, Chinese, etc.).'
+  }
+};
+
+// Pull up to N example creatives (thumbnails + names) tagged with this category/value.
+// Sorted by best CPTD (or highest spend if no TD data). Used in tag reference panel.
+function _getTagExamples(category, value, count = 3) {
+  if (!state?.taggerData?.length) return [];
+  const matches = state.taggerData.filter(c => {
+    const v = c.tags?.[category];
+    return v && String(v) === String(value);
+  });
+  matches.sort((a, b) => {
+    const aTd = parseNumber(a['TD']||a['td']||0), bTd = parseNumber(b['TD']||b['td']||0);
+    const aS = parseNumber(a['Spent']||a['spent']||0), bS = parseNumber(b['Spent']||b['spent']||0);
+    if (aTd > 0 && bTd > 0) return (aS/aTd) - (bS/bTd); // best CPTD first
+    return bS - aS; // fallback: highest spend
+  });
+  return matches.slice(0, count).map(c => ({
+    name: c['Ad name'] || c['ad name'] || 'Unknown',
+    thumb: c['thumbnail_url'] || c['image_url'] || '',
+    spend: parseNumber(c['Spent']||c['spent']||0),
+    td: parseNumber(c['TD']||c['td']||0),
+    cptd: parseNumber(c['TD']||0) > 0 ? parseNumber(c['Spent']||0) / parseNumber(c['TD']||0) : null
+  }));
+}
+
+// Returns tooltip string for a tag pill. For campaign_audience — full targeting. For
+// other categories — definition + count of examples.
+function _tagPillTitle(category, value) {
+  if (!value) return '';
+  if (category === 'campaign_audience') {
+    const fmt = _formatAudience(value);
+    return fmt.tooltip || value;
+  }
+  const def = TAG_DEFINITIONS[category]?.[value];
+  if (def) return `${value} — ${def}`;
+  const field = (typeof GODFATHER_TAXONOMY !== 'undefined') ? GODFATHER_TAXONOMY.fields?.[category] : null;
+  if (field?.description) return `${field.label || category}: ${field.description}`;
+  return `${category}: ${value}`;
+}
+
+// Tag reference panel — opens an overlay showing all definitions + example thumbnails.
+// Attached to a "?" button in the Patterns tab header.
+function openTagReference() {
+  const existing = document.getElementById('tagReferenceOverlay');
+  if (existing) { existing.remove(); return; }
+  const order = ['hook','content_format','pain_benefit','emotional_tone','talent_type','production_style','creative_type','language'];
+  const catLabel = cat => (GODFATHER_TAXONOMY?.fields?.[cat]?.label) || cat.replace(/_/g, ' ');
+  let body = '';
+  order.forEach(cat => {
+    const defs = TAG_DEFINITIONS[cat]; if (!defs) return;
+    body += `<section class="mb-8"><h3 class="text-sm font-bold uppercase tracking-wider text-text-secondary mb-3">${catLabel(cat)}</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-3">`;
+    Object.entries(defs).forEach(([val, def]) => {
+      const exs = _getTagExamples(cat, val, 3);
+      const thumbs = exs.map(e => e.thumb
+        ? `<img src="${e.thumb}" class="w-10 h-10 rounded object-cover border border-gray-200" title="${(e.name||'').replace(/"/g,'&quot;')}${e.cptd ? ' \u2014 ' + formatCurrency(e.cptd) + ' CPTD' : ''}" onerror="this.style.display='none'"/>`
+        : ''
+      ).join('');
+      body += `<div class="p-3 bg-white border border-gray-200 rounded-lg">
+        <p class="text-xs font-bold mb-1">${val}</p>
+        <p class="text-[11px] text-text-muted leading-snug mb-2">${def}</p>
+        <div class="flex gap-1.5">${thumbs || '<span class="text-[10px] text-text-muted italic">No example creative yet</span>'}</div>
+      </div>`;
+    });
+    body += '</div></section>';
+  });
+  const overlay = document.createElement('div');
+  overlay.id = 'tagReferenceOverlay';
+  overlay.className = 'fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-start justify-center p-6 overflow-y-auto';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `<div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full my-6 max-h-[92vh] overflow-y-auto">
+    <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div><h2 class="text-lg font-bold">Tag Reference</h2><p class="text-[11px] text-text-muted">Definition + 3 example creatives per tag value. Examples sorted by best CPTD.</p></div>
+      <button onclick="document.getElementById('tagReferenceOverlay').remove()" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div class="px-6 py-5">${body}</div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+// Shared formatter for audience/segment labels — used by Make More, Combos, Data Table, filters.
+// Returns { label, subtitleLines[], tooltip }. If audience isn't in TARGETING_CONFIG, flags it
+// so "General" / unclassified labels surface the need for a taxonomy entry (Phase 2.5b).
+function _formatAudience(audience) {
+  if (!audience) return { label: '\u2014', subtitleLines: [], tooltip: '' };
+  const cfg = (typeof TARGETING_CONFIG !== 'undefined') ? TARGETING_CONFIG[audience] : null;
+  if (!cfg) {
+    // Unclassified audience — either parser fell through to "General" or a new audience we haven't mapped.
+    return {
+      label: audience,
+      subtitleLines: [`Targeting not yet mapped \u2014 see raw campaign name on the ad`],
+      tooltip: `${audience} — no TARGETING_CONFIG entry. Add one in index.html to show full targeting details.`,
+      unclassified: true
+    };
+  }
+  const lines = [];
+  if (cfg.age) lines.push(`Age ${cfg.age}${cfg.gender ? ' \u00B7 ' + cfg.gender : ''}`);
+  if (cfg.interests?.length) lines.push(`Interests: ${cfg.interests.join(', ')}`);
+  if (cfg.vernacular?.length) lines.push(`Language: ${cfg.vernacular.join(', ')}`);
+  if (cfg.geo?.length) lines.push(`Geo: ${cfg.geo.join(', ')}`);
+  if (cfg.campaigns?.length) lines.push(`Campaigns: ${cfg.campaigns.join(', ')}`);
+  return {
+    label: audience,
+    subtitleLines: lines,
+    tooltip: lines.join(' \u00B7 ')
+  };
+}
+
 // Phase 2.7: Audience cluster performance aggregator
 function getAudiencePerformance(market, from, to) {
   const data = getFilteredTaggerData();
@@ -15079,7 +15590,7 @@ function renderCreativeReview() {
             <div><span class="text-text-muted block">CTR</span><span class="font-bold ${ctr > 1.5 ? 'text-green-700' : ctr > 0 ? '' : 'text-text-muted'}">${ctr > 0 ? ctr.toFixed(2)+'%' : '—'}</span>${showBenchmark ? ` ${cmp(ctr, b.avgCTR, false)}` : ''}</div>
             <div><span class="text-text-muted block">CPC</span><span class="font-bold">${cpc > 0 ? formatCurrency(cpc) : '—'}</span>${showBenchmark ? ` ${cmp(cpc, b.avgCPC, true)}` : ''}</div>
             <div><span class="text-text-muted block">Click→QL</span><span class="font-bold ${clickQL > 3 ? 'text-green-700' : ''}">${clickQL > 0 ? clickQL.toFixed(1)+'%' : '—'}</span>${showBenchmark ? ` ${cmp(clickQL, b.avgClickQL, false)}` : ''}</div>
-            <div><span class="text-text-muted block">CPTD</span><span class="font-bold ${cptd > 0 ? (cptd < 40000 ? 'text-green-700' : cptd < 70000 ? 'text-amber-600' : 'text-red-600') : 'text-text-muted'}">${cptd > 0 ? formatCurrency(cptd) : '—'}</span>${showBenchmark && cptd > 0 ? ` ${cmp(cptd, b.avgCPTD, true)}` : ''}</div>
+            <div><span class="text-text-muted block">CPTD</span><span class="font-bold ${cptd > 0 ? (cptd < ((SENTINEL_THRESHOLDS[mkt]||SENTINEL_THRESHOLDS['US']).cptd?.green||35000) ? 'text-green-700' : cptd < ((SENTINEL_THRESHOLDS[mkt]||SENTINEL_THRESHOLDS['US']).cptd?.amber||50000) ? 'text-amber-600' : 'text-red-600') : 'text-text-muted'}">${cptd > 0 ? formatCurrency(cptd) : '—'}</span>${showBenchmark && cptd > 0 ? ` ${cmp(cptd, b.avgCPTD, true)}` : ''}</div>
           </div>
           <div class="flex gap-3 mt-1.5 text-[9px] text-text-muted">
             <span>Spend: ${formatCurrency(spend)}</span>
@@ -15120,7 +15631,14 @@ function renderCreativeReview() {
         </div>
         <div class="bg-white rounded-xl border border-gray-200 p-3 text-center">
           <div class="text-[10px] text-text-muted mb-1">Avg CPTD</div>
-          <div class="text-sm font-bold ${portfolioCPTD < 40000 ? 'text-green-700' : portfolioCPTD < 70000 ? 'text-amber-600' : 'text-red-600'}">${formatCurrency(portfolioCPTD)}</div>
+          <div class="text-sm font-bold ${(() => {
+            // Portfolio CPTD colored against a weighted-average of per-market thresholds present in filtered data
+            const _mkts = [...new Set(data.map(c => extractMarket(c) || 'US'))];
+            let _g = 0, _a = 0, _n = 0;
+            _mkts.forEach(mk => { const th = SENTINEL_THRESHOLDS[mk] || SENTINEL_THRESHOLDS['US']; _g += (th.cptd?.green||35000); _a += (th.cptd?.amber||50000); _n++; });
+            const avgG = _n > 0 ? _g / _n : 35000, avgA = _n > 0 ? _a / _n : 50000;
+            return portfolioCPTD < avgG ? 'text-green-700' : portfolioCPTD < avgA ? 'text-amber-600' : 'text-red-600';
+          })()}">${formatCurrency(portfolioCPTD)}</div>
         </div>
         <div class="bg-green-50 rounded-xl border border-green-200 p-3 text-center">
           <div class="text-[10px] text-green-700 mb-1">Scale + Working</div>
@@ -15524,7 +16042,8 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
     tagCount++;
     const baseCat = cat.replace('_secondary','');
     const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(baseCat) || 'purple'];
-    tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5" title="${cat}">${tagLabel(val)}</span>`;
+    const pillTitle = _tagPillTitle(baseCat, val).replace(/"/g,'&quot;');
+    tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5" title="${pillTitle}">${tagLabel(val)}</span>`;
   });
   // Count remaining valid tags beyond the 5 shown
   if (isAllFilter) {
@@ -16154,9 +16673,9 @@ function renderTagCombos() {
         <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="text-xs font-bold text-accent-green">#${i+1}</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcA.bg} ${tcA.text} font-medium">${tagLabel(c.tagA)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcA.bg} ${tcA.text} font-medium" title="${_tagPillTitle(c.catA, c.tagA).replace(/"/g,'&quot;')}">${tagLabel(c.tagA)}</span>
             <span class="text-[10px] text-text-muted">+</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcB.bg} ${tcB.text} font-medium">${tagLabel(c.tagB)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcB.bg} ${tcB.text} font-medium" title="${_tagPillTitle(c.catB, c.tagB).replace(/"/g,'&quot;')}">${tagLabel(c.tagB)}</span>
           </div>
           <div class="text-right shrink-0 ml-2">
             <span class="text-xs font-bold text-accent-green">${formatCurrency(c.medianMetric)}</span>
@@ -16185,9 +16704,9 @@ function renderTagCombos() {
         <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="text-xs font-bold text-accent-red">#${i+1}</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcA.bg} ${tcA.text} font-medium">${tagLabel(c.tagA)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcA.bg} ${tcA.text} font-medium" title="${_tagPillTitle(c.catA, c.tagA).replace(/"/g,'&quot;')}">${tagLabel(c.tagA)}</span>
             <span class="text-[10px] text-text-muted">+</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcB.bg} ${tcB.text} font-medium">${tagLabel(c.tagB)}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded ${tcB.bg} ${tcB.text} font-medium" title="${_tagPillTitle(c.catB, c.tagB).replace(/"/g,'&quot;')}">${tagLabel(c.tagB)}</span>
           </div>
           <div class="text-right shrink-0 ml-2">
             <span class="text-xs font-bold text-accent-red">${formatCurrency(c.medianMetric)}</span>
@@ -17367,11 +17886,17 @@ function renderWinningByAudience() {
   });
   html += `</div></div>`;
 
-  // Audience cards
+  // Audience cards — thresholds per dashboard country filter's market
+  const _audViewMkt = document.getElementById('dashboardCountryFilter')?.value || 'US';
+  const _audViewTh = SENTINEL_THRESHOLDS[_audViewMkt === 'all' ? 'US' : _audViewMkt] || SENTINEL_THRESHOLDS['US'];
+  const _audGreen = _audViewTh.cptd?.green || 35000;
+  const _audAmber = _audViewTh.cptd?.amber || 50000;
+  const _audCpqlGreen = _audViewTh.cpql?.green || 10000;
+  const _audCpqlAmber = _audViewTh.cpql?.amber || 15000;
   html += '<div class="space-y-4">';
   audRows.forEach(r => {
-    const cptdColor = r.cptd ? (r.cptd < 40000 ? 'text-accent-green' : r.cptd < 70000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
-    const cpqlColor = r.cpql ? (r.cpql < 12000 ? 'text-accent-green' : r.cpql < 20000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+    const cptdColor = r.cptd ? (r.cptd < _audGreen ? 'text-accent-green' : r.cptd < _audAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+    const cpqlColor = r.cpql ? (r.cpql < _audCpqlGreen ? 'text-accent-green' : r.cpql < _audCpqlAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
 
     html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-5">
       <div class="flex items-center justify-between mb-4">

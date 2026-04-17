@@ -4,6 +4,61 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Pause Now trust fix + Make More rebuild (2026-04-17)
+
+### Phase 1 — Pause Now paused-ad filter
+- `isPaused()` expanded from 2 status codes to 10: adds `CAMPAIGN_PAUSED`, `ADSET_PAUSED`, `ARCHIVED`, `DELETED`, `DISAPPROVED`, `WITH_ISSUES`, `PENDING_REVIEW`, `PENDING_BILLING_INFO`, `IN_PROCESS`. Catches parent-pause cascades.
+- Secondary liveness check: `_livenessSet` built from last-7-days daily spend. Ad must have spend > 0 in that window OR be marked ACTIVE in metaCreatives. Silences false positives from name-matching misses.
+
+### Phase 2 — Per-market CPTD threshold enforcement
+- Replaced hardcoded ₹40K/₹70K CPTD thresholds across Creative Review card colors (line 15123), portfolio Avg CPTD card (line 15164), Make More fallback audience cards (line 7685), Insights audience cards (line 17425). All routed through `SENTINEL_THRESHOLDS[market].cptd`.
+- Make More cluster cards: use cluster's `TARGETING_CONFIG.geo[0]` primary market for threshold comparison (not portfolio blend).
+- Pause Now Signal 2 (CPTQL Leak): now also flags ads above their OWN market's `cpql.amber` threshold — catches ads that pass the 2× portfolio-avg test but are still abusive for their specific geo.
+
+### Phase 2.5a+d — Audience + Segment full-detail subtitle
+- New `_formatAudience(audience)` helper returns `{ label, subtitleLines[], tooltip, unclassified }`.
+- Make More cluster cards now render full targeting inline: age · gender · interests · language · geo · campaigns.
+- Deploy-in block simplified — collapsed to a single copyable campaign code (full campaigns now in the subtitle).
+- New `_tagPillTitle(category, value)` drives tooltips on tag pills — full targeting for `campaign_audience`, definition + field description for other categories.
+
+### Phase 2.5b — "General" fallback killed
+- Parser (`GODFATHER_TAXONOMY.fields.campaign_audience.parse`) no longer returns "General (BAU)" / "General (PLA)" when no keyword matches. Now emits the first 40 chars of the campaign name + "(unclassified)" so users see real context.
+- Unclassified campaign names logged to `window.__unclassifiedCampaigns` so new keywords can be added to the parser.
+- `_formatAudience` flags unclassified audiences with a yellow "unclassified" badge in the UI.
+
+### Phase 2.5c — Tag definitions + example thumbnails
+- New `TAG_DEFINITIONS` lookup — one-sentence definition per tag value across 8 categories (~60 definitions authored). Distinguishes shared-word confusions (Testimonial is a format, Authority is both hook and tone, etc.).
+- `_getTagExamples(cat, val, count=3)` pulls best-CPTD creatives tagged with a given value for use in the reference panel.
+- `openTagReference()` renders a modal overlay showing all definitions + 3 example thumbnails per value. Grouped by category.
+- "Tag reference" button added to Patterns sub-tab header.
+- `_tagPillTitle` now uses `TAG_DEFINITIONS` for per-value tooltips.
+
+### Phase 3 — Make More rebuilt as ad-level with adjacency
+- `_renderMakeMoreClusters` replaced with `_renderMakeMoreAds`. Source switched from tagger-aggregated clusters to individual CRM-matched ads.
+- Per-ad winner classification via `_classifyWinner(ad)`:
+  - **Tier 1 (Proven):** TD ≥ 3 AND CPTD ≤ market's green threshold
+  - **Tier 2 (Emerging):** TD ≥ 1 AND CPTD ≤ market's amber AND CPTQL ≤ market's green
+  - Fails both → not a winner (regardless of TD volume)
+- Per-card narrative via `_winnerWhy(ad)` — plain-English explanation using the ad's tag pattern + metrics.
+- Adjacency engine via `_findAdjacentAudience(winner, allWinners)`:
+  - **Stage 1 (tag-pattern match):** find audiences where same hook+pain_benefit pair has ≥ 2 winners, rank by avg CPTD. If found, recommend with data citation.
+  - **Stage 2 (curated family fallback):** `AUDIENCE_FAMILIES` map — NRI→Lookalike, Vernacular→Interest, K-2→K-8, etc. Uses `TARGETING_CONFIG` to surface demographic overlap.
+- Output per card: thumbnail, PROVEN/EMERGING tier badge, market, current audience inline, Why it worked, "→ Also try on: [adjacent audience]" panel with campaign code + Copy button.
+- Flow-aware: BAU filter excludes PLA-labeled winners; PLA filter pins to PLA winners only.
+- Kill labels removed from Make More entirely (that belonged in Pause Now).
+
+### Phase 4 — Refresh-don't-kill for fatigued winners
+- Pause Now Signal 6 (Fatigue): for fatigued ads whose historical tier is `tier1` or `tier2`, label changes from "FATIGUED" to "REFRESH · was a winner" with blue card bg (not red). Why line explicitly says: "The CREATIVE PATTERN works — refresh visual/hook, keep same audience + format, DON'T kill."
+
+### Phase 5 — All-Geo 2-3 per market
+- When country filter = "all", Pause Now caps at 2 ads per market (soft total 14) so every geo surfaces, instead of US dominating top 10.
+- Make More already implements per-market cap in the Phase 3 rebuild.
+
+### Files touched
+- `index.html` only. New globals: `AUDIENCE_FAMILIES`, `TAG_DEFINITIONS`, `_formatAudience`, `_tagPillTitle`, `_getTagExamples`, `openTagReference`, `_classifyWinner`, `_winnerWhy`, `_findAdjacentAudience`, `_renderMakeMoreAds`.
+
+---
+
 ## Tagger Consolidation + System-wide Why Pass (2026-04-17)
 
 ### Principle
