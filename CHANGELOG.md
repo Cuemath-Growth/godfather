@@ -4,6 +4,37 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 7 · Tighten winner classification + cohort maturity (2026-04-17)
+
+### Why this shipped
+User caught a "winner" showing 3 TDs from 3 QLs at ₹7.3K CPTD — a 100% conversion rate that's
+either a clamp artifact, cohort timing, or too-small sample to trust. This phase tightens the
+winner bar and gates on mature cohorts so no more magical-math recommendations leak through.
+
+### `_classifyWinner` tightened
+- **Hard gates (both tiers):** spend ≥ ₹25K · CPTD exists and > 0 · QL > TD (strict) · QL ≥ TD × 2.5 (so conversion rate ≤ 40%, realistic ceiling)
+- **Tier 1 (Proven):** TD ≥ 5 · CPTD ≤ market's green threshold
+- **Tier 2 (Emerging):** TD ≥ 2 · CPTD ≤ market's amber · CPTQL ≤ market's green
+- The `QL > TD` sanity check is what rejected the 3/3 card.
+
+### Parser: CTF removed
+- `GODFATHER_TAXONOMY.fields.campaign_audience.parse` no longer returns "Creative Testing" when campaign starts with `CTF_`. CTF is a framework prefix, not an audience — the next keyword (LAL, Expats, etc.) wins. Campaigns with ONLY CTF now fall to the unclassified path (raw campaign name + "(unclassified)" badge).
+
+### Cohort maturity gate
+- New constant `_COHORT_MATURITY_DAYS = 14`. Before `_renderMakeMoreAds` runs, we fetch a second snapshot of `getAdPerformance` with `endDate = today - 14 days` ("mature view"). Only leads created ≥ 14 days ago count.
+- Each ad in `adCampData` annotated with `.mature = { spend, ql, td, cptd, cptql }` or `._matureMissing: true`.
+- `_classifyWinner(ad)` now reads from `ad.mature` when present — same classification logic, but applied to mature cohort metrics.
+- `_renderMakeMoreAds` skips ads with `_matureMissing` (too new to judge) and displays `_displayCPTD/TD/QL/Spend` fields on each card so what the user sees matches what classified the ad.
+- `_winnerWhy` now narrates conversion rate ("X TDs from Y QLs, Z% conv") and notes "on a ≥14-day-mature cohort" when mature metrics were used.
+
+### Net effect on Make More
+- No more 100%-conversion false positives.
+- No more low-volume (< 5 TDs) ads treated as Proven winners.
+- No more ₹22K-spend ads celebrated as scaling candidates.
+- Fresh ads (< 14 days old) don't appear at all — they need to mature first.
+
+---
+
 ## Pause Now trust fix + Make More rebuild (2026-04-17)
 
 ### Phase 1 — Pause Now paused-ad filter

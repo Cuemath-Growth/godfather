@@ -2081,8 +2081,9 @@ const GODFATHER_TAXONOMY = {
         else if (camp.includes('k-2') || camp.includes('k_2')) audience = 'K-2';
         else if (camp.includes('k-8') || camp.includes('k_8')) audience = 'K-8'; // 1.13: new grade-band campaign (Apr 14)
         else if (camp.includes('high-school') || camp.includes('high_school')) audience = 'High School';
-        else if (camp.includes('ctf')) audience = 'Creative Testing';
-        else if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('razorpay') || camp.includes('lookalike')) audience = 'Lookalike'; // 1.15: added razorpay as LAL seed
+        // CTF = Creative Testing Framework prefix — NOT a real audience. The targeting keyword
+        // that follows (_LAL_, _Expats_, etc.) is the true audience. Don't short-circuit on ctf.
+        else if (camp.includes('lal') || camp.includes('enrolled') || camp.includes('payu') || camp.includes('razorpay') || camp.includes('lookalike')) audience = 'Lookalike';
         else if (camp.includes('hni') || camp.includes('premium') || camp.includes('job-titles') || camp.includes('job_titles') || camp.includes('+income')) audience = 'HNI'; // 1.15: India premium campaigns
         else if (camp.includes('retarget') || camp.includes('remarket') || camp.includes('rmkt')) audience = 'Retargeting';
         else if (camp.includes('int_') || camp.includes('int4c') || camp.includes('int-') || camp.includes('interests') || camp.includes('engaged') || camp.includes('school') || camp.includes('entertainment') || camp.includes('parenting') || camp.includes('bollywood')) audience = 'Interest'; // 1.15: parenting + bollywood
@@ -9026,7 +9027,41 @@ function renderOracleCardsV2() {
   // pair each with an adjacent-audience recommendation based on tag-pattern match.
   const makeMoreList = document.getElementById('oracleMakeMoreList');
   const pausedAdNames = new Set(pauseAds.map(a => normalizeAdName(a.name)));
-  _renderMakeMoreAds(makeMoreList, adCampData, pausedAdNames, market);
+
+  // Phase 7: mature-cohort view for winner classification. Leads created in last 14 days
+  // haven't had time to complete trials, so their conversion rate is artificially low and
+  // CPTD is artificially high. Evaluate winners only on cohorts that have had time to mature.
+  const _COHORT_MATURITY_DAYS = 14;
+  const _matTo = new Date(); _matTo.setDate(_matTo.getDate() - _COHORT_MATURITY_DAYS);
+  const _matToStr = _matTo.toISOString().slice(0, 10);
+  const _matFromStr = from || (() => { const d = new Date(_matTo); d.setDate(d.getDate() - 90); return d.toISOString().slice(0, 10); })();
+  let _mature = null;
+  try {
+    const matureRaw = getAdPerformance(market, _matFromStr, _matToStr);
+    _mature = {};
+    matureRaw.forEach(r => {
+      const key = normalizeAdName(r['Ad name']);
+      if (!key) return;
+      _mature[key] = {
+        spend: r['Spent'],
+        ql: r['QL'],
+        td: r['TD'],
+        cptd: r['CPTD'],
+        cptql: r['CPTQL'],
+        market: r._market || ''
+      };
+    });
+  } catch(e) { console.error('[makeMore] mature cohort fetch failed:', e); _mature = null; }
+
+  // Annotate each ad with its mature-cohort metrics so _classifyWinner can evaluate against them.
+  // Ads with no mature history are skipped from winner consideration (too new to judge).
+  const _matureAdCampData = adCampData.map(a => {
+    const m = _mature?.[normalizeAdName(a.adName)];
+    if (!m) return { ...a, _matureMissing: true };
+    return { ...a, mature: m };
+  });
+
+  _renderMakeMoreAds(makeMoreList, _matureAdCampData, pausedAdNames, market);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -9057,19 +9092,41 @@ const AUDIENCE_FAMILIES = {
 };
 
 // Classify an ad against its own market's thresholds. Returns 'tier1' | 'tier2' | null.
+// Phase 7 tightening:
+//   Tier 1 = TD >= 5 AND QL > TD AND QL >= TD * 2.5 (≤ 40% conv) AND CPTD <= market green AND spend >= ₹25K
+//   Tier 2 = TD >= 2 AND QL > TD AND CPTD <= market amber AND CPTQL <= market green AND spend >= ₹25K
+// The QL > TD clause rejects the 100%-conversion clamp / cohort-artifact case the user flagged
+// (3 QLs / 3 TDs @ ₹7.3K looks magical but is either data drift or a sample too small to trust).
 function _classifyWinner(ad) {
+  // Phase 7: evaluate against mature cohort if annotated (Make More path). Fall back to
+  // raw ad metrics (e.g. Pause Now's Refresh detection still classifies against current snapshot).
+  const src = ad.mature || ad;
   const mkt = ad.market || 'US';
   const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
   const cptdGreen = th.cptd?.green || 35000;
   const cptdAmber = th.cptd?.amber || 50000;
   const cpqlGreen = th.cpql?.green || 10000;
-  const td = ad.td || 0;
-  const cptd = ad.cptd;
-  const cptql = ad.cptql;
-  // Tier 1: statistically reliable (TD >= 3) AND in market green zone
-  if (td >= 3 && cptd !== null && cptd !== undefined && cptd <= cptdGreen) return 'tier1';
-  // Tier 2: emerging winner — one-plus TDs under amber AND CPTQL already in green
-  if (td >= 1 && cptd !== null && cptd !== undefined && cptd <= cptdAmber && cptql !== null && cptql !== undefined && cptql <= cpqlGreen) return 'tier2';
+  const td = src.td || 0;
+  const ql = src.ql || 0;
+  const spend = src.spend || 0;
+  const cptd = src.cptd;
+  const cptql = src.cptql;
+  const MIN_SPEND = 25000;
+  const hasCPTD = cptd !== null && cptd !== undefined && cptd > 0;
+  const hasCPTQL = cptql !== null && cptql !== undefined && cptql > 0;
+
+  // Hard gates for both tiers
+  if (spend < MIN_SPEND) return null;
+  if (!hasCPTD) return null;
+  // Sanity: QL must exceed TD (catches clamp / cohort artifacts)
+  if (ql <= td) return null;
+  // Sanity: conversion rate ≤ 40% (QL ≥ TD × 2.5)
+  if (ql < td * 2.5) return null;
+
+  // Tier 1: high confidence — 5+ TDs at green-zone CPTD
+  if (td >= 5 && cptd <= cptdGreen) return 'tier1';
+  // Tier 2: emerging — 2+ TDs under amber AND CPTQL in green
+  if (td >= 2 && cptd <= cptdAmber && hasCPTQL && cptql <= cpqlGreen) return 'tier2';
   return null;
 }
 
@@ -9082,10 +9139,16 @@ function _winnerWhy(ad) {
   if (tags.pain_benefit) bits.push(tagLabel(tags.pain_benefit));
   const pattern = bits.length ? bits.join(' + ') : 'this creative pattern';
   const audLabel = tags.campaign_audience || 'the current audience';
-  const metric = ad.td >= 3
-    ? `${ad.td} TDs at ${formatCurrency(ad.cptd)} CPTD`
-    : `${ad.td} TD${ad.td===1?'':'s'} at ${formatCurrency(ad.cptd)} CPTD (low-volume early signal)`;
-  return `${pattern} is working on ${audLabel} — ${metric}.`;
+  // Use mature-cohort metrics when available (Phase 7)
+  const td = ad._displayTD != null ? ad._displayTD : ad.td;
+  const ql = ad._displayQL != null ? ad._displayQL : ad.ql;
+  const cptd = ad._displayCPTD != null ? ad._displayCPTD : ad.cptd;
+  const convRate = (ql > 0 && td > 0) ? Math.round(td / ql * 100) : null;
+  const cohortNote = ad.mature ? ' (on a \u226514-day-mature cohort)' : '';
+  const metric = td >= 5
+    ? `${td} TDs from ${ql} QLs (${convRate}% conv) at ${formatCurrency(cptd)} CPTD${cohortNote}`
+    : `${td} TD${td===1?'':'s'} from ${ql} QLs at ${formatCurrency(cptd)} CPTD (emerging signal${cohortNote})`;
+  return `${pattern} is working on ${audLabel} \u2014 ${metric}.`;
 }
 
 // Stage 1 tag-pattern adjacency → Stage 2 curated family fallback.
@@ -9141,16 +9204,28 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
   if (!container) return;
   const flow = (typeof getFlowFilter === 'function') ? getFlowFilter() : 'all';
 
-  // 1. Classify all ads
+  // 1. Classify all ads against their MATURE cohort (leads ≥14 days old — Phase 7).
+  //    Ads without mature history are skipped (too new to judge reliably).
   const winners = [];
   adCampData.forEach(a => {
     if (pausedAdNames.has(normalizeAdName(a.adName))) return;
+    if (a._matureMissing) return; // no mature cohort yet — wait 14 days
     const tier = _classifyWinner(a);
     if (!tier) return;
     // Respect flow filter: exclude PLA winners in BAU view and vice versa
     if (flow === 'bau' && /\(PLA\)/i.test(a.tags?.campaign_audience || '')) return;
     if (flow === 'pla' && !/\(PLA\)/i.test(a.tags?.campaign_audience || '')) return;
-    winners.push({ ...a, _tier: tier });
+    // Carry mature metrics forward — the card displays these (not the filter-window snapshot)
+    // so the number the user sees matches the number that classified this ad as a winner.
+    const m = a.mature || {};
+    winners.push({
+      ...a,
+      _tier: tier,
+      _displayCPTD: m.cptd !== undefined ? m.cptd : a.cptd,
+      _displayTD: m.td !== undefined ? m.td : a.td,
+      _displayQL: m.ql !== undefined ? m.ql : a.ql,
+      _displaySpend: m.spend !== undefined ? m.spend : a.spend
+    });
   });
 
   if (!winners.length) {
@@ -9160,10 +9235,10 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     return;
   }
 
-  // 2. Rank — Tier 1 first, CPTD asc within tier
+  // 2. Rank — Tier 1 first, mature CPTD asc within tier
   winners.sort((a, b) => {
     if (a._tier !== b._tier) return a._tier === 'tier1' ? -1 : 1;
-    return (a.cptd || Infinity) - (b.cptd || Infinity);
+    return (a._displayCPTD || Infinity) - (b._displayCPTD || Infinity);
   });
 
   // 3. When "all" — 2 per market; else top 5
@@ -9199,7 +9274,8 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     const thumb = w.thumbnail_url || w.image_url || '';
     const mkt = w.market || 'US';
     const mktTh = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
-    const cptdColor = w.cptd && w.cptd <= (mktTh.cptd?.green||35000) ? 'green' : w.cptd && w.cptd <= (mktTh.cptd?.amber||50000) ? 'orange' : 'red';
+    const _dispCPTD = w._displayCPTD;
+    const cptdColor = _dispCPTD && _dispCPTD <= (mktTh.cptd?.green||35000) ? 'green' : _dispCPTD && _dispCPTD <= (mktTh.cptd?.amber||50000) ? 'orange' : 'red';
     const currentAud = w.tags?.campaign_audience || '';
     const audFmt = _formatAudience(currentAud);
     const tierBadge = w._tier === 'tier1'
@@ -9227,8 +9303,8 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
           <p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-base font-bold text-accent-${cptdColor}">${w.cptd ? formatCurrency(w.cptd) : '\u2014'}</p>
-          <p class="text-[9px] text-text-muted">CPTD<br>${w.td || 0} TDs \u00B7 ${w.ql || 0} QLs</p>
+          <p class="text-base font-bold text-accent-${cptdColor}">${w._displayCPTD ? formatCurrency(w._displayCPTD) : '\u2014'}</p>
+          <p class="text-[9px] text-text-muted" title="Mature cohort \u2014 leads created \u226514 days ago. Excludes fresh leads that haven't had time to convert.">CPTD<br>${w._displayTD || 0} TDs \u00B7 ${w._displayQL || 0} QLs</p>
         </div>
       </div>
       ${adj ? `<div class="mt-3 pt-3 border-t border-gray-100 bg-accent-purple-light/20 -mx-4 -mb-4 px-4 pb-3 pt-2 rounded-b-xl">
