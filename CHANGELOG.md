@@ -4,6 +4,94 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tagger Consolidation + System-wide Why Pass (2026-04-17)
+
+### Principle
+Every recommendation card now emits `Signal + Why + Action`. No silent numbers anywhere.
+
+### Tagger: 6 sub-tabs → 3
+- New pills: **Signals / Explore / Patterns**. Nothing deleted — existing tab divs re-grouped via `TAGGER_TAB_GROUPS` map in `switchTaggerTab`.
+- **Signals** = Creative Review. Market Alerts section removed (duplicated Pause Now on Dashboard). "What's Working — Tag Performance" bars removed (moved to Patterns).
+- **Explore** = Data Table (Tree default) + Grid (toggle). New `_exploreView` state + `setExploreView()` flips between `taggerTab-table` and `taggerTab-grid`. Grid default sort changed to Highest Impact (spend).
+- **Patterns** = Tag Performance Insights headline + Combos + Heatmap (stacked). Insights card block moved from Signals.
+
+### Data Table → 3-level tree
+- Default `taggerViewLevel = 'campaign'` (was `'ad'`).
+- Campaign branch rewrote to emit `Campaign ▸ Ad Set ▸ Ad` hierarchy. `renderTaggerGroupRow()` extended with `parentGroupId` so ad-set rows can nest as hidden children of campaign rows.
+- Every ad row renders a verdict chip + inline Why sentence ("₹41K spent, 3 QLs, 0 TDs — pause" / "18 TDs at ₹14K CPTD — below target"). Verdict taxonomy unchanged; `why` field added to `_ins` block.
+
+### Grid → all-creative impact view
+- Each card now shows: verdict chip, market pill, impact% (share of portfolio TDs + spend), CPTD/CPTQL badge, Why line. Portfolio totals `_totSpend` / `_totTD` computed once per render.
+- Threshold colors moved to per-market `SENTINEL_THRESHOLDS[mkt].cptd` (was hardcoded 30K/60K).
+
+### Combos decluttered
+- Top 10 → top 5, bottom 5 → top 3.
+- Every combo card: Signal + Why (sample size, spend, prevalence in top5/bottom5) + Action ("Brief N more" / "Stop producing").
+- "Key insight" footer removed (redundant with top card).
+
+### Tag operations bar collapsed
+- Four fat buttons (Load Data / Pilot 50 / Tag All New / Re-tag All) → single "Tag New" primary + overflow menu. Moved to right-aligned compact bar.
+
+### System-wide Why pass (Dashboard Oracle)
+- **Pause Now**: all 6 signal types (Burn / CPTQL leak / Wrong audience / Dead funnel / Spam / Fatigue) emit `_why` line. Dead funnel diagnoses intent gap vs no-show vs spam vs wrong audience based on `ts`, `invalidPct`, `nriPct`. Added `ts: parseNumber(r['TS']||0)` to `adCampData` mapping.
+- **Make More clusters**: each card gets Why explaining the status label (Scale/Starving/Saturated/Kill/Healthy) using actual numbers. Action line now prefixed with `→ Action:` in purple.
+- **Deploy These**: each Library asset card explains why that audience is the match.
+- **Influencer Scaling**: each Scale Up / Pause Down creator card has Why with CPQL vs portfolio median.
+- **Market Health**: inline Why cites the actual CPTD threshold crossed per market. `→ Action:` prefix on the recommendation.
+
+### Files touched
+- `index.html` only. No external deps. New/modified globals: `TAGGER_TAB_GROUPS`, `_exploreView`, `setExploreView`, `TAGGER_TAB_GROUPS` routing in `switchTaggerTab`, `_renderMakeMoreClusters` Why logic, `renderTaggerGroupRow(parentGroupId)` signature extension.
+
+---
+
+## Phase 3 Intelligence Wiring: Track A + B (2026-04-16)
+
+### 3.1 Dashboard KPI sparklines
+- Hero CPTD + Trials Done cards: 30-day inline sparklines (right-aligned in metric row).
+- Secondary KPI row (Spend, CPTQL, QL→TD%, Enrolled / Trials Booked): 30-day sparkline per card via `renderSparkline(metric, geo, {width:80,height:18,days:30})`.
+- Geo derived from dashboard country filter.
+
+### 3.2 WoW WHY → action prescriptions
+- `_buildWoWWhy()` now emits `{text, action}` pairs. Each driver gets a purple "→ Action:" line.
+- Actions wired to live data: `_topPauseInMarket(mkt)` finds top spend/0-TD ads, `_topComboInMarket(mkt)` finds best `getAudiencePerformance` cluster.
+- Five drivers covered: spend up + TDs flat, TD drop, NRI shift, QL→TD conversion delta, zero-TD spend concentration.
+
+### 3.3 Market Health clipboard export
+- Added `<div id="oracleMarketHealth">` Section 5 to dashboard (was missing — `renderOracleActions` was bailing out at line 7805 because the container did not exist; section is now visible).
+- "Copy Slack template" button → `copyMarketHealthClipboard()` builds Monday Slack message: per-geo status emoji, spend/CPTD/CPQL/QL→TD, action verb. Honors flow filter and date range.
+
+### 3.4 Funnel waterfall visualization
+- Replaced flat 5-stage flow in `funnelTable` with `_renderFunnelWaterfall(crm, isPLA, cac)`: bar widths proportional to stage volume, leak % per stage, `kept %` color-coded green/amber/red against per-stage thresholds.
+- BAU vs PLA: relabels stages (Trials Sched ↔ Trials Booked) and adjusts thresholds (PLA TS→TD has lower bar — broader audience, lower intent).
+- Detail row preserves NRI/Asian (BAU) or Trials Booked (PLA) breakdown, invalid %, CAC.
+
+### 3.5 Budget pace indicator
+- New `BUDGET_PLAN_INR_CR.US` constant from summary doc §9.4 (FY26-27 monthly plan: Apr 2.25 Cr → Sep 8.10 Cr peak → Dec 2.58 Cr trough).
+- `renderBudgetPace()` shows MTD spend vs plan, day-of-month progress, status pill (Ahead / On pace / Behind), pace marker on the bar, daily-spend-needed-to-hit-plan.
+- Renders only when dashboard country is US or All Markets (other markets have AOP plans not yet wired).
+- New `<div id="budgetPaceCard">` slot under funnelTable.
+
+### 3.6 Tag value filter in Data Table
+- New `<select id="taggerFilterValue">` next to existing category dropdown. Hidden when category = All Tags.
+- `_refreshTaggerValueFilter()` populates values from current tagger data, sorted by frequency, with counts ("Testimonial (47)").
+- `getFilteredTaggerDataWithDropdowns()` extended to apply the value filter when both category and value are non-"all".
+
+### 3.8 Make More: audience-clustered recommendations
+- Replaced ad-by-ad scoring with cluster-grouped cards from `getAudiencePerformance(market)`.
+- Per cluster (top 5): best performer + thumbnail, cluster CPTD vs portfolio (colored delta), spend share, format/theme rec ("Make 2 more videos for NRI (BAU)").
+- Status labels: Scale (CPTD ≤ 0.8x portfolio), Starving (<5% spend share, healthy CPTD), Healthy, Saturated (>30% spend share), Kill (CPTD > 2x portfolio + <2 TD).
+- Flow-aware: PLA filter pins to `*(PLA)` clusters; BAU filter excludes them.
+
+### 3.9 Make More: deployment suggestion
+- Per cluster card pulls `TARGETING_CONFIG[audience].campaigns[0]` and shows it in a copyable `<code>` block.
+- Targeting line: age, top 2 interests, geo, vernacular if applicable.
+
+### Files touched
+- `index.html` only. No external deps changed.
+- New globals: `BUDGET_PLAN_INR_CR`, `_renderFunnelWaterfall`, `renderBudgetPace`, `copyMarketHealthClipboard`, `_refreshTaggerValueFilter`, `_renderMakeMoreClusters`.
+
+---
+
 ## Data Pipeline Fix: UTM Nomenclature + Column Ranges (2026-04-16)
 
 ### Ad Name Resolution (fixes ~50% of April 2026 CRM→Meta matching gap)

@@ -311,6 +311,7 @@
           <div class="mb-6" id="tickerSection">
             <div id="metricTicker"></div>
             <div id="funnelTable" class="mt-4"></div>
+            <div id="budgetPaceCard" class="mt-4"></div>
           </div>
 
           <!-- BAU vs PLA Comparison -->
@@ -396,6 +397,20 @@
               <span class="text-[10px] text-text-muted">— who to scale, who to pause</span>
             </div>
             <div id="oracleInfluencerList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary">e.g. "Creator @mathwithmaya — 12K views, 4.2% ER, 8 enrolments → scale budget"</p></div>
+          </div>
+
+          <!-- Section 5: MARKET HEALTH -->
+          <div class="mb-6" id="oracleMarketHealth">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-6 h-6 rounded-lg bg-accent-blue flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
+              <h3 class="text-sm font-bold">Market Health</h3>
+              <span class="text-[10px] text-text-muted">— per-geo CPTD, conversion, status</span>
+              <button onclick="copyMarketHealthClipboard(this)" class="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold btn-secondary rounded-lg border border-gray-200" title="Copy Monday Slack template">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                Copy Slack template
+              </button>
+            </div>
+            <div id="oracleMarketHealthList"></div>
           </div>
 
           <!-- Hidden compat containers (legacy, kept for JS references) -->
@@ -828,23 +843,24 @@
           </div>
         </div>
 
-        <!-- Tag Actions — OUTSIDE upload/results, always visible -->
-        <div id="taggerActionBar" class="flex items-center gap-3 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <span class="text-xs font-bold text-amber-800">Tag:</span>
-          <button onclick="useDashboardData()" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-blue-400 bg-white text-blue-700 hover:bg-blue-100 shadow-sm" title="Load ads from dashboard data (Google Sheets + Meta API)">
-            Load Data
+        <!-- Tag Actions — compact: one primary button + overflow menu -->
+        <div id="taggerActionBar" class="flex items-center justify-end gap-2 mb-4">
+          <span id="taggerActionCount" class="text-[11px] text-text-muted mr-auto"></span>
+          <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-primary rounded-lg shadow-sm" title="Tag all new/untagged creatives via Haiku vision">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+            Tag New
           </button>
-          <button onclick="retagCreatives(true, 50)" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold rounded-lg border-2 border-amber-400 bg-white text-amber-700 hover:bg-amber-100 shadow-sm" title="Tag up to 50 untagged creatives via Haiku vision (bypasses cache)">
-            Pilot 50
-          </button>
-          <button onclick="retagCreatives(false)" class="flex items-center gap-1.5 px-4 py-2 text-sm font-bold btn-primary rounded-lg shadow-sm" title="Tags all new/untagged creatives">
-            Tag All New
-          </button>
-          <button onclick="retagCreatives(true)" class="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-red-300 bg-white text-red-600 hover:bg-red-50" title="Re-tag ALL creatives from scratch (ignores cache, uses API credits)">
-            Re-tag All
-          </button>
-          <div class="flex-1"></div>
-          <span id="taggerActionCount" class="text-xs text-amber-700"></span>
+          <div class="relative">
+            <button onclick="event.preventDefault();this.nextElementSibling.classList.toggle('hidden')" class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 bg-white hover:bg-surface-tertiary" title="More tag operations">
+              <svg class="w-3.5 h-3.5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+            </button>
+            <div class="hidden absolute right-0 top-9 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 min-w-[180px]" onclick="this.classList.add('hidden')">
+              <button onclick="useDashboardData()" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary" title="Load ads from dashboard data">Load Data from Dashboard</button>
+              <button onclick="retagCreatives(true, 50)" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary" title="Tag up to 50 untagged via Haiku vision">Pilot 50 (vision test)</button>
+              <hr class="my-1 border-gray-100"/>
+              <button onclick="retagCreatives(true)" class="w-full text-left px-3 py-1.5 text-[11px] text-red-600 hover:bg-red-50" title="Re-tag ALL creatives, ignores cache, uses API credits">Re-tag All (burns credits)</button>
+            </div>
+          </div>
         </div>
 
         <!-- Upload Section -->
@@ -906,15 +922,12 @@
             </div>
           </div>
 
-          <!-- Section Tabs -->
+          <!-- Section Tabs — 3-group consolidation (Signals / Explore / Patterns) -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1 flex-wrap">
-              <button class="pill-btn active px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="review" onclick="switchTaggerTab('review')">Creative Review</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="table" onclick="switchTaggerTab('table')">Data Table</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="heatmap" onclick="switchTaggerTab('heatmap')">Heatmap</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="combos" onclick="switchTaggerTab('combos')">Combos</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="grid" onclick="switchTaggerTab('grid')">Grid</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="leaderboard" onclick="switchTaggerTab('leaderboard')">Leaderboard</button>
+              <button class="pill-btn active px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="signals" onclick="switchTaggerTab('signals')" title="What needs attention right now">Signals</button>
+              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="explore" onclick="switchTaggerTab('explore')" title="Per-creative performance — tree and grid views">Explore</button>
+              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-tagger-tab="patterns" onclick="switchTaggerTab('patterns')" title="Winning and losing creative formulas">Patterns</button>
             </div>
             <div class="flex items-center gap-2">
               <div class="relative">
@@ -940,10 +953,6 @@
 
           <!-- Tab: Creative Review (Landing View) -->
           <div id="taggerTab-review" class="tagger-tab">
-            <div class="mb-5">
-              <h3 class="text-base font-bold mb-3">Tag Performance Insights</h3>
-              <div id="taggerInsights" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-            </div>
             <div id="creativeReviewContent"></div>
           </div>
 
@@ -951,13 +960,17 @@
           <div id="taggerTab-table" class="tagger-tab hidden">
             <!-- View Level Toggle + Filter Bar -->
             <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
-              <!-- Row 1: View level + verdict summary -->
-              <div class="flex items-center gap-3 mb-3">
-                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">View:</span>
+              <!-- Row 1: Tree/Grid switch + hierarchy level + verdict summary -->
+              <div class="flex items-center gap-3 mb-3 flex-wrap">
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table and thumbnail grid">
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-explore-view="tree" onclick="setExploreView('tree')">Tree</button>
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="grid" onclick="setExploreView('grid')">Grid</button>
+                </div>
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Level:</span>
                 <div class="flex bg-surface-tertiary rounded-lg p-0.5">
-                  <button class="tagger-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="campaign" onclick="setTaggerViewLevel('campaign')">Campaign</button>
+                  <button class="tagger-level-btn active px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-level="campaign" onclick="setTaggerViewLevel('campaign')">Campaign</button>
                   <button class="tagger-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="adset" onclick="setTaggerViewLevel('adset')">Ad Set</button>
-                  <button class="tagger-level-btn active px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-level="ad" onclick="setTaggerViewLevel('ad')">Ad</button>
+                  <button class="tagger-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="ad" onclick="setTaggerViewLevel('ad')">Ad</button>
                 </div>
                 <div class="flex-1"></div>
                 <div id="taggerVerdictSummary" class="flex items-center gap-2 text-[10px]"></div>
@@ -985,13 +998,16 @@
                   <option value="fatigued">Fatigued</option>
                   <option value="pause">✗ Pause</option>
                 </select>
-                <select id="taggerFilterCategory" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                <select id="taggerFilterCategory" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;_refreshTaggerValueFilter();renderTaggerTable()">
                   <option value="all">All Tags</option>
                   <option value="hook">Hook</option>
                   <option value="content_format">Format</option>
                   <option value="pain_benefit">Benefit</option>
                   <option value="campaign_audience">Audience</option>
                   <option value="segment">Segment</option>
+                </select>
+                <select id="taggerFilterValue" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium hidden" onchange="state._taggerTablePage=1;renderTaggerTable()">
+                  <option value="all">All Values</option>
                 </select>
                 <select id="taggerSortBy" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;renderTaggerTable()">
                   <option value="cpql_asc">Best CPTQL</option>
@@ -1041,24 +1057,35 @@
             <div id="taggerHeatmapPager" class="flex items-center justify-between px-1 py-3 text-xs"></div>
           </div>
 
+          <!-- Patterns group: Tag Performance Insights headline + Combos + (Heatmap below, collapsed) -->
           <!-- Tab: Combos -->
           <div id="taggerTab-combos" class="tagger-tab hidden">
-            <h3 class="text-sm font-bold mb-1">Tag Combos &amp; Signals</h3>
+            <!-- Tag Performance Insights (headline card block) — moved here from Creative Review -->
+            <div class="mb-5">
+              <h3 class="text-base font-bold mb-1">Tag Performance Insights</h3>
+              <p class="text-xs text-text-secondary mb-3">Best and worst tag values per category, by CPTD across all tagged creatives in the current filter.</p>
+              <div id="taggerInsights" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+            </div>
+            <h3 class="text-sm font-bold mb-1">Proven Tag Combos</h3>
             <p class="text-xs text-text-secondary mb-3">Which tag pairs produce the cheapest trials? Based on median CPTD across all creatives sharing the same two tags. "Use More" = found in top performers, "Avoid" = found in bottom performers.</p>
             <div id="taggerCombos" class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5"><p class="text-xs text-text-muted text-center py-6">Needs tagged creatives with performance data. Shows which tag pairs (e.g. Testimonial + NRI) appear in top performers but not bottom ones.</p></div>
           </div>
 
           <!-- Tab: Grid -->
           <div id="taggerTab-grid" class="tagger-tab hidden">
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="text-sm font-bold">Creative Grid</h3>
-              <div class="flex items-center gap-2">
+            <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table and thumbnail grid">
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="tree" onclick="setExploreView('tree')">Tree</button>
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-explore-view="grid" onclick="setExploreView('grid')">Grid</button>
+                </div>
+                <div class="flex-1"></div>
                 <select id="gridSortBy" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="state._gridPage=1;renderCreativeGrid()">
-                  <option value="recent">Most Recent</option>
-                  <option value="spend_desc">Highest Spend</option>
+                  <option value="spend_desc">Highest Impact (spend)</option>
+                  <option value="td_desc">Most TDs</option>
                   <option value="cptd_asc">Best CPTD</option>
                   <option value="cpql_asc">Best CPTQL</option>
-                  <option value="td_desc">Most TDs</option>
+                  <option value="recent">Most Recent</option>
                 </select>
                 <select id="gridTagFilter" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium max-w-[200px]" onchange="state._gridPage=1;renderCreativeGrid()">
                   <option value="all">All Creatives</option>
@@ -5355,6 +5382,19 @@ function getNRI(market, startDate, endDate) {
   }).length;
 }
 
+// India QL count for the current filter — used so funnel ethnicity buckets sum to total QL
+function getIndiaQL(market, startDate, endDate) {
+  let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
+  return rows.filter(r => {
+    const d = r.lead_created_date || '';
+    if (startDate && d < startDate) return false;
+    if (endDate && d > endDate) return false;
+    if (String(r.qls) !== '1') return false;
+    const cb = (r.country_bucket || '').trim().toLowerCase();
+    return cb === 'india' || cb === 'in' || cb === 'asia';
+  }).length;
+}
+
 function getAsian(market, startDate, endDate) {
   let rows = filterLeadsByMarket(_filterLeadsByFlow(leadsData), market);
   return rows.filter(r => {
@@ -5381,9 +5421,10 @@ function getMarketMetrics(market, startDate, endDate) {
   const invalid = getInvalid(market, startDate, endDate);
   const nri = getNRI(market, startDate, endDate);
   const asian = getAsian(market, startDate, endDate);
+  const india_ql = getIndiaQL(market, startDate, endDate);
 
   return {
-    spend, ql, tql, nri, asian, td: td_snap, td_cohort, ts, enrolled, invalid,
+    spend, ql, tql, nri, asian, india_ql, td: td_snap, td_cohort, ts, enrolled, invalid,
     cpql: safeDivide(spend, ql),
     cptql: safeDivide(spend, tql),
     cptd: safeDivide(spend, td_snap),
@@ -7021,6 +7062,7 @@ function onDashboardFilterChange() {
   state.analysis = null;
   try { renderPipeline(); } catch(e) { console.error('renderPipeline:', e); }
   try { renderMetricTicker(); } catch(e) { console.error('renderMetricTicker:', e); }
+  try { renderBudgetPace(); } catch(e) { console.error('renderBudgetPace:', e); }
   try { renderBauPlaComparison(); } catch(e) { console.error('renderBauPlaComparison:', e); }
   try { renderOracleModules(); } catch(e) { console.error('renderOracleModules:', e); }
   try { renderOracleActions(); } catch(e) { console.error('renderOracleActions:', e); }
@@ -7726,17 +7768,24 @@ function renderOracleActions() {
     });
 
     if (deployRecs.length) {
+      const bestAudRef = _audRows[0];
       let html = '<div class="space-y-2">';
       deployRecs.slice(0, 6).forEach(r => {
-        html += `<div class="flex items-center justify-between p-3 bg-accent-purple-light/30 border border-purple-200 rounded-xl">
-          <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold">${r.asset}</p>
-            <p class="text-[10px] text-accent-purple">Deploy to <strong>${r.audience}</strong> audience ${r.hook ? '· matches ' + r.hook + ' pattern' : ''} ${r.metric ? '· predicted ' + r.metric : ''}</p>
+        const whyLine = bestAudRef
+          ? `<strong>${r.audience}</strong> is your top-performing audience cluster (${bestAudRef.ads} ads, ${Math.round(bestAudRef.tdCount)} TDs${r.metric ? ', ' + r.metric : ''}). This asset hasn't been deployed there yet \u2014 ship it as a variant.`
+          : `This asset is sitting in Library but hasn't been deployed to any top audience yet.`;
+        html += `<div class="p-3 bg-accent-purple-light/30 border border-purple-200 rounded-xl">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-semibold truncate" title="${r.asset}">${r.asset}</p>
+              <p class="text-[10px] text-accent-purple">Deploy to <strong>${r.audience}</strong>${r.hook ? ' \u00B7 matches ' + r.hook + ' pattern' : ''}${r.metric ? ' \u00B7 predicted ' + r.metric : ''}</p>
+            </div>
+            <div class="flex gap-1 shrink-0 ml-2">
+              ${r.link ? `<a href="${r.link}" target="_blank" class="text-[10px] px-3 py-1 rounded-full bg-accent-purple text-white font-bold hover:bg-accent-purple/80">View \u2192</a>` : ''}
+              <button onclick="markActionDone('Deployed: ${r.asset.replace(/'/g,"\\'")} \u2192 ${r.audience.replace(/'/g,"\\'")}','deploy','')" class="text-[10px] px-3 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200" title="Mark as done">Done \u2713</button>
+            </div>
           </div>
-          <div class="flex gap-1 shrink-0 ml-2">
-            ${r.link ? `<a href="${r.link}" target="_blank" class="text-[10px] px-3 py-1 rounded-full bg-accent-purple text-white font-bold hover:bg-accent-purple/80">View →</a>` : ''}
-            <button onclick="markActionDone('Deployed: ${r.asset.replace(/'/g,"\\'")} → ${r.audience.replace(/'/g,"\\'")}','deploy','')" class="text-[10px] px-3 py-1 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200" title="Mark as done">Done &#10003;</button>
-          </div>
+          <p class="text-[10px] text-text-secondary mt-1.5 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${whyLine}</p>
         </div>`;
       });
       if (deployRecs.length > 6) html += `<p class="text-[10px] text-text-muted mt-1">+${deployRecs.length - 6} more undeployed creatives</p>`;
@@ -7764,17 +7813,26 @@ function renderOracleActions() {
     const scaleUp = ranked.filter(r => r.cpql).sort((a,b) => a.cpql - b.cpql).slice(0, 3);
     const pauseDown = ranked.filter(r => r.spend > 10000 && (!r.cpql || r.cpql > 20000)).sort((a,b) => b.spend - a.spend).slice(0, 3);
 
+    // Creator-level benchmarks to power the Why
+    const rankedCPQLs = ranked.filter(r => r.cpql).map(r => r.cpql).sort((a,b) => a-b);
+    const medCPQL = rankedCPQLs.length ? rankedCPQLs[Math.floor(rankedCPQLs.length/2)] : 0;
+
     let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">';
     if (scaleUp.length) {
       html += '<div class="bg-accent-green-light/30 border border-green-200 rounded-xl p-4"><p class="text-[10px] font-bold text-green-700 uppercase mb-2">Scale Up (creators by CPQL)</p>';
       scaleUp.forEach(r => {
-        html += `<div class="flex items-center justify-between py-1.5 border-b border-green-100 last:border-0">
-          <div><span class="text-xs font-semibold">${r.displayName}</span> ${r.type ? `<span class="text-[9px] text-text-muted">(${r.type})</span>` : ''}</div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-accent-green">${r.cpql ? formatCurrency(r.cpql) + ' CPQL' : '\u2014'}</span>
-            <button onclick="oracleAction('creator_scale:${r.displayName.replace(/'/g,"\\'")}','creator','done','${r.displayName.replace(/'/g,"\\'")}');this.textContent='Done ✓';this.disabled=true" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">${getOracleAction('creator_scale:'+r.displayName)?.status==='done'?'Done ✓':'Scale ✓'}</button>
-            <button onclick="oracleAction('creator_scale:${r.displayName.replace(/'/g,"\\'")}','creator','snoozed','${r.displayName.replace(/'/g,"\\'")}');this.closest('.flex').parentElement.style.display='none'" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">7d</button>
+        const vsMed = medCPQL > 0 && r.cpql ? Math.round((1 - r.cpql / medCPQL) * 100) : 0;
+        const why = `${r.ads.length} ad${r.ads.length===1?'':'s'} live, ${Math.round(r.td || 0)} TD${r.td===1?'':'s'} at ${formatCurrency(r.cpql)} CPQL${vsMed > 5 ? ` \u2014 ${vsMed}% cheaper than your median creator` : ''}. Scale budget and brief 2 more variants with this creator.`;
+        html += `<div class="py-2 border-b border-green-100 last:border-0">
+          <div class="flex items-center justify-between">
+            <div class="min-w-0 flex-1"><span class="text-xs font-semibold">${r.displayName}</span> ${r.type ? `<span class="text-[9px] text-text-muted">(${r.type})</span>` : ''}</div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs font-bold text-accent-green">${r.cpql ? formatCurrency(r.cpql) + ' CPQL' : '\u2014'}</span>
+              <button onclick="oracleAction('creator_scale:${r.displayName.replace(/'/g,"\\'")}','creator','done','${r.displayName.replace(/'/g,"\\'")}');this.textContent='Done \u2713';this.disabled=true" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">${getOracleAction('creator_scale:'+r.displayName)?.status==='done'?'Done \u2713':'Scale \u2713'}</button>
+              <button onclick="oracleAction('creator_scale:${r.displayName.replace(/'/g,"\\'")}','creator','snoozed','${r.displayName.replace(/'/g,"\\'")}');this.closest('.py-2').style.display='none'" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">7d</button>
+            </div>
           </div>
+          <p class="text-[10px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${why}</p>
         </div>`;
       });
       html += '</div>';
@@ -7782,13 +7840,20 @@ function renderOracleActions() {
     if (pauseDown.length) {
       html += '<div class="bg-accent-red-light/30 border border-red-200 rounded-xl p-4"><p class="text-[10px] font-bold text-red-700 uppercase mb-2">Consider Pausing (creators)</p>';
       pauseDown.forEach(r => {
-        html += `<div class="flex items-center justify-between py-1.5 border-b border-red-100 last:border-0">
-          <div><span class="text-xs font-semibold">${r.displayName}</span></div>
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-bold text-accent-red">${r.cpql ? formatCurrency(r.cpql) + ' CPQL' : formatCurrency(r.spend) + ' spent, 0 QLs'}</span>
-            <button onclick="oracleAction('creator_pause:${r.displayName.replace(/'/g,"\\'")}','creator','done','${r.displayName.replace(/'/g,"\\'")}');this.textContent='Done ✓';this.disabled=true" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">${getOracleAction('creator_pause:'+r.displayName)?.status==='done'?'Done ✓':'Paused ✓'}</button>
-            <button onclick="oracleAction('creator_pause:${r.displayName.replace(/'/g,"\\'")}','creator','snoozed','${r.displayName.replace(/'/g,"\\'")}');this.closest('.flex').parentElement.style.display='none'" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">7d</button>
+        const ratio = medCPQL > 0 && r.cpql ? Math.round(r.cpql / medCPQL) : 0;
+        const why = r.cpql
+          ? `${r.ads.length} ad${r.ads.length===1?'':'s'} live at ${formatCurrency(r.cpql)} CPQL${ratio >= 2 ? `, ${ratio}\u00D7 your median creator cost` : ' \u2014 above the scaling threshold'}. Pause lowest-performing ad first; if the rest hold up, keep the creator on a smaller allocation.`
+          : `${formatCurrency(r.spend)} spent across ${r.ads.length} ad${r.ads.length===1?'':'s'} with 0 QLs attributed \u2014 pause immediately; matching may also be broken (verify in Meta Ads Manager).`;
+        html += `<div class="py-2 border-b border-red-100 last:border-0">
+          <div class="flex items-center justify-between">
+            <div class="min-w-0 flex-1"><span class="text-xs font-semibold">${r.displayName}</span></div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs font-bold text-accent-red">${r.cpql ? formatCurrency(r.cpql) + ' CPQL' : formatCurrency(r.spend) + ' spent, 0 QLs'}</span>
+              <button onclick="oracleAction('creator_pause:${r.displayName.replace(/'/g,"\\'")}','creator','done','${r.displayName.replace(/'/g,"\\'")}');this.textContent='Done \u2713';this.disabled=true" class="text-[9px] px-2 py-0.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">${getOracleAction('creator_pause:'+r.displayName)?.status==='done'?'Done \u2713':'Paused \u2713'}</button>
+              <button onclick="oracleAction('creator_pause:${r.displayName.replace(/'/g,"\\'")}','creator','snoozed','${r.displayName.replace(/'/g,"\\'")}');this.closest('.py-2').style.display='none'" class="text-[9px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-bold hover:bg-amber-200">7d</button>
+            </div>
           </div>
+          <p class="text-[10px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${why}</p>
         </div>`;
       });
       html += '</div>';
@@ -7822,6 +7887,16 @@ function renderOracleActions() {
     const statusColor = status === 'Healthy' ? 'bg-accent-green-light text-green-700' : status === 'Watch' ? 'bg-accent-orange-light text-amber-700' : status === 'Alert' ? 'bg-accent-red-light text-red-700' : 'bg-surface-tertiary text-text-muted';
     const qlTdPct = m.ql > 0 && m.td > 0 ? Math.min(m.td / m.ql * 100, 100).toFixed(1) + '%' : '\u2014';
     const upcoming = getUpcomingEvents(geo);
+    // Market Why — explain the status using the actual threshold being crossed
+    const mhTh = SENTINEL_THRESHOLDS[geo] || SENTINEL_THRESHOLDS['US'];
+    const mhWhy = (() => {
+      if (status === 'Healthy') return `CPTD ${m.cptd ? formatCurrency(m.cptd) : '\u2014'} is below ${formatCurrency(mhTh.cptd?.green || 35000)} target. Funnel is healthy end-to-end \u2014 protect budget and test new audiences to extend the win.`;
+      if (status === 'Watch') return `CPTD ${m.cptd ? formatCurrency(m.cptd) : '\u2014'} sits between target (${formatCurrency(mhTh.cptd?.green || 35000)}) and amber (${formatCurrency(mhTh.cptd?.amber || 50000)}). Small slippage \u2014 refresh hooks before it turns red.`;
+      if (status === 'Alert') return `CPTD ${m.cptd ? formatCurrency(m.cptd) : '\u2014'} exceeds the ${formatCurrency(mhTh.cptd?.amber || 50000)} amber threshold. Funnel is leaking \u2014 pause worst spenders first, audit QL\u2192TD conversion.`;
+      if (status === 'Partial') return `Spend recorded but no completed trials yet \u2014 either cohort is too recent (give it 3\u20137 days), or trial scheduler is backed up.`;
+      return 'Not enough data to classify yet.';
+    })();
+
     mhHtml += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 shadow-sm">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full ${gc.dot}"></div><span class="font-bold text-sm">${geo}</span></div>
@@ -7834,7 +7909,8 @@ function renderOracleActions() {
       </div>
       <div class="my-1.5 flex justify-center">${renderSparkline('cptd', geo, {width:140,height:28,days:14})}</div>
       <p class="text-[10px] text-text-muted">${formatCurrency(m.spend)} spend · ${Math.round(m.ql)} QLs · ${Math.round(m.td)} TDs · ${Math.round(m.enrolled||0)} enrolled</p>
-      <p class="text-[10px] mt-1.5 font-medium ${status === 'Healthy' ? 'text-green-700' : status === 'Watch' ? 'text-amber-700' : status === 'Alert' ? 'text-red-700' : 'text-text-muted'}">${status === 'Healthy' ? 'Scale — increase budget or test new audiences' : status === 'Watch' ? 'Optimize — refresh creatives, test new hooks' : status === 'Alert' ? 'Investigate — pause worst performers, check funnel' : 'Need more data'}</p>
+      <p class="text-[10px] text-text-secondary mt-1.5 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${mhWhy}</p>
+      <p class="text-[10px] mt-1.5 font-medium ${status === 'Healthy' ? 'text-green-700' : status === 'Watch' ? 'text-amber-700' : status === 'Alert' ? 'text-red-700' : 'text-text-muted'}"><span class="font-bold">\u2192 Action:</span> ${status === 'Healthy' ? 'Scale \u2014 increase budget or test new audiences' : status === 'Watch' ? 'Optimize \u2014 refresh creatives, test new hooks' : status === 'Alert' ? 'Investigate \u2014 pause worst performers, check funnel' : 'Need more data'}</p>
       ${(status === 'Alert' || status === 'Watch') ? `<details class="mt-1" data-diag-geo="${geo}"><summary class="text-[9px] font-bold text-accent-purple cursor-pointer hover:underline">Why?</summary><div class="diag-container"></div></details>` : ''}
       ${upcoming.length ? `<p class="text-[10px] text-text-muted mt-1">\ud83d\udcc5 ${upcoming[0].event} (${upcoming[0].start})</p>` : ''}
     </div>`;
@@ -7886,6 +7962,51 @@ function renderOracleActions() {
     }
   }
   renderActionLog(true); // async: load from Supabase on tab render
+}
+
+// ── Market Health → Monday Slack template (Daily Playbook) ──
+function copyMarketHealthClipboard(btn) {
+  const mhGeos = ['US','India','AUS','MEA','UK','EU','APAC'];
+  const mhFrom = document.getElementById('dashboardDateFrom')?.value || '';
+  const mhTo = document.getElementById('dashboardDateTo')?.value || '';
+  const today = new Date().toISOString().slice(0,10);
+  const dateLabel = mhFrom && mhTo ? `${mhFrom} \u2192 ${mhTo}` : `as of ${today}`;
+  const flow = getFlowFilter ? (getFlowFilter() === 'pla' ? 'PLA' : getFlowFilter() === 'bau' ? 'BAU' : 'All') : 'All';
+
+  const lines = [`*Market Health \u2014 ${dateLabel}* (Flow: ${flow})`, ''];
+  let hadAny = false;
+  mhGeos.forEach(geo => {
+    const m = leadsData?.length ? getMarketMetrics(geo, mhFrom, mhTo) : null;
+    if (!m || !m.spend) return;
+    hadAny = true;
+    const cptdHealth = typeof getThresholdColor === 'function' ? getThresholdColor('cptd', m.cptd || 0, geo) : 'gray';
+    const status = m.cptd > 0
+      ? (cptdHealth === 'green' ? ':white_check_mark: Healthy' : cptdHealth === 'orange' ? ':warning: Watch' : ':rotating_light: Alert')
+      : (m.cpql > 0 ? ':grey_question: Partial' : ':zzz: No data');
+    const action = m.cptd > 0
+      ? (cptdHealth === 'green' ? 'Scale \u2014 increase budget or test new audiences'
+         : cptdHealth === 'orange' ? 'Optimize \u2014 refresh creatives, test new hooks'
+         : 'Investigate \u2014 pause worst performers, audit funnel')
+      : 'Need more data';
+    const qlTd = m.ql > 0 && m.td > 0 ? `${(m.td / m.ql * 100).toFixed(1)}%` : '\u2014';
+    lines.push(`*${geo}* \u2014 ${status}`);
+    lines.push(`  \u2022 Spend ${formatCurrency(m.spend)} \u2022 CPTD ${m.cptd ? formatCurrency(m.cptd) : '\u2014'} \u2022 CPQL ${m.cpql ? formatCurrency(m.cpql) : '\u2014'} \u2022 QL\u2192TD ${qlTd}`);
+    lines.push(`  \u2022 ${Math.round(m.ql)} QLs \u2022 ${Math.round(m.td)} TDs \u2022 ${Math.round(m.enrolled || 0)} enrolled`);
+    lines.push(`  \u2192 ${action}`);
+    lines.push('');
+  });
+  if (!hadAny) { showToast && showToast('No Market Health data to copy'); return; }
+  lines.push(`_Pulled from Godfather \u2022 ${new Date().toLocaleString()}_`);
+
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied';
+      setTimeout(() => { btn.innerHTML = orig; }, 1800);
+    }
+    showToast && showToast('Market Health copied to clipboard');
+  }).catch(() => { showToast && showToast('Copy failed \u2014 paste manually'); });
 }
 
 // ── Section 2: Oracle Pause Now + Make More from CRM data ──
@@ -8331,7 +8452,8 @@ function renderWoWDigest() {
   </div>`;
 }
 
-// ── Oracle WHY — plain English decomposition of WoW movement ──
+// ── Oracle WHY — plain English decomposition of WoW movement + action prescription per driver ──
+// Skill: Creative Diagnostician (Data Skill 7) — every WHY pairs with a specific next move.
 function _buildWoWWhy(twCost, lwCost, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD, twQL, lwQL, twCPTD, lwCPTD) {
   const reasons = [];
   const MARKETS = ['US', 'India', 'AUS', 'MEA', 'UK'];
@@ -8349,30 +8471,62 @@ function _buildWoWWhy(twCost, lwCost, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD
     twT: mktTD(twCRM, m), lwT: mktTD(lwCRM, m),
   })).filter(d => d.twS > 1000 || d.lwS > 1000);
 
+  // Helpers for action prescriptions
+  const _topPauseInMarket = (mkt) => {
+    if (typeof getAdPerformance !== 'function') return [];
+    try {
+      const ads = getAdPerformance(mkt, null, null) || [];
+      return ads
+        .filter(a => parseNumber(a['Spent']||0) > 5000 && parseNumber(a['TD']||0) === 0)
+        .sort((a, b) => parseNumber(b['Spent']||0) - parseNumber(a['Spent']||0))
+        .slice(0, 2)
+        .map(a => (a['Ad name']||a['ad name']||'').replace(/^.+_/, '').slice(0, 40));
+    } catch (_) { return []; }
+  };
+  const _topComboInMarket = (mkt) => {
+    if (typeof getAudiencePerformance !== 'function') return null;
+    try {
+      const clusters = getAudiencePerformance(mkt) || [];
+      const top = clusters.filter(c => c.cptd != null && c.td >= 3).sort((a, b) => a.cptd - b.cptd)[0];
+      return top ? `${top.audience} (\u20B9${Math.round(top.cptd/1000)}K CPTD)` : null;
+    } catch (_) { return null; }
+  };
+  const _push = (text, action) => reasons.push({ text, action });
+
   // Find biggest spend increase with no TD gain
   const spendUpNoTD = mktDeltas.filter(d => d.twS > d.lwS * 1.2 && d.twT <= d.lwT && d.twS > 5000);
   if (spendUpNoTD.length > 0) {
     const top = spendUpNoTD.sort((a, b) => (b.twS - b.lwS) - (a.twS - a.lwS))[0];
     const delta = top.twS - top.lwS;
-    reasons.push(`<strong>${top.m}</strong> spend up ${formatCurrency(delta)} but TDs flat (${top.lwT}→${top.twT}) — new budget not converting yet`);
+    const pauseNames = _topPauseInMarket(top.m);
+    const combo = _topComboInMarket(top.m);
+    let act = `Pause top ${top.m} burners`;
+    if (pauseNames.length) act += ` (e.g. ${pauseNames.join(', ')})`;
+    if (combo) act += `; reallocate to ${combo}`;
+    _push(`<strong>${top.m}</strong> spend up ${formatCurrency(delta)} but TDs flat (${top.lwT}\u2192${top.twT}) \u2014 new budget not converting yet`, act);
   }
 
   // Find market TD drop
   const tdDrops = mktDeltas.filter(d => d.lwT > 0 && d.twT < d.lwT * 0.7 && d.lwT >= 2);
   if (tdDrops.length > 0) {
     const top = tdDrops.sort((a, b) => (b.lwT - b.twT) - (a.lwT - a.twT))[0];
-    reasons.push(`<strong>${top.m}</strong> TDs dropped ${top.lwT}→${top.twT} (${Math.round((1 - top.twT / top.lwT) * 100)}% decline)`);
+    const combo = _topComboInMarket(top.m);
+    const act = combo
+      ? `Refresh ${top.m} creatives \u2014 lean into ${combo}; check trial scheduler for capacity issues`
+      : `Investigate ${top.m} \u2014 audit creative fatigue (Decay tab) and trial scheduler capacity`;
+    _push(`<strong>${top.m}</strong> TDs dropped ${top.lwT}\u2192${top.twT} (${Math.round((1 - top.twT / top.lwT) * 100)}% decline)`, act);
   }
 
-  // Driver 2: NRI vs non-NRI shift (BAU US-specific — NRI is what converts)
-  // SKIP for PLA: NRI is irrelevant, PLA targets broad audience
+  // Driver 2: NRI vs non-NRI shift (BAU US-specific)
   if (getFlowFilter() !== 'pla') {
     const twNRI_TD = twCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
     const lwNRI_TD = lwCRM.filter(r => isNRIEthnicity(r) && parseFloat(r.trials_done) > 0).length;
     if (lwNRI_TD > 0 && twNRI_TD < lwNRI_TD * 0.7 && lwNRI_TD >= 2) {
-      reasons.push(`NRI TDs dropped ${lwNRI_TD}\u2192${twNRI_TD} \u2014 your highest-converting segment is slowing`);
+      const usCombo = _topComboInMarket('US');
+      const act = `Refresh NRI hooks \u2014 deploy 2 new Expats / LAL Enrolled statics${usCombo ? `; ${usCombo} is your strongest cluster` : ''}`;
+      _push(`NRI TDs dropped ${lwNRI_TD}\u2192${twNRI_TD} \u2014 your highest-converting segment is slowing`, act);
     } else if (twNRI_TD > lwNRI_TD * 1.3 && twNRI_TD >= 2) {
-      reasons.push(`NRI TDs up ${lwNRI_TD}\u2192${twNRI_TD} \u2014 core segment accelerating`);
+      _push(`NRI TDs up ${lwNRI_TD}\u2192${twNRI_TD} \u2014 core segment accelerating`, `Increase NRI / Expats LAL budget by 20\u201330% while CPTD holds`);
     }
   }
 
@@ -8383,26 +8537,33 @@ function _buildWoWWhy(twCost, lwCost, twCRM, lwCRM, twSpend, lwSpend, twTD, lwTD
     const convDelta = (twConv - lwConv) / lwConv * 100;
     if (Math.abs(convDelta) > 20) {
       const dir = convDelta > 0 ? 'improved' : 'deteriorated';
-      reasons.push(`QL→TD conversion ${dir}: ${(lwConv * 100).toFixed(0)}%→${(twConv * 100).toFixed(0)}% — ${convDelta > 0 ? 'funnel tightening' : 'leads not converting to trials'}`);
+      const act = convDelta > 0
+        ? `Hold creative mix; document what changed and replicate in cousin markets`
+        : `Audit Wrong-Audience leaks in Pause Now; tighten interest stack on Broad/Advantage+ campaigns`;
+      _push(`QL\u2192TD conversion ${dir}: ${(lwConv * 100).toFixed(0)}%\u2192${(twConv * 100).toFixed(0)}% \u2014 ${convDelta > 0 ? 'funnel tightening' : 'leads not converting to trials'}`, act);
     }
   } else if (twQL > 5 && twTD === 0 && lwTD > 0) {
-    reasons.push(`${twQL} QLs this week with 0 TDs — complete funnel stall`);
+    _push(`${twQL} QLs this week with 0 TDs \u2014 complete funnel stall`, `Check trial scheduler / sales handoff first; pause campaigns spending >\u20B95K with 0 TDs`);
   }
 
   // Driver 4: Spend concentration in zero-TD segments
   const twZeroTD_spend = mktDeltas.filter(d => d.twT === 0 && d.twS > 5000).reduce((s, d) => s + d.twS, 0);
   if (twZeroTD_spend > twSpend * 0.3 && twZeroTD_spend > 10000) {
-    reasons.push(`${formatCurrency(twZeroTD_spend)} (${Math.round(twZeroTD_spend / twSpend * 100)}% of spend) going to markets with 0 TDs this week`);
+    const zeroMkts = mktDeltas.filter(d => d.twT === 0 && d.twS > 5000).map(d => d.m).join(', ');
+    _push(`${formatCurrency(twZeroTD_spend)} (${Math.round(twZeroTD_spend / twSpend * 100)}% of spend) going to markets with 0 TDs this week`, `Pause or cap budget in ${zeroMkts}; reallocate to top market by CPTD`);
   }
 
   if (reasons.length === 0) return '';
 
   return `<div class="mt-3 pt-3 border-t border-purple-200/50">
     <p class="text-[9px] font-bold text-purple-700 uppercase tracking-wider mb-2">Why?</p>
-    <div class="space-y-1.5">
+    <div class="space-y-2">
       ${reasons.slice(0, 4).map(r => `<div class="flex items-start gap-2">
         <span class="text-purple-400 mt-0.5 shrink-0">&#8226;</span>
-        <p class="text-[11px] text-gray-700 leading-snug">${r}</p>
+        <div class="flex-1 min-w-0">
+          <p class="text-[11px] text-gray-700 leading-snug">${r.text}</p>
+          ${r.action ? `<p class="text-[10px] text-purple-700 leading-snug mt-0.5"><span class="font-bold">\u2192 Action:</span> ${r.action}</p>` : ''}
+        </div>
       </div>`).join('')}
     </div>
   </div>`;
@@ -8595,7 +8756,7 @@ function renderOracleCardsV2() {
     displayName: stripCampaignPrefix(r['Ad name']),
     campaignContext: stripCampaignPrefix(r['Campaign name']),
     market: r._market || '',
-    spend: r['Spent'], ql: r['QL'], tql: r['TQL'], td: r['TD'], enrolled: r['Paid'],
+    spend: r['Spent'], ql: r['QL'], tql: r['TQL'], td: r['TD'], ts: parseNumber(r['TS']||0), enrolled: r['Paid'],
     nri: r['NRI'], invalid: parseNumber(r['Invalid%']) * (r['QL'] + (r['TD']||0)) / 100,
     totalLeads: r['QL'] + (parseNumber(r['Invalid%']) > 0 ? Math.round(r['QL'] / (1 - parseNumber(r['Invalid%'])/100)) - r['QL'] : 0),
     nriPct: (r['NRI%'] || 0) / 100,
@@ -8623,8 +8784,12 @@ function renderOracleCardsV2() {
     .map(a => {
       const wt = _getWeeklyTrend(a.adName);
       const trendStr = wt ? ` · ${wt.label} ${formatCurrency(wt.twSpend)} this wk` : '';
+      const why = a._hasCRM
+        ? `${formatCurrency(a.spend)} delivered 0 QLs \u2014 hook isn't landing or the audience isn't seeing enough value to sign up`
+        : `No CRM row found for this ad \u2014 matching may have broken. Verify in Meta Ads Manager before pausing (the ad may be converting but we can't see it).`;
       return { ...a, name: a.adName, _type: 'burn', _priority: a._hasCRM ? 1 : 2, _trend: wt,
-        _signal: `${formatCurrency(a.spend)} spent · 0 QLs${a._hasCRM ? ' — pure waste' : ' — ⚠️ no CRM link'}${trendStr}` };
+        _signal: `${formatCurrency(a.spend)} spent \u00B7 0 QLs${a._hasCRM ? ' \u2014 pure waste' : ' \u2014 \u26A0\uFE0F no CRM link'}${trendStr}`,
+        _why: why };
     });
 
   // ── SIGNAL 2: CPTQL too high — 2x+ market average ──
@@ -8635,8 +8800,12 @@ function renderOracleCardsV2() {
     .map(a => {
       const wt = _getWeeklyTrend(a.adName);
       const trendStr = wt ? ` · ${wt.label} ${wt.twQL}QL this wk vs ${wt.lwQL} last` : '';
+      const multiplier = Math.round(a.cptql / avgCPTQL);
+      const mktLabel = a.market || 'portfolio';
+      const why = `CPTQL ${formatCurrency(a.cptql)} is ${multiplier}\u00D7 the ${mktLabel} average (${formatCurrency(avgCPTQL)}). Spend is delivering TQLs but at a cost that wipes out any downstream enrollment margin.`;
       return { ...a, name: a.adName, _type: 'cptql', _priority: 2, _trend: wt,
-        _signal: `CPTQL ${formatCurrency(a.cptql)} (${Math.round(a.cptql / avgCPTQL)}x avg) · ${a.tql} TQLs${trendStr}` };
+        _signal: `CPTQL ${formatCurrency(a.cptql)} (${multiplier}x avg) \u00B7 ${a.tql} TQLs${trendStr}`,
+        _why: why };
     });
 
   // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
@@ -8648,15 +8817,31 @@ function renderOracleCardsV2() {
     .sort((a, b) => a.nriPct - b.nriPct)
     .slice(0, 3)
     .map(a => ({ ...a, name: a.adName, _type: 'audience', _priority: 2,
-      _signal: `Only ${Math.round(a.nriPct * 100)}% NRI (${a.nri}/${a.ql}) · ${formatCurrency(a.spend)} — attracting wrong audience` }));
+      _signal: `Only ${Math.round(a.nriPct * 100)}% NRI (${a.nri}/${a.ql}) \u00B7 ${formatCurrency(a.spend)} \u2014 attracting wrong audience`,
+      _why: `NRI is the highest-converting US segment. Only ${Math.round(a.nriPct*100)}% of this ad's QLs are NRI (benchmark 40%+). The creative or targeting is pulling in non-converting audiences \u2014 tighten interest stack or refresh the hook to speak to expat parents.` }));
 
-  // ── SIGNAL 4: Dead funnel — QLs but zero TDs (QL >= 8, spend > ₹20K) ──
+  // ── SIGNAL 4: Dead funnel — QLs but zero TDs (QL >= 15, spend > ₹20K) ──
+  // Diagnostic priority: TS=0 (intent gap) > high invalid (spam) > high non-NRI (US, wrong audience) > all-scheduled-no-show (capacity)
   const deadFunnel = adCampData
     .filter(a => a.spend >= 20000 && a.ql >= 15 && a.td === 0 && !isPaused(a.adName))
     .sort((a, b) => b.ql - a.ql)
     .slice(0, 3)
-    .map(a => ({ ...a, name: a.adName, _type: 'funnel', _priority: 2,
-      _signal: `${a.ql} QLs → 0 TDs · ${formatCurrency(a.spend)} — leads aren't converting` }));
+    .map(a => {
+      const reasons = [];
+      // Intent gap: leads exist, never even tried to schedule
+      if (a.ts === 0) reasons.push(`${a.ql} QLs but 0 trial-bookings \u2014 leads aren't intent-qualified (LP click without form completion, or wrong audience)`);
+      // No-show: scheduled but didn't attend
+      else if (a.ts > 0 && a.td === 0) reasons.push(`${a.ts} trials scheduled, 0 completed \u2014 no-show / sales-handoff issue, not a creative problem`);
+      // Spam
+      if (a.invalidPct > 0.25) reasons.push(`${Math.round(a.invalidPct*100)}% invalid leads (${Math.round(a.invalid)}/${Math.round(a.totalLeads)}) \u2014 spam magnet`);
+      // Wrong audience (US BAU only)
+      if (a.market === 'US' && !_isPLACampaignName(a.campaignName) && a.nriPct < 0.20) reasons.push(`only ${Math.round(a.nriPct*100)}% NRI (${a.nri}/${a.ql}) \u2014 attracting wrong audience`);
+      // Default: pure funnel stall, no obvious cause from data we have
+      if (!reasons.length) reasons.push(`${a.ql} QLs scheduled trials but none completed \u2014 check trial scheduler capacity or LP form quality`);
+      return { ...a, name: a.adName, _type: 'funnel', _priority: 2,
+        _signal: `${a.ql} QLs \u2192 0 TDs \u00B7 ${formatCurrency(a.spend)}`,
+        _why: reasons[0] };
+    });
 
   // ── SIGNAL 5: Spam magnet — high invalid rate (> 25%, QL >= 5) ──
   const spamAds = adCampData
@@ -8664,18 +8849,24 @@ function renderOracleCardsV2() {
     .sort((a, b) => b.invalidPct - a.invalidPct)
     .slice(0, 3)
     .map(a => ({ ...a, name: a.adName, _type: 'spam', _priority: 2,
-      _signal: `${Math.round(a.invalidPct * 100)}% invalid leads (${a.invalid}/${a.totalLeads}) · ${formatCurrency(a.spend)}` }));
+      _signal: `${Math.round(a.invalidPct * 100)}% invalid leads (${Math.round(a.invalid)}/${Math.round(a.totalLeads)}) \u00B7 ${formatCurrency(a.spend)}`,
+      _why: `${Math.round(a.invalidPct * 100)}% of this ad's leads are marked invalid (bots, junk forms, disposable emails). The creative is attracting pattern-matchers who auto-submit forms \u2014 usually a hook or offer that implies "easy money" / low-commitment signup.` }));
 
-  // ── SIGNAL 6: Fatigue (existing) ──
+  // ── SIGNAL 6: Fatigue — declining CPM / CTR / spend efficiency over time ──
   const seenNames = new Set([...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds].map(a => normalizeAdName(a.name)));
   const fatigueAds = detectFatigue()
     .filter(f => f.stage >= 2 && !seenNames.has(normalizeAdName(f.ad_name)))
     .slice(0, 4)
-    .map(f => ({
-      name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0, market: '',
-      _type: 'fatigue', _priority: f.stage === 3 ? 0 : 1,
-      _signal: f.signals.join(' · ') + (f.stage === 3 ? ' · URGENT' : '')
-    }));
+    .map(f => {
+      const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
+      const why = `${stageText} \u2014 ${f.signals.join('; ')}. Audience has seen this creative too many times; refresh the visual and hook before it drags down the account\'s learning phase.`;
+      return {
+        name: f.ad_name, spend: f.daily_spend * 3, ql: 0, td: 0, market: '',
+        _type: 'fatigue', _priority: f.stage === 3 ? 0 : 1,
+        _signal: f.signals.join(' \u00B7 ') + (f.stage === 3 ? ' \u00B7 URGENT' : ''),
+        _why: why
+      };
+    });
 
   // Combine + sort: priority 0 (urgent fatigue) → 1 (burns, early fatigue) → 2 (leaks/audience/funnel)
   const pauseAds = [...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds, ...fatigueAds]
@@ -8714,6 +8905,7 @@ function renderOracleCardsV2() {
             <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
             ${campCtx ? `<p class="text-[11px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
             <p class="text-xs ${metricColor} mt-0.5">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
+            ${a._why ? `<p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : ''}
             ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
           </div>
         </div>
@@ -8732,124 +8924,154 @@ function renderOracleCardsV2() {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 90 days).</p>';
   }
 
-  // ── MAKE MORE: multi-signal — efficient + right audience + converting ──
+  // ── MAKE MORE: audience-clustered recommendations + deployment suggestions ──
+  // Phase 3.8 + 3.9 — group by campaign_audience cluster, show best performer + deployment campaign.
   const makeMoreList = document.getElementById('oracleMakeMoreList');
-  const portfolioCPTQL = _mm0 ? (_mm0.cptql || Infinity) : (getQL() > 0 ? getSpend() / getQL() : Infinity);
-  const avgNriPct = (() => { const us = adCampData.filter(a => a.market === 'US' && a.ql >= 3); return us.length ? us.reduce((s, a) => s + a.nriPct, 0) / us.length : 0.5; })();
-  const avgQlToTd = (() => { const withTd = adCampData.filter(a => a.ql >= 5); return withTd.length ? withTd.reduce((s, a) => s + a.qlToTdPct, 0) / withTd.length : 0.1; })();
+  const portfolioCPTD = _mm0 ? (_mm0.cptd || Infinity) : Infinity;
+  const portfolioSpend = _mm0 ? (_mm0.spend || 0) : 0;
+  _renderMakeMoreClusters(makeMoreList, market || 'all', portfolioCPTD, portfolioSpend);
+}
 
-  // Exclude any ad already flagged in Pause Now — prevents contradictory recommendations
-  const pauseNames = new Set(pauseAds.map(a => normalizeAdName(a.name)));
+// Phase 3.8 + 3.9 — Make More clusters with deployment suggestions.
+// Falls back to a friendly empty-state when no audience data is available.
+function _renderMakeMoreClusters(container, market, portfolioCPTD, portfolioSpend) {
+  if (!container) return;
+  const flow = getFlowFilter ? getFlowFilter() : 'all';
+  let clusters = [];
+  try { clusters = getAudiencePerformance(market === 'all' ? null : market) || []; } catch(_) { clusters = []; }
 
-  // Score each ad: works WITH or WITHOUT spend data
-  // With spend: CPTQL efficiency is primary signal
-  // Without spend: TQL volume + NRI% + funnel conversion are signals
-  const makeAds = adCampData
-    .filter(a => a.tql >= 3 && !pauseNames.has(normalizeAdName(a.adName))) // minimum: 3 TQLs, not in Pause Now
-    .filter(a => {
-      if (a.spend !== null && a.cptql !== null) {
-        // Must pass ABSOLUTE threshold (green zone) — ₹15K CPTQL is never "make more" worthy
-        const mkt = a.market || geo || 'US';
-        const th = (SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US']).cpql || { amber: 15000 };
-        if (a.cptql >= th.amber) return false; // above amber = red zone, never recommend
-        return a.cptql < portfolioCPTQL * 1.2; // within portfolio efficiency
-      }
-      return a.tql >= 5; // no spend data: need stronger volume signal
-    })
-    .map(a => {
-      const signals = [];
-      let score = 0;
+  // Filter to viable clusters: 3+ ads, real QLs, not "Unknown"
+  clusters = clusters.filter(c => c.audience && c.audience !== 'Unknown' && c.count >= 3 && c.ql > 0);
+  // PLA flow: prefer PLA clusters; BAU flow: prefer BAU clusters
+  if (flow === 'pla') clusters = clusters.filter(c => /\(PLA\)/i.test(c.audience));
+  else if (flow === 'bau') clusters = clusters.filter(c => !/\(PLA\)/i.test(c.audience));
 
-      // CPTQL efficiency (when spend available)
-      if (a.cptql !== null && portfolioCPTQL > 0 && portfolioCPTQL < Infinity) {
-        const cptqlScore = Math.max(0, 1 - a.cptql / portfolioCPTQL);
-        score += cptqlScore;
-        if (a.cptql < portfolioCPTQL * 0.5) signals.push(`CPTQL ${formatCurrency(a.cptql)} — ${Math.round((1 - a.cptql / portfolioCPTQL) * 100)}% below avg`);
-        else signals.push(`CPTQL ${formatCurrency(a.cptql)}`);
-      }
+  // Classify each cluster
+  const portfolioCPTDFinite = portfolioCPTD && portfolioCPTD !== Infinity ? portfolioCPTD : null;
+  clusters.forEach(c => {
+    const spendShare = portfolioSpend > 0 ? c.spend / portfolioSpend : 0;
+    let label = 'Healthy', labelCls = 'bg-accent-green-light text-green-700';
+    if (portfolioCPTDFinite && c.cptd && c.cptd > portfolioCPTDFinite * 2 && c.td < 2) {
+      label = 'Kill'; labelCls = 'bg-accent-red-light text-red-700';
+    } else if (spendShare > 0.30) {
+      label = 'Saturated'; labelCls = 'bg-accent-orange-light text-amber-700';
+    } else if (spendShare > 0 && spendShare < 0.05 && c.cptd && portfolioCPTDFinite && c.cptd <= portfolioCPTDFinite) {
+      label = 'Starving'; labelCls = 'bg-accent-blue-light text-accent-blue';
+    } else if (c.cptd && portfolioCPTDFinite && c.cptd <= portfolioCPTDFinite * 0.8) {
+      label = 'Scale'; labelCls = 'bg-accent-green-light text-green-700';
+    }
+    c._label = label; c._labelCls = labelCls; c._spendShare = spendShare;
+  });
 
-      // Volume signal
-      if (a.tql >= 10) { score += 0.2; signals.push(`${a.tql} TQLs`); }
-      else if (a.tql >= 5) signals.push(`${a.tql} TQLs`);
+  // Sort: Scale → Starving → Healthy → Saturated → Kill, with CPTD ascending within
+  const labelOrder = { Scale: 0, Starving: 1, Healthy: 2, Saturated: 3, Kill: 4 };
+  clusters.sort((a, b) => (labelOrder[a._label] - labelOrder[b._label]) || ((a.cptd || Infinity) - (b.cptd || Infinity)));
+  const top = clusters.slice(0, 5);
 
-      // Right audience: BAU = NRI% (US). PLA = booking rate (broad audience, NRI irrelevant).
-      if (_flowForSignals === 'pla') {
-        // PLA: reward high booking rate (trial_request filled → _trialBooked on matched leads)
-        if (a.qlToTdPct > 0.1 && a.td >= 2) { score += 0.3; signals.push(`${Math.round(a.qlToTdPct * 100)}% QL\u2192TD`); }
-      } else if (a.market === 'US' && a.nriPct > avgNriPct && a.nri >= 3) {
-        score += 0.3;
-        signals.push(`${Math.round(a.nriPct * 100)}% NRI`);
-      }
-
-      // Funnel health
-      if (a.td > 0 && a.qlToTdPct > avgQlToTd) {
-        score += 0.3;
-        signals.push(`${a.td} TDs (${Math.round(a.qlToTdPct * 100)}% QL→TD)`);
-      }
-      if (a.enrolled > 0) { score += 0.2; signals.push(`${a.enrolled} enrolled`); }
-
-      // Spend info if available
-      if (a.spend !== null && !signals.some(s => s.includes('CPTQL'))) signals.push(formatCurrency(a.spend) + ' spent');
-
-      // Weekly trend
-      const wt = _getWeeklyTrend(a.adName);
-      if (wt && wt.trend === 'improving') { score += 0.3; signals.push(`${wt.label} ${wt.lwQL}→${wt.twQL} QLs (vs prior wk)`); }
-      else if (wt && wt.trend === 'declining') { score -= 0.2; signals.push(`${wt.label} ${wt.lwQL}→${wt.twQL} QLs (vs prior wk)`); }
-
-      return { ...a, _score: score, _makeSignals: signals, _trend: wt };
-    })
-    .sort((a, b) => b._score - a._score)
-    .slice(0, 8);
-
-  const visibleMake = makeAds.filter(c => isItemVisible('make:' + c.adName));
+  // Visibility filter (respects existing dismiss/snooze system)
+  const visibleTop = top.filter(c => isItemVisible('make:cluster:' + c.audience));
   const makeBadge = document.getElementById('makeMoreBadge');
-  if (makeBadge) makeBadge.textContent = visibleMake.length > 0 ? `${visibleMake.length} ads` : '';
+  if (makeBadge) makeBadge.textContent = visibleTop.length > 0 ? `${visibleTop.length} clusters` : '';
 
-  if (visibleMake.length) {
-    let html = '<div class="space-y-2">';
-    visibleMake.forEach((c, i) => {
-      const itemId = 'make:' + c.adName;
-      const action = getOracleAction(itemId);
-      const isDone = action?.status === 'done';
-      const opacity = isDone ? 'opacity-50' : '';
-      const _mmMkt = c.market || geo || 'US';
-      const _mmTh = (SENTINEL_THRESHOLDS[_mmMkt] || SENTINEL_THRESHOLDS['US']).cpql || { green: 10000, amber: 15000 };
-      const cpqlColor = (c.cptql !== null && c.cptql <= _mmTh.green) ? 'green' : (c.cptql !== null && c.cptql <= _mmTh.amber) ? 'orange' : 'red';
-      const esc = s => s.replace(/'/g, "\\'");
-      const geoTag = c.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold shrink-0">${c.market}</span>` : '';
-      html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${c.displayName}">
-        <div class="flex items-center gap-3">
-          ${_oracleThumbnail(c.adName)}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2"><p class="text-sm font-semibold truncate" title="${c.adName}">${c.displayName}</p>${geoTag}</div>
-            <p class="text-[11px] text-text-muted truncate" title="${c.campaignName}">${c.campaignContext}</p>
-            <p class="text-xs text-text-muted mt-0.5">${c._makeSignals?.length ? c._makeSignals.join(' · ') : `${c.tql} TQLs · ${formatCurrency(c.spend)} spent`}</p>
-            ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
-          </div>
-          <div class="text-right shrink-0">
-            <p class="text-base font-bold text-accent-${cpqlColor}">${formatCurrency(c.cptql)}</p>
-            <p class="text-[11px] text-text-muted">CPTQL</p>
-          </div>
-        </div>
-        ${!isDone ? (() => {
-          const makeNoteId = 'note_' + itemId.replace(/[^a-zA-Z0-9]/g, '_');
-          const makeExistingNote = getOracleAction(itemId)?.note || '';
-          return `<div class="mt-2 pt-2 border-t border-gray-100">
-            <div class="flex items-center gap-1.5 mb-1.5">
-              <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(c.displayName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
-              <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(c.displayName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
-              <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(c.displayName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
-            </div>
-            <input type="text" id="${makeNoteId}" placeholder="Add a note..." value="${esc(makeExistingNote)}" onblur="oracleSaveNote('${esc(itemId)}', this.value)" onkeydown="if(event.key==='Enter'){this.blur()}" class="w-full text-[11px] px-3 py-1.5 rounded-lg border border-gray-200 bg-surface-secondary text-text-primary placeholder:text-text-muted/50 focus:border-accent-blue focus:outline-none" />
-          </div>`;
-        })() : ''}
-      </div>`;
-    });
-    html += '</div>';
-    makeMoreList.innerHTML = html;
-  } else {
-    makeMoreList.innerHTML = '<p class="text-xs text-text-muted py-3">No standout ads found (need 3+ TQLs with good funnel metrics).</p>';
+  if (!visibleTop.length) {
+    container.innerHTML = '<p class="text-xs text-text-muted py-3">No audience clusters with sufficient data (need 3+ ads with QLs per cluster). Tag more creatives or widen the date range.</p>';
+    return;
   }
+
+  const esc = s => String(s || '').replace(/'/g, "\\'");
+  let html = '<div class="space-y-3">';
+  visibleTop.forEach(c => {
+    const itemId = 'make:cluster:' + c.audience;
+    const action = typeof getOracleAction === 'function' ? getOracleAction(itemId) : null;
+    const isDone = action?.status === 'done';
+    const opacity = isDone ? 'opacity-50' : '';
+    // Deployment suggestion from TARGETING_CONFIG
+    const cfg = c.config || (typeof TARGETING_CONFIG !== 'undefined' ? TARGETING_CONFIG[c.audience] : null);
+    const deployCampaign = cfg?.campaigns?.[0] || '';
+    const targetingBits = cfg ? [
+      cfg.age ? `Age ${cfg.age}` : '',
+      cfg.interests?.length ? `Interests: ${cfg.interests.slice(0,2).join(', ')}` : '',
+      cfg.geo?.length ? `Geo: ${cfg.geo.join('/')}` : '',
+      cfg.vernacular?.length ? `Lang: ${cfg.vernacular.join('/')}` : ''
+    ].filter(Boolean).join(' · ') : '';
+
+    // Best performer + thumbnail
+    const best = c.best3?.[0];
+    const bestName = best ? (best['Ad name'] || best['ad name'] || '') : '';
+    const bestDisplay = bestName ? (typeof stripCampaignPrefix === 'function' ? stripCampaignPrefix(bestName) : bestName) : '';
+    const bestThumb = bestName && typeof _oracleThumbnail === 'function' ? _oracleThumbnail(bestName) : '';
+    const bestFmt = best ? (best['Creative type'] || best['creative type'] || '') : '';
+    const bestCPTD = best && parseNumber(best['TD']||0) > 0 ? parseNumber(best['Spent']||0) / parseNumber(best['TD']||0) : null;
+
+    // Format/theme recommendation: dominant format among best performers
+    const fmtCounts = {};
+    (c.best3 || []).forEach(b => {
+      const f = b['Creative type'] || b['creative type'];
+      if (f) fmtCounts[f] = (fmtCounts[f] || 0) + 1;
+    });
+    const dominantFmt = Object.entries(fmtCounts).sort((a,b) => b[1]-a[1])[0]?.[0];
+    const recVerb = c._label === 'Kill' ? 'Stop producing' : c._label === 'Saturated' ? 'Refresh' : 'Make 2 more';
+    const fmtRec = dominantFmt
+      ? `${recVerb} ${dominantFmt.toLowerCase()}s for ${c.audience}`
+      : `${recVerb} for ${c.audience}`;
+
+    // Cluster CPTD vs portfolio
+    const cptdColor = c.cptd ? (portfolioCPTDFinite && c.cptd <= portfolioCPTDFinite * 0.8 ? 'green' : portfolioCPTDFinite && c.cptd <= portfolioCPTDFinite * 1.2 ? 'orange' : 'red') : 'gray';
+    const deltaPct = (portfolioCPTDFinite && c.cptd) ? Math.round((c.cptd / portfolioCPTDFinite - 1) * 100) : null;
+    const deltaTxt = deltaPct == null ? '' : (deltaPct === 0 ? 'on portfolio avg' : (deltaPct < 0 ? `${Math.abs(deltaPct)}% below avg` : `${deltaPct}% above avg`));
+
+    // Why — explain the status label using the numbers we already have
+    const sharePct = Math.round(c._spendShare * 100);
+    const whyLine = (() => {
+      if (c._label === 'Scale') return `CPTD ${formatCurrency(c.cptd)} is ${Math.abs(deltaPct || 0)}% below portfolio average and you have ${c.count} ads in this cluster delivering ${Math.round(c.td)} TDs \u2014 the formula works, pour more fuel in.`;
+      if (c._label === 'Starving') return `Cluster only gets ${sharePct}% of spend but CPTD ${formatCurrency(c.cptd)} is already at or better than portfolio. Under-funded winner \u2014 increase allocation before the creative fatigues.`;
+      if (c._label === 'Saturated') return `${sharePct}% of total spend already sits here and CPTD is drifting. The audience has seen your creatives too many times \u2014 refresh hooks/visuals rather than adding more budget.`;
+      if (c._label === 'Kill') return `CPTD ${formatCurrency(c.cptd)} is ${deltaPct || 0}% above portfolio with only ${Math.round(c.td)} TDs across ${c.count} ads. The formula isn't working \u2014 stop producing for this audience and pause running ads.`;
+      return `${c.count} ads, ${Math.round(c.td)} TDs, CPTD ${c.cptd ? formatCurrency(c.cptd) : '\u2014'}${deltaTxt ? ' (' + deltaTxt + ')' : ''}. Monitor; not enough signal yet to scale or kill.`;
+    })();
+
+    html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${esc(c.audience)}">
+      <div class="flex items-center gap-3 mb-2">
+        ${bestThumb}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-sm font-bold">${c.audience}</p>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${c._labelCls}">${c._label}</span>
+            <span class="text-[10px] text-text-muted">${c.count} ads · ${Math.round(c._spendShare*100)}% of spend</span>
+          </div>
+          <p class="text-[11px] text-accent-purple mt-0.5"><span class="font-bold">\u2192 Action:</span> ${fmtRec}</p>
+          ${bestDisplay ? `<p class="text-[10px] text-text-muted truncate mt-0.5" title="${esc(bestName)}">Best: ${bestDisplay}${bestFmt ? ` (${bestFmt})` : ''}${bestCPTD ? ` \u2014 ${formatCurrency(bestCPTD)} CPTD` : ''}</p>` : ''}
+        </div>
+        <div class="text-right shrink-0">
+          <p class="text-base font-bold text-accent-${cptdColor}">${c.cptd ? formatCurrency(c.cptd) : '\u2014'}</p>
+          <p class="text-[10px] text-text-muted">CPTD${deltaTxt ? `<br>${deltaTxt}` : ''}</p>
+        </div>
+      </div>
+      <p class="text-[10px] text-text-secondary mt-2 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${whyLine}</p>
+      <div class="grid grid-cols-3 gap-2 text-center text-[10px] text-text-muted py-1.5 border-t border-gray-100 mt-2">
+        <div><span class="font-bold text-text-primary">${formatCurrency(c.spend)}</span> spend</div>
+        <div><span class="font-bold text-text-primary">${Math.round(c.td)}</span> TDs</div>
+        <div><span class="font-bold text-text-primary">${c.qlTd != null ? c.qlTd.toFixed(1) + '%' : '\u2014'}</span> QL\u2192TD</div>
+      </div>
+      ${deployCampaign || targetingBits ? `<div class="mt-2 pt-2 border-t border-gray-100">
+        <p class="text-[10px] font-bold text-purple-700 uppercase tracking-wider mb-1">Deploy in</p>
+        ${deployCampaign ? `<div class="flex items-center gap-2">
+          <code class="text-[10px] bg-surface-tertiary px-2 py-1 rounded font-mono text-text-primary truncate flex-1" title="${esc(deployCampaign)}">${deployCampaign}</code>
+          <button onclick="navigator.clipboard.writeText('${esc(deployCampaign)}');this.textContent='Copied'" class="text-[10px] px-2 py-1 rounded bg-accent-purple text-white font-bold hover:bg-purple-700 shrink-0">Copy</button>
+        </div>` : ''}
+        ${targetingBits ? `<p class="text-[10px] text-text-muted mt-1">${targetingBits}</p>` : ''}
+      </div>` : ''}
+      ${!isDone ? `<div class="mt-2 pt-2 border-t border-gray-100">
+        <div class="flex items-center gap-1.5">
+          <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(c.audience)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(c.audience)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+          <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(c.audience)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+        </div>
+      </div>` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>`}
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 function renderOracleModules() {
@@ -9508,7 +9730,7 @@ function renderMetricTicker() {
   const cac = m.cac || 0;
   const tqlTdPct = m.ql_td_pct ? m.ql_td_pct * 100 : 0;
   // Compat shim so the rest of renderMetricTicker keeps working
-  const crm = { ql: m.ql, tql: m.tql, td: m.td, paid: m.enrolled, invalid: m.invalid || 0, ts: m.ts || 0, nri: m.nri || 0, asian: m.asian || 0 };
+  const crm = { ql: m.ql, tql: m.tql, td: m.td, paid: m.enrolled, invalid: m.invalid || 0, ts: m.ts || 0, nri: m.nri || 0, asian: m.asian || 0, india: m.india_ql || 0 };
 
   if (totalSpend > 0 || crm.td > 0) {
     // ── PRIOR PERIOD for trends ──
@@ -9632,13 +9854,20 @@ function renderMetricTicker() {
         .slice(0, 3);
       if (fmtCptd.length) formatCptdLine = fmtCptd.map(f => `${f.fmt} ${formatCurrency(f.cptd)}`).join(' · ');
     }
+    const _sparkGeo = market === 'all' ? 'all' : market;
+    const _heroSparkOpts = { width: 110, height: 22, days: 30, fillGradient: false };
+    const _cptdSpark = cptd > 0 ? renderSparkline('cptd', _sparkGeo, _heroSparkOpts) : '';
+    const _tdSpark = crm.td > 0 ? renderSparkline('td', _sparkGeo, _heroSparkOpts) : '';
     html += `<div class="grid grid-cols-2 gap-3 mb-3">
       <div class="metric-card bg-white rounded-xl p-5 border-l-4 border-accent-${cptdColor}">
         <div class="flex items-center gap-2 mb-1">
           <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider">CPTD</p>
           <p class="text-[9px] text-text-muted">Primary Metric — Cost Per Trial Done</p>
         </div>
-        <p class="text-3xl font-black text-accent-${cptdColor}">${cptd > 0 ? formatCurrency(cptd) : '—'}</p>
+        <div class="flex items-end justify-between gap-3">
+          <p class="text-3xl font-black text-accent-${cptdColor}">${cptd > 0 ? formatCurrency(cptd) : '—'}</p>
+          ${_cptdSpark ? `<div class="shrink-0 opacity-80" title="30-day CPTD trend">${_cptdSpark}</div>` : ''}
+        </div>
         <div class="flex items-center gap-2 mt-1">
           ${cptdTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${cptdTrend}` : ''}
           ${cptd > 0 ? `<span class="text-[9px] text-text-muted ml-auto">${formatCurrency(totalSpend)} spend</span>` : ''}
@@ -9650,7 +9879,10 @@ function renderMetricTicker() {
           <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Trials Done</p>
           <p class="text-[9px] text-text-muted">${dateLabel}</p>
         </div>
-        <p class="text-3xl font-black text-accent-teal">${crm.td > 0 ? crm.td.toLocaleString() : '—'}</p>
+        <div class="flex items-end justify-between gap-3">
+          <p class="text-3xl font-black text-accent-teal">${crm.td > 0 ? crm.td.toLocaleString() : '—'}</p>
+          ${_tdSpark ? `<div class="shrink-0 opacity-80" title="30-day TD trend">${_tdSpark}</div>` : ''}
+        </div>
         <div class="flex items-center gap-2 mt-1">
           ${tdTrend ? `<span class="text-[9px] text-text-muted">${priorLabel || 'vs prior period'}</span>${tdTrend}` : ''}
           ${crm.td > 0 ? `<span class="text-[9px] text-text-muted ml-auto">from ${crm.ql.toLocaleString()} QLs</span>` : ''}
@@ -9663,21 +9895,26 @@ function renderMetricTicker() {
     // 4th card: PLA = Trials Booked (lead-gen metric), BAU = Enrolled (enrollment metric)
     const _tbCount = _isPLAFlow ? (m.ts || 0) : 0;
     const _tbRate = _isPLAFlow && crm.ql > 0 ? ((_tbCount / crm.ql) * 100).toFixed(0) + '% booking rate' : '';
+    const _kpiSparkOpts = { width: 80, height: 18, days: 30, fillGradient: false };
     const kpis = [
-      { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: dateLabel },
-      { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: `${crm.tql.toLocaleString()} TQLs` },
-      { label: 'QL\u2192TD%', value: tqlTdPct > 0 ? tqlTdPct.toFixed(1) + '%' : '—', color: tqlTdPct >= 25 ? 'green' : tqlTdPct >= 15 ? 'orange' : 'red', trend: trend(tqlTdPct, priorQlTdPct, false), sub: 'Cohort conversion' },
+      { label: 'Spend', value: totalSpend > 0 ? formatCurrency(totalSpend) : '—', color: 'purple', trend: trend(totalSpend, priorSpend, false), sub: dateLabel, sparkMetric: 'spend' },
+      { label: 'CPTQL', value: cptql > 0 ? formatCurrency(cptql) : '—', color: getThresholdColor('cptql', cptql, dashCountry), trend: trend(cptql, priorCptql, true), sub: `${crm.tql.toLocaleString()} TQLs`, sparkMetric: 'cptql' },
+      { label: 'QL\u2192TD%', value: tqlTdPct > 0 ? tqlTdPct.toFixed(1) + '%' : '—', color: tqlTdPct >= 25 ? 'green' : tqlTdPct >= 15 ? 'orange' : 'red', trend: trend(tqlTdPct, priorQlTdPct, false), sub: 'Cohort conversion', sparkMetric: 'ql_td_pct' },
       _isPLAFlow
-        ? { label: 'Trials Booked', value: _tbCount > 0 ? _tbCount.toLocaleString() : '—', color: 'purple', trend: trend(_tbCount, priorCrm.ts || 0, false), sub: _tbRate }
-        : { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toLocaleString() : '—', color: crm.paid > 0 ? 'green' : 'blue', trend: trend(crm.paid, priorCrm.paid, false), sub: crm.paid > 0 ? `CAC ${formatCurrency(cac)}` : '' },
+        ? { label: 'Trials Booked', value: _tbCount > 0 ? _tbCount.toLocaleString() : '—', color: 'purple', trend: trend(_tbCount, priorCrm.ts || 0, false), sub: _tbRate, sparkMetric: 'ql' }
+        : { label: 'Enrolled', value: crm.paid > 0 ? crm.paid.toLocaleString() : '—', color: crm.paid > 0 ? 'green' : 'blue', trend: trend(crm.paid, priorCrm.paid, false), sub: crm.paid > 0 ? `CAC ${formatCurrency(cac)}` : '', sparkMetric: 'td' },
     ];
     html += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">`;
     kpis.forEach(k => {
+      const _kpiSpark = k.sparkMetric ? renderSparkline(k.sparkMetric, _sparkGeo, _kpiSparkOpts) : '';
       html += `<div class="metric-card bg-white rounded-xl p-3">
         <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1" ${k.label === 'CPTQL' ? 'title="Cost Per Qualified Lead — lower is better. Green < ₹10K (US)"' : ''}>${k.label}</p>
-        <div class="flex items-center gap-1">
-          <p class="text-lg font-black text-accent-${k.color}">${k.value}</p>
-          ${k.trend}
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1 min-w-0">
+            <p class="text-lg font-black text-accent-${k.color}">${k.value}</p>
+            ${k.trend}
+          </div>
+          ${_kpiSpark ? `<div class="shrink-0 opacity-70" title="30-day trend">${_kpiSpark}</div>` : ''}
         </div>
         ${k.sub ? `<p class="text-[9px] text-text-muted mt-0.5">${k.sub}</p>` : ''}
       </div>`;
@@ -9686,64 +9923,11 @@ function renderMetricTicker() {
 
     container.innerHTML = html;
 
-    // 4. Visual Funnel (replacing 13-column table)
-    // Step conversion rates: each % shows conversion to the NEXT step in the funnel
-    const qlToTqlPct = crm.ql > 0 && crm.tql > 0 ? (crm.tql / crm.ql * 100).toFixed(1) : '—';  // QL → TQL
-    const tqlTsPct = crm.tql > 0 && crm.ts > 0 ? (crm.ts / crm.tql * 100).toFixed(1) : '—';     // TQL → TS
-    const tsTdPct = crm.ts > 0 && crm.td > 0 ? (crm.td / crm.ts * 100).toFixed(1) : '—';        // TS → TD
-    const tdEPct = crm.td > 0 && crm.paid > 0 ? (crm.paid / crm.td * 100).toFixed(1) : '—';     // TD → Enrolled
+    // 4. Visual Funnel — true waterfall with leak % per stage
     const invalidPct = crm.ql > 0 ? (crm.invalid / crm.ql * 100).toFixed(1) : '0';
-
-    const convColor = (pct, goodAbove, badBelow) => {
-      const v = parseFloat(pct);
-      if (isNaN(v)) return 'text-text-muted';
-      return v >= goodAbove ? 'text-accent-green' : v <= badBelow ? 'text-accent-red' : 'text-accent-orange';
-    };
-
     const funnelEl = document.getElementById('funnelTable');
     if (funnelEl) {
-      funnelEl.innerHTML = `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4">
-        <!-- Main funnel flow -->
-        <div class="flex items-center justify-between gap-1 mb-3">
-          <div class="text-center flex-1">
-            <p class="text-lg font-black">${crm.ql.toLocaleString()}</p>
-            <p class="text-[9px] text-text-muted font-bold uppercase">QLs</p>
-          </div>
-          <div class="text-center px-1"><p class="text-xs font-bold ${convColor(qlToTqlPct, 60, 30)}">${qlToTqlPct}%</p><p class="text-[8px] text-text-muted">→</p></div>
-          <div class="text-center flex-1">
-            <p class="text-lg font-black">${crm.tql.toLocaleString()}</p>
-            <p class="text-[9px] text-text-muted font-bold uppercase">TQLs</p>
-          </div>
-          <div class="text-center px-1"><p class="text-xs font-bold ${convColor(tqlTsPct, 60, 30)}">${tqlTsPct}%</p><p class="text-[8px] text-text-muted">→</p></div>
-          <div class="text-center flex-1">
-            <p class="text-lg font-black">${(crm.ts||0).toLocaleString()}</p>
-            <p class="text-[9px] text-text-muted font-bold uppercase">Trials Scheduled</p>
-          </div>
-          <div class="text-center px-1"><p class="text-xs font-bold ${convColor(tsTdPct, 80, 50)}">${tsTdPct}%</p><p class="text-[8px] text-text-muted">→</p></div>
-          <div class="text-center flex-1">
-            <p class="text-lg font-black">${crm.td.toLocaleString()}</p>
-            <p class="text-[9px] text-text-muted font-bold uppercase">Trials Done</p>
-          </div>
-          <div class="text-center px-1"><p class="text-xs font-bold ${convColor(tdEPct, 35, 20)}">${tdEPct}%</p><p class="text-[8px] text-text-muted">→</p></div>
-          <div class="text-center flex-1">
-            <p class="text-lg font-black text-accent-green">${crm.paid.toLocaleString()}</p>
-            <p class="text-[9px] text-text-muted font-bold uppercase">Enrolled</p>
-          </div>
-        </div>
-        <!-- Detail row (expandable) -->
-        <details class="text-[10px] text-text-muted">
-          <summary class="cursor-pointer hover:text-text-primary font-medium">Detail: ${getFlowFilter() === 'pla' ? `TB ${crm.ts.toLocaleString()} · TB rate ${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}%` : `NRI ${crm.nri.toLocaleString()} · Asian ${(crm.asian||0).toLocaleString()}`} · Invalid ${invalidPct}% · CAC ${cac > 0 ? formatCurrency(cac) : '—'}</summary>
-          <div class="grid grid-cols-4 gap-3 mt-2 pt-2 border-t border-gray-100">
-            ${getFlowFilter() === 'pla'
-              ? `<div><span class="font-bold">Trials Booked:</span> ${crm.ts.toLocaleString()} (${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
-            <div><span class="font-bold">QL\u2192TD%:</span> ${crm.ql > 0 ? (crm.td/crm.ql*100).toFixed(1) : 0}%</div>`
-              : `<div><span class="font-bold">NRI:</span> ${crm.nri.toLocaleString()} (${crm.ql > 0 ? (crm.nri/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
-            <div><span class="font-bold">Asian:</span> ${(crm.asian||0).toLocaleString()}</div>`}
-            <div><span class="font-bold">Invalid:</span> ${invalidPct}%${parseFloat(invalidPct) > 10 ? ' <span class="text-accent-red font-bold">⚠ High</span>' : ''}</div>
-            <div><span class="font-bold">CAC:</span> ${cac > 0 ? formatCurrency(cac) : '—'}</div>
-          </div>
-        </details>
-      </div>`;
+      funnelEl.innerHTML = _renderFunnelWaterfall(crm, _isPLAFlow, cac);
     }
     return;
   }
@@ -12610,6 +12794,172 @@ function renderSparkline(metric, geo, opts = {}) {
   return generateSparklineSVG(data, { ...opts, lowerBetter, id: `sp_${metric}_${geo || 'all'}_${Math.random().toString(36).slice(2,6)}` });
 }
 
+// US monthly spend plan (₹ Cr) — FY26-27 from summary doc §9.4. US-only; other markets via AOP not yet wired.
+const BUDGET_PLAN_INR_CR = {
+  US: { Apr: 2.25, May: 1.72, Jun: 3.50, Jul: 5.10, Aug: 6.85, Sep: 8.10, Oct: 6.95, Nov: 5.45, Dec: 2.58, Jan: 7.35, Feb: 6.40, Mar: 4.45 }
+};
+
+function renderBudgetPace() {
+  const el = document.getElementById('budgetPaceCard');
+  if (!el) return;
+  const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  // Only render for US or All Markets (other markets have no monthly plan wired)
+  const market = dashCountry === 'all' || dashCountry === 'US' ? 'US' : null;
+  if (!market || !costData?.length) { el.innerHTML = ''; return; }
+
+  const today = new Date();
+  const monthName = today.toLocaleString('en', { month: 'short' });
+  const planCr = BUDGET_PLAN_INR_CR[market]?.[monthName];
+  if (!planCr) { el.innerHTML = ''; return; }
+
+  const planInr = planCr * 1e7;
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0,10);
+  const todayStr = today.toISOString().slice(0,10);
+
+  const monthCost = filterCostByMarket(_filterCostByFlow(costData), market)
+    .filter(r => r.day >= monthStart && r.day <= todayStr);
+  const spentMTD = monthCost.reduce((s, r) => s + (parseFloat(r.amount_spent) || parseFloat(r.spend) || 0), 0);
+
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const dayOfMonth = today.getDate();
+  const monthPct = dayOfMonth / daysInMonth * 100;
+  const budgetPct = spentMTD / planInr * 100;
+  const expectedSpend = planInr * (dayOfMonth / daysInMonth);
+  const paceDelta = budgetPct - monthPct;
+
+  let status, statusColor, statusBg;
+  if (paceDelta > 10) { status = 'Ahead'; statusColor = 'text-amber-700'; statusBg = 'bg-accent-orange-light'; }
+  else if (paceDelta < -10) { status = 'Behind'; statusColor = 'text-red-700'; statusBg = 'bg-accent-red-light'; }
+  else { status = 'On pace'; statusColor = 'text-green-700'; statusBg = 'bg-accent-green-light'; }
+
+  const barColor = paceDelta > 10 ? 'bg-accent-orange' : paceDelta < -10 ? 'bg-accent-red' : 'bg-accent-green';
+  const barTrack = 'bg-surface-tertiary';
+  const remainingDays = daysInMonth - dayOfMonth;
+  const remainingBudget = Math.max(0, planInr - spentMTD);
+  const dailyPace = remainingDays > 0 ? remainingBudget / remainingDays : 0;
+
+  el.innerHTML = `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-2">
+      <div class="flex items-center gap-2">
+        <h4 class="text-xs font-bold text-text-secondary uppercase tracking-wider">${market} Budget Pace \u2014 ${monthName} ${today.getFullYear()}</h4>
+        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusBg} ${statusColor}">${status}</span>
+      </div>
+      <span class="text-[10px] text-text-muted">Day ${dayOfMonth}/${daysInMonth} \u2014 ${monthPct.toFixed(0)}% through month</span>
+    </div>
+    <div class="flex items-center gap-2 mb-2">
+      <div class="flex-1 h-3 ${barTrack} rounded-full overflow-hidden relative">
+        <div class="h-full ${barColor} transition-all" style="width:${Math.min(budgetPct, 100).toFixed(1)}%"></div>
+        <div class="absolute top-0 bottom-0 w-px bg-text-primary" style="left:${monthPct.toFixed(1)}%" title="Linear pace marker"></div>
+      </div>
+      <span class="text-xs font-bold text-text-primary shrink-0">${budgetPct.toFixed(0)}%</span>
+    </div>
+    <div class="flex items-center justify-between text-[11px]">
+      <p><span class="font-bold">${formatCurrency(spentMTD)}</span> spent of <span class="font-bold">\u20B9${planCr} Cr</span> planned</p>
+      <p class="text-text-muted">Linear pace: ${formatCurrency(expectedSpend)} \u2014 ${paceDelta >= 0 ? '+' : ''}${formatCurrency(spentMTD - expectedSpend)} ${paceDelta >= 0 ? 'over' : 'under'}</p>
+    </div>
+    ${remainingDays > 0 ? `<p class="text-[10px] text-text-muted mt-1">To hit plan: ${formatCurrency(dailyPace)}/day for the remaining ${remainingDays} days.</p>` : ''}
+  </div>`;
+}
+
+// Funnel waterfall — visual bars with leak % per stage
+// crm: { ql, tql, ts, td, paid, nri, asian, invalid }
+// PLA: relabels stages; thresholds are slightly lower (broad audience funnel)
+function _renderFunnelWaterfall(crm, isPLA, cac) {
+  const stages = isPLA
+    ? [
+      { key: 'ql',   label: 'QLs',            count: crm.ql,        good: 100, bad: 30 },
+      { key: 'tql',  label: 'TQL',            count: crm.tql,       good: 60,  bad: 30 },
+      { key: 'ts',   label: 'Trials Booked',  count: crm.ts || 0,   good: 70,  bad: 35 },
+      { key: 'td',   label: 'Trials Done',    count: crm.td,        good: 60,  bad: 30 },
+      { key: 'paid', label: 'Enrolled',       count: crm.paid,      good: 25,  bad: 10 },
+    ]
+    : [
+      { key: 'ql',   label: 'QLs',            count: crm.ql,        good: 100, bad: 30 },
+      { key: 'tql',  label: 'TQL',            count: crm.tql,       good: 60,  bad: 30 },
+      { key: 'ts',   label: 'Trials Sched',   count: crm.ts || 0,   good: 70,  bad: 35 },
+      { key: 'td',   label: 'Trials Done',    count: crm.td,        good: 80,  bad: 50 },
+      { key: 'paid', label: 'Enrolled',       count: crm.paid,      good: 35,  bad: 20 },
+    ];
+  const maxCount = Math.max(...stages.map(s => s.count || 0), 1);
+  const barColor = (pct, good, bad) => pct >= good ? 'bg-accent-green' : pct <= bad ? 'bg-accent-red' : 'bg-accent-orange';
+  const leakColor = (leakPct) => leakPct < 30 ? 'text-accent-green' : leakPct > 70 ? 'text-accent-red' : 'text-accent-orange';
+  const flowLabel = isPLA ? 'PLA Funnel' : 'BAU Funnel';
+  const invalidPct = crm.ql > 0 ? (crm.invalid / crm.ql * 100).toFixed(1) : '0';
+
+  let rows = '';
+  stages.forEach((s, i) => {
+    const widthPct = maxCount > 0 ? Math.max(2, (s.count || 0) / maxCount * 100) : 2;
+    const prev = i > 0 ? stages[i-1] : null;
+    const convPct = prev && prev.count > 0 ? (s.count / prev.count * 100) : null;
+    const leakPct = convPct != null ? (100 - convPct) : null;
+    const dropCount = prev ? Math.max(0, prev.count - s.count) : 0;
+    const bar = barColor(convPct == null ? 100 : convPct, s.good, s.bad);
+    rows += `<div class="flex items-center gap-3">
+      <div class="w-24 shrink-0 text-right">
+        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider">${s.label}</p>
+      </div>
+      <div class="flex-1 relative h-7 bg-surface-tertiary rounded-md overflow-hidden">
+        <div class="h-full ${bar} flex items-center px-2 transition-all" style="width:${widthPct.toFixed(1)}%">
+          <span class="text-[11px] font-black text-white whitespace-nowrap">${(s.count||0).toLocaleString()}</span>
+        </div>
+      </div>
+      <div class="w-28 shrink-0 text-left">
+        ${convPct != null
+          ? `<p class="text-[10px] font-bold ${leakColor(leakPct)}">${convPct.toFixed(1)}% kept</p>
+             <p class="text-[9px] text-text-muted">leak ${leakPct.toFixed(0)}% (\u2212${dropCount.toLocaleString()})</p>`
+          : `<p class="text-[10px] text-text-muted">entry</p>`}
+      </div>
+    </div>`;
+  });
+
+  // Ethnicity breakdown: India (ethnicity always blank by source), NRI, Asian, Other.
+  // These four buckets always sum to crm.ql. Skip empty ones in the display.
+  const indiaCount = crm.india || 0;
+  const otherEth = Math.max(0, crm.ql - indiaCount - crm.nri - (crm.asian || 0));
+  const pctOf = (n) => crm.ql > 0 ? (n / crm.ql * 100).toFixed(0) + '%' : '\u2014';
+  const ethBuckets = [
+    { label: 'India',         count: indiaCount,      cls: 'text-text-primary' },
+    { label: 'NRI',           count: crm.nri,         cls: 'text-accent-purple' },
+    { label: 'Asian',         count: crm.asian || 0,  cls: 'text-accent-blue' },
+    { label: 'Other ethnicity', count: otherEth,      cls: 'text-text-muted' },
+  ].filter(b => b.count > 0);
+
+  const detailLine = isPLA
+    ? `Trials Booked ${(crm.ts||0).toLocaleString()} · Booking rate ${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}%`
+    : ethBuckets.map(b => `${b.label} ${b.count.toLocaleString()} (${pctOf(b.count)})`).join(' · ');
+
+  return `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h4 class="text-xs font-bold text-text-secondary uppercase tracking-wider">${flowLabel}</h4>
+      <span class="text-[9px] text-text-muted">Bar width = stage volume · Leak = drop from prior stage</span>
+    </div>
+    <div class="space-y-1.5">${rows}</div>
+    <details class="mt-3 text-[10px] text-text-muted">
+      <summary class="cursor-pointer hover:text-text-primary font-medium">${detailLine} · Invalid ${invalidPct}% · CAC ${cac > 0 ? formatCurrency(cac) : '\u2014'}</summary>
+      <div class="mt-2 pt-2 border-t border-gray-100">
+        ${isPLA
+          ? `<div class="grid grid-cols-4 gap-3">
+              <div><span class="font-bold">Trials Booked:</span> ${(crm.ts||0).toLocaleString()} (${crm.ql > 0 ? (crm.ts/crm.ql*100).toFixed(0) : 0}% of QLs)</div>
+              <div><span class="font-bold">QL\u2192TD%:</span> ${crm.ql > 0 ? (crm.td/crm.ql*100).toFixed(1) : 0}%</div>
+              <div><span class="font-bold">Invalid:</span> ${invalidPct}%${parseFloat(invalidPct) > 10 ? ' <span class="text-accent-red font-bold">\u26A0 High</span>' : ''}</div>
+              <div><span class="font-bold">CAC:</span> ${cac > 0 ? formatCurrency(cac) : '\u2014'}</div>
+            </div>`
+          : `<p class="text-[9px] uppercase tracking-wider text-text-muted font-bold mb-1.5">Ethnicity buckets (sum to ${crm.ql.toLocaleString()} QLs)</p>
+             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-2">
+               ${ethBuckets.map(b => `<div><span class="font-bold ${b.cls}">${b.label}:</span> ${b.count.toLocaleString()} <span class="text-text-muted">(${pctOf(b.count)})</span></div>`).join('')}
+             </div>
+             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-gray-100">
+               <div><span class="font-bold">Invalid:</span> ${invalidPct}%${parseFloat(invalidPct) > 10 ? ' <span class="text-accent-red font-bold">\u26A0 High</span>' : ''}</div>
+               <div><span class="font-bold">CAC:</span> ${cac > 0 ? formatCurrency(cac) : '\u2014'}</div>
+               <div><span class="font-bold">QL\u2192TD%:</span> ${crm.ql > 0 ? (crm.td/crm.ql*100).toFixed(1) : 0}%</div>
+               <div><span class="font-bold">Total QLs:</span> ${crm.ql.toLocaleString()}</div>
+             </div>`}
+      </div>
+    </details>
+  </div>`;
+}
+
 // ==================== P1: DIAGNOSIS ENGINE ====================
 // Decomposes "why is CPTD bad?" into audience/hook/format/funnel factors
 
@@ -14330,20 +14680,64 @@ function onTaggerCountryChange() {
 state._taggerTablePage = 1; state._heatmapPage = 1; state._gridPage = 1;
 const TAGGER_PAGE_SIZE = 15;
 
+// 3-group consolidation: each pill maps to a list of legacy content divs to reveal.
+// Signals   = Creative Review
+// Explore   = Data Table (tree, default) or Grid (toggle) — Leaderboard's hierarchy already lives in the Data Table tree
+// Patterns  = Tag Performance Insights (headline) + Combos + Heatmap (collapsed)
+const TAGGER_TAB_GROUPS = {
+  signals: ['review'],
+  explore: ['table', 'grid'],
+  patterns: ['combos', 'heatmap']
+};
+let _exploreView = 'tree'; // 'tree' or 'grid'
+function setExploreView(v) {
+  _exploreView = v;
+  document.querySelectorAll('.explore-view-btn').forEach(b => {
+    const on = b.dataset.exploreView === v;
+    b.classList.toggle('bg-white', on);
+    b.classList.toggle('shadow-sm', on);
+    b.classList.toggle('text-accent-purple', on);
+  });
+  switchTaggerTab('explore');
+}
+
 function switchTaggerTab(tab) {
+  // Map legacy ids (review/table/heatmap/combos/grid/leaderboard) to new groups
+  const group = TAGGER_TAB_GROUPS[tab] || [tab];
   document.querySelectorAll('.tagger-tab').forEach(t => t.classList.add('hidden'));
-  document.getElementById('taggerTab-'+tab).classList.remove('hidden');
+  if (tab === 'explore') {
+    // Show either tree (table) or grid — one at a time
+    const show = _exploreView === 'grid' ? 'grid' : 'table';
+    const el = document.getElementById('taggerTab-' + show);
+    if (el) el.classList.remove('hidden');
+  } else {
+    group.forEach(id => {
+      const el = document.getElementById('taggerTab-' + id);
+      if (el) el.classList.remove('hidden');
+    });
+  }
   document.querySelectorAll('[data-tagger-tab]').forEach(p => p.classList.toggle('active', p.dataset.taggerTab === tab));
   renderActiveTaggerTab(tab);
 }
 function renderActiveTaggerTab(tab) {
-  if (!tab) tab = document.querySelector('[data-tagger-tab].active')?.dataset.taggerTab || 'review';
-  if (tab === 'review') renderCreativeReview();
-  else if (tab === 'table') renderTaggerTable();
-  else if (tab === 'heatmap') renderTaggerHeatmap();
-  else if (tab === 'combos') renderTagCombos();
-  else if (tab === 'grid') renderCreativeGrid();
-  else if (tab === 'leaderboard') renderLeaderboard();
+  if (!tab) tab = document.querySelector('[data-tagger-tab].active')?.dataset.taggerTab || 'signals';
+  if (tab === 'signals') { try { renderCreativeReview(); } catch(_) {} }
+  else if (tab === 'explore') {
+    if (_exploreView === 'grid') { try { renderCreativeGrid(); } catch(_) {} }
+    else { try { renderTaggerTable(); } catch(_) {} }
+  }
+  else if (tab === 'patterns') {
+    try { renderTagCombos(); } catch(_) {}
+    try { renderTaggerHeatmap(); } catch(_) {}
+    try { renderTaggerInsights(); } catch(_) {}
+  }
+  // Back-compat for any legacy direct calls (e.g. "table", "heatmap")
+  else if (tab === 'review') { try { renderCreativeReview(); } catch(_) {} }
+  else if (tab === 'table') { try { renderTaggerTable(); } catch(_) {} }
+  else if (tab === 'heatmap') { try { renderTaggerHeatmap(); } catch(_) {} }
+  else if (tab === 'combos') { try { renderTagCombos(); } catch(_) {} }
+  else if (tab === 'grid') { try { renderCreativeGrid(); } catch(_) {} }
+  else if (tab === 'leaderboard') { try { renderLeaderboard(); } catch(_) {} }
 }
 function renderPager(containerId, page, totalItems, onPageChange) {
   const el = document.getElementById(containerId); if (!el) return;
@@ -14708,48 +15102,8 @@ function renderCreativeReview() {
   const portfolioCTR = totalImp > 0 ? (totalClicks/totalImp*100) : 0;
   const portfolioCPTD = totalTD > 0 ? totalSpend/totalTD : 0;
 
-  // ── SECTION 0: Market Triggers (Phase 2, Decision #5) ──
-  // NOTE: Tagger data only matches ~70-80% of CRM leads to specific ads.
-  // Portfolio CPTD from tagger aggregation is ALWAYS higher than CRM-based portfolio CPTD.
-  // So we compute CPTD only from creatives that have TD > 0 (proven converters), not all creatives.
-  const _triggerGeos = ['US','India','AUS','MEA','UK','EU'];
-  const triggers = [];
-  _triggerGeos.forEach(g => {
-    const gData = data.filter(c => extractMarket(c) === g);
-    if (gData.length < 5) return;
-    const gTh = SENTINEL_THRESHOLDS[g] || SENTINEL_THRESHOLDS['US'];
-    const cptdGreen = gTh.cptd?.green || 35000;
-    // Compute CPTD only from creatives WITH conversions (avoids 0-TD inflation)
-    const withTD = gData.filter(c => parseNumber(c['TD']||0) > 0);
-    const tdSpend = withTD.reduce((s,c) => s + parseNumber(c['Spent']||0), 0);
-    const tdCount = withTD.reduce((s,c) => s + parseNumber(c['TD']||0), 0);
-    const gCPTD = tdCount > 0 ? tdSpend / tdCount : 0;
-    // Kills: only flag creatives with SIGNIFICANT spend (3x CPTD green) + 0 TDs
-    const killThreshold = cptdGreen * 3;
-    const kills = gData.filter(c => parseNumber(c['Spent']||0) > killThreshold && parseNumber(c['TD']||0) === 0);
-    if (kills.length >= 2) triggers.push({ market: g, severity: 'critical', text: `${kills.length} creatives burnt ${formatCurrency(kills.reduce((s,c)=>s+parseNumber(c['Spent']||0),0))} with 0 TDs`, action: 'Pause immediately' });
-    // Scale: creatives hitting scale this period
-    const scalable = gData.filter(c => { const v = getCreativeVerdict(c); return v.key === 'scale'; });
-    if (scalable.length >= 2) triggers.push({ market: g, severity: 'positive', text: `${scalable.length} creatives at Scale — proven CPTD below ${formatCurrency(cptdGreen)}`, action: 'Increase budget' });
-    // CPTD above threshold — using converter-only CPTD, not all-creative CPTD
-    if (gCPTD > (gTh.cptd?.amber||50000) && tdCount >= 5) triggers.push({ market: g, severity: 'alert', text: `Converter CPTD ${formatCurrency(gCPTD)} exceeds ${formatCurrency(gTh.cptd?.amber||50000)} threshold`, action: 'Review spend allocation' });
-  });
-
-  let triggersHtml = '';
-  if (triggers.length) {
-    const severityStyles = { critical: 'bg-red-50 border-red-200 text-red-800', alert: 'bg-amber-50 border-amber-200 text-amber-800', positive: 'bg-green-50 border-green-200 text-green-800' };
-    const severityIcons = { critical: '🔴', alert: '🟡', positive: '🟢' };
-    triggersHtml = `<div class="mb-5"><h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-2">Market Alerts</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-2">`;
-    triggers.forEach(t => {
-      triggersHtml += `<div class="p-2.5 rounded-lg border ${severityStyles[t.severity]}">
-        <div class="flex items-center gap-2"><span>${severityIcons[t.severity]}</span><span class="text-[10px] font-bold">${t.market}</span><span class="text-[10px]">${t.text}</span></div>
-        <p class="text-[9px] mt-1 opacity-70">→ ${t.action}</p>
-      </div>`;
-    });
-    triggersHtml += '</div></div>';
-  }
-
-  let html = triggersHtml + `
+  // Market Alerts section removed — duplicates Pause Now on Dashboard (cross-tab dup = confusing).
+  let html = `
     <div class="mb-6">
       <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-bold">Creative Performance — ${periodLabel}</h3>
@@ -14807,46 +15161,8 @@ function renderCreativeReview() {
     </div>`;
   }
 
-  // ── SECTION 4: What Tags Work — Cumulative Performance ──
-  html += `<div class="mb-6">
-    <h3 class="text-base font-bold mb-1">What's Working — Tag Performance</h3>
-    <p class="text-xs text-text-muted mb-3">Cumulative performance by creative tag. Green = below average CPTD (good). Red = above (bad). Use this to plan next week's assets.</p>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">`;
-
-  TAG_DIMS.forEach(dim => {
-    const dimData = tagPerf[dim];
-    if (!dimData) return;
-    const entries = Object.entries(dimData)
-      .map(([tag, t]) => ({ tag, ...t, cptd: t.td >= 2 ? t.spend/t.td : 0, ctr: t.imp > 0 ? t.clicks/t.imp*100 : 0, clickQL: t.clicks > 0 ? t.ql/t.clicks*100 : 0 }))
-      .filter(e => e.count >= 3)
-      .sort((a, b) => {
-        if (a.td >= 2 && b.td >= 2) return a.cptd - b.cptd;
-        if (a.td >= 2) return -1;
-        if (b.td >= 2) return 1;
-        return b.ql - a.ql;
-      });
-    if (!entries.length) return;
-
-    html += `<div class="bg-white rounded-xl border border-gray-200 p-3">
-      <h4 class="text-xs font-bold mb-2 text-text-muted uppercase tracking-wider">${TAG_DIM_LABELS[dim] || dim}</h4>
-      <div class="space-y-1.5">`;
-    entries.slice(0, 6).forEach((e, i) => {
-      const isGood = e.cptd > 0 && e.cptd < portfolioCPTD;
-      const barColor = e.td >= 2 ? (isGood ? 'bg-green-400' : 'bg-red-400') : 'bg-gray-300';
-      const maxSpend = Math.max(...entries.map(x => x.spend));
-      const barW = maxSpend > 0 ? Math.max(e.spend / maxSpend * 100, 8) : 8;
-      html += `<div class="flex items-center gap-2">
-        <span class="text-[10px] font-medium w-28 truncate" title="${e.tag}">${tagLabel(e.tag)}</span>
-        <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden relative">
-          <div class="${barColor} h-full rounded-full" style="width:${barW}%"></div>
-          <span class="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-gray-700">${e.count} ads · ${e.td} TDs${e.cptd > 0 ? ' · CPTD ' + formatCurrency(e.cptd) : ''}</span>
-        </div>
-        <span class="text-[9px] w-12 text-right ${e.ctr > 1.5 ? 'text-green-700 font-bold' : 'text-text-muted'}">${e.ctr > 0 ? e.ctr.toFixed(1)+'%' : '—'}</span>
-      </div>`;
-    });
-    html += `</div></div>`;
-  });
-  html += `</div></div>`;
+  // "What's Working — Tag Performance" removed from Signals — this lives in Patterns tab (Tag Performance Insights).
+  // Keep the tagPerf computation lexically for any downstream refs, but skip rendering.
 
   // ── SECTION 5: Next Week Recommendations ──
   html += `<div class="mb-6">
@@ -14951,7 +15267,7 @@ function renderCreativeReview() {
 }
 
 // ── Creative verdict: answers "is this working, should I pause/scale/refresh?" ──
-let taggerViewLevel = 'ad'; // 'campaign' | 'adset' | 'ad'
+let taggerViewLevel = 'campaign'; // 'campaign' (3-level tree, default) | 'adset' | 'ad'
 
 function setTaggerViewLevel(level) {
   taggerViewLevel = level;
@@ -15059,7 +15375,48 @@ function getFilteredTaggerDataWithDropdowns() {
     data = data.filter(c => getCreativeVerdict(c).key === verdictFilter);
   }
 
+  // Tag value filter (paired with taggerFilterCategory)
+  const tagCat = document.getElementById('taggerFilterCategory')?.value || 'all';
+  const tagVal = document.getElementById('taggerFilterValue')?.value || 'all';
+  if (tagCat !== 'all' && tagVal !== 'all') {
+    data = data.filter(c => {
+      const v = c.tags?.[tagCat];
+      return v && String(v) === tagVal;
+    });
+  }
+
   return data;
+}
+
+// Populate the value dropdown with values that actually appear in the current taggerFilterCategory
+function _refreshTaggerValueFilter() {
+  const cat = document.getElementById('taggerFilterCategory')?.value || 'all';
+  const sel = document.getElementById('taggerFilterValue');
+  if (!sel) return;
+  if (cat === 'all') {
+    sel.classList.add('hidden');
+    sel.value = 'all';
+    return;
+  }
+  // Pull values from current tagger data (pre-value-filter)
+  const data = getFilteredTaggerData();
+  const counts = {};
+  data.forEach(c => {
+    const v = c.tags?.[cat];
+    if (!v || v === 'Unknown' || v === 'null' || v === 'N/A') return;
+    counts[v] = (counts[v] || 0) + 1;
+  });
+  const values = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  if (!values.length) {
+    sel.classList.add('hidden');
+    sel.value = 'all';
+    return;
+  }
+  const prev = sel.value;
+  sel.innerHTML = '<option value="all">All Values</option>' +
+    values.map(([v, n]) => `<option value="${v.replace(/"/g,'&quot;')}">${tagLabel ? tagLabel(v) : v} (${n})</option>`).join('');
+  sel.value = values.some(([v]) => v === prev) ? prev : 'all';
+  sel.classList.remove('hidden');
 }
 
 // ── Tagger sort helper ──
@@ -15185,18 +15542,18 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
   const pl = indent ? `pl-${indent * 4 + 3}` : 'pl-3';
   const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
 
-  // Insight text (same logic as Performance tab)
+  // Insight text (verdict + WHY) — same signal taxonomy as Pause Now / Make More, restated for each ad row.
   const _ins = (() => {
-    if (spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
-    if (td_val >= 3 && cptd_val < (mktThresholds.cptd?.green||35000)) return { text: 'Scale — proven CPTD', color: 'text-green-700', icon: '↑' };
-    if (td_val >= 1 && cptd_val < (mktThresholds.cptd?.amber||50000)) return { text: 'Working — keep running', color: 'text-green-600', icon: '✓' };
-    if (spend > 50000 && td_val === 0) return { text: 'Kill — ' + formatCurrency(spend) + ' burnt', color: 'text-red-700', icon: '✗' };
-    if (spend > 20000 && td_val === 0 && ql <= 2) return { text: 'Budget leak — pause', color: 'text-red-600', icon: '⚠' };
-    if (spend > 15000 && ql >= 5 && td_val === 0) return { text: 'Funnel break — no TDs', color: 'text-amber-700', icon: '⚠' };
-    if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR — fatigue', color: 'text-amber-600', icon: '↓' };
-    if (ql >= 3 && clickQL > 3) return { text: 'Promising — add budget', color: 'text-blue-600', icon: '→' };
-    if (spend > 10000 && ql <= 1) return { text: 'Weak — low leads', color: 'text-gray-500', icon: '↓' };
-    return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
+    if (spend < 3000) return { text: 'Too early', color: 'text-gray-400', icon: '○', why: `Only ${formatCurrency(spend)} spent \u2014 not enough data to judge yet` };
+    if (td_val >= 3 && cptd_val < (mktThresholds.cptd?.green||35000)) return { text: 'Scale', color: 'text-green-700', icon: '↑', why: `${td_val} TDs at ${formatCurrency(cptd_val)} CPTD \u2014 below ${formatCurrency(mktThresholds.cptd?.green||35000)} target` };
+    if (td_val >= 1 && cptd_val < (mktThresholds.cptd?.amber||50000)) return { text: 'Working', color: 'text-green-600', icon: '✓', why: `${td_val} TD${td_val>1?'s':''} at ${formatCurrency(cptd_val)} CPTD \u2014 in the amber zone, hold` };
+    if (spend > 50000 && td_val === 0) return { text: 'Kill', color: 'text-red-700', icon: '✗', why: `${formatCurrency(spend)} spent, 0 TDs \u2014 pause and reallocate` };
+    if (spend > 20000 && td_val === 0 && ql <= 2) return { text: 'Budget leak', color: 'text-red-600', icon: '⚠', why: `${formatCurrency(spend)} spent, only ${ql} QL${ql===1?'':'s'}, 0 TDs \u2014 pause` };
+    if (spend > 15000 && ql >= 5 && td_val === 0) return { text: 'Funnel break', color: 'text-amber-700', icon: '⚠', why: `${ql} QLs but 0 TDs \u2014 leads not converting to trials (audience or scheduler issue)` };
+    if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR', color: 'text-amber-600', icon: '↓', why: `CTR ${ctr.toFixed(2)}% at ${formatCurrency(spend)} spend \u2014 creative fatigue, refresh visual` };
+    if (ql >= 3 && clickQL > 3) return { text: 'Promising', color: 'text-blue-600', icon: '→', why: `${ql} QLs, click\u2192QL ${clickQL.toFixed(1)}% \u2014 add budget to accelerate` };
+    if (spend > 10000 && ql <= 1) return { text: 'Weak', color: 'text-gray-500', icon: '↓', why: `${formatCurrency(spend)} spent, ${ql} QL \u2014 hook not landing, try different angle` };
+    return { text: 'Monitoring', color: 'text-gray-400', icon: '…', why: '' };
   })();
 
   // CPTD "vs avg" arrow (benchmark from renderTaggerTable)
@@ -15235,7 +15592,10 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
         </div>
       </div>
     </td>
-    <td class="px-1.5 py-2"><span class="text-[9px] font-bold ${_ins.color}" title="${v.reason}">${_ins.icon} ${_ins.text}</span>${_actBtn}</td>
+    <td class="px-1.5 py-2">
+      <div class="flex items-start gap-1"><span class="text-[9px] font-bold ${_ins.color} whitespace-nowrap" title="${v.reason}">${_ins.icon} ${_ins.text}</span>${_actBtn}</div>
+      ${_ins.why ? `<p class="text-[9px] text-text-muted mt-0.5 leading-snug">${_ins.why}</p>` : ''}
+    </td>
     <td class="px-2 py-2 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
     <td class="px-2 py-2 text-right text-[11px]">${ql > 0 ? Math.round(ql) : '<span class="text-text-muted">0</span>'}</td>
     <td class="px-2 py-2 text-right text-[11px] font-semibold">${td_val > 0 ? Math.round(td_val) : '<span class="text-text-muted">0</span>'}</td>
@@ -15245,10 +15605,12 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
 }
 
 // ── Render a group (campaign/adset) aggregate row ──
-function renderTaggerGroupRow(label, totals, groupId, level, childCount) {
+function renderTaggerGroupRow(label, totals, groupId, level, childCount, parentGroupId) {
   const shortLabel = shortAdName(label);
   const bgClass = level === 'campaign' ? 'bg-surface-tertiary/60' : 'bg-surface-secondary/40';
   const pl = level === 'adset' ? 'pl-6' : 'pl-3';
+  const childClass = parentGroupId ? ' hidden tagger-child' : '';
+  const parentAttr = parentGroupId ? ` data-parent="${parentGroupId}"` : '';
   const _tgrMkt = document.getElementById('taggerFilterCountry')?.value || 'US';
   const _tgrTh = SENTINEL_THRESHOLDS[_tgrMkt] || SENTINEL_THRESHOLDS['US'];
   const cptdColor = totals.cptd > 0 ? (totals.cptd <= (_tgrTh.cptd?.green||35000) ? 'text-accent-green' : totals.cptd <= (_tgrTh.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
@@ -15267,7 +15629,7 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount) {
     return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
   })();
 
-  return `<tr class="${bgClass} tagger-group-row" onclick="toggleTaggerGroup('${groupId}')">
+  return `<tr class="${bgClass} tagger-group-row${childClass}"${parentAttr} onclick="toggleTaggerGroup('${groupId}')">
     <td class="px-3 py-2.5 ${pl} font-bold">
       <span class="text-[10px] text-text-muted mr-1 tagger-arrow" data-group="${groupId}">&#9654;</span>
       <span title="${label}" class="text-[11px]">${shortLabel}</span>
@@ -15353,16 +15715,23 @@ function renderTaggerTable() {
   if (pagerEl) pagerEl.innerHTML = `<span class="text-text-muted">${sortedCampaigns.length} campaigns · ${data.length} ads</span>`;
 
   if (viewLevel === 'campaign') {
+    // 3-level tree: Campaign ▸ Ad Set ▸ Ad. Click campaign → reveals ad sets. Click ad set → reveals ads.
     sortedCampaigns.slice(0, 40).forEach((campaign, ci) => {
       const ct = campaignTotals[campaign];
-      const gid = 'tc_' + ci;
-      html += renderTaggerGroupRow(campaign, ct, gid, 'campaign', ct.count);
-      // Child ads (hidden by default)
-      Object.values(hierarchy[campaign]).forEach(ads => {
+      const campGid = 'tc_' + ci;
+      html += renderTaggerGroupRow(campaign, ct, campGid, 'campaign', ct.count);
+
+      // Ad Set rows — hidden under campaign by default
+      const adSetsInCamp = hierarchy[campaign];
+      Object.entries(adSetsInCamp).forEach(([adSet, ads], asi) => {
+        const ast = aggregateTaggerRows(ads);
+        const asGid = campGid + '_as' + asi;
+        html += renderTaggerGroupRow(adSet, ast, asGid, 'adset', ads.length, campGid);
+
+        // Ad rows — hidden under ad set by default
         ads.forEach(c => {
-          html += `<tr class="hidden tagger-child border-b border-gray-50" data-parent="${gid}">` +
-            renderTaggerAdRow(c, catFilter, 2, _benchmarks).replace('<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ', '<tr class="').replace(/<tr[^>]*>/, '').replace(/<\/tr>$/, '') +
-            `</tr>`;
+          const inner = renderTaggerAdRow(c, catFilter, 3, _benchmarks).replace(/^<tr[^>]*>/, '').replace(/<\/tr>\s*$/, '');
+          html += `<tr class="hidden tagger-child border-b border-gray-50" data-parent="${asGid}">${inner}</tr>`;
         });
       });
     });
@@ -15645,8 +16014,8 @@ function renderTagCombos() {
   // Filter out combos with absurd metrics (>₹1Cr CPTD = unreliable)
   const validCombos = combos.filter(c => c.medianMetric < 10000000);
   validCombos.sort((a,b) => a.medianMetric - b.medianMetric);
-  const top = validCombos.slice(0, 10);
-  const bottom = validCombos.slice(-5).reverse();
+  const top = validCombos.slice(0, 5);
+  const bottom = validCombos.slice(-3).reverse();
 
   if (!top.length && !tagSignals.length) { container.innerHTML = '<p class="text-sm text-text-muted">Not enough data for pattern analysis (need 3+ creatives per combo with reliable metrics)</p>'; return; }
 
@@ -15769,14 +16138,20 @@ function renderTagCombos() {
       return { name, thumb };
     }
 
-    // Top combos
-    html += '<div><h4 class="text-xs font-bold text-accent-green uppercase tracking-wider mb-3">Winning Combos</h4><p class="text-[10px] text-text-muted mb-2">Tag pairs that produce the cheapest trials</p><div class="space-y-2">';
+    // Winning combos — each card: signal + why + action
+    html += '<div><h4 class="text-xs font-bold text-accent-green uppercase tracking-wider mb-3">Winning Combos</h4><p class="text-[10px] text-text-muted mb-2">Tag pairs producing the cheapest trials</p><div class="space-y-2">';
+    const bestMetric = top.length ? top[0].medianMetric : 1;
     top.forEach((c, i) => {
       const tcA = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catA)||'purple'];
       const tcB = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catB)||'blue'];
       const ex = findComboExample(c.catA, c.tagA, c.catB, c.tagB);
-      html += `<div class="p-2.5 rounded-lg bg-accent-green-light/50 border border-green-100">
-        <div class="flex items-center justify-between">
+      // Why: data-driven — sample size, prevalence in top5, efficiency
+      const whyBits = [];
+      whyBits.push(`${c.count} ads share this pair, ${c.totalTD} TDs at ${formatCurrency(c.totalSpend)} spend`);
+      if (hasSignalData && c.inTop >= 2) whyBits.push(`appears in ${c.inTop}/${c.topTotal} of your top performers`);
+      const action = `Brief ${Math.min(3, Math.max(2, Math.ceil(c.count/3)))} more creatives in this combo`;
+      html += `<div class="p-3 rounded-lg bg-accent-green-light/50 border border-green-100">
+        <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="text-xs font-bold text-accent-green">#${i+1}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded ${tcA.bg} ${tcA.text} font-medium">${tagLabel(c.tagA)}</span>
@@ -15785,29 +16160,29 @@ function renderTagCombos() {
           </div>
           <div class="text-right shrink-0 ml-2">
             <span class="text-xs font-bold text-accent-green">${formatCurrency(c.medianMetric)}</span>
-            <span class="text-[9px] text-text-muted ml-1">${c.metricLabel} · ${c.count} ads</span>
+            <span class="text-[9px] text-text-muted ml-1">${c.metricLabel}</span>
           </div>
         </div>
-        <div class="flex items-center gap-3 mt-1 text-[9px] text-text-muted">
-          <span><strong>${c.totalQL}</strong> QLs</span>
-          <span>CPTQL <strong>${c.totalQL > 0 ? formatCurrency(c.totalSpend / c.totalQL) : '—'}</strong></span>
-          <span>Spend <strong>${formatCurrency(c.totalSpend)}</strong></span>
-        </div>
-        ${ex ? `<div class="flex items-center gap-1.5 mt-1">${ex.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-text-muted truncate" title="${ex.name}">Best: ${ex.name}</p></div>` : ''}
+        <p class="text-[10px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${whyBits.join(' \u00B7 ')}.</p>
+        <p class="text-[10px] text-green-700 leading-snug mt-0.5"><span class="font-bold">\u2192 Action:</span> ${action}.</p>
+        ${ex ? `<div class="flex items-center gap-1.5 mt-1.5">${ex.thumb ? `<img src="${ex.thumb}" class="w-7 h-7 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<p class="text-[9px] text-text-muted truncate" title="${ex.name}">Best example: ${ex.name}</p></div>` : ''}
       </div>`;
     });
     html += '</div></div>';
 
-    // Bottom combos
-    const bestMetric = top.length ? top[0].medianMetric : 1;
-    html += '<div><h4 class="text-xs font-bold text-accent-red uppercase tracking-wider mb-3">Money Pits</h4><p class="text-[10px] text-text-muted mb-2">Tag pairs burning budget — consider pausing or reworking</p><div class="space-y-2">';
+    // Losing combos — each card: signal + why + action
+    html += '<div><h4 class="text-xs font-bold text-accent-red uppercase tracking-wider mb-3">Money Pits</h4><p class="text-[10px] text-text-muted mb-2">Tag pairs burning budget</p><div class="space-y-2">';
     bottom.forEach((c, i) => {
       const tcA = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catA)||'purple'];
       const tcB = TAG_COLORS[GODFATHER_TAXONOMY.getColor(c.catB)||'blue'];
       const ratio = bestMetric > 0 ? c.medianMetric / bestMetric : 1;
       const ex = findComboExample(c.catA, c.tagA, c.catB, c.tagB);
-      html += `<div class="p-2.5 rounded-lg bg-accent-red-light/50 border border-red-100">
-        <div class="flex items-center justify-between">
+      const ratioTxt = ratio >= 2 ? `${ratio.toFixed(1)}\u00D7 the cost of your #1 winner` : `${Math.round((ratio - 1) * 100)}% more expensive than #1 winner`;
+      const whyBits = [ratioTxt, `${c.count} ads, ${c.totalTD} TDs on ${formatCurrency(c.totalSpend)} spend`];
+      if (hasSignalData && c.inBottom >= 2) whyBits.push(`appears in ${c.inBottom}/${c.bottomTotal} of your worst ads`);
+      const action = c.totalTD === 0 ? 'Stop producing this combo; pause running ads' : 'Retire this combo and reallocate spend to Winning Combos above';
+      html += `<div class="p-3 rounded-lg bg-accent-red-light/50 border border-red-100">
+        <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-1.5 flex-wrap">
             <span class="text-xs font-bold text-accent-red">#${i+1}</span>
             <span class="text-[10px] px-1.5 py-0.5 rounded ${tcA.bg} ${tcA.text} font-medium">${tagLabel(c.tagA)}</span>
@@ -15816,26 +16191,15 @@ function renderTagCombos() {
           </div>
           <div class="text-right shrink-0 ml-2">
             <span class="text-xs font-bold text-accent-red">${formatCurrency(c.medianMetric)}</span>
-            <span class="text-[9px] text-text-muted ml-1">${c.metricLabel} · ${c.count} ads</span>
+            <span class="text-[9px] text-text-muted ml-1">${c.metricLabel}</span>
           </div>
         </div>
-        <div class="flex items-center gap-3 mt-1 text-[9px] text-text-muted">
-          <span><strong>${c.totalQL}</strong> QLs</span>
-          <span>CPTQL <strong>${c.totalQL > 0 ? formatCurrency(c.totalSpend / c.totalQL) : '—'}</strong></span>
-          <span>Spend <strong>${formatCurrency(c.totalSpend)}</strong></span>
-        </div>
-        <div class="flex items-center gap-1.5 mt-1">${ex?.thumb ? `<img src="${ex.thumb}" class="w-6 h-6 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<span class="text-[10px] text-text-muted">${ratio >= 2 ? Math.round(ratio) + 'x more expensive than #1 winner' : Math.round((ratio - 1) * 100) + '% more expensive than #1 winner'}${ex ? ` · e.g. ${ex.name}` : ''}</span></div>
+        <p class="text-[10px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${whyBits.join(' \u00B7 ')}.</p>
+        <p class="text-[10px] text-red-700 leading-snug mt-0.5"><span class="font-bold">\u2192 Action:</span> ${action}.</p>
+        ${ex ? `<div class="flex items-center gap-1.5 mt-1.5">${ex.thumb ? `<img src="${ex.thumb}" class="w-7 h-7 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}<p class="text-[9px] text-text-muted truncate" title="${ex.name}">Example: ${ex.name}</p></div>` : ''}
       </div>`;
     });
     html += '</div></div></div>';
-
-    // Actionable insight
-    if (top.length && bottom.length) {
-      const diff = Math.round(((bottom[0].medianMetric - top[0].medianMetric) / bottom[0].medianMetric) * 100);
-      html += `<div class="mt-4 p-3 rounded-lg" style="background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(59,130,246,0.06))">
-        <p class="text-xs text-text-secondary"><strong class="gradient-text">Key insight:</strong> "${tagLabel(top[0].tagA)} + ${tagLabel(top[0].tagB)}" outperforms "${tagLabel(bottom[0].tagA)} + ${tagLabel(bottom[0].tagB)}" by <strong>${diff}%</strong> on median ${top[0].metricLabel}. Consider creating more creatives with the winning combination.</p>
-      </div>`;
-    }
   }
 
   container.innerHTML = html;
@@ -15916,6 +16280,10 @@ function renderCreativeGrid() {
     container.innerHTML = '<div class="text-center py-12 text-text-muted text-sm">No creatives match the current filters. Try changing the market, tag filter, or date range.</div>';
     return;
   }
+  // Portfolio totals for impact % per card
+  const _totSpend = data.reduce((s, c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
+  const _totTD = data.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
+
   container.innerHTML = gPaged.map(c => {
     const name = c['Ad name']||c['ad name']||c['Creative name']||c['Ad Name']||'Unknown';
     const campaign = c['Campaign name']||c['campaign name']||c['Campaign Name']||'';
@@ -15923,18 +16291,42 @@ function renderCreativeGrid() {
     const spend = parseNumber(c['Spent']||c['spent']||0);
     const ql = parseNumber(c['QL']||c['ql']||0);
     const cpql = parseNumber(c['CPQL']||c['cpql']||0) || (ql > 0 ? spend / ql : 0);
-    const nri = parseNumber(c['NRI']||c['nri']||0);
     const tags = c.tags || {};
+    const mkt = extractMarket(c) || 'US';
+    const mktTh = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
 
     const tdVal = parseNumber(c['TD']||c['td']||0);
     const cptd = tdVal >= 1 ? spend / tdVal : 0;
-    // Show CPTD badge if available, otherwise CPTQL
+    const impressions = parseNumber(c['Impressions']||c['impressions']||0);
+    const clicks = parseNumber(c['Clicks']||c['clicks']||0);
+    const ctr = impressions > 0 ? (clicks/impressions*100) : 0;
     const badgeMetric = cptd > 0 ? cptd : cpql;
     const badgeLabel = cptd > 0 ? 'CPTD' : cpql > 0 ? 'CPTQL' : '';
-    const badgeColor = badgeMetric > 0 ? (badgeMetric < 30000 ? 'text-accent-green' : badgeMetric < 60000 ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
-    const badgeBg = badgeMetric > 0 ? (badgeMetric < 30000 ? 'bg-accent-green-light border-green-200' : badgeMetric < 60000 ? 'bg-accent-orange-light border-orange-200' : 'bg-accent-red-light border-red-200') : 'bg-surface-tertiary border-gray-200';
+    const badgeColor = badgeMetric > 0 ? (badgeMetric < (mktTh.cptd?.green||35000) ? 'text-accent-green' : badgeMetric < (mktTh.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+    const badgeBg = badgeMetric > 0 ? (badgeMetric < (mktTh.cptd?.green||35000) ? 'bg-accent-green-light border-green-200' : badgeMetric < (mktTh.cptd?.amber||50000) ? 'bg-accent-orange-light border-orange-200' : 'bg-accent-red-light border-red-200') : 'bg-surface-tertiary border-gray-200';
 
-    // Show top 6 most interesting tags (filter out Unknown)
+    // Verdict + why — same taxonomy as Tree view
+    const clickQL = clicks > 0 ? (ql/clicks*100) : 0;
+    const verdict = (() => {
+      if (spend < 3000) return { text: 'Too early', color: 'bg-gray-100 text-gray-500', why: '' };
+      if (tdVal >= 3 && cptd < (mktTh.cptd?.green||35000)) return { text: 'Scale', color: 'bg-accent-green-light text-green-700', why: `${tdVal} TDs at ${formatCurrency(cptd)} CPTD — below target` };
+      if (tdVal >= 1 && cptd < (mktTh.cptd?.amber||50000)) return { text: 'Working', color: 'bg-accent-green-light text-green-600', why: `${tdVal} TD${tdVal>1?'s':''} at ${formatCurrency(cptd)} CPTD` };
+      if (spend > 50000 && tdVal === 0) return { text: 'Kill', color: 'bg-accent-red-light text-red-700', why: `${formatCurrency(spend)} spent, 0 TDs — pause` };
+      if (spend > 20000 && tdVal === 0 && ql <= 2) return { text: 'Budget leak', color: 'bg-accent-red-light text-red-600', why: `${ql} QL${ql===1?'':'s'}, 0 TDs — pause` };
+      if (spend > 15000 && ql >= 5 && tdVal === 0) return { text: 'Funnel break', color: 'bg-accent-orange-light text-amber-700', why: `${ql} QLs but 0 TDs — audience or scheduler issue` };
+      if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR', color: 'bg-accent-orange-light text-amber-600', why: `CTR ${ctr.toFixed(2)}% — fatigue, refresh` };
+      if (ql >= 3 && clickQL > 3) return { text: 'Promising', color: 'bg-accent-blue-light text-accent-blue', why: `${ql} QLs, click→QL ${clickQL.toFixed(1)}% — add budget` };
+      if (spend > 10000 && ql <= 1) return { text: 'Weak', color: 'bg-gray-100 text-gray-600', why: `${formatCurrency(spend)} spent, ${ql} QL — hook not landing` };
+      return { text: 'Monitoring', color: 'bg-gray-100 text-gray-500', why: '' };
+    })();
+
+    // Impact contribution
+    const spendPct = _totSpend > 0 ? (spend / _totSpend * 100) : 0;
+    const tdPct = _totTD > 0 ? (tdVal / _totTD * 100) : 0;
+    const impactLabel = tdPct >= 1
+      ? `${tdPct.toFixed(1)}% of portfolio TDs · ${spendPct.toFixed(1)}% of spend`
+      : `${spendPct.toFixed(1)}% of portfolio spend${tdVal === 0 && spendPct > 1 ? ' · 0 TD contribution' : ''}`;
+
     const displayTags = ['hook','pain_benefit','emotional_tone','campaign_audience']
       .filter(cat => tags[cat] && tags[cat] !== 'Unknown')
       .slice(0, 5)
@@ -15949,13 +16341,18 @@ function renderCreativeGrid() {
     return `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
       ${thumbUrl ? `<div class="h-56 bg-gray-50 overflow-hidden flex items-center justify-center"><img src="${thumbUrl}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full text-text-muted text-3xl text-gray-300\\'>${type === 'Video' ? '\u25B6' : '\u25A1'}</div>'" /></div>` : `<div class="h-56 bg-surface-tertiary flex items-center justify-center"><span class="text-3xl text-gray-300">${type === 'Video' ? '\u25B6' : '\u25A1'}</span></div>`}
       <div class="p-4">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${type==='Video'?'bg-accent-purple-light text-accent-purple':'bg-accent-blue-light text-accent-blue'}">${type}</span>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border ${badgeBg} ${badgeColor}">${badgeMetric > 0 ? formatCurrency(badgeMetric)+' '+badgeLabel : _hasCRM ? '\u2014' : 'No CRM'}</span>
+      <div class="flex items-center justify-between mb-2 gap-1">
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${type==='Video'?'bg-accent-purple-light text-accent-purple':'bg-accent-blue-light text-accent-blue'}">${type}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${verdict.color}">${verdict.text}</span>
+          <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
+        </div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border ${badgeBg} ${badgeColor} shrink-0">${badgeMetric > 0 ? formatCurrency(badgeMetric)+' '+badgeLabel : _hasCRM ? '\u2014' : 'No CRM'}</span>
       </div>
-      <p class="text-xs font-semibold mb-1 truncate" title="${name}">${shortAdName(name)}</p>
-      <p class="text-[10px] text-text-muted mb-3 truncate" title="${campaign}">${campaign}</p>
-      <div class="grid grid-cols-3 gap-2 mb-3 text-center">
+      <p class="text-xs font-semibold mb-0.5 truncate" title="${name}">${shortAdName(name)}</p>
+      <p class="text-[10px] text-text-muted mb-2 truncate" title="${campaign}">${campaign}</p>
+      <p class="text-[10px] text-text-muted mb-2">${impactLabel}</p>
+      <div class="grid grid-cols-3 gap-2 mb-2 text-center">
         <div class="bg-surface-secondary rounded-lg py-1.5 px-1">
           <p class="text-[10px] text-text-muted">Spend</p>
           <p class="text-xs font-bold">${formatCurrency(spend)}</p>
@@ -15969,6 +16366,7 @@ function renderCreativeGrid() {
           <p class="text-xs font-bold">${_hasCRM ? Math.round(tdVal) : _noCRMLabel}</p>
         </div>
       </div>
+      ${verdict.why ? `<p class="text-[10px] text-text-secondary mb-2 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${verdict.why}</p>` : ''}
       <div class="flex flex-wrap gap-1">${displayTags || '<span class="text-[10px] text-text-muted">No tags</span>'}</div>
     </div></div>`;
   }).join('');
