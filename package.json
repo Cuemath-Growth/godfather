@@ -2,6 +2,6 @@
   "name": "godfather",
   "private": true,
   "scripts": {
-    "build": "mkdir -p dist && cp index.html dist/index.html"
+    "build": "mkdir -p dist && cp index.html dist/index.html && cp -r shared dist/shared"
   }
 }
