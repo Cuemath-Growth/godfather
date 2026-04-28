@@ -4,6 +4,33 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Cleanup: remove orphaned Costs Tracker + Regional code (2026-04-28)
+
+### Why this shipped
+Pressure-test of the prior "blocker sweep" commit (ee6c8f4) revealed `_costsTracker` and
+`_regionalData` are dead code — fetched but never rendered. Git blame traces it to commit b9e38db
+(2026-04-03, "Phase 2.2: delete deprecated code") which removed `fetchCostsTrackerAllGeos`,
+`getCostsTrackerMetrics`, `fetchPerfTrackerDaily`, `mergePerfIntoTagger`, and
+`COSTS_TRACKER_TABS` — but left the orphan fetches behind. The prior commit's "fix" restored
+fetches whose consumers had been deleted three weeks earlier.
+
+The Apr 17 blocker note ("Costs Tracker / Regional returning 0 rows") was reading a dead
+diagnostic checking a dead variable.
+
+### Removed
+- `DEFAULT_SHEETS.costsTrackerUrl` and `DEFAULT_SHEETS.regionalUrl`
+- `state._costsTracker` and `state._regionalData` declarations
+- `check('Regional data loaded', ...)` diagnostic
+- The two orphan fetches in `refreshData()` (used to live near line 6583)
+
+### Net effect
+- Diagnostics drops from 31 PASS → 30 PASS (one fewer check on dead data — correct)
+- ~15 lines removed
+- One less spurious "Costs Tracker fetched: 307 rows" log per session (the rows went nowhere)
+- No render path changes — nothing was being rendered anyway
+
+---
+
 ## Scope honesty — relabel Dashboard as Meta-only (2026-04-28)
 
 ### Why this shipped

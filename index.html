@@ -2364,8 +2364,6 @@ const COST_DATA_START = '2025-11-01';
 const DEFAULT_SHEETS = {
   metaUrl: 'https://docs.google.com/spreadsheets/d/11q8zU3mRa1RzD8WSjanRVAzXBXXoiFsZNXo_R4OwbKk/edit?gid=1805066969#gid=1805066969',
   crmLeadsUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=2057861499#gid=2057861499',
-  costsTrackerUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1269911854#gid=1269911854',
-  regionalUrl: 'https://docs.google.com/spreadsheets/d/1lhgXeOPQ2OJfCxt6v4QGpZPzyMIQmE8emwqs6eCpWDs/edit?gid=1622533630#gid=1622533630',
   influencerUrl: 'https://docs.google.com/spreadsheets/d/1laJcSF7qcHiaKgze0032poaT7QBSNGk99k0ZJXTFZ-Q/gviz/tq?tqx=out:csv&gid=645685654',
   creatorRosterUrl: 'https://docs.google.com/spreadsheets/d/1mhntjIuXl1DQnKd3SzlJczsNlqsAd1wWoZ_4hYmMif0/gviz/tq?tqx=out:csv&gid=1892749954',
   influencerGroundTruthId: '1KKzqnMRpfrmLkU5u8gPk45j_QdBwFr0x4Pw0TSsidnE',
@@ -2382,8 +2380,6 @@ const state = {
   preferences: JSON.parse(localStorage.getItem('gf_preferences') || '{"defaultMarket":"US","refreshInterval":1800000}'),
   rawData: { metaAds: null }, // No longer cached in localStorage — fetched fresh from sheets
   // _crmLeads: REMOVED — all CRM data flows through leadsData (Google Sheets API leads!A:BG)
-  _costsTracker: null,   // Costs tracker sheet — fetched fresh each session
-  _regionalData: null,   // Regional performance sheet — fetched fresh each session
   _influencerData: null, // Influencer organic data sheet — fetched fresh each session
   _creatorRoster: null, // Creator roster from master influencer sheet — source of truth for names
   _librarySheet: null, // Library creative assets from GSheet — fetched on tab open
@@ -3353,7 +3349,6 @@ function runDiagnostics() {
   // ── Data Sources ──
   check('Tagger data loaded', state.taggerData?.length > 0, `${state.taggerData?.length || 0} creatives`);
   check('CRM leads loaded', leadsData?.length > 0, `${leadsData?.length || 0} leads`);
-  check('Regional data loaded', state._regionalData?.length > 0, `${state._regionalData?.length || 0} rows`);
 
   if (state.taggerData?.length) {
     // ── Thumbnails ──
@@ -6580,12 +6575,6 @@ async function refreshData() {
 
   // Fetch ALL sheets (kept in memory — too large for localStorage)
 
-  if (state.sheetConfig.costsTrackerUrl) {
-    try { const csv = await fetchSheetAsCsv(state.sheetConfig.costsTrackerUrl); state._costsTracker = parseCSV(csv); console.log('Costs Tracker fetched:', state._costsTracker.length, 'rows'); } catch(e) { console.error('Costs Tracker:', e); }
-  }
-  if (state.sheetConfig.regionalUrl) {
-    try { const csv = await fetchSheetAsCsv(state.sheetConfig.regionalUrl); state._regionalData = parseCSV(csv); console.log('Regional Performance fetched:', state._regionalData.length, 'rows'); } catch(e) { console.error('Regional:', e); }
-  }
   if (state.sheetConfig.influencerUrl) {
     try {
       const csv = await fetchSheetAsCsv(state.sheetConfig.influencerUrl);
