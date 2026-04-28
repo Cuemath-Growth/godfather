@@ -4,6 +4,50 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 1a — extract pure utilities to `shared/cuemath-data.js` (2026-04-28)
+
+### Why this shipped
+Foundation for the Path C intelligence chassis (see `02-skills/intelligence-chassis-spec.md`).
+Both Godfather and the upcoming Google Creative Dashboard will share core data + intelligence
+modules. This first extraction proves the loading pattern with the safest slice — pure functions,
+no state coupling — before the riskier metric primitive extractions in Week 2-3.
+
+### Changes
+- New file `shared/cuemath-data.js` — exposes 6 pure utility functions on `window`:
+  `parseNumber`, `safeDivide`, `extractSheetId`, `parseSheetValues`, `parseCSV`,
+  `_isPLACampaignName`. Plus sentinel `__CUEMATH_DATA_VERSION = '1.0.0'`.
+- `index.html` line 9 — added `<script src="shared/cuemath-data.js"></script>` before any
+  inline `<script>` so functions exist before app code runs.
+- Removed inline definitions of all 6 functions (replaced with one-line breadcrumb comments
+  pointing to the shared file).
+
+### Verification
+- JS syntax check: ✓ shared file parses, ✓ all 3 inline script blocks in index.html parse
+- Function uniqueness: ✓ each of the 6 functions defined exactly once (in shared, zero in inline)
+- Load order: ✓ shared script tag at line 9, first inline script at line 11
+
+### Net behavior change
+Zero. Same functions, same signatures, same call sites. Just relocated.
+
+### What's next (Phase 1b, Week 1 Day 3-5)
+- Chassis core (`shared/cuemath-intelligence.js`): `registerVerdict`, scoring, queue render skeleton
+- `_PARSER_VERSION` cache invalidation pattern
+- Then Phase 1c: extract market filters + flow filters (BAU/PLA logic) to `cuemath-data.js`
+- Then Phase 1d: extract metric primitives (getQL, getTQL, getTD, getMarketMetrics) — these
+  couple to `leadsData` so will refactor to take it as parameter
+
+### How to test before pushing to Cloudflare
+1. Open `index.html` in your browser (or run `python3 -m http.server 8000` from project root
+   and visit http://localhost:8000)
+2. Open browser DevTools console
+3. Type: `__CUEMATH_DATA_VERSION` — should output `"1.0.0"`
+4. Look for NO red errors mentioning `parseNumber is not defined` or similar
+5. Try the dashboard — KPIs should load identically to before
+
+If anything breaks: `git revert HEAD` and ping.
+
+---
+
 ## Cleanup: remove orphaned Costs Tracker + Regional code (2026-04-28)
 
 ### Why this shipped

@@ -6,6 +6,7 @@
   <title>Godfather — Cuemath Content Command Center</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="shared/cuemath-data.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script>
     tailwind.config = {
@@ -4532,21 +4533,7 @@ function parseSheetUrl(url) {
 let leadsData = [];  // leads!A:BG — one row per lead
 let costData = [];   // cost!A:H — one row per day/market/campaign
 
-function extractSheetId(url) {
-  if (!url) return null;
-  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : null;
-}
-
-function parseSheetValues(values) {
-  if (!values || values.length < 2) return [];
-  const headers = values[0];
-  return values.slice(1).map(row => {
-    const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i] !== undefined ? row[i] : ''; });
-    return obj;
-  });
-}
+// extractSheetId + parseSheetValues moved to shared/cuemath-data.js (Apr 28)
 
 async function fetchSheetData(sheetUrl, apiKey) {
   const id = extractSheetId(sheetUrl);
@@ -5428,7 +5415,7 @@ function getAsian(market, startDate, endDate) {
 
 // ── Derived metrics — never divide by zero, return null ──
 
-function safeDivide(num, den) { return den > 0 ? num / den : null; }
+// safeDivide moved to shared/cuemath-data.js (Apr 28)
 
 function getMarketMetrics(market, startDate, endDate) {
   const spend = getSpend(market, startDate, endDate);
@@ -6211,42 +6198,7 @@ async function fetchSheetAsCsv(url, tq) {
 // Keep parseCSV for now — still used by refreshData until fully rewired
 
 
-function parseCSV(text) {
-  const lines = [];
-  let current = '', inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === '"') { if (inQuotes && text[i+1] === '"') { current += '"'; i++; } else inQuotes = !inQuotes; }
-    else if (ch === '\n' && !inQuotes) { lines.push(current); current = ''; }
-    else current += ch;
-  }
-  if (current) lines.push(current);
-  const splitRow = (row) => {
-    const cols = []; let col = '', q = false;
-    for (let i = 0; i < row.length; i++) {
-      const c = row[i];
-      if (c === '"') q = !q;
-      else if (c === ',' && !q) { cols.push(col.trim()); col = ''; }
-      else col += c;
-    }
-    cols.push(col.trim()); return cols;
-  };
-  if (!lines.length) return [];
-  const headers = splitRow(lines[0]);
-  const result = [];
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const cols = splitRow(lines[i]);
-    const obj = {};
-    headers.forEach((h, idx) => { obj[h] = cols[idx] || ''; });
-    result.push(obj);
-  }
-  return result;
-}
-function parseNumber(val) {
-  if (!val) return 0;
-  return parseFloat(String(val).replace(/[,$%]/g, '')) || 0;
-}
+// parseCSV + parseNumber moved to shared/cuemath-data.js (Apr 28)
 
 function mergeCRMWithMeta() {
   // Idempotency: skip if already merged with same data version
@@ -6984,14 +6936,8 @@ function setFlowFilter(flow) {
 // Detect PLA from campaign name string (same logic as _isLPCampaign's isPLA check)
 // Detect PLA/Eval (automated, non-BAU) from campaign name.
 // PLA = automated signup flow. Eval = MathFit evaluation flow. Both are non-sales-led.
-function _isPLACampaignName(name) {
-  const camp = (name || '').toLowerCase();
-  // PLA campaigns: _pla_ / pla_ / _pla (end)
-  if (camp.includes('_pla_') || camp.includes('pla_') || camp.includes('_pla ') || camp.endsWith('_pla')) return true;
-  // Eval campaigns: _eval_ / eval_ / _eval (end)
-  if (camp.includes('_eval_') || camp.includes('eval_') || camp.includes('_eval ') || camp.endsWith('_eval')) return true;
-  return false;
-}
+// _isPLACampaignName moved to shared/cuemath-data.js (Apr 28)
+// Will be deprecated Week 4 in favor of canonical CRM lead_type column.
 
 // Filter leadsData by BAU/PLA flow. Uses both _source and campaign name detection
 // because main CRM sheet PLA leads may not always have _source='pla'.
