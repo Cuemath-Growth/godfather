@@ -4,6 +4,67 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 1b — chassis core skeleton + smoke-test verdict (2026-04-28)
+
+### Why this shipped
+Week 1 Day 3-5 of the Path C build (see `02-skills/intelligence-chassis-spec.md`).
+This is the verdict-driven engine skeleton. Real verdicts (the existing Pause Now,
+Make More, Refresh, Market Health, Funnel Leak, Influencer alerts) begin migrating
+to this chassis in Week 2.
+
+### Changes
+- New file `shared/cuemath-intelligence.js` (~270 lines) — exposes `window.cuemathIntelligence`:
+  - `registerVerdict(verdict)` / `getVerdicts(filter)` — verdict registry
+  - `registerGuardrail(name, fn)` — extensible guardrail framework
+  - `runDetection(toolName, data, context)` — runs all verdicts, applies guardrails,
+    scores, returns `{byMarket, all, stats}` with results sorted by priority
+    **within each market** (markets are silos — see `feedback_markets_are_silos`)
+  - `renderActionQueue(detectionResult, container, opts)` — skeleton render to console
+    + optional DOM container; full UI lands Week 1 Day 4-5
+  - `interleaveTopNPerMarket(byMarket, totalLimit)` — round-robin so India/UK don't
+    get drowned by US in "All markets" view
+  - `dismiss(verdictId, entityId, reason)` — localStorage skeleton; Supabase migration
+    in Week 2 Day 1
+  - `computePriority(severity, confidence, effort)` — `severity × confidenceWeight ÷ effortDivisor`
+  - `CONFIDENCE` (CONFIDENT/LIKELY/LOW) and `EFFORT` (1_CLICK/5_MIN/INVESTIGATE) enums
+  - `PARSER_VERSION = '1.0.0'` + `checkParserVersion(cached)` for cache invalidation
+  - 6 stub guardrails (cohort_matured, volume_floor, not_recently_dismissed,
+    brand_defense_exception, market_priority_check, historical_winner_check) —
+    real implementations land Week 2
+- `index.html` line 10 — added `<script src="shared/cuemath-intelligence.js"></script>`
+  after cuemath-data.js
+- `index.html` boot sequence — registers a `chassis_smoke_test` dummy verdict and runs
+  detection once at boot to confirm wiring. Console output expected:
+  `[chassis] runDetection(godfather): 1 verdicts → 1 signals → 1 recommendations`
+
+### Verification
+- JS syntax: ✓ chassis parses, ✓ data still parses (no regression), ✓ all 3 inline
+  blocks in index.html parse
+- Load order: ✓ cuemath-data line 9, cuemath-intelligence line 10, first inline line 12
+- Sentinel: `__CUEMATH_INTELLIGENCE_VERSION === '0.1.0'` after boot
+
+### Net behavior change
+Zero visible change. Smoke-test logs to console; no UI.
+
+### What's next (Week 1 Day 4-5 → Week 2)
+- Day 4-5: Action Queue UI tab in Godfather (real card render, dismissal interactions)
+- Week 2 Day 1: Supabase `recommendation_log` + `recommendation_dismissals` tables;
+  swap localStorage dismissal store for Supabase
+- Week 2 Day 2: Real guardrail implementations (`cohort_matured`, `volume_floor`, etc.)
+- Week 2 Day 3+: First real verdict migration (`meta_pause_cptd_leak`)
+
+### How to test before pushing to Cloudflare
+1. Open `index.html` (`python3 -m http.server 8000`, then http://localhost:8000)
+2. Open browser DevTools console (Cmd+Option+J)
+3. Type `__CUEMATH_INTELLIGENCE_VERSION` → should output `"0.1.0"`
+4. Look for boot log: `[chassis] runDetection(godfather): 1 verdicts → 1 signals → 1 recommendations`
+5. Type `cuemathIntelligence.getVerdicts({tool:'godfather'})` → array with 1 verdict (`chassis_smoke_test`)
+6. Dashboard otherwise behaves identically to before
+
+If broken: `git revert HEAD` and ping.
+
+---
+
 ## Phase 1a — extract pure utilities to `shared/cuemath-data.js` (2026-04-28)
 
 ### Why this shipped

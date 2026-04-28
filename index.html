@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="shared/cuemath-data.js"></script>
+  <script src="shared/cuemath-intelligence.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script>
     tailwind.config = {
@@ -3603,6 +3604,40 @@ function init() {
 
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
+
+    // ── Intelligence chassis smoke test (Phase 1b skeleton, Apr 28) ──
+    // Registers a "hello world" dummy verdict + runs detection to confirm
+    // shared/cuemath-intelligence.js is wired correctly. Real verdicts begin
+    // migrating in Week 2. See 02-skills/intelligence-chassis-spec.md.
+    try {
+      const ci = window.cuemathIntelligence;
+      if (ci) {
+        ci.registerVerdict({
+          id: 'chassis_smoke_test',
+          tool: 'godfather',
+          channel: 'meta',
+          detect: (data) => [{
+            entity_type: 'system',
+            entity_id: 'chassis_v' + ci.CHASSIS_VERSION,
+            market: 'US',
+            signal: `Chassis v${ci.CHASSIS_VERSION} loaded · ${data.leadsData.length} leads available`,
+            why: 'Skeleton verdict registered at boot to validate end-to-end wiring.',
+            raw_metrics: { leads: data.leadsData.length, cost_rows: data.costData.length }
+          }],
+          scoreSeverity: () => 1,
+          scoreConfidence: () => ci.CONFIDENCE.LOW,
+          scoreEffort: () => ci.EFFORT.INVESTIGATE,
+          guardrails: ['not_recently_dismissed'],
+          action: { label: 'No-op (smoke test)', type: 'noop' },
+        });
+        const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
+        console.log(`[chassis] smoke test: ${result.stats.surfaced} recommendation(s) surfaced`);
+      } else {
+        console.warn('[chassis] cuemathIntelligence not loaded — shared/cuemath-intelligence.js missing or failed to parse');
+      }
+    } catch (e) {
+      console.error('[chassis] smoke test failed:', e);
+    }
 
     // Resolve ad names + tag PLA leads across ALL leadsData
     // UTM nomenclature (Apr 2026+): utm_medium=campaign, utm_campaign=adset, utm_term=ad name
