@@ -208,6 +208,7 @@
           <button onclick="setFlowFilter('bau')" data-flow="bau" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">BAU</button>
           <button onclick="setFlowFilter('pla')" data-flow="pla" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">PLA</button>
         </div>
+        <span class="text-[9px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 cursor-help" title="Godfather scope: Meta only. Google/Influencer/WhatsApp/BTL leads are excluded from KPIs. For all-channel BAU MTD, see the perf tracker leads tab.">Meta only</span>
         <span id="dataDateRange" class="text-[9px] text-text-muted shrink-0" style="display:none"></span>
         <div class="ml-auto flex items-center gap-1 shrink-0">
           <span class="text-[9px] text-text-muted whitespace-nowrap" id="dataTimestamp"></span>
@@ -4891,10 +4892,11 @@ async function fetchMetaCreatives(force = false) {
     try {
       let page = await callMetaAPI(`${account.id}/ads`, {
         fields: 'id,name,creative{thumbnail_url,image_url},status,effective_status',
-        limit: '25'
+        limit: '100',
+        filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE','PAUSED','PENDING_REVIEW','IN_PROCESS','WITH_ISSUES','CAMPAIGN_PAUSED','ADSET_PAUSED'] }])
       });
       let pageNum = 1;
-      while (page && pageNum <= 20) {
+      while (page && pageNum <= 30) {
         if (page.data) {
           page.data.forEach(ad => {
             all.push({
@@ -6199,8 +6201,9 @@ function fmtMetric(val, prefix, suffix) {
   return Math.round(val).toLocaleString();
 }
 
-// ==================== SECTION2_DEPRECATED: OLD DATA FETCHING ====================
-/* SECTION2_DEPRECATED — old CSV-based sheet fetching, replaced by Sheets API JSON
+// CSV sheet fetcher — used by Costs Tracker, Regional, Influencer, Creator Roster, Library tabs.
+// Main spend pipeline (costData, leadsData) uses Sheets API JSON via loadCsv(); this is the
+// gviz fallback for derived/secondary sheets that don't need the API quota.
 async function fetchSheetAsCsv(url, tq) {
   const info = parseSheetUrl(url);
   if (!info) throw new Error('Invalid sheet URL');
@@ -6210,9 +6213,6 @@ async function fetchSheetAsCsv(url, tq) {
   if (!resp.ok) throw new Error(`Sheet fetch failed: ${resp.status}`);
   return await resp.text();
 }
-SECTION2_DEPRECATED */
-// Stub so old refreshData() doesn't crash — returns empty CSV
-function fetchSheetAsCsv() { return Promise.resolve(''); }
 // Keep parseCSV for now — still used by refreshData until fully rewired
 
 
@@ -8312,7 +8312,7 @@ function renderBauPlaComparison() {
     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <div class="w-6 h-6 rounded-md bg-indigo-100 flex items-center justify-center"><span class="text-indigo-600 text-[10px] font-black">B|P</span></div>
-        <h3 class="text-sm font-bold">BAU vs PLA Comparison</h3>
+        <h3 class="text-sm font-bold">Meta BAU vs Meta PLA</h3>
       </div>
       <span class="text-[10px] text-text-muted">${dashCountry === 'all' ? 'All Markets' : dashCountry}</span>
     </div>`;
@@ -13471,7 +13471,7 @@ function _renderFunnelWaterfall(crm, isPLA, cac) {
   const maxCount = Math.max(...stages.map(s => s.count || 0), 1);
   const barColor = (pct, good, bad) => pct >= good ? 'bg-accent-green' : pct <= bad ? 'bg-accent-red' : 'bg-accent-orange';
   const leakColor = (leakPct) => leakPct < 30 ? 'text-accent-green' : leakPct > 70 ? 'text-accent-red' : 'text-accent-orange';
-  const flowLabel = isPLA ? 'PLA Funnel' : 'BAU Funnel';
+  const flowLabel = isPLA ? 'Meta PLA Funnel' : 'Meta BAU Funnel';
   const invalidPct = crm.ql > 0 ? (crm.invalid / crm.ql * 100).toFixed(1) : '0';
 
   let rows = '';

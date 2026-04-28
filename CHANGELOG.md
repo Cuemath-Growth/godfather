@@ -4,6 +4,72 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Scope honesty — relabel Dashboard as Meta-only (2026-04-28)
+
+### Why this shipped
+User pulled the leads tab and ran a side-by-side: her CMO weekly report shows USA BAU MTD = 327 TD,
+but Godfather has been showing ~139 because `fetchSheetData` (line 4581) filters all leads to
+`utm_medium='meta'` at fetch time — dropping ~5,400 non-Meta rows (google_brand 1,854 +
+google_other 1,360 + others 492 + Influencer 32 + whatsapp 17 + BTL 10). The filter is intentional
+("Godfather is Meta-only"), but the dashboard never said so. KPIs read like all-channel BAU,
+producing low TDs and inflated CPTD whenever compared against the cross-channel reports.
+
+### Decision
+Keep Meta-only scope (option 3). Don't widen the filter. Make scope visible everywhere it matters
+so no future comparison is apples-to-oranges.
+
+### Changes
+- **Persistent "Meta only" pill** next to the BAU/PLA flow toggle (header). Tooltip: "Godfather
+  scope: Meta only. Google/Influencer/WhatsApp/BTL leads are excluded from KPIs. For all-channel
+  BAU MTD, see the perf tracker leads tab."
+- **"BAU vs PLA Comparison" → "Meta BAU vs Meta PLA"** (renderBauPlaComparison header).
+- **"BAU Funnel" / "PLA Funnel" → "Meta BAU Funnel" / "Meta PLA Funnel"** (funnel renderer).
+
+### Net effect
+Dashboard KPIs are unchanged (still Meta-only). Labels now make scope explicit so the gap to
+all-channel reports is expected, not a bug. No data-pipeline changes.
+
+---
+
+## Blocker sweep — Supabase oracle_actions + Meta thumbnails + sheet fetcher (2026-04-28)
+
+### `fetchSheetAsCsv` un-stubbed — fixes Costs Tracker / Regional / Creator Roster / Library tabs
+Class bug. The function was deprecated and replaced with `Promise.resolve('')` during the move to
+the Sheets API JSON path for the main spend pipeline. But four downstream consumers still relied
+on the gviz CSV fetcher and have been silently returning 0 rows ever since:
+- Costs Tracker (`state._costsTracker`)
+- Regional Performance (`state._regionalData`)
+- Creator Roster (`state._creatorRoster`)
+- Library tab fetches (`renderLibrary` flow)
+- Influencer (`state._influencerData`) via the same path
+
+Verified all four URLs return HTTP 200 + non-empty CSV (308 / 25 / 179 / N rows). Restored the
+original implementation; no call-site changes required. Main spend pipeline (`costData`,
+`leadsData`) continues to use Sheets API JSON via `loadCsv()` — unaffected.
+
+
+
+### oracle_actions table created (Supabase)
+Boot-time 404 from `loadOracleActions()` → fixed. Created `public.oracle_actions` with PK `item_id`,
+RLS policy `FOR ALL TO public USING (true)` (mirrors `action_log`/`library_assets` pattern), plus
+indexes on `card_type` and `status`. Schema matches what `oracleAction()`, `oracleSaveNote()`,
+`oracleBulkAction()` write: item_id (PK), card_type, status, note, item_name, actioned_by,
+actioned_at, snooze_until. No code change required — `_oracleActions` simply starts persisting.
+
+### `fetchMetaCreatives` coverage expanded
+fbcdn thumbnail 403s were largely a coverage gap, not pure URL expiry. Old call only pulled the first
+~500 ads per account (limit:25 × 20 pages), and archived/deleted ads were burning slots. Now:
+- `limit: '100'` (was '25')
+- `pageNum <= 30` (was 20) — yields up to 3000 active ads per account vs 500
+- `filtering: effective_status IN [ACTIVE, PAUSED, PENDING_REVIEW, IN_PROCESS, WITH_ISSUES, CAMPAIGN_PAUSED, ADSET_PAUSED]` — drops ARCHIVED/DELETED/DISAPPROVED so currently-displayable ads aren't crowded out
+- Fresh URLs cover ~6× the inventory without changing render or onerror paths
+
+Note: fbcdn URLs still carry signed expiry (~24-48h). For sessions left open >24h, thumbnails will
+still 403 — onerror handlers already swap to grey placeholders. Permanent thumbnail storage was
+considered and skipped (overkill for a 5-person tool).
+
+---
+
 ## Phase 7 · Tighten winner classification + cohort maturity (2026-04-17)
 
 ### Why this shipped
