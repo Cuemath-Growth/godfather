@@ -11,8 +11,8 @@
 |---|---|---|
 | 1 | Where shared code lives | **Same git repo as Godfather**, in `~/Documents/Brain/godfather/shared/`. Deploys with same Cloudflare project. |
 | 2 | Outcome tracking storage | **Existing Cuemath Supabase project** (same one Godfather uses). Add 2 tables: `recommendation_log` + `recommendation_dismissals`. |
-| 3 | Brand keyword list | **PENDING USER INPUT.** Naina to confirm/extend list. Starter: cuemath, cue math, mathfit + competitors (Kumon, Mathnasium, Sylvan, Khan Academy, Outschool, Brighterly, Splash Math, Mathletics). Needed by Week 5. |
-| 4 | Severity weighting per market | **PENDING USER INPUT.** Either rough ABVs per market OR confirm flat "US 3× / others 1×" rule. Needed by Week 1. Default fallback if no answer: flat US 3×. |
+| 3 | Brand keyword list | Deferred to Week 5 (Google work). Naina to share when Google dashboard begins. |
+| 4 | Severity weighting per market | **CLOSED Apr 28** — no ABV needed. Markets are independent strategies per annual plan; no cross-market budget reallocation ever. Severity is computed in-market using `SENTINEL_THRESHOLDS[market]` (CPQL ceilings from annual plan §4.7: US ₹18K, APAC ₹8.5K, MEA ₹7.5K, India ₹1.2K). Action queue is per-market by default; "All markets" view interleaves top-N from each market. |
 | 5 | Out-of-scope features | **Confirmed dropped:** ML anomaly detection, predictive forecasting, Slack alerts, mobile UI. |
 | 6 | Migration cutover style | **Hybrid.** Soft (parallel) cutover for first 2-3 verdicts; hard cutover for the rest after pattern proven. |
 | 7 | Settings toggle "Action Queue (beta) / Legacy cards" | **Yes**, in Settings panel. Removed after all migrations complete (~Week 5). |
@@ -32,7 +32,7 @@
 | "Why now?" engine (24h/72h diff) | ✅ | | |
 | Universal guardrails contract | ✅ | | |
 | Per-market threshold config pattern | ✅ | | |
-| Market priority weighting | ✅ | | |
+| Per-market action queue (no cross-market ranking) | ✅ | | |
 | Cohort maturity gating | ✅ | | |
 | Volume floor gating | ✅ | | |
 | `_PARSER_VERSION` cache invalidation | ✅ | | |
@@ -199,7 +199,7 @@ Nightly Edge Function: for `acted` rows where `acted_at < now() - outcomeWindow`
 - Sort: priority (default), severity, confidence, recency, effort
 - Bulk actions: "Apply all 1-CLICK + CONFIDENT" with confirmation
 - Outcome stats in header (transparency)
-- Top-N-per-market interleaving (so India signals don't get drowned by US — replaces flat 3× US weighting)
+- Per-market action queues (each market's strategy is independent per annual plan). Default UI = market filter active. "All markets" view interleaves top-N from each market. NO cross-market severity ranking, NO cross-market budget moves — Verdict #8 (Reallocate Budget) is strictly same-market.
 - ≤7 cards above the fold; "Show N more" expands
 
 ---
@@ -274,8 +274,9 @@ Outer-bound risks could push to 8 weeks if M2 (first real migration) reveals cha
 
 | # | Input | Blocks | Default if not provided |
 |---|---|---|---|
-| 3 | Brand keyword list confirmation | Week 5 (Google Add Negative verdict) | Use starter list above; risk of recommending brand terms as negatives |
-| 4 | ABVs per market OR "use flat US 3×" | Week 1 (chassis severity scoring) | Top-N-per-market interleaving with flat US weighting |
+| 3 | Brand keyword list | Week 5 (Google Add Negative verdict) | User to share when Google work begins; not a blocker for Week 1-4 Godfather migration |
+
+**Decision 4 (severity weighting per market): CLOSED Apr 28.** No ABV needed. Annual plan §1, §4.7 confirms markets are independent strategies. Action queue is per-market. Severity computed in-market against `SENTINEL_THRESHOLDS[market]` derived from annual plan CPQL ceilings (US ₹18K, APAC ₹8.5K, MEA ₹7.5K, India ₹1.2K). Verdict #8 (Reallocate Budget) is strictly same-market.
 
 ---
 
