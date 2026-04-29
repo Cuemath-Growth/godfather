@@ -3653,21 +3653,21 @@ function init() {
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
 
-    // ── Intelligence chassis boot check (Day 4-5, Apr 29) ──
-    // Confirms shared/cuemath-intelligence.js loaded and runDetection wires up.
-    // Real verdicts (Pause Now / Make More / Refresh / Market Health / Funnel Leak)
-    // migrate in Week 2 Day 3+. Until then runDetection returns 0 surfaced.
+    // ── Intelligence chassis boot (Week 2 Day 1, Apr 29) ──
+    // configure() wires Supabase: dismissals persist to recommendation_dismissals,
+    // surfaced recs log to recommendation_log. Real verdicts migrate Week 2 Day 3+.
     // See 02-skills/intelligence-chassis-spec.md.
     try {
       const ci = window.cuemathIntelligence;
       if (ci) {
+        ci.configure({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
         const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
-        console.log(`[chassis] boot check: v${ci.CHASSIS_VERSION} loaded · ${result.stats.verdicts} verdict(s) registered · ${result.stats.surfaced} surfaced`);
+        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced · Supabase wired`);
       } else {
         console.warn('[chassis] cuemathIntelligence not loaded — shared/cuemath-intelligence.js missing or failed to parse');
       }
     } catch (e) {
-      console.error('[chassis] boot check failed:', e);
+      console.error('[chassis] boot failed:', e);
     }
 
     // Resolve ad names + tag PLA leads across ALL leadsData
@@ -15678,7 +15678,7 @@ function _winningCreativesTable(data) {
     const td = parseNumber(c['TD']||c['td']||0);
     const tql = mkt === 'US' ? nri : ql;
     if (tql < (VOLUME_FLOORS[mkt] || 3)) return;
-    if (td < 1) return;
+    if (td < 2) return;
     const cptql = tql > 0 ? spend / tql : Infinity;
     const cptd = td > 0 ? spend / td : Infinity;
     const cptqlGate = th.cpnri?.amber || th.cpql?.amber || 15000;
@@ -16110,64 +16110,145 @@ function setTaggerViewLevel(level) {
 }
 window.setTaggerViewLevel = setTaggerViewLevel;
 
+// WoW trend cache — computed once per render, keyed by today + flow filter.
+// Used by getCreativeVerdict() for trend-based Fatigued detection.
+let _verdictTrendCache = { key: '', data: {} };
+function _computeVerdictTrends() {
+  const today = new Date().toISOString().slice(0, 10);
+  const flow = (typeof getFlowFilter === 'function') ? getFlowFilter() : 'all';
+  const cacheKey = `${today}|${flow}`;
+  if (_verdictTrendCache.key === cacheKey) return _verdictTrendCache.data;
+
+  const todayDate = new Date(today);
+  const last7 = new Date(todayDate); last7.setDate(todayDate.getDate() - 7);
+  const prev14 = new Date(todayDate); prev14.setDate(todayDate.getDate() - 14);
+  const last7Start = last7.toISOString().slice(0, 10);
+  const prev14Start = prev14.toISOString().slice(0, 10);
+
+  let daily = [];
+  try { daily = (typeof getAdPerformanceDaily === 'function') ? getAdPerformanceDaily(null, prev14Start, today) : []; } catch (_) { daily = []; }
+
+  const map = {};
+  daily.forEach(r => {
+    const norm = r.normName;
+    if (!norm) return;
+    if (!map[norm]) map[norm] = { l7: { spend:0, td:0, ql:0, clicks:0, imp:0 }, p7: { spend:0, td:0, ql:0, clicks:0, imp:0 } };
+    const bucket = (r.date >= last7Start) ? 'l7' : 'p7';
+    map[norm][bucket].spend += r.spend || 0;
+    map[norm][bucket].td += r.td || 0;
+    map[norm][bucket].ql += r.ql || 0;
+    map[norm][bucket].clicks += r.clicks || 0;
+    map[norm][bucket].imp += r.impressions || 0;
+  });
+
+  const trends = {};
+  Object.entries(map).forEach(([norm, d]) => {
+    const lcptd = d.l7.td > 0 ? d.l7.spend / d.l7.td : null;
+    const pcptd = d.p7.td > 0 ? d.p7.spend / d.p7.td : null;
+    const lcpql = d.l7.ql > 0 ? d.l7.spend / d.l7.ql : null;
+    const pcpql = d.p7.ql > 0 ? d.p7.spend / d.p7.ql : null;
+    const lctr = d.l7.imp > 0 ? d.l7.clicks / d.l7.imp * 100 : null;
+    const pctr = d.p7.imp > 0 ? d.p7.clicks / d.p7.imp * 100 : null;
+    trends[norm] = {
+      cptdRising: pcptd != null && lcptd != null && lcptd > pcptd * 1.3,
+      cpqlRising: pcpql != null && lcpql != null && lcpql > pcpql * 1.3,
+      ctrFalling: pctr != null && lctr != null && lctr < pctr * 0.6,
+    };
+  });
+
+  _verdictTrendCache = { key: cacheKey, data: trends };
+  return trends;
+}
+
+// Spend floors (INR) for "enough data" gate — per-market.
+const VERDICT_SPEND_FLOOR = { US: 15000, India: 3000, AUS: 8000, APAC: 8000, MEA: 5000, UK: 10000, EU: 10000, ROW: 5000 };
+
+// Unified verdict — same logic for Tagger Grid, Signals, Sentinel, Winning Creatives.
+// Order matters: first match wins. All rules past Testing require age ≥14d (cohort maturity).
 function getCreativeVerdict(c) {
   const spend = parseNumber(c['Spent']||c['spent']||0);
   const ql = parseNumber(c['QL']||c['ql']||0);
+  const nri = parseNumber(c['NRI']||c['nri']||0);
   const td = parseNumber(c['TD']||c['td']||0);
   const impressions = parseNumber(c['Impressions']||c['impressions']||0);
   const clicks = parseNumber(c['Clicks']||c['clicks']||0);
-  const cptd = td >= 1 ? spend / td : 0;
-  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-  const cpc = clicks > 0 ? spend / clicks : 0;
-  const clickQL = clicks > 0 ? (ql / clicks) * 100 : 0;
   const mkt = extractMarket(c) || 'US';
   const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
+  const tql = mkt === 'US' ? nri : ql;
+  const cptd = td >= 1 ? spend / td : 0;
+  const cptql = tql > 0 ? spend / tql : 0;
+  const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
 
-  // Not enough data
-  if (spend < 3000) return { label: 'New', key: 'new', color: 'gray', reason: 'Spend < ₹3K — not enough data yet' };
+  const cptdGreen = th.cptd?.green || 35000;
+  const cptdAmber = th.cptd?.amber || 50000;
+  const cptqlGreen = th.cpnri?.green || th.cpql?.green || 10000;
+  const cptqlAmber = th.cpnri?.amber || th.cpql?.amber || 15000;
+  const floor = VERDICT_SPEND_FLOOR[mkt] || 5000;
 
-  // Check for wrong verdict feedback — demote if previously marked wrong
+  // Cohort age — _date or DDMMYY in ad name
   const adName = c['Ad name'] || c['ad name'] || '';
+  let date = c['_date'] || null;
+  if (!date) {
+    const m = adName.match(/(\d{6})$/);
+    if (m) date = `20${m[1].slice(4,6)}-${m[1].slice(2,4)}-${m[1].slice(0,2)}`;
+  }
+  const ageDays = date ? Math.floor((Date.now() - new Date(date).getTime()) / 86400000) : null;
+
+  // Wrong-verdict feedback (preserved from old logic)
   const wrongScale = _oracleActions.find(a => a.item_id === _taggerItemId(adName, 'scale') && a.status === 'wrong');
   const wrongPause = _oracleActions.find(a => a.item_id === _taggerItemId(adName, 'pause') && a.status === 'wrong');
 
-  // SCALE: green CPTD with volume (demoted to Working if previously marked wrong)
-  if (td >= 3 && cptd <= th.cptd.green) {
-    if (wrongScale) return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} — previously overrated, watch closely.` };
-    return { label: 'Scale', key: 'scale', color: 'green', reason: `CPTD ${formatCurrency(cptd)} is below ${formatCurrency(th.cptd.green)} target. ${td} TDs — proven performer.` };
+  // 1. Too early — not enough spend OR fresh cohort
+  if (spend < floor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent (floor ${formatCurrency(floor)}) — not enough data yet` };
+  if (ageDays != null && ageDays < 7) return { label: 'Too early', key: 'new', color: 'gray', reason: `${ageDays}d live — wait for cohort to mature` };
+
+  // 2. Testing — 7–13 days, signal not trusted
+  if (ageDays != null && ageDays < 14) return { label: 'Testing', key: 'new', color: 'gray', reason: `${ageDays}d live — testing window, signals not trusted yet` };
+
+  // 3. Funnel break — TQLs but no trials
+  if (tql >= 5 && td === 0) return { label: 'Funnel break', key: 'watch', color: 'amber', reason: `${tql} TQL but 0 TDs after ${formatCurrency(spend)} — LP/scheduler issue, fix funnel` };
+
+  // 4. Pause — burned 2× floor with zero trials
+  if (spend >= floor * 2 && td === 0) {
+    if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive` };
+    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent, 0 TDs — kill` };
   }
 
-  // WORKING: decent CPTD or strong CTR with conversions
-  if (td >= 1 && cptd <= th.cptd.amber)
-    return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} within guardrails. ${td} TD${td>1?'s':''}.` };
-  if (ql >= 3 && ctr > 1.0)
-    return { label: 'Working', key: 'working', color: 'green', reason: `CTR ${ctr.toFixed(2)}% with ${ql} QLs — good engagement + conversion.` };
-
-  // FATIGUED: high spend, declining efficiency
-  if (spend > 20000 && ctr < 0.5 && ql <= 2)
-    return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `${formatCurrency(spend)} spent but CTR only ${ctr.toFixed(2)}% and ${ql} QLs. Audience may be exhausted.` };
-  if (td >= 1 && cptd > th.cptd.amber)
-    return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `CPTD ${formatCurrency(cptd)} above ${formatCurrency(th.cptd.amber)} limit. Was converting but getting expensive.` };
-
-  // PAUSE: clear budget leak (promoted to Watch if previously marked wrong)
-  if (spend > 30000 && td === 0 && ql <= 2) {
-    if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive.` };
-    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials and ${ql} QLs — budget leak.` };
-  }
-  if (spend > 50000 && td === 0) {
-    if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive.` };
-    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent with 0 trials — stop immediately.` };
+  // 5. Fatigued (trend-based) — WoW degradation, even if today's metric still in range
+  const trends = _computeVerdictTrends();
+  const trend = trends[(typeof normalizeAdName === 'function') ? normalizeAdName(adName) : adName];
+  if (td >= 1 && trend && (trend.cptdRising || trend.cpqlRising || trend.ctrFalling)) {
+    const reasons = [];
+    if (trend.cptdRising) reasons.push('CPTD up ≥30% WoW');
+    if (trend.cpqlRising) reasons.push('CPTQL up ≥30% WoW');
+    if (trend.ctrFalling) reasons.push('CTR down ≥40% WoW');
+    return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `${reasons.join(' · ')} — refresh creative` };
   }
 
-  // FUNNEL BREAK: high QLs but zero TDs — something broken between QL and TD
-  if (spend > 15000 && ql >= 5 && td === 0)
-    return { label: 'Watch', key: 'watch', color: 'amber', reason: `Funnel break: ${ql} QLs but 0 TDs after ${formatCurrency(spend)} spent. Check LP→trial flow.` };
+  // 6. Scale — both CPTD AND CPTQL in green, ≥3 TDs
+  if (td >= 3 && cptd <= cptdGreen && cptql > 0 && cptql <= cptqlGreen) {
+    if (wrongScale) return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)} — previously overrated, watch closely` };
+    return { label: 'Scale', key: 'scale', color: 'green', reason: `${td} TDs · CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)} — both below green target. Proven performer.` };
+  }
 
-  // WATCH: some signal but not conclusive
-  if (ql >= 1 || td >= 1)
-    return { label: 'Watch', key: 'watch', color: 'amber', reason: `${ql} QLs, ${td} TDs — early signal, needs more data.` };
+  // 7. Working — both CPTD AND CPTQL in amber, ≥2 TDs
+  if (td >= 2 && cptd <= cptdAmber && cptql > 0 && cptql <= cptqlAmber) {
+    return { label: 'Working', key: 'working', color: 'green', reason: `${td} TDs · CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)} — within guardrails on both metrics` };
+  }
 
-  return { label: 'Watch', key: 'watch', color: 'gray', reason: `${formatCurrency(spend)} spent, ${ql} QLs — no clear signal yet.` };
+  // 8. Fatigued (static) — already over amber on either metric
+  if (td >= 1 && (cptd > cptdAmber || (cptql > 0 && cptql > cptqlAmber))) {
+    const which = (cptd > cptdAmber && cptql > cptqlAmber) ? 'CPTD + CPTQL' : (cptd > cptdAmber ? 'CPTD' : 'CPTQL');
+    return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `${which} above amber — was converting but getting expensive` };
+  }
+
+  // 9. Weak — spent meaningfully, ≤1 TD
+  if (spend >= floor && td <= 1) {
+    return { label: 'Weak', key: 'watch', color: 'gray', reason: `${formatCurrency(spend)} spent · ${td} TD${td===1?'':'s'} — hook not landing` };
+  }
+
+  // 10. Monitoring — fallback
+  return { label: 'Monitoring', key: 'watch', color: 'gray', reason: `${tql} TQL · ${td} TDs — no clear signal yet` };
 }
 
 // ── Tagger data filtering with new dropdown filters ──
@@ -17071,7 +17152,11 @@ function renderCreativeGrid() {
   const MIN_GRID_SPEND = 1000;
   data.sort((a,b) => {
     const s = c => parseNumber(c['Spent']||c['spent']||0);
-    const q = c => parseNumber(c['QL']||c['ql']||0);
+    // TQL: NRI for US (per data-schemas.md), QL for everywhere else
+    const q = c => {
+      const m = extractMarket(c) || 'US';
+      return parseNumber(m === 'US' ? (c['NRI']||c['nri']||0) : (c['QL']||c['ql']||0));
+    };
     const t = c => parseNumber(c['TD']||c['td']||0);
     if (gridSort === 'recent') {
       // Sort by date extracted from ad name (DDMMYY suffix) or _date field, newest first
@@ -17120,35 +17205,43 @@ function renderCreativeGrid() {
     const type = c['Creative type']||c['creative type']||c['Creative Type']||'-';
     const spend = parseNumber(c['Spent']||c['spent']||0);
     const ql = parseNumber(c['QL']||c['ql']||0);
-    const cpql = parseNumber(c['CPQL']||c['cpql']||0) || (ql > 0 ? spend / ql : 0);
     const tags = c.tags || {};
     const mkt = extractMarket(c) || 'US';
     const mktTh = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
 
     const tdVal = parseNumber(c['TD']||c['td']||0);
     const cptd = tdVal >= 1 ? spend / tdVal : 0;
+    // TQL = NRI for US, QL elsewhere — matches Winning Creatives + verdict logic
+    const tql = mkt === 'US' ? parseNumber(c['NRI']||c['nri']||0) : ql;
+    const cptql = tql > 0 ? spend / tql : 0;
     const impressions = parseNumber(c['Impressions']||c['impressions']||0);
     const clicks = parseNumber(c['Clicks']||c['clicks']||0);
     const ctr = impressions > 0 ? (clicks/impressions*100) : 0;
-    const badgeMetric = cptd > 0 ? cptd : cpql;
-    const badgeLabel = cptd > 0 ? 'CPTD' : cpql > 0 ? 'CPTQL' : '';
-    const badgeColor = badgeMetric > 0 ? (badgeMetric < (mktTh.cptd?.green||35000) ? 'text-accent-green' : badgeMetric < (mktTh.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
-    const badgeBg = badgeMetric > 0 ? (badgeMetric < (mktTh.cptd?.green||35000) ? 'bg-accent-green-light border-green-200' : badgeMetric < (mktTh.cptd?.amber||50000) ? 'bg-accent-orange-light border-orange-200' : 'bg-accent-red-light border-red-200') : 'bg-surface-tertiary border-gray-200';
+    // Badge mirrors active sort: CPTQL when sorted by CPTQL, CPTD when sorted by CPTD,
+    // auto-pick (CPTD preferred, CPTQL fallback) for date/spend/td sorts.
+    const _cptdGreen = mktTh.cptd?.green || 35000;
+    const _cptdAmber = mktTh.cptd?.amber || 50000;
+    const _cptqlGreen = mktTh.cpnri?.green || mktTh.cpql?.green || 10000;
+    const _cptqlAmber = mktTh.cpnri?.amber || mktTh.cpql?.amber || 15000;
+    let badgeMetric, badgeLabel, _bGreen, _bAmber;
+    if (gridSort === 'cpql_asc' && cptql > 0) {
+      badgeMetric = cptql; badgeLabel = 'CPTQL'; _bGreen = _cptqlGreen; _bAmber = _cptqlAmber;
+    } else if (gridSort === 'cptd_asc' && cptd > 0) {
+      badgeMetric = cptd; badgeLabel = 'CPTD'; _bGreen = _cptdGreen; _bAmber = _cptdAmber;
+    } else if (cptd > 0) {
+      badgeMetric = cptd; badgeLabel = 'CPTD'; _bGreen = _cptdGreen; _bAmber = _cptdAmber;
+    } else if (cptql > 0) {
+      badgeMetric = cptql; badgeLabel = 'CPTQL'; _bGreen = _cptqlGreen; _bAmber = _cptqlAmber;
+    } else {
+      badgeMetric = 0; badgeLabel = ''; _bGreen = _cptdGreen; _bAmber = _cptdAmber;
+    }
+    const badgeColor = badgeMetric > 0 ? (badgeMetric < _bGreen ? 'text-accent-green' : badgeMetric < _bAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+    const badgeBg = badgeMetric > 0 ? (badgeMetric < _bGreen ? 'bg-accent-green-light border-green-200' : badgeMetric < _bAmber ? 'bg-accent-orange-light border-orange-200' : 'bg-accent-red-light border-red-200') : 'bg-surface-tertiary border-gray-200';
 
-    // Verdict + why — same taxonomy as Tree view
-    const clickQL = clicks > 0 ? (ql/clicks*100) : 0;
-    const verdict = (() => {
-      if (spend < 3000) return { text: 'Too early', color: 'bg-gray-100 text-gray-500', why: '' };
-      if (tdVal >= 3 && cptd < (mktTh.cptd?.green||35000)) return { text: 'Scale', color: 'bg-accent-green-light text-green-700', why: `${tdVal} TDs at ${formatCurrency(cptd)} CPTD — below target` };
-      if (tdVal >= 1 && cptd < (mktTh.cptd?.amber||50000)) return { text: 'Working', color: 'bg-accent-green-light text-green-600', why: `${tdVal} TD${tdVal>1?'s':''} at ${formatCurrency(cptd)} CPTD` };
-      if (spend > 50000 && tdVal === 0) return { text: 'Kill', color: 'bg-accent-red-light text-red-700', why: `${formatCurrency(spend)} spent, 0 TDs — pause` };
-      if (spend > 20000 && tdVal === 0 && ql <= 2) return { text: 'Budget leak', color: 'bg-accent-red-light text-red-600', why: `${ql} QL${ql===1?'':'s'}, 0 TDs — pause` };
-      if (spend > 15000 && ql >= 5 && tdVal === 0) return { text: 'Funnel break', color: 'bg-accent-orange-light text-amber-700', why: `${ql} QLs but 0 TDs — audience or scheduler issue` };
-      if (spend > 20000 && ctr < 0.5) return { text: 'Low CTR', color: 'bg-accent-orange-light text-amber-600', why: `CTR ${ctr.toFixed(2)}% — fatigue, refresh` };
-      if (ql >= 3 && clickQL > 3) return { text: 'Promising', color: 'bg-accent-blue-light text-accent-blue', why: `${ql} QLs, click→QL ${clickQL.toFixed(1)}% — add budget` };
-      if (spend > 10000 && ql <= 1) return { text: 'Weak', color: 'bg-gray-100 text-gray-600', why: `${formatCurrency(spend)} spent, ${ql} QL — hook not landing` };
-      return { text: 'Monitoring', color: 'bg-gray-100 text-gray-500', why: '' };
-    })();
+    // Verdict — single source of truth via getCreativeVerdict()
+    const _v = getCreativeVerdict(c);
+    const _vTW = { green: 'bg-accent-green-light text-green-700', amber: 'bg-accent-orange-light text-amber-700', red: 'bg-accent-red-light text-red-700', gray: 'bg-gray-100 text-gray-600' };
+    const verdict = { text: _v.label, color: _vTW[_v.color] || _vTW.gray, why: _v.reason || '' };
 
     // Impact contribution
     const spendPct = _totSpend > 0 ? (spend / _totSpend * 100) : 0;

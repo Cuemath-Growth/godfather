@@ -4,6 +4,138 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Week 2 Day 1 — Chassis v0.2.0: Supabase wire-up (2026-04-29)
+
+### Why this shipped
+Day 4-5 dismissals lived only in the browser (localStorage) — switching to a different
+laptop or browser would lose all snoozes. Day 1 of Week 2 wires the chassis to two
+new Supabase tables so dismissals + recommendation history persist across sessions
+and devices, and outcomes can be measured 21 days later.
+
+### Schema (migration: `add_recommendation_log_and_dismissals`)
+- `public.recommendation_log` — every surfaced recommendation. `action_taken` /
+  `outcome_metric` backfilled when user clicks an action button + after the 21-day
+  outcome window. Indexes: `(verdict_id, entity_id, recommended_at desc)`,
+  `(market, recommended_at desc)`, partial index on outcome-pending rows.
+- `public.recommendation_dismissals` — user dismissals from Action Queue.
+  `expires_at NULL` = `never_again`, otherwise the snooze window. Indexes:
+  `(verdict_id, entity_id, expires_at desc)`, `(dismissed_at desc)`.
+- Both tables: RLS enabled, anon `FOR ALL USING (true) WITH CHECK (true)` policy
+  to match existing Cuemath project tables.
+
+### Chassis changes (`shared/cuemath-intelligence.js`, bumped to v0.2.0)
+- New `cuemathIntelligence.configure({ supabaseUrl, supabaseKey, userId })` API.
+  index.html boot now calls `ci.configure({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY })`
+  before the first `runDetection`.
+- `dismiss(verdictId, entityId, reason)` is now async. Three writes in order:
+  (1) in-memory cache → guardrail picks it up immediately on next render,
+  (2) localStorage → offline fallback,
+  (3) Supabase `recommendation_dismissals` POST → cross-device persistence.
+- New `_refreshDismissalsCache()` runs at `configure()` and lazily every 60s during
+  `runDetection`. Pulls active dismissals (`expires_at IS NULL OR expires_at > now`)
+  into an in-memory Map keyed by `verdict_id|entity_id`.
+- `not_recently_dismissed` guardrail consults the Supabase cache first, falls back
+  to localStorage when cache hasn't loaded.
+- New fire-and-forget logger: every surfaced recommendation gets POST'd to
+  `recommendation_log` with `chassis_version` + `parser_version` stamped. Deduped
+  per session by `verdict_id|entity_id` so re-renders don't spam inserts.
+- Chassis-version chip in Action Queue header now reads `chassis v0.2.0` (auto via
+  `ci.CHASSIS_VERSION`).
+
+### Verification
+- Node simulation (mocked fetch): configure → prefetch dismissals → register
+  test verdict → runDetection logs to `recommendation_log` → dismiss writes to
+  `recommendation_dismissals` + cache + localStorage → re-runDetection blocks
+  via guardrail. All transitions correct.
+- Direct SQL writes against the real Supabase tables succeed (chassis-shape
+  payloads, then cleaned up).
+- Browser verified on `localhost:8765`: console shows
+  `[chassis] boot: v0.2.0 · 0 verdict(s) · 0 surfaced · Supabase wired` +
+  `[chassis] dismissals cache: 0 active` — the second line proves the GET to
+  Supabase succeeded with valid auth.
+
+### What did NOT ship today
+- Real verdict implementations — Week 2 Day 3+ (`meta_pause_cptd_leak` first)
+- 21-day outcome measurement job — Week 2 Day 2 (placeholder only; live job builds
+  alongside first real verdict)
+- Supabase-backed real guardrails (cohort_matured, volume_floor, etc.) — Week 2 Day 2
+- Outcome stats in Action Queue header — needs ≥10 measured outcomes per verdict
+  before we surface them
+
+---
+
+## Tagger Grid — CPTQL sort + badge mirror fix (2026-04-29)
+
+### Why this shipped
+Two bugs flagged in original screenshot: (1) "Best CPTQL" sort divided spend by total QL not
+NRI for US — wrong CPTQL definition for US market; (2) badge metric/label always showed CPTD
+when TD ≥ 1, ignoring the sort the user had picked. Result: a US influencer ad with high CPTD
+but cheap CPTQL ranked first under "Best CPTQL" but displayed its CPTD on the badge — looked
+like the sort was broken.
+
+### Changes
+- `index.html` ~line 17155: sort comparator's `q()` function now reads NRI for US, QL for all
+  other markets (matches `data-schemas.md` TQL definition and unified verdict).
+- `index.html` ~line 17204: removed redundant `cpql` calculation, replaced with `tql`/`cptql`
+  using the same TQL rule.
+- `index.html` ~line 17214: badge metric/label now mirrors `gridSort` selection. When sort is
+  `cpql_asc`, badge shows CPTQL (with cpnri/cpql amber thresholds for color). When sort is
+  `cptd_asc`, badge shows CPTD. For neutral sorts (recent/spend/td), keeps existing auto-pick
+  (CPTD preferred, CPTQL fallback). Threshold colors now match the displayed metric, not always
+  CPTD's bands.
+
+### Verification
+- `node` syntax check: 3 inline script blocks, 0 parse errors.
+- Cross-checked against unified `getCreativeVerdict()` — both Tagger Grid and Signals now use
+  the same TQL definition and same threshold sources (`th.cpnri.amber` for CPTQL, `th.cptd.amber`
+  for CPTD).
+
+---
+
+## Unified verdict — `getCreativeVerdict()` rewrite (2026-04-29)
+
+### Why this shipped
+Two parallel verdict systems existed: `getCreativeVerdict()` (Signals + Sentinel) and an inline
+verdict closure in `renderCreativeGrid()`. They disagreed on labels and thresholds. Both had
+fundamental flaws: 1 TD passed as "Working" (statistical noise — `feedback_cohort_maturity.md`
+requires ≥14d), no age check, no CPTQL gate (only CPTD). User confirmed: TD floor = 2, gate on
+both CPTD AND CPTQL, add WoW trend signals to Fatigued.
+
+### Changes
+- `index.html` ~line 16113: `getCreativeVerdict(c)` rewritten with 10-rule cascade. Order matters:
+  Too early → Testing → Funnel break → Pause → Fatigued (trend) → Scale → Working → Fatigued
+  (static) → Weak → Monitoring.
+  - Cohort age: read from `_date` field, fallback to DDMMYY suffix in ad name.
+  - Spend floor: `VERDICT_SPEND_FLOOR` constant (US 15K · India 3K · AUS/APAC 8K · MEA 5K · UK 10K).
+  - **Working/Scale require BOTH** CPTD ≤ amber/green AND CPTQL ≤ amber/green. CPTQL = NRI-based for
+    US (`th.cpnri`), QL-based elsewhere (falls back to `th.cpql`).
+  - **TD floor**: Working ≥ 2, Scale ≥ 3.
+  - Wrong-verdict feedback loop preserved (demote Scale→Working, Pause→Watch on prior `wrong` mark).
+  - Verdict keys preserved for downstream filter compatibility: `new`, `scale`, `working`,
+    `fatigued`, `pause`, `watch`. New labels `Testing`/`Weak`/`Funnel break`/`Monitoring`/`Too early`
+    map to existing keys.
+- `index.html` ~line 16098: new `_computeVerdictTrends()` helper. Computes WoW deltas (last 7d
+  vs prev 7d) for CPTD, CPTQL, CTR per ad from `getAdPerformanceDaily()`. Cached by today+flow.
+  Trend-Fatigued thresholds: CPTD up ≥30%, CPTQL up ≥30%, CTR down ≥40%.
+- `index.html` ~line 17138: Tagger Grid inline verdict (10 lines of closure logic) replaced with
+  `const _v = getCreativeVerdict(c);` + Tailwind color map. Same source of truth as Signals/Sentinel.
+- `index.html` ~line 15691: Winning Creatives table TD floor raised from `td < 1` to `td < 2` to
+  match new "Working" verdict threshold. Prevents table rows showing verdict "Weak".
+
+### Verification
+- `node` syntax check: 3 inline script blocks, 0 parse errors.
+- Verdict keys downstream: filtered at `taggerVerdictFilter` dropdown — kept legacy keys.
+- Wrong-verdict feedback paths still hit (preserved logic for `wrongScale` and `wrongPause`).
+- Trend cache keyed by `today|flow`, won't recompute per row within one render.
+
+### Known follow-ups (not in this change)
+- Tagger Grid badge metric/label still always shows CPTD when TD ≥ 1, regardless of sort
+  selection (line ~17133). Will fix when user requests.
+- "Best CPTQL" sort in Tagger Grid still divides by total QL not NRI for US (line ~16847).
+  Will fix when user requests.
+
+---
+
 ## Tagger Signals — "Winning Creatives" cross-market table (2026-04-29)
 
 ### Why this shipped
