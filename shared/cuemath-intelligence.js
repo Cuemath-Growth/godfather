@@ -6,10 +6,19 @@
 //   (detect/score/guardrails/action), the chassis runs them, applies guardrails,
 //   ranks by priority, and emits an Action Queue.
 //
+// What changed in v0.2.0 (Week 2 Day 1):
+//   - Supabase wire-up via cuemathIntelligence.configure({ supabaseUrl, supabaseKey })
+//   - dismiss() persists to recommendation_dismissals table (localStorage stays as
+//     offline fallback)
+//   - not_recently_dismissed guardrail consults an in-memory cache primed from
+//     Supabase, falls back to localStorage when cache hasn't loaded yet
+//   - Every surfaced recommendation is logged to recommendation_log (fire-and-forget,
+//     deduped within a session by verdict_id|entity_id)
+//
 // What this is NOT (yet):
-//   - Outcome tracking with Supabase (Week 2 Day 1)
 //   - Real verdict migrations (Week 2 Day 3+)
-//   - UI tab integration (Week 1 Day 4-5)
+//   - 21-day outcome measurement job (Week 2 Day 2)
+//   - "Why now?" diff engine (Week 2 Day 2)
 //
 // Markets are silos. Severity is computed in-market. The "all markets" queue
 // interleaves top-N from each market — never ranks across markets.
@@ -19,7 +28,7 @@
 (function (global) {
   'use strict';
 
-  const CHASSIS_VERSION = '0.1.0';
+  const CHASSIS_VERSION = '0.2.0';
   const PARSER_VERSION = '1.0.0';
 
   // ─── Enum constants ─────────────────────────────────────────────────────────
@@ -29,8 +38,26 @@
   const _CONFIDENCE_WEIGHT = { CONFIDENT: 1.0, LIKELY: 0.7, LOW: 0.4 };
   const _EFFORT_DIVISOR = { '1_CLICK': 1.0, '5_MIN': 1.5, 'INVESTIGATE': 3.0 };
 
+  // ─── Supabase config (set via configure()) ─────────────────────────────────
+  let _config = { supabaseUrl: null, supabaseKey: null, userId: null };
+  // In-memory cache of active dismissals: key = `${verdict_id}|${entity_id}`, val = expires_at ms (Number.MAX_SAFE_INTEGER for never_again)
+  const _dismissalsCache = new Map();
+  let _dismissalsCacheLoadedAt = 0;
+  const _DISMISSALS_CACHE_TTL_MS = 60 * 1000; // refresh every minute
+  // Per-session dedup: avoid re-logging same (verdict_id, entity_id) on every render
+  const _loggedThisSession = new Set();
+
+  function configure(opts) {
+    _config = { ..._config, ...(opts || {}) };
+    if (_config.supabaseUrl && _config.supabaseKey) {
+      // Prime the dismissals cache once configured
+      _refreshDismissalsCache().catch(e =>
+        console.warn('[chassis] initial dismissals refresh failed:', e.message)
+      );
+    }
+  }
+
   // ─── Verdict registry ──────────────────────────────────────────────────────
-  // Map: verdict_id → verdict definition object
   const _verdicts = new Map();
 
   function registerVerdict(verdict) {
@@ -43,7 +70,6 @@
     if (_verdicts.has(verdict.id)) {
       console.warn(`[chassis] verdict "${verdict.id}" re-registered (overwriting)`);
     }
-    // Defaults
     verdict.guardrails = verdict.guardrails || [];
     verdict.outcomeWindow = verdict.outcomeWindow || 21;
     _verdicts.set(verdict.id, verdict);
@@ -60,26 +86,83 @@
     });
   }
 
+  // ─── Supabase helpers ──────────────────────────────────────────────────────
+  async function _supabaseFetch(path, init) {
+    if (!_config.supabaseUrl || !_config.supabaseKey) {
+      throw new Error('Supabase not configured — call cuemathIntelligence.configure({ supabaseUrl, supabaseKey })');
+    }
+    const url = `${_config.supabaseUrl}/rest/v1/${path}`;
+    const headers = {
+      'apikey': _config.supabaseKey,
+      'Authorization': `Bearer ${_config.supabaseKey}`,
+      ...((init && init.headers) || {}),
+    };
+    const res = await fetch(url, { ...init, headers });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Supabase ${res.status}: ${body.slice(0, 200)}`);
+    }
+    if (res.status === 204) return null;
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  async function _refreshDismissalsCache() {
+    if (!_config.supabaseUrl) return;
+    try {
+      const nowIso = new Date().toISOString();
+      // Active = expires_at IS NULL (never_again) OR expires_at > now
+      const query = `select=verdict_id,entity_id,expires_at,reason&or=(expires_at.is.null,expires_at.gt.${encodeURIComponent(nowIso)})`;
+      const rows = await _supabaseFetch(`recommendation_dismissals?${query}`, { method: 'GET' });
+      _dismissalsCache.clear();
+      (rows || []).forEach(r => {
+        const expiresMs = r.expires_at == null ? Number.MAX_SAFE_INTEGER : new Date(r.expires_at).getTime();
+        const key = `${r.verdict_id}|${r.entity_id}`;
+        // If multiple rows for same key, keep the longest-running dismissal
+        const prev = _dismissalsCache.get(key) || 0;
+        if (expiresMs > prev) _dismissalsCache.set(key, expiresMs);
+      });
+      _dismissalsCacheLoadedAt = Date.now();
+      console.log(`[chassis] dismissals cache: ${_dismissalsCache.size} active`);
+    } catch (e) {
+      console.warn('[chassis] dismissals cache refresh failed:', e.message);
+    }
+  }
+
+  function _maybeRefreshDismissalsCache() {
+    if (Date.now() - _dismissalsCacheLoadedAt > _DISMISSALS_CACHE_TTL_MS) {
+      _refreshDismissalsCache();
+    }
+  }
+
   // ─── Guardrails ─────────────────────────────────────────────────────────────
-  // Each guardrail returns { passed: bool, reason: string }.
-  // Skeleton stubs always pass; real implementations land Week 2.
   const _guardrails = {
-    cohort_matured: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2)' }),
-    volume_floor: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2)' }),
+    cohort_matured: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
+    volume_floor: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
     not_recently_dismissed: (signal, ctx) => {
-      // localStorage-backed skeleton — Supabase migration in Week 2
+      const verdictId = signal.verdict_id || '';
+      const entityId = signal.entity_id || '';
+      const cacheKey = `${verdictId}|${entityId}`;
+      // 1. Supabase-backed cache (authoritative when populated)
+      if (_dismissalsCache.has(cacheKey)) {
+        const expiresAt = _dismissalsCache.get(cacheKey);
+        if (Date.now() < expiresAt) {
+          return { passed: false, reason: `dismissed until ${expiresAt === Number.MAX_SAFE_INTEGER ? 'never_again' : new Date(expiresAt).toISOString()}` };
+        }
+      }
+      // 2. localStorage fallback (offline / cache not yet loaded)
       try {
-        const key = `_dismiss_${signal.verdict_id || ''}_${signal.entity_id || ''}`;
-        const expiresAt = parseInt(global.localStorage?.getItem(key) || '0', 10);
+        const lsKey = `_dismiss_${verdictId}_${entityId}`;
+        const expiresAt = parseInt(global.localStorage?.getItem(lsKey) || '0', 10);
         if (expiresAt && Date.now() < expiresAt) {
-          return { passed: false, reason: `dismissed until ${new Date(expiresAt).toISOString()}` };
+          return { passed: false, reason: `dismissed (localStorage) until ${new Date(expiresAt).toISOString()}` };
         }
       } catch (_) {}
       return { passed: true };
     },
     brand_defense_exception: (signal, ctx) => ({ passed: true, reason: 'skeleton — brand list lands Week 5' }),
-    market_priority_check: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2)' }),
-    historical_winner_check: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2)' }),
+    market_priority_check: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
+    historical_winner_check: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
   };
 
   function registerGuardrail(name, fn) {
@@ -115,10 +198,9 @@
   }
 
   // ─── Detection loop ─────────────────────────────────────────────────────────
-  // Call after data is loaded. Returns array of recommendations sorted by priority
-  // within each market (markets are silos — no cross-market ranking).
   function runDetection(toolName, data, context) {
     context = context || {};
+    _maybeRefreshDismissalsCache();
     const t0 = performance.now();
     const verdicts = getVerdicts({ tool: toolName });
     const recommendations = [];
@@ -158,32 +240,27 @@
         const priority = computePriority(severityRaw, confidence, effort);
 
         recommendations.push({
-          // identification
           verdict_id: verdict.id,
           tool: verdict.tool,
           channel: verdict.channel,
           entity_type: signal.entity_type,
           entity_id: signal.entity_id,
           market: signal.market,
-          // contract fields
           signal: signal.signal,
           why: signal.why,
           why_now: typeof verdict.whyNow === 'function' ? safeWhyNow(verdict, signal) : null,
           action: verdict.action,
-          // scoring
           severity_raw: severityRaw,
           confidence,
           effort,
           priority,
           guardrails_passed: guardrailResult.passed,
-          // bookkeeping
           raw_metrics: signal.raw_metrics,
           recommended_at: new Date().toISOString(),
         });
       }
     }
 
-    // Sort by priority within market (markets are silos — never compared across)
     const byMarket = {};
     for (const rec of recommendations) {
       const mkt = rec.market || 'unknown';
@@ -196,6 +273,13 @@
     const t1 = performance.now();
     console.log(`[chassis] runDetection(${toolName}): ${verdicts.length} verdicts → ${detected} signals → ${recommendations.length} recommendations (${skipped} skipped by guardrails) in ${Math.round(t1 - t0)}ms`);
 
+    // Fire-and-forget log to Supabase (deduped per session)
+    if (recommendations.length && _config.supabaseUrl) {
+      _logSurfacedRecommendations(recommendations).catch(e =>
+        console.warn('[chassis] recommendation_log insert failed:', e.message)
+      );
+    }
+
     return { byMarket, all: recommendations.sort((a, b) => b.priority - a.priority), stats: { verdicts: verdicts.length, detected, skipped, surfaced: recommendations.length } };
   }
 
@@ -204,9 +288,43 @@
     catch (e) { console.warn(`[chassis] whyNow() threw on ${verdict.id}:`, e.message); return null; }
   }
 
+  // ─── Recommendation logging ────────────────────────────────────────────────
+  async function _logSurfacedRecommendations(recommendations) {
+    const fresh = recommendations.filter(r => {
+      const key = `${r.verdict_id}|${r.entity_id}`;
+      if (_loggedThisSession.has(key)) return false;
+      _loggedThisSession.add(key);
+      return true;
+    });
+    if (!fresh.length) return;
+    const rows = fresh.map(r => ({
+      verdict_id: r.verdict_id,
+      tool: r.tool || 'godfather',
+      channel: r.channel || null,
+      entity_type: r.entity_type,
+      entity_id: r.entity_id,
+      market: r.market || null,
+      signal: r.signal,
+      why: r.why || null,
+      why_now: r.why_now || null,
+      severity_raw: r.severity_raw,
+      confidence: r.confidence,
+      effort: r.effort,
+      priority: r.priority,
+      guardrails_passed: r.guardrails_passed || [],
+      raw_metrics: r.raw_metrics || null,
+      chassis_version: CHASSIS_VERSION,
+      parser_version: PARSER_VERSION,
+    }));
+    await _supabaseFetch('recommendation_log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify(rows),
+    });
+    console.log(`[chassis] logged ${rows.length} recommendation(s) to Supabase`);
+  }
+
   // ─── Render ────────────────────────────────────────────────────────────────
-  // Skeleton: console + optional DOM container injection.
-  // Real Action Queue UI lands Week 1 Day 4-5.
   function renderActionQueue(detectionResult, container, opts) {
     opts = opts || {};
     const market = opts.market || 'all';
@@ -222,16 +340,12 @@
     });
 
     if (container && container.innerHTML !== undefined) {
-      // Skeleton placeholder — Day 4-5 will replace with real card UI
-      container.innerHTML = `<div class="text-xs text-text-muted px-3 py-2">Action Queue (${market}): ${list.length} recommendations · skeleton render · UI lands Week 1 Day 4-5</div>`;
+      container.innerHTML = `<div class="text-xs text-text-muted px-3 py-2">Action Queue (${market}): ${list.length} recommendations · skeleton render</div>`;
     }
 
     return list;
   }
 
-  // ─── Top-N-per-market interleave (markets are silos) ──────────────────────
-  // For "All markets" view: take top N from each market in priority order,
-  // then interleave round-robin so no single market dominates the screen.
   function interleaveTopNPerMarket(byMarket, totalLimit) {
     const markets = Object.keys(byMarket);
     if (!markets.length) return [];
@@ -248,34 +362,57 @@
     return out;
   }
 
-  // ─── Dismissal store (skeleton — localStorage; Supabase in Week 2) ─────────
+  // ─── Dismissal store (Supabase-backed; localStorage as offline fallback) ──
   const DISMISS_DURATIONS = { snooze_24h: 24*60*60*1000, skip_7d: 7*24*60*60*1000, never_again: null };
 
-  function dismiss(verdictId, entityId, reason) {
+  async function dismiss(verdictId, entityId, reason) {
     const duration = DISMISS_DURATIONS[reason];
     if (duration === undefined) {
       console.warn(`[chassis] dismiss: unknown reason "${reason}"`);
       return;
     }
+    const expiresMs = duration === null ? Number.MAX_SAFE_INTEGER : (Date.now() + duration);
+    const expiresIso = duration === null ? null : new Date(expiresMs).toISOString();
+
+    // 1. Update in-memory cache immediately so guardrail picks it up on next render
+    _dismissalsCache.set(`${verdictId}|${entityId}`, expiresMs);
+
+    // 2. localStorage write (offline fallback + sync read in guardrail)
     try {
       const key = `_dismiss_${verdictId}_${entityId}`;
-      const expiresAt = duration === null ? Number.MAX_SAFE_INTEGER : (Date.now() + duration);
-      global.localStorage?.setItem(key, String(expiresAt));
-      console.log(`[chassis] dismissed ${verdictId}/${entityId} reason=${reason} until=${duration === null ? 'forever' : new Date(expiresAt).toISOString()}`);
-    } catch (e) {
-      console.error('[chassis] dismiss failed:', e);
+      global.localStorage?.setItem(key, String(expiresMs));
+    } catch (_) {}
+
+    // 3. Supabase write (fire-and-forget; localStorage already covers persistence)
+    if (_config.supabaseUrl) {
+      try {
+        await _supabaseFetch('recommendation_dismissals', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({
+            verdict_id: verdictId,
+            entity_id: entityId,
+            user_id: _config.userId || null,
+            reason,
+            expires_at: expiresIso,
+          }),
+        });
+        console.log(`[chassis] dismissed ${verdictId}/${entityId} reason=${reason} → Supabase`);
+      } catch (e) {
+        console.warn(`[chassis] Supabase dismiss failed (localStorage still active):`, e.message);
+      }
+    } else {
+      console.log(`[chassis] dismissed ${verdictId}/${entityId} reason=${reason} → localStorage only (Supabase not configured)`);
     }
   }
 
-  // ─── _PARSER_VERSION cache invalidation ────────────────────────────────────
-  // When a parser/format changes, bump PARSER_VERSION. Cached values stamped
-  // with an older version get invalidated on next boot.
+  // ─── Parser version cache invalidation ─────────────────────────────────────
   function checkParserVersion(cachedVersion) {
     if (cachedVersion === PARSER_VERSION) return { valid: true };
     return { valid: false, reason: `cached=${cachedVersion} current=${PARSER_VERSION}` };
   }
 
-  // ─── INR formatter (helper, since shared/cuemath-data.js doesn't export one yet) ─
+  // ─── INR formatter ─────────────────────────────────────────────────────────
   function formatINR(n) {
     if (n == null || isNaN(n)) return '?';
     if (n >= 10000000) return (n / 10000000).toFixed(1) + 'Cr';
@@ -286,6 +423,8 @@
 
   // ─── Public API ────────────────────────────────────────────────────────────
   global.cuemathIntelligence = Object.freeze({
+    // config
+    configure,
     // verdicts
     registerVerdict, getVerdicts,
     // guardrails
@@ -300,6 +439,8 @@
     CHASSIS_VERSION, PARSER_VERSION, checkParserVersion,
     // enums
     CONFIDENCE, EFFORT,
+    // diagnostics
+    _refreshDismissalsCache,
   });
 
   global.__CUEMATH_INTELLIGENCE_VERSION = CHASSIS_VERSION;
