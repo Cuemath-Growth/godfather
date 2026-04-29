@@ -4,6 +4,96 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tagger Signals — "Winning Creatives" cross-market table (2026-04-29)
+
+### Why this shipped
+User flagged that the Explore tab shows all creatives without any compiled "winners" view.
+She needed a single table that surfaces creatives passing ALL of: volume floor, CPTQL ≤ amber,
+CPTD ≤ amber, ≥14d cohort age — for their own market. Previously the Tagger Grid badge
+displayed CPTD even when sorted by Best CPTQL, and the "Working" verdict could fire on a
+single TD, both of which obscured the real winners list.
+
+### Changes
+- `index.html` line 15663: new `_winningCreativesTable(data)` module function (~95 lines).
+  Defined right above `renderCreativeReview` for lexical proximity to the call site.
+  - Volume floors per market: US 5, India 10, AUS/APAC/MEA/UK/EU/ROW 3.
+  - TQL = NRI for US, QL for everywhere else (per `data-schemas.md`).
+  - CPTQL gate = `SENTINEL_THRESHOLDS[mkt].cpnri.amber` (US 15K · India 1.2K · AUS 15K ·
+    MEA 10K · UK 20K — values match what user confirmed).
+  - CPTD gate = `SENTINEL_THRESHOLDS[mkt].cptd.amber`.
+  - Cohort age = 14 days. Date sourced from `_date` field, fallback to DDMMYY suffix in ad name.
+  - Per `feedback_markets_are_silos.md`: rows grouped by market header, sorted by CPTD ASC
+    within each market group. No cross-market ordered list.
+  - Per `feedback_signal_why_action.md`: each row's Action cell shows verdict pill + sentence
+    ("Scale +30% budget" / "Hold spend; brief V2"); full verdict reason in tooltip.
+- `index.html` line 15998: insertion point in `renderCreativeReview()` between Section 3
+  (Pause/Refresh) and Section 5 (Next Week Recommendations), labeled "SECTION 4: Winning
+  Creatives".
+
+### Verification
+- `node` syntax check: 3 inline script blocks, all parse cleanly (0 errors).
+- Empty-state branch: returns its own card with "No creatives currently pass all gates" message.
+- Reuses `getCreativeVerdict()`, `extractMarket()`, `parseNumber()`, `formatCurrency()`,
+  `tagLabel()`, `shortAdName()`, `_hdThumb()`, `SENTINEL_THRESHOLDS` — all already global.
+
+### Known follow-ups (not in this change)
+- Tagger Grid badge still shows CPTD when sorted by Best CPTQL (line 16906-16907 bug). Separate fix.
+- Grid sort labeled "Best CPTQL" actually divides by total QL not NRI for US — separate fix.
+- "Working" verdict fires on 1 TD; cohort-maturity feedback says require ≥2 TDs. Separate fix.
+
+---
+
+## Week 1 Day 4-5 — Action Queue UI tab (2026-04-29)
+
+### Why this shipped
+Day 4-5 of the chassis Week 1 plan. The chassis was emitting recommendations to console
+only; no operator could see what it was producing. This adds the operator-facing surface.
+
+### Changes
+- `index.html` line ~130: new sidebar nav item `data-view="actionq"` between Dashboard and Insights.
+  Includes `actionQueueNavBadge` (counter, hidden when zero) and `[beta]` chip.
+- `index.html` lines 484-514: new `<div id="view-actionq" class="view hidden p-6">` (sibling of all
+  other view divs — verified, not nested). Has header (with chassis version chip), stat strip,
+  empty state, cards container, and footer note.
+- `index.html` `navigateTo()`: titles/subs map updated for `actionq`; render hook added
+  (`renderActionQueueView()` called when switching to view).
+- `index.html` `onGlobalFilterChange()`: now re-renders Action Queue when the active view is `actionq`
+  (so country dropdown propagates).
+- `index.html` ~line 7186: new `renderActionQueueView()` + `_renderActionQueueCard(rec)` +
+  `actionQueueDismiss(verdictId, entityId, reason)` + `_updateActionQueueNavBadge(count)` +
+  `_escapeHtml(s)` helpers.
+- Card layout follows spec §"Action Queue UI": severity chip · confidence · effort · market ·
+  verdict id; signal headline; Why; Why now (when present); guardrails passed line; primary action
+  button + Snooze 24h / Skip 7d / Never again. Smoke-test verdict's action button is disabled
+  (type `noop`) so no fake action is offered.
+- Severity chip color tier: ≥₹50K/wk red · ≥₹10K/wk amber · else gray. Same-market only —
+  no cross-market severity ranking.
+- `cuemathIntelligence.dismiss()` already plumbed to localStorage; `not_recently_dismissed`
+  guardrail filters dismissed cards on next render. End-to-end dismissal works without Supabase
+  (Supabase migration is Week 2 Day 1).
+
+### Verification
+- `node` syntax check: 3 inline script blocks, all parse cleanly.
+- View structure: 9 view divs, all siblings of one another (verified by grep — no nesting).
+- `npm run build`: emits `dist/index.html`, `dist/shared/cuemath-data.js`, `dist/shared/cuemath-intelligence.js`.
+- Manual checklist for browser verification (per `feedback_triple_careful_deploys.md`):
+  1. Hard reload production after deploy
+  2. Sidebar shows new "Action Queue [beta]" nav item between Dashboard and Insights
+  3. Click it: page renders with `chassis v0.1.0` chip, smoke-test card visible (signal:
+     "Chassis v0.1.0 loaded · N leads available")
+  4. Click "Snooze 24h" — card disappears
+  5. Hard reload — card stays gone (localStorage persisted) for 24h, then returns
+  6. Console shows two `[chassis] runDetection(godfather)` log lines (boot + view-render)
+
+### What did NOT ship today (per spec, deferred)
+- Real verdicts (Week 2 Day 3+ migration of Pause / Make More / Refresh / etc.)
+- Outcome stats in header (Week 2 Day 1, blocked on Supabase tables)
+- "Why now" diff engine (Week 2 Day 2)
+- Bulk actions ("Apply all 1-CLICK + CONFIDENT")
+- Verdict-type filter dropdown — defer until ≥3 verdicts are registered
+
+---
+
 ## Phase 1b — chassis core skeleton + smoke-test verdict (2026-04-28)
 
 ### Why this shipped
