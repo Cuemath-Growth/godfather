@@ -4,6 +4,63 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Week 2 Day 3 — Chassis: first real verdict migrations (2026-04-29)
+
+### Why this shipped
+Day 2 wired the engine and guardrails. Day 3 puts the first real verdicts on it
+so Action Queue starts surfacing actionable Pause recommendations. Runs in
+parallel with the legacy Pause Now card on Dashboard for parity audit
+(Week 2 Day 5 will deprecate the old card if 24-48hr parity holds).
+
+### Verdicts registered
+- **`meta_pause_cptql_leak`** — equivalent to Pause Now Signal 2. Detects ads
+  with `tql ≥ 5` AND `cptql > market amber`. Why: cost-per-qualified-lead
+  exceeds market amber; downstream margin is gone — pause and reallocate.
+- **`meta_pause_dead_funnel`** — equivalent to Pause Now Signal 4. Detects ads
+  with `spend ≥ ₹20K` AND `ql ≥ 15` AND `td === 0`. Why varies by `ts`:
+  if `ts === 0`, leads weren't intent-qualified (LP/audience problem); else
+  scheduled but didn't complete (no-show / sales-handoff problem).
+
+### Why both at once
+Naina flagged that an ad with decent CPTQL but zero TDs after 14d maturity is
+still wasted spend. CPTQL leak alone would miss those, breaking the parity
+check vs Pause Now (which catches them via Signal 4). Migrating both together
+preserves parity from day one and exercises the multi-verdict path that Week 3
+relies on.
+
+### Changes (`index.html`)
+- New `_chassisPrepAds()` helper: builds prepared-ad list with `cohort_age_days`,
+  `was_top_tier` (via existing `_classifyWinner`), `is_paused` (Meta status +
+  7-day liveness).
+- New `_chassisPauseSeverity` / `_chassisPauseConfidence` helpers shared by both
+  verdicts. Severity = ₹/wk waste = `(spend / cohort_age_days) × 7`. Confidence
+  = CONFIDENT iff `cohort ≥ 21d` AND `spend ≥ 2× per-market floor`.
+- New `registerMetaPauseVerdicts(ci)` registers both verdicts. Both opt into
+  guardrails: `cohort_matured`, `volume_floor`, `historical_winner_check`,
+  `not_recently_dismissed`. Each verdict supplies the required signal fields
+  per the verdict-author contract from chassis v0.3.0.
+- Boot section calls `registerMetaPauseVerdicts(ci)` after `ci.configure()`.
+  Boot log now reads `2 verdict(s) · N surfaced`.
+
+### Parity audit checklist (Week 2 Day 5)
+- Action Queue currently catches **only** CPTQL leak + Dead funnel (2 of 6
+  Pause Now signals). Migration of remaining signals (1, 3, 5, 6) is queued
+  on follow-up branches.
+- If parity holds across 24-48hrs of refreshed data, the old Pause Now card on
+  Dashboard gets deprecated and Action Queue becomes the single source.
+
+### What did NOT ship today
+- Pause Now Signal 1 (Budget burns / 0 QLs) — queued
+- Pause Now Signal 3 (Wrong audience / NRI < 30%) — queued
+- Pause Now Signal 5 (Spam / >25% invalid) — queued
+- Pause Now Signal 6 (Fatigue / Refresh) — queued; needs special handling
+  for `wasWinner` → "Refresh" not "Pause" path
+- Real Meta-API pause action wiring — Week 4+
+- Make More verdicts (Tier 1 / Tier 2 / Refresh) — Week 3 Day 3-4 (separate branch)
+- Market Health verdicts — Week 3 Day 5 (separate branch)
+
+---
+
 ## Thumbnail backfill — exact-match only + dryRun mode (2026-04-29)
 
 ### Why this shipped
