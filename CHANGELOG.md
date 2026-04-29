@@ -4,6 +4,31 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tagger Grid — show CPTQL + CPTD pills together on cards (2026-04-29)
+
+### Why this shipped
+Grid card showed only one efficiency metric in the badge — whichever the active
+sort selected, with CPTD as fallback. The "Why" line could say "CPTQL above
+amber" while the actual CPTQL number was nowhere on the card. User couldn't
+verify the verdict's reasoning at a glance.
+
+### Changes
+- `index.html` `renderCreativeGrid()` card render (~line 17331): single badge
+  replaced with up to two pills (CPTQL + CPTD), each colored against its own
+  per-market threshold band (`cpnri.green/amber` for CPTQL, `cptd.green/amber`
+  for CPTD). Both pills appear when both metrics are computable; one pill if
+  only one is; "No CRM" / "—" fallback otherwise.
+- Existing sort-aware single-badge logic deprecated (variables `badgeMetric`,
+  `badgeLabel`, `badgeBg`, `badgeColor` now unused but left in place — the
+  inline IIFE reads `cptql`, `cptd`, and the threshold constants directly).
+
+### Verification
+- `node` syntax check: 3 inline script blocks, 0 parse errors.
+- Same threshold sources as Tagger Tree CPTQL column and Winning Creatives —
+  single source of truth.
+
+---
+
 ## Tagger Tree — add CPTQL column (2026-04-29)
 
 ### Why this shipped
