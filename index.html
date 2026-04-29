@@ -7334,7 +7334,7 @@ function _updateActionQueueNavBadge(count) {
 // Three verdicts emitted:
 //   1. meta_scale_tier1_winner   - proven Tier-1 winner, deploy to adjacent audience
 //   2. meta_scale_tier2_winner   - emerging Tier-2 winner, double down
-//   3. meta_refresh_fatigued_winner - historical Tier-1/2 winner now fatiguing -> refresh
+//   (meta_refresh_fatigued_winner moved to chassis-pause-remaining to avoid duplicate registration)
 //
 // Helpers reused unchanged from existing Make More codepath (READ-ONLY here):
 //   _classifyWinner(ad)  -> 'tier1' | 'tier2' | null  (line ~9255)
@@ -7574,71 +7574,10 @@ function _updateActionQueueNavBadge(count) {
       },
     });
 
-    // -- Verdict 3: Refresh - historical winner now fatiguing --------------------
-    ci.registerVerdict({
-      id: 'meta_refresh_fatigued_winner',
-      tool: 'godfather',
-      channel: 'meta',
-      detect: function(data, context) {
-        const market = (context && context.market) || 'all';
-        const prep = _chassisScalePrepAds(market);
-        const fatigued = prep.fatigued;
-        const out = [];
-        for (let i = 0; i < fatigued.length; i++) {
-          const x = fatigued[i];
-          const w = x.ad;
-          const f = x.fatigue;
-          const tier = x.historicalTier;
-          // Cohort age: this ad has historical mature TDs (it's a winner) - reuse 14d threshold
-          // since classification was based on the >=14-day-mature cohort.
-          const cohortAge = w._matureCohortDays || 14;
-          const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
-          const tierLabel = tier === 'tier1' ? 'proven' : 'emerging';
-          const cptdStr = w.cptd ? 'INR ' + Math.round(w.cptd).toLocaleString('en-IN') : '?';
-          const why = stageText + ' - but this ad was a ' + tierLabel + ' winner (CPTD ' + cptdStr + ', ' + (w.td || 0) + ' TDs). Signals: ' + f.signals.join('; ') + ". The CREATIVE PATTERN works - refresh visual/hook, keep audience + format, DON'T kill.";
-          out.push({
-            entity_type: 'ad',
-            entity_id: w.adName,
-            market: w.market || 'unknown',
-            cohort_age_days: cohortAge,
-            spend: w.spend || (f.daily_spend * 7) || 0,
-            window_days: 90,
-            // was_top_tier required ONLY if historical_winner_check is in guardrails - it is not
-            // here because by definition this verdict fires on past winners. Including it would
-            // self-block. Documenting for clarity.
-            signal: 'Proven winner fatiguing - ' + f.signals.join(' - ') + (f.stage === 3 ? ' - URGENT' : ''),
-            why: why,
-            raw_metrics: {
-              historical_tier: tier,
-              fatigue_stage: f.stage,
-              fatigue_signals: f.signals,
-              frequency: f.frequency,
-              daily_spend: f.daily_spend,
-              td: w.td, ql: w.ql, cptd: w.cptd,
-              campaign_audience: (w.tags && w.tags.campaign_audience) || null,
-            },
-          });
-        }
-        return out;
-      },
-      scoreSeverity: function(signal) {
-        // Refresh urgency = weekly spend at risk of decay. Stage 3 weighted heavier.
-        const weeklySpend = (signal.spend || 0) * (7 / (signal.window_days || 90));
-        const stage = (signal.raw_metrics && signal.raw_metrics.fatigue_stage) || 2;
-        return weeklySpend * (stage === 3 ? 1.3 : 1.0);
-      },
-      scoreConfidence: function() { return C.LIKELY; },
-      scoreEffort: function() { return E.FIVE_MIN; },
-      // historical_winner_check OMITTED - this verdict REQUIRES was_top_tier === true.
-      guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
-      action: { label: 'Brief refresh variant', type: 'refresh' },
-      whyNow: function(signal) {
-        const stage = signal.raw_metrics && signal.raw_metrics.fatigue_stage;
-        return stage === 3
-          ? 'Severe fatigue - performance is decaying fast. Brief refresh today before learning phase resets.'
-          : 'Frequency rising - refresh visual/hook now while audience response data still clearly attributes to creative, not novelty fatigue.';
-      },
-    });
+    // Verdict 3 (meta_refresh_fatigued_winner) intentionally lives in chassis-pause-remaining
+    // co-located with the fatigued-loser sibling under registerMetaPauseVerdicts (both share
+    // the detectFatigue() detector). Removed from this branch on 2026-04-29 to avoid
+    // double-registration when both branches merge to main. See CHANGELOG note below.
   }
 
   // Expose for boot integration. Other helpers stay file-private inside this IIFE.

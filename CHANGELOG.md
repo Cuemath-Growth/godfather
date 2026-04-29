@@ -28,10 +28,11 @@ log outcomes per `02-skills/intelligence-chassis-spec.md`.
      audience' }`. Emits a `_findAdjacentAudience(...)` suggestion in the why-line.
    - `meta_scale_tier2_winner` — fires on `_classifyWinner(ad) === 'tier2'`. Confidence
      LIKELY, same scale action.
-   - `meta_refresh_fatigued_winner` — fires on `detectFatigue()` ads whose full perf
-     row still classifies as Tier 1/2 (the "creative pattern works, just wore out"
-     case). Confidence LIKELY, Effort 5_MIN, Action `{ type: 'refresh', label:
-     'Brief refresh variant' }`.
+   - **`meta_refresh_fatigued_winner` REMOVED on 2026-04-29** to avoid duplicate
+     registration with the `chassis-pause-remaining` branch, which co-locates the
+     refresh sibling alongside `meta_pause_fatigued_loser` (both share the same
+     `detectFatigue()` detector — cleaner co-location). The verdict still ships;
+     it just lives on the Pause branch.
 
 ### Verdict-author contract (chassis v0.3.0+)
 - All three verdicts emit `cohort_age_days` (= 14) and `spend` (= mature-cohort INR).
