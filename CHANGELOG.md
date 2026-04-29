@@ -4,6 +4,79 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Week 2 Day 3 — remaining Pause verdicts (2026-04-29)
+
+### Why this shipped
+Earlier today the chassis-pause-cptd branch shipped 2 of 6 legacy Pause Now signals
+(`meta_pause_cptql_leak`, `meta_pause_dead_funnel`). This branch closes the gap so
+the Action Queue catches every signal the legacy Pause Now card catches — required
+before Week 2 Day 5 deprecates the old card.
+
+### Verdicts registered (5 new)
+- **`meta_pause_budget_burn`** — Pause Now Signal 1 equivalent. Detects ads with
+  `spend ≥ ₹15K` AND `ql === 0`. Why: pure waste, no qualified leads at all.
+- **`meta_pause_wrong_audience`** — Pause Now Signal 3 equivalent. **US BAU only**
+  (skips non-US, skips PLA campaigns via `_isPLACampaignName`). Detects
+  `market === 'US' AND spend ≥ ₹20K AND ql ≥ 15 AND nriPct < 0.30`. Why: NRI is
+  the highest-converting US segment; <30% NRI rate at scale means creative or
+  targeting is pulling the wrong audience.
+- **`meta_pause_spam`** — Pause Now Signal 5 equivalent. Detects
+  `spend ≥ ₹10K AND totalLeads ≥ 20 AND invalidPct > 0.25`. Why: high invalid-lead
+  rate; creative attracts pattern-matchers / bots.
+- **`meta_pause_fatigued_loser`** — Pause Now Signal 6, non-winner branch. Reuses
+  the existing `detectFatigue()` helper, filters to Stage-2/3 fatigue, and routes
+  via `historical_winner_check` so only non-winners surface here. Action: Pause.
+- **`meta_refresh_fatigued_winner`** — Pause Now Signal 6, winner branch. Same
+  fatigue detection, but emits ONLY when `was_top_tier === true` and uses
+  `action: { label: 'Refresh creative', type: 'refresh' }`. The CREATIVE PATTERN
+  works — refresh visual/hook, keep audience + format, DON'T kill the pattern.
+  `historical_winner_check` is OMITTED from this verdict's guardrails because by
+  definition it fires only on past winners (would otherwise self-block).
+
+### Why two fatigue verdicts instead of one
+The chassis API takes a static `action` per verdict. Branching the action label
+based on a per-signal field would require chassis-side changes. Cleanest split:
+two sibling verdicts, with the loser branch keeping `historical_winner_check`
+to route winners away, and the winner branch dropping that guardrail since past
+winners are exactly what it targets. Both fire from the same `detectFatigue()`
+output; their detect filters partition the fatigued ads cleanly.
+
+### Changes (`index.html`)
+- `_chassisPrepAds()` (~line 7245) extended with `campaignName`, `nri`, `nriPct`,
+  `invalid`, `invalidPct`, `totalLeads`. Mirrors the legacy mapping at
+  `index.html:9098-9102` so wrong-audience and spam verdicts read the same
+  numbers Pause Now does.
+- `registerMetaPauseVerdicts(ci)` extended in-place with 5 additional
+  `ci.registerVerdict({...})` calls. All 4 new Pause verdicts opt into the full
+  guardrail set (`cohort_matured`, `volume_floor`, `historical_winner_check`,
+  `not_recently_dismissed`); the Refresh-winner verdict drops
+  `historical_winner_check`.
+- Header comment block at the top of the chassis section + boot comment near
+  line 3657 updated to reflect the full 7-verdict registry.
+
+### Verdict-author contract (chassis v0.3.0+)
+Every verdict's signal supplies `cohort_age_days`, `spend`, `was_top_tier` (and
+`market`, `entity_id`, `entity_type`) — these are read directly from the
+`_chassisPrepAds()` enriched row. Missing fields throw at runtime in the
+guardrail layer; verified via synthetic detect run before push.
+
+### Verification
+- `node` syntax check on inline `<script>` blocks: 3 scanned, 0 errors.
+- Synthetic chassis run with 9 ads: 7 verdicts → 10 signals → 8 surfaced
+  (2 skipped by guardrails — fresh-cohort burn ad blocked by `cohort_matured`,
+  fatigued winner correctly blocked by `historical_winner_check` from the
+  fatigued_loser path so it surfaces only via the Refresh sibling). Each new
+  verdict fires on at least one synthetic ad.
+- `npm run build` clean (dist contains both `index.html` and `shared/`).
+
+### What did NOT ship today
+- Real Meta-API pause/refresh action wiring — still Week 4+ (the action buttons
+  are no-op for now; the chassis just emits the recommendation).
+- Make More verdicts — separate parallel branch (Agent B / chassis-make-more).
+- Market Health verdicts — Week 3 Day 5 (separate branch).
+
+---
+
 ## Week 2 Day 3 — Chassis: first real verdict migrations (2026-04-29)
 
 ### Why this shipped
