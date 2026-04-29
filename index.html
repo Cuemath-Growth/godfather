@@ -15668,7 +15668,20 @@ function _winningCreativesTable(data) {
     return Math.floor((Date.now() - t) / 86400000);
   };
 
+  // Build all-time spend lookup once — used for coverage sanity check below
+  const _allTimeSpendByAd = {};
+  if (Array.isArray(state.taggerData)) {
+    state.taggerData.forEach(x => {
+      const k = (typeof normalizeAdName === 'function' ? normalizeAdName(x['Ad name']||x['ad name']||'') : (x['Ad name']||x['ad name']||''));
+      if (!k) return;
+      const s = parseNumber(x['Spent']||x['spent']||0);
+      if (s > (_allTimeSpendByAd[k] || 0)) _allTimeSpendByAd[k] = s;
+    });
+  }
+  const _filterFrom = (typeof getGlobalDateRange === 'function') ? (getGlobalDateRange().from || '') : '';
+
   const qualified = [];
+  let _coverageSkipped = 0;
   data.forEach(c => {
     const mkt = extractMarket(c) || 'US';
     const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
@@ -15685,7 +15698,30 @@ function _winningCreativesTable(data) {
     const cptdGate = th.cptd?.amber || 50000;
     if (cptql > cptqlGate) return;
     if (cptd > cptdGate) return;
-    if (_adAgeDays(c) < COHORT_DAYS) return;
+    const ageDays = _adAgeDays(c);
+    if (ageDays < COHORT_DAYS) return;
+
+    // Coverage sanity: if ad launched on/after the filter window's `from` date,
+    // its date-filtered spend should equal its all-time spend. If it's less than
+    // 50%, daily-spend data has gaps in the requested window — skip to avoid
+    // fake-cheap CPTQL/CPTD from incomplete spend (Apr 29 root cause).
+    const adNameKey = (typeof normalizeAdName === 'function' ? normalizeAdName(c['Ad name']||c['ad name']||'') : (c['Ad name']||c['ad name']||''));
+    const allTime = _allTimeSpendByAd[adNameKey] || 0;
+    if (allTime > 0 && spend / allTime < 0.5) {
+      // Compute launch date the same way as _adAgeDays
+      let launch = c['_date'] || null;
+      if (!launch) {
+        const m = ((c['Ad name']||c['ad name']||'')).match(/(\d{6})$/);
+        if (m) launch = `20${m[1].slice(4,6)}-${m[1].slice(2,4)}-${m[1].slice(0,2)}`;
+      }
+      // Only flag if launch is within the filter window — otherwise narrow-window
+      // analysis legitimately captures only a slice of the ad's spend.
+      if (launch && _filterFrom && launch >= _filterFrom) {
+        _coverageSkipped++;
+        return;
+      }
+    }
+
     qualified.push({ c, mkt, spend, tql, td, cptql, cptd, tqlToTd: tql > 0 ? (td/tql*100) : 0 });
   });
 
@@ -15729,9 +15765,10 @@ function _winningCreativesTable(data) {
     });
   });
 
+  const _coverageNote = _coverageSkipped > 0 ? ` · <span class="text-amber-700">${_coverageSkipped} hidden — incomplete spend in window (run "Backfill Full History" in Settings)</span>` : '';
   return `<div class="mb-6">
     <h3 class="text-base font-bold mb-1">\u{1F3C6} Winning Creatives</h3>
-    <p class="text-xs text-text-muted mb-3">${qualified.length} creative${qualified.length>1?'s':''} passing all 4 gates in their own market: TQL volume floor, CPTQL ≤ target, CPTD ≤ target, ≥14 days live. Sorted by CPTD within each market — never cross-ranked.</p>
+    <p class="text-xs text-text-muted mb-3">${qualified.length} creative${qualified.length>1?'s':''} passing all 4 gates in their own market: TQL volume floor, CPTQL ≤ target, CPTD ≤ target, ≥14 days live. Sorted by CPTD within each market — never cross-ranked.${_coverageNote}</p>
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
       <table class="w-full text-[11px]">
         <thead><tr class="bg-surface-secondary border-b border-gray-200 text-text-muted text-[10px] uppercase tracking-wider">
