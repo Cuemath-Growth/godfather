@@ -4,6 +4,67 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Week 2 Day 2 — Chassis v0.3.0: real guardrails (2026-04-29)
+
+### Why this shipped
+Day 1 wired Supabase. Day 2 replaces 4 skeleton guardrail stubs with real
+implementations so the verdicts that migrate Week 2 Day 3+ are gated by
+correct safety logic from the moment they ship — not silently passing
+everything until later.
+
+### Changes (`shared/cuemath-intelligence.js`, bumped to v0.3.0)
+- **`cohort_matured`** — fails when `signal.cohort_age_days < 14`. Mirrors
+  `feedback_cohort_maturity.md` rule that trials need ≥14 days to complete.
+  Throws if a verdict registers this guardrail without supplying the field.
+- **`volume_floor`** — fails when `signal.spend` is below the per-market floor.
+  Floors mirror the unified verdict's `VERDICT_SPEND_FLOOR` constant from index.html
+  (US 15K · India 3K · AUS/APAC 8K · MEA 5K · UK/EU 10K · ROW 5K). Unknown markets
+  fall back to the most-conservative floor (US 15K).
+- **`historical_winner_check`** — fails when `signal.was_top_tier` is true.
+  Forces past Tier-1/2 winners onto the Refresh path instead of Pause, matching
+  the existing "REFRESH · was a winner" behavior in Pause Now (Apr 17 commit
+  `e705679`).
+- **`market_priority_check`** — only fires for `verdict.action.type ==
+  'reallocate_budget'`. Blocks any rec that would reduce US spend by `delta_inr <
+  0`. Mirrors `feedback_business_context_not_naive_math.md`: US is primary,
+  never reduce US budget regardless of CPTD math.
+- **`brand_defense_exception`** stays skeleton (lands Week 5 with Google work).
+- `_runGuardrails` now passes `ctx.verdict` so guardrails can read action type
+  (one-line change; backwards compatible for guardrails that ignore it).
+
+### Verdict-author contract (new in v0.3.0)
+Verdicts that register a guardrail MUST supply the matching signal field at
+`detect()` time. Missing fields throw with a clear message:
+- `cohort_matured` → `signal.cohort_age_days` (number, days)
+- `volume_floor` → `signal.spend` (number, INR)
+- `historical_winner_check` → `signal.was_top_tier` (bool)
+- `market_priority_check` → `signal.delta_inr` (number; only required when
+  market='US' AND verdict.action.type='reallocate_budget')
+
+This is a deliberate fail-fast: the alternative — silent pass on missing field —
+masks wiring bugs and erodes guardrail trust. Catches author errors at first run.
+
+### Tests
+- `shared/tests/guardrails.test.js` — 27 standalone unit tests (one per case).
+- `shared/tests/guardrails-integration.test.js` — 16 chassis-level tests that
+  exercise the guardrails through `runDetection` + `_runGuardrails`, including
+  the `ctx.verdict` plumbing for `market_priority_check` and a multi-guardrail
+  composition case.
+- Both suites green. Run with `node shared/tests/guardrails.test.js` and
+  `node shared/tests/guardrails-integration.test.js`.
+
+### Production blast radius today
+**Zero.** No verdicts register these guardrails yet. The change is invisible
+until Week 2 Day 3 migrates `meta_pause_cptd_leak` (which will register
+`cohort_matured`, `volume_floor`, `historical_winner_check`).
+
+### What did NOT ship today
+- Brand defense list — Week 5 with Google work.
+- 21-day outcome measurement nightly job — wiring lands alongside first real
+  verdict (Week 2 Day 3) so we have something to measure outcomes against.
+
+---
+
 ## Week 2 Day 1 — Chassis v0.2.0: Supabase wire-up (2026-04-29)
 
 ### Why this shipped
