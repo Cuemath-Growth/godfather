@@ -17328,7 +17328,14 @@ function renderCreativeGrid() {
           <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${verdict.color}">${verdict.text}</span>
           <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
         </div>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold border ${badgeBg} ${badgeColor} shrink-0">${badgeMetric > 0 ? formatCurrency(badgeMetric)+' '+badgeLabel : _hasCRM ? '\u2014' : 'No CRM'}</span>
+        ${(() => {
+          const _band = (v, g, a) => v <= 0 ? null : v <= g ? { color: 'text-accent-green', bg: 'bg-accent-green-light border-green-200' } : v <= a ? { color: 'text-accent-orange', bg: 'bg-accent-orange-light border-orange-200' } : { color: 'text-accent-red', bg: 'bg-accent-red-light border-red-200' };
+          const _qB = _band(cptql, _cptqlGreen, _cptqlAmber);
+          const _dB = _band(cptd, _cptdGreen, _cptdAmber);
+          const _pill = (label, val, b) => b ? `<span class="text-[10px] px-1.5 py-0.5 rounded-full font-bold border ${b.bg} ${b.color}">${formatCurrency(val)} ${label}</span>` : '';
+          if (_qB || _dB) return `<div class="flex flex-wrap gap-1 shrink-0 justify-end">${_pill('CPTQL', cptql, _qB)}${_pill('CPTD', cptd, _dB)}</div>`;
+          return `<span class="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-surface-tertiary border-gray-200 text-text-muted shrink-0">${_hasCRM ? '\u2014' : 'No CRM'}</span>`;
+        })()}
       </div>
       <p class="text-xs font-semibold mb-0.5 truncate" title="${name}">${shortAdName(name)}</p>
       <p class="text-[10px] text-text-muted mb-2 truncate" title="${campaign}">${campaign}</p>
