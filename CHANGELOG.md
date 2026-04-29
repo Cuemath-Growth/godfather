@@ -4,6 +4,31 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Tagger Tree — add CPTQL column (2026-04-29)
+
+### Why this shipped
+User sorted Tagger > Explore > Tree by "Best CPTQL" but the table only showed
+Spend/QL/TD/CPTD — the CPTQL column was missing entirely. Sort worked, but you
+couldn't see the value to verify the order.
+
+### Changes
+- `index.html` line ~1083: new CPTQL `<th>` between TD and CPTD. Sort hint at
+  column index 5; CPTD now at column index 6 (header sort onclick updated).
+- `index.html` `aggregateTaggerRows()`: now sums `tql` (NRI for US, QL elsewhere)
+  per row and computes group-level `cptql = spend / tql`.
+- `index.html` `renderTaggerAdRow()`: per-ad CPTQL cell with green/orange/red
+  bands using `SENTINEL_THRESHOLDS[mkt].cpnri` (or `cpql` fallback). Tooltip
+  shows TQL count + spend so the math is auditable.
+- `index.html` `renderTaggerGroupRow()`: group totals show CPTQL with the same
+  threshold colors. Tooltip shows aggregate TQL.
+
+### Verification
+- `node` syntax check: 3 inline script blocks, 0 parse errors.
+- Same TQL definition + threshold sources as Winning Creatives table and the
+  unified `getCreativeVerdict()` — single source of truth across the app.
+
+---
+
 ## Winning Creatives — spend-coverage sanity gate (2026-04-29)
 
 ### Why this shipped
