@@ -4,6 +4,36 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Winning Creatives — spend-coverage sanity gate (2026-04-29)
+
+### Why this shipped
+User flagged Row 1 + Row 2 of the Winning Creatives table had implausibly cheap CPTQL
+(₹2.4K, ₹5.5K vs US benchmark ~₹10–15K). Diagnostic via console showed the CRM merge was
+PERFECT (score 1.00, all 21 leads belong to the matched ad). The actual issue: date-filtered
+spend was only 21% of all-time spend (₹43.6K vs ₹2.07L) because the daily spend layer had
+gaps for older dates. CRM lead counts had full coverage → divide partial spend by full leads
+→ fake-cheap winners. User ran the "Backfill Full History (Nov 2025–today)" action in
+Settings to fill the gap.
+
+### Changes
+- `index.html` `_winningCreativesTable()` now builds an all-time-spend lookup from
+  `state.taggerData` once per render, and skips any qualifying row where:
+  - `filtered_spend / all_time_spend < 0.5` AND
+  - `ad_launch_date >= filter_window.from`
+  Logic: if the ad launched within the filter window, its filtered spend SHOULD equal its
+  all-time spend; a >50% gap means daily-spend data is incomplete in the requested window.
+- Caption now shows "N hidden — incomplete spend in window (run Backfill...)" when the gate
+  fires, so the user knows defensive filtering is active.
+- Narrow-window analysis preserved: if the ad launched BEFORE the filter window,
+  filtered-spend is legitimately a slice of all-time and the gate is bypassed.
+
+### Verification
+- `node` syntax check: 3 inline script blocks, 0 parse errors.
+- Pre-backfill: gate would catch ~all rows (filtered spend << all-time).
+- Post-backfill: gate should be quiet for normal use; only fires if a future fetch has gaps.
+
+---
+
 ## Week 2 Day 2 — Chassis v0.3.0: real guardrails (2026-04-29)
 
 ### Why this shipped
