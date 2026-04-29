@@ -1081,7 +1081,8 @@
                       <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] cursor-pointer hover:text-text-primary" style="min-width:55px;width:6%" title="Total Meta ad spend (INR)" onclick="_colSort('taggerTableBody',2,'num')">Spend</th>
                       <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] cursor-pointer hover:text-text-primary" style="min-width:30px;width:3%" title="Qualified Leads — signups meeting quality criteria" onclick="_colSort('taggerTableBody',3,'num')">QL</th>
                       <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] cursor-pointer hover:text-text-primary" style="min-width:30px;width:3%" title="Trial Dones — completed demo classes. THE conversion metric." onclick="_colSort('taggerTableBody',4,'num')">TD</th>
-                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] cursor-pointer hover:text-text-primary" style="min-width:55px;width:5%" title="Cost Per Trial Done — THE metric" onclick="_colSort('taggerTableBody',5,'num')">CPTD</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] cursor-pointer hover:text-text-primary" style="min-width:55px;width:5%" title="Cost Per True Qualified Lead — Spend ÷ TQL (NRI for US, QL elsewhere)" onclick="_colSort('taggerTableBody',5,'num')">CPTQL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] cursor-pointer hover:text-text-primary" style="min-width:55px;width:5%" title="Cost Per Trial Done — THE metric" onclick="_colSort('taggerTableBody',6,'num')">CPTD</th>
                       <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px;width:18%">Tags</th>
                     </tr>
                   </thead>
@@ -16403,10 +16404,14 @@ function sortTaggerData(data, sortBy) {
 
 // ── Aggregate tagger rows for hierarchy view ──
 function aggregateTaggerRows(rows) {
-  let spend = 0, ql = 0, td = 0, imp = 0, clicks = 0, paid = 0;
+  let spend = 0, ql = 0, tql = 0, td = 0, imp = 0, clicks = 0, paid = 0;
   rows.forEach(c => {
     spend += parseNumber(c['Spent']||c['spent']||0);
-    ql += parseNumber(c['QL']||c['ql']||0);
+    const _ql = parseNumber(c['QL']||c['ql']||0);
+    const _nri = parseNumber(c['NRI']||c['nri']||0);
+    const _mkt = extractMarket(c) || 'US';
+    ql += _ql;
+    tql += (_mkt === 'US' ? _nri : _ql);
     td += parseNumber(c['TD']||c['td']||0);
     imp += parseNumber(c['Impressions']||c['impressions']||0);
     clicks += parseNumber(c['Clicks']||c['clicks']||0);
@@ -16416,7 +16421,8 @@ function aggregateTaggerRows(rows) {
   const cpc = clicks > 0 ? spend/clicks : 0;
   const clickQL = clicks > 0 ? (ql/clicks)*100 : 0;
   const cptd = td >= 1 ? spend/td : 0;
-  return { spend, ql, td, imp, clicks, paid, ctr, cpc, clickQL, cptd, count: rows.length };
+  const cptql = tql >= 1 ? spend/tql : 0;
+  return { spend, ql, tql, td, imp, clicks, paid, ctr, cpc, clickQL, cptd, cptql, count: rows.length };
 }
 
 // ── Toggle tagger group rows ──
@@ -16547,6 +16553,15 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
     <td class="px-2 py-2 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
     <td class="px-2 py-2 text-right text-[11px]">${ql > 0 ? Math.round(ql) : '<span class="text-text-muted">0</span>'}</td>
     <td class="px-2 py-2 text-right text-[11px] font-semibold">${td_val > 0 ? Math.round(td_val) : '<span class="text-text-muted">0</span>'}</td>
+    ${(() => {
+      const _nri = parseNumber(c['NRI']||c['nri']||0);
+      const _tql = mkt === 'US' ? _nri : ql;
+      const _cptql = _tql > 0 ? spend / _tql : 0;
+      const _cptqlGreen = mktThresholds.cpnri?.green || mktThresholds.cpql?.green || 10000;
+      const _cptqlAmber = mktThresholds.cpnri?.amber || mktThresholds.cpql?.amber || 15000;
+      const _cls = _cptql <= _cptqlGreen ? 'text-accent-green' : _cptql <= _cptqlAmber ? 'text-accent-orange' : 'text-accent-red';
+      return `<td class="px-2 py-2 text-right font-bold text-[11px]">${_cptql > 0 ? `<span class="${_cls}" title="${_tql} TQL \u00b7 spend ${formatCurrency(spend)}">${formatCurrency(_cptql)}</span>` : '<span class="text-text-muted">\u2014</span>'}</td>`;
+    })()}
     <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>${_cptdArrow}` : '<span class="text-text-muted">\u2014</span>'}</td>
     <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5 max-h-[2.5rem] overflow-hidden">${tagHtml || '<span class="text-text-muted text-[9px]">\u2014</span>'}</div></td>
   </tr>`;
@@ -16587,6 +16602,12 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount, parentG
     <td class="px-2 py-2.5 text-right font-bold text-[11px]">${formatCurrency(totals.spend)}</td>
     <td class="px-2 py-2.5 text-right text-[11px]">${totals.ql}</td>
     <td class="px-2 py-2.5 text-right font-bold text-[11px]">${totals.td}</td>
+    ${(() => {
+      const _gqlGreen = _tgrTh.cpnri?.green || _tgrTh.cpql?.green || 10000;
+      const _gqlAmber = _tgrTh.cpnri?.amber || _tgrTh.cpql?.amber || 15000;
+      const _gqlCls = totals.cptql > 0 ? (totals.cptql <= _gqlGreen ? 'text-accent-green' : totals.cptql <= _gqlAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
+      return `<td class="px-2 py-2.5 text-right font-bold text-[11px] ${_gqlCls}" title="${totals.tql} TQL">${totals.cptql > 0 ? formatCurrency(totals.cptql) : '-'}</td>`;
+    })()}
     <td class="px-2 py-2.5 text-right font-bold text-[11px] ${cptdColor}">${totals.cptd > 0 ? formatCurrency(totals.cptd) : '-'}</td>
     <td class="px-2 py-2.5"></td>
   </tr>`;
