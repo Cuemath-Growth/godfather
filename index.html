@@ -4120,20 +4120,29 @@ function recordMetaPull() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Backfill thumbnails for existing tagger data without re-pulling all ads
-async function backfillThumbnails() {
+async function backfillThumbnails(opts) {
+  const dryRun = !!(opts && opts.dryRun);
   const token = state.metaApi?.token || META_API_TOKEN;
   if (!token) { showToast('Enter Meta API token in Settings first'); return; }
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
   if (!accounts.length) { showToast('No Meta ad accounts configured'); return; }
   if (!state.taggerData.length) { showToast('No tagger data to backfill'); return; }
 
-  showToast('Fetching thumbnails + ad copy from Meta API...');
-  // Build index: exact match + lowercase match + token-overlap fallback
+  showToast(dryRun ? 'DRY RUN: fetching from Meta API (no writes)...' : 'Fetching thumbnails + ad copy from Meta API...');
+  // Build index: exact + lowercase + normalizeAdName match
+  // Apr 29: removed token-overlap fuzzy fallback — it caused wrong-thumbnail corruption Apr 28.
+  // See project_thumbnail_corruption_apr28. Better no thumbnail than wrong thumbnail.
   const adNameIndex = {};
   const adNameIndexLower = {};
+  const adNameIndexNorm = {};
   state.taggerData.forEach((c, i) => {
     const n = c['Ad name'] || c['ad name'] || '';
-    if (n) { adNameIndex[n] = i; adNameIndexLower[n.toLowerCase().trim()] = i; }
+    if (n) {
+      adNameIndex[n] = i;
+      adNameIndexLower[n.toLowerCase().trim()] = i;
+      const norm = normalizeAdName(n);
+      if (norm) adNameIndexNorm[norm] = i;
+    }
   });
 
   const findMatch = (apiName) => {
@@ -4142,19 +4151,16 @@ async function backfillThumbnails() {
     if (idx !== undefined) return idx;
     idx = adNameIndexLower[apiName.toLowerCase().trim()];
     if (idx !== undefined) return idx;
-    // Token overlap fallback: if exact/lowercase fails, try matching by significant tokens
-    const apiTokens = apiName.toLowerCase().split(/[_\-\s]+/).filter(t => t.length >= 4);
-    if (apiTokens.length < 2) return undefined;
-    let bestIdx, bestScore = 0;
-    for (const [name, i] of Object.entries(adNameIndex)) {
-      const taggerTokens = name.toLowerCase().split(/[_\-\s]+/).filter(t => t.length >= 4);
-      let overlap = 0;
-      for (const t of apiTokens) if (taggerTokens.includes(t)) overlap++;
-      const score = Math.min(apiTokens.length, taggerTokens.length) > 0 ? overlap / Math.min(apiTokens.length, taggerTokens.length) : 0;
-      if (score > bestScore && score >= 0.7) { bestScore = score; bestIdx = i; }
+    const norm = normalizeAdName(apiName);
+    if (norm) {
+      idx = adNameIndexNorm[norm];
+      if (idx !== undefined) return idx;
     }
-    return bestIdx;
+    return undefined; // STRICT: no fuzzy fallback (Apr 28 corruption fix)
   };
+
+  // Track every proposed assignment for dry-run inspection + audit
+  const proposed = [];
 
   let matched = 0, apiAds = 0, errors = 0;
   for (const account of accounts) {
@@ -4174,12 +4180,15 @@ async function backfillThumbnails() {
             if (idx !== undefined && ad.creative) {
               const t = state.taggerData[idx];
               const _bestImg = ad.effective_image_url || ad.creative.image_url || ad.creative.thumbnail_url || '';
-              t['image_url'] = _bestImg || t['image_url'] || '';
-              t['thumbnail_url'] = _bestImg || t['thumbnail_url'] || '';
-              if (ad.creative.body) t['ad_body'] = ad.creative.body;
-              if (ad.creative.title) t['ad_title'] = ad.creative.title;
-              if (ad.creative.description) t['ad_description'] = ad.creative.description;
-              if (ad.creative.call_to_action_type) t['ad_cta'] = ad.creative.call_to_action_type;
+              proposed.push({ apiName: ad.name, taggerAdName: t['Ad name'] || t['ad name'] || '', imageUrl: _bestImg, account: account.name });
+              if (!dryRun) {
+                t['image_url'] = _bestImg || t['image_url'] || '';
+                t['thumbnail_url'] = _bestImg || t['thumbnail_url'] || '';
+                if (ad.creative.body) t['ad_body'] = ad.creative.body;
+                if (ad.creative.title) t['ad_title'] = ad.creative.title;
+                if (ad.creative.description) t['ad_description'] = ad.creative.description;
+                if (ad.creative.call_to_action_type) t['ad_cta'] = ad.creative.call_to_action_type;
+              }
               matched++;
             }
           });
@@ -4208,10 +4217,13 @@ async function backfillThumbnails() {
               if (idx !== undefined) {
                 const t = state.taggerData[idx];
                 const _bestImg2 = creative.effective_image_url || creative.image_url || creative.thumbnail_url || '';
-                t['thumbnail_url'] = _bestImg2 || t['thumbnail_url'] || '';
-                t['image_url'] = _bestImg2 || t['image_url'] || '';
-                if (creative.body) t['ad_body'] = creative.body;
-                if (creative.title) t['ad_title'] = creative.title;
+                proposed.push({ apiName: creative.name, taggerAdName: t['Ad name'] || t['ad name'] || '', imageUrl: _bestImg2, account: account.name });
+                if (!dryRun) {
+                  t['thumbnail_url'] = _bestImg2 || t['thumbnail_url'] || '';
+                  t['image_url'] = _bestImg2 || t['image_url'] || '';
+                  if (creative.body) t['ad_body'] = creative.body;
+                  if (creative.title) t['ad_title'] = creative.title;
+                }
                 matched++;
               }
             });
@@ -4229,7 +4241,21 @@ async function backfillThumbnails() {
     await sleep(500);
   }
 
-  console.log(`Thumbnail backfill done: ${matched} matched out of ${apiAds} API ads across ${accounts.length} accounts. ${errors} errors.`);
+  console.log(`${dryRun ? '[DRY RUN] ' : ''}Thumbnail backfill ${dryRun ? 'would-match' : 'done'}: ${matched} matched out of ${apiAds} API ads across ${accounts.length} accounts. ${errors} errors.`);
+
+  if (dryRun) {
+    // Stash full proposed list for inspection; print 10 samples
+    window._lastBackfillProposed = proposed;
+    console.log(`[DRY RUN] ${proposed.length} proposed assignments. First 10 samples:`);
+    proposed.slice(0, 10).forEach((p, i) => {
+      console.log(`  ${i + 1}. apiName="${(p.apiName || '').substring(0, 80)}"`);
+      console.log(`     → tagger="${(p.taggerAdName || '').substring(0, 80)}"  [${p.account}]`);
+    });
+    console.log(`[DRY RUN] Full list at window._lastBackfillProposed (${proposed.length} entries). Eyeball before running for real.`);
+    showToast(`DRY RUN: ${matched}/${apiAds} would match. Check console for samples — ${proposed.length} proposed.`);
+    return { dryRun: true, matched, apiAds, errors, proposed };
+  }
+
   // Persist thumbnails to Supabase creative_tags
   // IMPORTANT: must match existing row's account field, not taggerData's _account (often empty)
   if (matched > 0) {

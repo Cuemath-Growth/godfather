@@ -4,6 +4,49 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Thumbnail backfill — exact-match only + dryRun mode (2026-04-29)
+
+### Why this shipped
+Apr 28 night: `backfillThumbnails()` ran in production and assigned wrong thumbnails to
+wrong ad cards. Root cause: token-overlap fuzzy matching at score ≥ 0.7. Cuemath ad names
+share many tokens (`USA_PFX_FB_Leads_Conv_LAL_PayU_NRI_35-55_LeadGen_010825` vs
+`..._Signup_010825` share 11/12 tokens → 0.92 score → wrong assignment). Bad thumbnails
+were upserted to Supabase `creative_tags`. See `project_thumbnail_corruption_apr28`.
+
+### Changes (one file: index.html, lines ~4123-4275)
+- **Removed token-overlap fuzzy fallback** entirely (was lines 4145-4156).
+- **Added `normalizeAdName()`-based match** between exact and lowercase tries — catches
+  legit matches that differ only in dashes/spaces/case using the same normalizer used
+  elsewhere. Strict otherwise: exact + lowercase + normalized only.
+- **Added `{ dryRun: true }` parameter** to `backfillThumbnails(opts)`. In dry-run mode:
+  - Builds full `proposed` array of `{apiName, taggerAdName, imageUrl, account}`
+  - Skips all `state.taggerData` mutations
+  - Skips all `supabaseUpsert` calls
+  - Stashes full list to `window._lastBackfillProposed` for inspection
+  - Logs first 10 samples to console
+  - Returns `{ dryRun: true, matched, apiAds, errors, proposed }`
+
+### Verification
+- JS syntax: ✓ all 3 inline scripts in index.html parse
+- Build: ✓ `dist/` contains updated index.html + shared/ unchanged
+- Other 3 `score > bestScore` matches in codebase confirmed unrelated (they're in
+  different fuzzy matchers for different purposes — `findBestMatch` for campaigns etc.)
+
+### Net behavior change
+**Strictly safer.** No false positives possible. Match rate may drop slightly for
+legit ads that differ in non-normalized ways, but those will get empty thumbnails
+(rendered as placeholder) instead of wrong thumbnails (misleading data).
+
+### Recovery plan
+1. Push patched code to production
+2. Run `await backfillThumbnails({ dryRun: true })` on production console (read-only)
+3. Eyeball 10-20 sample matches, confirm they look correct
+4. Run `await backfillThumbnails()` for real → overwrites Apr 28 corrupt rows with
+   correct URLs (or empties them if no exact match exists in Meta API)
+5. Hard-reload, verify thumbnails on cards visually
+
+---
+
 ## Week 2 Day 2 — Chassis v0.3.0: real guardrails (2026-04-29)
 
 ### Why this shipped
