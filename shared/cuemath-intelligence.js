@@ -15,10 +15,18 @@
 //   - Every surfaced recommendation is logged to recommendation_log (fire-and-forget,
 //     deduped within a session by verdict_id|entity_id)
 //
+// What changed in v0.3.0 (Week 2 Day 2):
+//   - Real implementations of cohort_matured, volume_floor, historical_winner_check,
+//     market_priority_check (replace skeleton stubs)
+//   - _runGuardrails passes ctx.verdict so market_priority_check can read action.type
+//   - Verdict-author contract: required signal fields throw at detect-time if missing,
+//     surfacing wiring bugs early instead of silently passing
+//
 // What this is NOT (yet):
 //   - Real verdict migrations (Week 2 Day 3+)
-//   - 21-day outcome measurement job (Week 2 Day 2)
+//   - 21-day outcome measurement job (Week 2 Day 2 — placeholder)
 //   - "Why now?" diff engine (Week 2 Day 2)
+//   - brand_defense_exception (Week 5 with Google work)
 //
 // Markets are silos. Severity is computed in-market. The "all markets" queue
 // interleaves top-N from each market — never ranks across markets.
@@ -28,7 +36,7 @@
 (function (global) {
   'use strict';
 
-  const CHASSIS_VERSION = '0.2.0';
+  const CHASSIS_VERSION = '0.3.0';
   const PARSER_VERSION = '1.0.0';
 
   // ─── Enum constants ─────────────────────────────────────────────────────────
@@ -37,6 +45,20 @@
 
   const _CONFIDENCE_WEIGHT = { CONFIDENT: 1.0, LIKELY: 0.7, LOW: 0.4 };
   const _EFFORT_DIVISOR = { '1_CLICK': 1.0, '5_MIN': 1.5, 'INVESTIGATE': 3.0 };
+
+  // ─── Guardrail thresholds (markets are silos; mirror VERDICT_SPEND_FLOOR in index.html) ─
+  const COHORT_MATURITY_DAYS = 14;
+  const VOLUME_FLOORS_INR = Object.freeze({
+    US: 15000,
+    India: 3000,
+    AUS: 8000,
+    APAC: 8000,
+    MEA: 5000,
+    UK: 10000,
+    EU: 10000,
+    ROW: 5000,
+  });
+  const VOLUME_FLOOR_DEFAULT = 15000; // unknown market → conservative (US ceiling)
 
   // ─── Supabase config (set via configure()) ─────────────────────────────────
   let _config = { supabaseUrl: null, supabaseKey: null, userId: null };
@@ -136,9 +158,39 @@
   }
 
   // ─── Guardrails ─────────────────────────────────────────────────────────────
+  // Each guardrail returns { passed: bool, reason?: string }.
+  // Verdict-author contract (v0.3.0+): required signal fields THROW if missing,
+  // surfacing wiring bugs early instead of silently passing.
+  // Tests live in shared/tests/guardrails.test.js — run before editing.
   const _guardrails = {
-    cohort_matured: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
-    volume_floor: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
+    cohort_matured: (signal, ctx) => {
+      if (signal.cohort_age_days === undefined || signal.cohort_age_days === null) {
+        throw new Error(`cohort_matured: verdict ${signal.verdict_id || '<unknown>'} did not supply signal.cohort_age_days`);
+      }
+      const age = Number(signal.cohort_age_days);
+      if (!isFinite(age) || age < 0) {
+        return { passed: false, reason: `invalid cohort_age_days=${signal.cohort_age_days}` };
+      }
+      if (age < COHORT_MATURITY_DAYS) {
+        return { passed: false, reason: `cohort ${age}d < ${COHORT_MATURITY_DAYS}d minimum` };
+      }
+      return { passed: true };
+    },
+    volume_floor: (signal, ctx) => {
+      if (signal.spend === undefined || signal.spend === null) {
+        throw new Error(`volume_floor: verdict ${signal.verdict_id || '<unknown>'} did not supply signal.spend`);
+      }
+      const spend = Number(signal.spend);
+      if (!isFinite(spend) || spend < 0) {
+        return { passed: false, reason: `invalid spend=${signal.spend}` };
+      }
+      const market = signal.market || null;
+      const floor = (market && VOLUME_FLOORS_INR[market] !== undefined) ? VOLUME_FLOORS_INR[market] : VOLUME_FLOOR_DEFAULT;
+      if (spend < floor) {
+        return { passed: false, reason: `spend ₹${Math.round(spend)} below ${market || 'unknown-market'} floor ₹${floor}` };
+      }
+      return { passed: true };
+    },
     not_recently_dismissed: (signal, ctx) => {
       const verdictId = signal.verdict_id || '';
       const entityId = signal.entity_id || '';
@@ -161,8 +213,29 @@
       return { passed: true };
     },
     brand_defense_exception: (signal, ctx) => ({ passed: true, reason: 'skeleton — brand list lands Week 5' }),
-    market_priority_check: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
-    historical_winner_check: (signal, ctx) => ({ passed: true, reason: 'skeleton (Week 2 Day 2)' }),
+    market_priority_check: (signal, ctx) => {
+      // Only blocks US-budget-reduction recs. Other markets and non-reallocate verdicts pass.
+      const actionType = ctx?.verdict?.action?.type;
+      if (actionType !== 'reallocate_budget') return { passed: true };
+      if (signal.market !== 'US') return { passed: true };
+      if (signal.delta_inr === undefined || signal.delta_inr === null) {
+        throw new Error(`market_priority_check: verdict ${signal.verdict_id || '<unknown>'} on US reallocate did not supply signal.delta_inr`);
+      }
+      const delta = Number(signal.delta_inr);
+      if (delta < 0) {
+        return { passed: false, reason: `US is the primary market — cannot reduce US spend by ₹${Math.round(-delta)}/wk (annual plan §1)` };
+      }
+      return { passed: true };
+    },
+    historical_winner_check: (signal, ctx) => {
+      if (signal.was_top_tier === undefined) {
+        throw new Error(`historical_winner_check: verdict ${signal.verdict_id || '<unknown>'} did not supply signal.was_top_tier`);
+      }
+      if (signal.was_top_tier === true) {
+        return { passed: false, reason: 'entity was a Tier-1/2 winner — chassis recommends Refresh path instead' };
+      }
+      return { passed: true };
+    },
   };
 
   function registerGuardrail(name, fn) {
@@ -173,6 +246,8 @@
   function _runGuardrails(signal, verdict, ctx) {
     const passed = [];
     const failed = [];
+    // Pass verdict in ctx so guardrails like market_priority_check can read action.type
+    const guardCtx = { ...ctx, verdict };
     for (const name of (verdict.guardrails || [])) {
       const fn = _guardrails[name];
       if (!fn) {
@@ -180,7 +255,7 @@
         continue;
       }
       try {
-        const result = fn({ ...signal, verdict_id: verdict.id }, ctx);
+        const result = fn({ ...signal, verdict_id: verdict.id }, guardCtx);
         if (result && result.passed) passed.push(name);
         else failed.push({ name, reason: (result && result.reason) || 'unknown' });
       } catch (e) {
