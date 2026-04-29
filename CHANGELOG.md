@@ -4,6 +4,83 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Week 3 — Make More verdict migrations (2026-04-29)
+
+### Why this shipped
+Week 3 chassis migration: port the Dashboard "Make More" cards (Tier 1 proven winner,
+Tier 2 emerging winner, Refresh-was-winner) into the chassis verdict-engine so they
+flow through the unified Action Queue alongside the Pause verdicts that landed
+earlier this sprint. Goal is one place to read all signals + one place to dismiss /
+log outcomes per `02-skills/intelligence-chassis-spec.md`.
+
+### Changes (one file: index.html — 2 regions only)
+
+**1. Boot integration (~line 3661):** added one line under the existing `ci.configure(...)`
+   call to register the three new Scale verdicts at boot.
+
+**2. New section `// CHASSIS VERDICTS — Meta Scale (Week 3 Day 3-4)` (~line 7332,
+   after `_updateActionQueueNavBadge`, before `// AI ANALYSIS`):**
+
+   Three verdicts inside an IIFE that exposes only `window.registerMetaScaleVerdicts(ci)`:
+
+   - `meta_scale_tier1_winner` — fires on `_classifyWinner(ad) === 'tier1'`. Confidence
+     CONFIDENT, Effort 5_MIN, Action `{ type: 'scale', label: 'Scale to adjacent
+     audience' }`. Emits a `_findAdjacentAudience(...)` suggestion in the why-line.
+   - `meta_scale_tier2_winner` — fires on `_classifyWinner(ad) === 'tier2'`. Confidence
+     LIKELY, same scale action.
+   - `meta_refresh_fatigued_winner` — fires on `detectFatigue()` ads whose full perf
+     row still classifies as Tier 1/2 (the "creative pattern works, just wore out"
+     case). Confidence LIKELY, Effort 5_MIN, Action `{ type: 'refresh', label:
+     'Brief refresh variant' }`.
+
+### Verdict-author contract (chassis v0.3.0+)
+- All three verdicts emit `cohort_age_days` (= 14) and `spend` (= mature-cohort INR).
+- Guardrails registered: `cohort_matured`, `volume_floor`, `not_recently_dismissed`
+  (auto-supplied by chassis).
+- `historical_winner_check` is **deliberately omitted** on all three: Tier 1/2 verdicts
+  ARE recommending winners; Refresh requires `was_top_tier === true`. Including the
+  guardrail would self-block. This is documented inline in each verdict block.
+
+### Severity formula (placeholder; refine Week 4 with outcome data)
+```
+weeklySpend       = signal.spend × (7 / window_days)         // window_days = 90
+upliftFromScale   = weeklySpend × 0.5 × scaleMultiplier       // 2.0 Tier 1, 1.5 Tier 2
+severity          = max(weeklySpend, upliftFromScale)         // INR/wk at stake
+```
+Refresh urgency = `weeklySpend × (stage === 3 ? 1.3 : 1.0)`.
+
+### Helpers reused (READ-ONLY — no edits to existing code)
+`_classifyWinner`, `_winnerWhy`, `_findAdjacentAudience`, `detectFatigue`,
+`SENTINEL_THRESHOLDS`, `getAdPerformance`, `normalizeAdName` — all at module scope already.
+
+### Verification
+- JS syntax: ✓ all 3 inline scripts in index.html parse cleanly via `new Function(body)`
+- Existing chassis tests: ✓ `shared/tests/guardrails.test.js` 27/27 pass,
+  `shared/tests/guardrails-integration.test.js` 16/16 pass.
+- Synthetic detection test (one Tier-1 ad, one Tier-2 ad, one Tier-1 ad that's also
+  fatiguing): all 3 verdict IDs surface, 4 recommendations across 3 entities, 0
+  guardrail-blocked. Per-entity routing correct (Tier-1 only fires Tier 1, etc.).
+- Guardrail block test: cohort 5d → blocked, spend ₹1K (India floor ₹3K) → blocked,
+  spend ₹100K + cohort 30d → passes.
+- `npm run build`: ✓ dist clean, both index.html + shared/ copied.
+
+### Net behavior change
+**Additive only.** Three new verdicts join the chassis registry at boot. Legacy
+Make More Dashboard rendering (`_renderMakeMoreAds`) is unchanged — chassis runs in
+parallel for parity audit, same pattern as the Pause Now migration. Naina will
+browser-test in dashboard before any deprecation.
+
+### Coordination with parallel agents
+- Helpers `_chassisScalePrepAds`, `_chassisScaleSeverity`, `_chassisScaleConfidence`,
+  `registerMetaScaleVerdicts` are intentionally distinct from the Pause-side helpers
+  (`_chassisPrepAds`, `_chassisPauseSeverity`, etc.) on the parallel `chassis-pause-cptd`
+  / `chassis-pause-remaining` branches. They co-exist in the same IIFE-free namespace
+  without name collision.
+- Boot line is independent — both `registerMetaPauseVerdicts(ci)` (Pause branch) and
+  `registerMetaScaleVerdicts(ci)` (this branch) coexist. Resolves at merge-time.
+
+---
+
 ## Thumbnail backfill — exact-match only + dryRun mode (2026-04-29)
 
 ### Why this shipped

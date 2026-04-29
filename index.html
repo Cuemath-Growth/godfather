@@ -3662,6 +3662,8 @@ function init() {
       const ci = window.cuemathIntelligence;
       if (ci) {
         ci.configure({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
+        // Week 3 Day 3-4: Make More verdict migrations (Tier 1, Tier 2, Refresh).
+        if (typeof registerMetaScaleVerdicts === 'function') registerMetaScaleVerdicts(ci);
         const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
         console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced · Supabase wired`);
       } else {
@@ -7326,6 +7328,322 @@ function _updateActionQueueNavBadge(count) {
   if (count > 0) { badge.textContent = String(count); badge.style.display = ''; }
   else { badge.style.display = 'none'; }
 }
+
+// ==================== CHASSIS VERDICTS - Meta Scale (Week 3 Day 3-4) ====================
+// Migrates Make More Dashboard logic into chassis "Scale" verdicts.
+// Three verdicts emitted:
+//   1. meta_scale_tier1_winner   - proven Tier-1 winner, deploy to adjacent audience
+//   2. meta_scale_tier2_winner   - emerging Tier-2 winner, double down
+//   3. meta_refresh_fatigued_winner - historical Tier-1/2 winner now fatiguing -> refresh
+//
+// Helpers reused unchanged from existing Make More codepath (READ-ONLY here):
+//   _classifyWinner(ad)  -> 'tier1' | 'tier2' | null  (line ~9255)
+//   _winnerWhy(ad)       -> English why-line          (line ~9289)
+//   _findAdjacentAudience(winner, allWinners) -> suggested neighbor audience (line ~9311)
+//   detectFatigue()      -> fatigued ad list with stage info (line ~5223)
+//   SENTINEL_THRESHOLDS[market].cptd/cpql.green/amber                 (line ~13001)
+//   getAdPerformance(market, from, to)                                (line ~5834)
+//
+// Verdict-author contract (chassis v0.3.0+):
+//   Tier 1/2/Refresh ARE recommendations of past/proven winners - historical_winner_check
+//   would block them. So we exclude that guardrail and rely on cohort_matured + volume_floor
+//   + not_recently_dismissed (auto-supplied by chassis).
+//
+// Markets are silos. Severity is in-market INR/wk. Adjacent-audience suggestion stays in
+// the same market (per feedback_markets_are_silos.md).
+// =============================================================================
+
+(function _chassisMetaScale() {
+  // Build the same mature-cohort + paused-set inputs that _renderMakeMoreAds uses, so the
+  // chassis classifies winners against the same 14-day-mature snapshot the dashboard does.
+  // Returns { winners: [...], fatigued: [...] } where each winner already carries
+  // _displayCPTD/_displayTD/_displayQL/_displaySpend/_tier and ad.market, ad.tags, ad.adName.
+  function _chassisScalePrepAds(market) {
+    if (typeof getAdPerformance !== 'function') return { winners: [], fatigued: [] };
+
+    // Cohort maturity: leads must be >=14 days old to count toward winner classification.
+    // (See feedback_cohort_maturity.md - fresh cohorts inflate CPTD and underweight conv.)
+    const COHORT_MATURITY_DAYS = 14;
+    const matTo = new Date(); matTo.setDate(matTo.getDate() - COHORT_MATURITY_DAYS);
+    const matToStr = matTo.toISOString().slice(0, 10);
+    const matFrom = new Date(matTo); matFrom.setDate(matFrom.getDate() - 90);
+    const matFromStr = matFrom.toISOString().slice(0, 10);
+
+    const matureRaw = getAdPerformance(market || 'all', matFromStr, matToStr) || [];
+    const _mature = {};
+    matureRaw.forEach(r => {
+      const key = normalizeAdName(r['Ad name']);
+      if (!key) return;
+      _mature[key] = {
+        spend: r['Spent'] || 0, ql: r['QL'] || 0, td: r['TD'] || 0,
+        cptd: r['CPTD'], cptql: r['CPTQL']
+      };
+    });
+
+    // Pull a wide perf snapshot (90d) for the market - same shape the existing Make More uses.
+    const wideFrom = matFromStr; // reuse 90d window for current snapshot too
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const rawPerf = getAdPerformance(market || 'all', wideFrom, todayStr) || [];
+    const adCampData = rawPerf.map(r => ({
+      adName: r['Ad name'], campaignName: r['Campaign name'],
+      adSetName: r['Ad set name'] || r['ad set name'] || '',
+      market: r._market || '',
+      spend: r['Spent'], ql: r['QL'], td: r['TD'], nri: r['NRI'],
+      cptql: r['CPTQL'], cptd: r['CPTD'],
+      tags: r.tags || {},
+    }));
+
+    // Annotate with mature snapshot so _classifyWinner evaluates against it.
+    const annotated = adCampData.map(a => {
+      const m = _mature[normalizeAdName(a.adName)];
+      if (!m) return Object.assign({}, a, { _matureMissing: true });
+      return Object.assign({}, a, { mature: m });
+    });
+
+    // Winners: tier1 + tier2 (ads with no mature cohort skipped - feedback_cohort_maturity.md).
+    const winners = [];
+    annotated.forEach(a => {
+      if (a._matureMissing) return;
+      const tier = _classifyWinner(a);
+      if (!tier) return;
+      const m = a.mature || {};
+      winners.push(Object.assign({}, a, {
+        _tier: tier,
+        _displayCPTD: m.cptd !== undefined ? m.cptd : a.cptd,
+        _displayTD: m.td !== undefined ? m.td : a.td,
+        _displayQL: m.ql !== undefined ? m.ql : a.ql,
+        _displaySpend: m.spend !== undefined ? m.spend : a.spend,
+        _matureCohortDays: COHORT_MATURITY_DAYS,
+      }));
+    });
+
+    // Fatigued list - for the Refresh path. Cross-reference each fatigued ad with its full
+    // perf row + mature classification to detect the "was a winner" case.
+    const adByName = {};
+    annotated.forEach(a => { adByName[normalizeAdName(a.adName)] = a; });
+    const fatigued = (typeof detectFatigue === 'function' ? detectFatigue() : [])
+      .filter(f => f.stage >= 2)
+      .map(f => {
+        const fullAd = adByName[normalizeAdName(f.ad_name)] || null;
+        const historicalTier = fullAd ? _classifyWinner(fullAd) : null;
+        return { fatigue: f, ad: fullAd, historicalTier: historicalTier };
+      })
+      .filter(x => x.ad && (x.historicalTier === 'tier1' || x.historicalTier === 'tier2'));
+
+    return { winners: winners, fatigued: fatigued };
+  }
+
+  // Severity scorer - incremental INR/wk gain from scaling.
+  // Formula:
+  //   weeklySpend = displaySpend * (7 / windowDays)   (windowDays = 90 by default)
+  //   If current CPTD > market.cptd.green:
+  //     potentialDelta = weeklySpend * (cptd / cptdGreen - 1)   <- waste-recovery if scaled-and-tightened
+  //     But Tier 1/2 winners are ALREADY in green/amber, so this term is small.
+  //   Default: severity = weeklySpend (the INR/wk we'd LOSE if we let this winner stagnate).
+  // We pick the larger of (1*weeklySpend, 0.5*weeklySpend * scaleMultiplier) where
+  // scaleMultiplier = 2 for Tier 1, 1.5 for Tier 2 - represents the INR/wk uplift if deployed
+  // to an adjacent audience at parity.
+  // Documented for the next agent: this is a defensible placeholder. Refine in Week 4 once
+  // we have outcome data on actual scale moves.
+  function _chassisScaleSeverity(signal, scaleMultiplier) {
+    const windowDays = signal.window_days || 90;
+    const weeklySpend = (signal.spend || 0) * (7 / windowDays);
+    const upliftFromScale = weeklySpend * 0.5 * (scaleMultiplier || 1);
+    return Math.max(weeklySpend, upliftFromScale);
+  }
+
+  function _chassisScaleConfidence(tier) {
+    if (typeof window.cuemathIntelligence === 'undefined') return 'LIKELY';
+    const C = window.cuemathIntelligence.CONFIDENCE;
+    if (tier === 'tier1') return C.CONFIDENT;
+    return C.LIKELY;
+  }
+
+  // Public registration entry - called from boot.
+  function registerMetaScaleVerdicts(ci) {
+    if (!ci) return;
+    const C = ci.CONFIDENCE;
+    const E = ci.EFFORT;
+
+    // -- Verdict 1: Tier 1 (Proven Winner) - scale to adjacent audience ----------
+    ci.registerVerdict({
+      id: 'meta_scale_tier1_winner',
+      tool: 'godfather',
+      channel: 'meta',
+      detect: function(data, context) {
+        const market = (context && context.market) || 'all';
+        const prep = _chassisScalePrepAds(market);
+        const winners = prep.winners;
+        const out = [];
+        for (let i = 0; i < winners.length; i++) {
+          const w = winners[i];
+          if (w._tier !== 'tier1') continue;
+          // Build adjacent-audience suggestion (same-market siblings). _findAdjacentAudience
+          // uses tag-pattern + curated AUDIENCE_FAMILIES - already market-agnostic semantically
+          // since we limit candidate winners to this market via getAdPerformance(market, ...).
+          const adj = (typeof _findAdjacentAudience === 'function')
+            ? _findAdjacentAudience(w, winners) : null;
+          const why = (typeof _winnerWhy === 'function')
+            ? _winnerWhy(w)
+            : 'Proven winner: ' + w._displayTD + ' TDs at ' + (w._displayCPTD ? 'INR ' + Math.round(w._displayCPTD) : '?') + ' CPTD on a >=14-day-mature cohort.';
+          const adjLine = adj ? ' Adjacent audience to test: ' + adj.audience + ' (' + adj.source + ').' : '';
+          out.push({
+            entity_type: 'ad',
+            entity_id: w.adName,
+            market: w.market || 'unknown',
+            // Required for cohort_matured guardrail
+            cohort_age_days: w._matureCohortDays || 14,
+            // Required for volume_floor guardrail
+            spend: w._displaySpend || 0,
+            // Internal - for severity calc
+            window_days: 90,
+            signal: 'Proven winner - ' + w._displayTD + ' TDs, ' + w._displayQL + ' QLs at ' + (w._displayCPTD ? 'INR ' + Math.round(w._displayCPTD).toLocaleString('en-IN') : '?') + ' CPTD',
+            why: why + adjLine,
+            raw_metrics: {
+              tier: 'tier1', td: w._displayTD, ql: w._displayQL,
+              cptd: w._displayCPTD, spend: w._displaySpend,
+              campaign_audience: (w.tags && w.tags.campaign_audience) || null,
+              suggested_audience: adj ? adj.audience : null,
+              suggested_audience_source: adj ? adj.source : null,
+            },
+          });
+        }
+        return out;
+      },
+      scoreSeverity: function(signal) { return _chassisScaleSeverity(signal, 2.0); },
+      scoreConfidence: function() { return C.CONFIDENT; },
+      scoreEffort: function() { return E.FIVE_MIN; },
+      // NOTE: historical_winner_check OMITTED - this verdict IS recommending winners.
+      guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+      action: { label: 'Scale to adjacent audience', type: 'scale' },
+      whyNow: function(signal) {
+        const adj = signal.raw_metrics && signal.raw_metrics.suggested_audience;
+        return adj
+          ? 'Pattern works on ' + ((signal.raw_metrics && signal.raw_metrics.campaign_audience) || 'current audience') + ' - neighbor audience ' + adj + ' likely to convert at parity. Test now while creative is hot.'
+          : 'Mature winner - fastest growth lever is duplicating it onto a sibling audience while creative is still fresh.';
+      },
+    });
+
+    // -- Verdict 2: Tier 2 (Emerging) - double down ------------------------------
+    ci.registerVerdict({
+      id: 'meta_scale_tier2_winner',
+      tool: 'godfather',
+      channel: 'meta',
+      detect: function(data, context) {
+        const market = (context && context.market) || 'all';
+        const prep = _chassisScalePrepAds(market);
+        const winners = prep.winners;
+        const out = [];
+        for (let i = 0; i < winners.length; i++) {
+          const w = winners[i];
+          if (w._tier !== 'tier2') continue;
+          const adj = (typeof _findAdjacentAudience === 'function')
+            ? _findAdjacentAudience(w, winners) : null;
+          const why = (typeof _winnerWhy === 'function')
+            ? _winnerWhy(w)
+            : 'Emerging signal: ' + w._displayTD + ' TDs at ' + (w._displayCPTD ? 'INR ' + Math.round(w._displayCPTD) : '?') + ' CPTD on a >=14-day-mature cohort.';
+          const adjLine = adj ? ' Adjacent audience to test: ' + adj.audience + ' (' + adj.source + ').' : '';
+          out.push({
+            entity_type: 'ad',
+            entity_id: w.adName,
+            market: w.market || 'unknown',
+            cohort_age_days: w._matureCohortDays || 14,
+            spend: w._displaySpend || 0,
+            window_days: 90,
+            signal: 'Emerging signal - ' + w._displayTD + ' TD' + (w._displayTD === 1 ? '' : 's') + ', ' + w._displayQL + ' QLs at ' + (w._displayCPTD ? 'INR ' + Math.round(w._displayCPTD).toLocaleString('en-IN') : '?') + ' CPTD',
+            why: why + adjLine,
+            raw_metrics: {
+              tier: 'tier2', td: w._displayTD, ql: w._displayQL,
+              cptd: w._displayCPTD, cptql: w.cptql, spend: w._displaySpend,
+              campaign_audience: (w.tags && w.tags.campaign_audience) || null,
+              suggested_audience: adj ? adj.audience : null,
+              suggested_audience_source: adj ? adj.source : null,
+            },
+          });
+        }
+        return out;
+      },
+      scoreSeverity: function(signal) { return _chassisScaleSeverity(signal, 1.5); },
+      scoreConfidence: function() { return C.LIKELY; },
+      scoreEffort: function() { return E.FIVE_MIN; },
+      // historical_winner_check OMITTED - this is recommending an emerging winner.
+      guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+      action: { label: 'Scale to adjacent audience', type: 'scale' },
+      whyNow: function(signal) {
+        return 'Early winner - confirm with a parallel adset on a neighbor audience before committing more budget.';
+      },
+    });
+
+    // -- Verdict 3: Refresh - historical winner now fatiguing --------------------
+    ci.registerVerdict({
+      id: 'meta_refresh_fatigued_winner',
+      tool: 'godfather',
+      channel: 'meta',
+      detect: function(data, context) {
+        const market = (context && context.market) || 'all';
+        const prep = _chassisScalePrepAds(market);
+        const fatigued = prep.fatigued;
+        const out = [];
+        for (let i = 0; i < fatigued.length; i++) {
+          const x = fatigued[i];
+          const w = x.ad;
+          const f = x.fatigue;
+          const tier = x.historicalTier;
+          // Cohort age: this ad has historical mature TDs (it's a winner) - reuse 14d threshold
+          // since classification was based on the >=14-day-mature cohort.
+          const cohortAge = w._matureCohortDays || 14;
+          const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
+          const tierLabel = tier === 'tier1' ? 'proven' : 'emerging';
+          const cptdStr = w.cptd ? 'INR ' + Math.round(w.cptd).toLocaleString('en-IN') : '?';
+          const why = stageText + ' - but this ad was a ' + tierLabel + ' winner (CPTD ' + cptdStr + ', ' + (w.td || 0) + ' TDs). Signals: ' + f.signals.join('; ') + ". The CREATIVE PATTERN works - refresh visual/hook, keep audience + format, DON'T kill.";
+          out.push({
+            entity_type: 'ad',
+            entity_id: w.adName,
+            market: w.market || 'unknown',
+            cohort_age_days: cohortAge,
+            spend: w.spend || (f.daily_spend * 7) || 0,
+            window_days: 90,
+            // was_top_tier required ONLY if historical_winner_check is in guardrails - it is not
+            // here because by definition this verdict fires on past winners. Including it would
+            // self-block. Documenting for clarity.
+            signal: 'Proven winner fatiguing - ' + f.signals.join(' - ') + (f.stage === 3 ? ' - URGENT' : ''),
+            why: why,
+            raw_metrics: {
+              historical_tier: tier,
+              fatigue_stage: f.stage,
+              fatigue_signals: f.signals,
+              frequency: f.frequency,
+              daily_spend: f.daily_spend,
+              td: w.td, ql: w.ql, cptd: w.cptd,
+              campaign_audience: (w.tags && w.tags.campaign_audience) || null,
+            },
+          });
+        }
+        return out;
+      },
+      scoreSeverity: function(signal) {
+        // Refresh urgency = weekly spend at risk of decay. Stage 3 weighted heavier.
+        const weeklySpend = (signal.spend || 0) * (7 / (signal.window_days || 90));
+        const stage = (signal.raw_metrics && signal.raw_metrics.fatigue_stage) || 2;
+        return weeklySpend * (stage === 3 ? 1.3 : 1.0);
+      },
+      scoreConfidence: function() { return C.LIKELY; },
+      scoreEffort: function() { return E.FIVE_MIN; },
+      // historical_winner_check OMITTED - this verdict REQUIRES was_top_tier === true.
+      guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+      action: { label: 'Brief refresh variant', type: 'refresh' },
+      whyNow: function(signal) {
+        const stage = signal.raw_metrics && signal.raw_metrics.fatigue_stage;
+        return stage === 3
+          ? 'Severe fatigue - performance is decaying fast. Brief refresh today before learning phase resets.'
+          : 'Frequency rising - refresh visual/hook now while audience response data still clearly attributes to creative, not novelty fatigue.';
+      },
+    });
+  }
+
+  // Expose for boot integration. Other helpers stay file-private inside this IIFE.
+  window.registerMetaScaleVerdicts = registerMetaScaleVerdicts;
+})();
 
 // ==================== AI ANALYSIS ====================
 async function runAnalysis() {
