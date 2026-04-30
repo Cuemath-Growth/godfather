@@ -14444,6 +14444,142 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
   }
 })();
 
+// ── creative_tags_v3 (content-verified frames) ──
+// Parallel to creative_tags. Keyed by ad_name (raw + lowercased fallback). Surfaces
+// hook_frame, master_frame, close_type, specificity, pain_target in Tagger + Insights.
+// Schema/source priority: reference_creative_tags_v3.md.
+state._tagsV3Map = {};
+(async () => {
+  try {
+    const rows = await supabaseGet('creative_tags_v3', 'select=*');
+    if (Array.isArray(rows) && rows.length) {
+      rows.forEach(r => {
+        if (!r.ad_name) return;
+        state._tagsV3Map[r.ad_name] = r;
+        const lc = String(r.ad_name).toLowerCase();
+        if (!state._tagsV3Map[lc]) state._tagsV3Map[lc] = r;
+      });
+      console.log(`creative_tags_v3: ${rows.length} rows loaded`);
+      try {
+        localStorage.setItem('gf_creative_tags_v3_backup', JSON.stringify(rows));
+        localStorage.setItem('gf_creative_tags_v3_backup_ts', Date.now().toString());
+      } catch(e) { /* storage full — skip */ }
+    } else {
+      console.log('creative_tags_v3: 0 rows');
+    }
+  } catch(e) {
+    console.warn('creative_tags_v3 load failed, trying backup:', e.message);
+    try {
+      const backup = JSON.parse(localStorage.getItem('gf_creative_tags_v3_backup') || '[]');
+      if (backup.length) {
+        backup.forEach(r => {
+          if (!r.ad_name) return;
+          state._tagsV3Map[r.ad_name] = r;
+          const lc = String(r.ad_name).toLowerCase();
+          if (!state._tagsV3Map[lc]) state._tagsV3Map[lc] = r;
+        });
+        const age = Math.round((Date.now() - parseInt(localStorage.getItem('gf_creative_tags_v3_backup_ts') || '0')) / 3600000);
+        console.log(`Using backup creative_tags_v3 (${backup.length} rows, ${age}h old)`);
+      }
+    } catch(e2) { /* no backup */ }
+  }
+})();
+
+function getV3Tags(adName) {
+  if (!adName || !state._tagsV3Map) return null;
+  return state._tagsV3Map[adName] || state._tagsV3Map[String(adName).toLowerCase()] || null;
+}
+
+const _V3_PILL_FIELDS = [
+  ['hook_frame', 'teal'],
+  ['master_frame', 'indigo'],
+  ['close_type', 'blue'],
+  ['specificity', 'pink'],
+  ['pain_target', 'amber']
+];
+
+function _renderV3Pills(adName) {
+  const v = getV3Tags(adName);
+  if (!v) return '';
+  const pills = _V3_PILL_FIELDS.map(([f, color]) => {
+    const val = v[f];
+    if (!val || val === 'Unclear' || val === 'Unknown' || val === 'null') return '';
+    const tc = TAG_COLORS[color] || TAG_COLORS.teal;
+    const display = String(val).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2).join(', ');
+    if (!display) return '';
+    const title = `${f.replace('_',' ')} · v3 · ${v.confidence||'?'} · ${v.source||'?'}`;
+    return `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium" title="${title}">${display}</span>`;
+  }).filter(Boolean);
+  if (!pills.length) return '';
+  return `<div class="flex flex-wrap gap-0.5 items-center mt-1 pt-1 border-t border-dashed border-teal-200" title="Content-verified frames (creative_tags_v3)"><span class="text-[7px] font-bold text-accent-teal mr-1">v3</span>${pills.join('')}</div>`;
+}
+
+// CPTD comparison cards by a v3 field. Used by Tagger Insights + Lens "What's Working".
+function _renderV3FrameInsight(data, fieldKey, label, color) {
+  const perf = {};
+  data.forEach(c => {
+    const v = getV3Tags(c['Ad name'] || c['ad name']);
+    if (!v) return;
+    const raw = v[fieldKey];
+    if (!raw || raw === 'Unclear' || raw === 'Unknown') return;
+    const vals = fieldKey === 'pain_target'
+      ? String(raw).split(',').map(s => s.trim()).filter(Boolean)
+      : [String(raw).trim()];
+    const spend = parseNumber(c['Spent']||c['spent']||0);
+    const ql = parseNumber(c['QL']||c['ql']||0);
+    const td = parseNumber(c['TD']||c['td']||0);
+    vals.forEach(value => {
+      if (!perf[value]) perf[value] = { spend: 0, ql: 0, td: 0, count: 0 };
+      perf[value].spend += spend;
+      perf[value].ql += ql;
+      perf[value].td += td;
+      perf[value].count++;
+    });
+  });
+  const entries = Object.entries(perf).filter(([,v]) => v.count >= 3 && v.td >= 2);
+  if (entries.length < 2) return '';
+  entries.forEach(([,v]) => v.cptd = v.td > 0 ? v.spend / v.td : Infinity);
+  entries.sort((a,b) => a[1].cptd - b[1].cptd);
+  const best = entries[0], worst = entries[entries.length-1];
+  if (worst[1].cptd === Infinity || best[1].cptd <= 0) return '';
+  const ratio = worst[1].cptd / best[1].cptd;
+  if (ratio < 1.1) return '';
+  const tc = TAG_COLORS[color] || TAG_COLORS.teal;
+  const savings = ratio >= 2 ? (Math.round(ratio*10)/10) + 'x cheaper' : Math.round((1 - best[1].cptd/worst[1].cptd) * 100) + '% cheaper';
+  return `<div class="bg-white border border-gray-200/80 rounded-xl p-4 insight-card shadow-sm">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${tc.bg} ${tc.text}" title="Content-verified frame from creative_tags_v3">${label} <span class="opacity-60 ml-1">v3</span></span>
+      <span class="text-[10px] font-bold gradient-text">${savings}</span>
+    </div>
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[9px] font-bold text-accent-green bg-accent-green-light px-1.5 py-0.5 rounded">WINNER</span>
+          <span class="text-xs font-medium">${best[0]}</span>
+        </div>
+        <span class="text-xs font-bold text-accent-green">${formatCurrency(best[1].cptd)}</span>
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1.5">
+          <span class="text-[9px] font-bold text-accent-red bg-accent-red-light px-1.5 py-0.5 rounded">AVOID</span>
+          <span class="text-xs font-medium">${worst[0]}</span>
+        </div>
+        <span class="text-xs font-bold text-accent-red">${formatCurrency(worst[1].cptd)}</span>
+      </div>
+    </div>
+    <p class="text-[10px] text-text-muted mt-2">CPTD: "${best[0]}" (${best[1].count} ads, ${Math.round(best[1].td)} TDs) vs "${worst[0]}" (${worst[1].count} ads, ${Math.round(worst[1].td)} TDs)</p>
+  </div>`;
+}
+
+function _renderV3InsightsHTML(data) {
+  if (!data || !data.length) return '';
+  return [
+    _renderV3FrameInsight(data, 'hook_frame', 'Hook frame', 'teal'),
+    _renderV3FrameInsight(data, 'master_frame', 'Master frame', 'indigo'),
+    _renderV3FrameInsight(data, 'close_type', 'Close type', 'blue')
+  ].filter(Boolean).join('');
+}
+
 // Extract date from campaign/ad name suffix _DDMMYY → YYYY-MM-DD
 function extractDateFromAdName(row) {
   if (row['_date']) return; // already has a date (e.g. from Meta API pull)
@@ -15584,6 +15720,10 @@ function renderTaggerInsights() {
       <p class="text-[10px] text-text-muted mt-2">${ins.metricLabel}: "${tagLabel(ins.best)}" (${ins.bestCount} ads) costs ${savingsLabel} than "${tagLabel(ins.worst)}" (${ins.worstCount} ads)</p>
     </div>`;
   });
+
+  // Content-verified frames (creative_tags_v3) — appended only when v3 data joins to filtered ads.
+  const v3Html = _renderV3InsightsHTML(filteredData);
+  if (v3Html) container.innerHTML += v3Html;
 }
 
 // ==================== CREATIVE REVIEW (Landing View) ====================
@@ -16589,7 +16729,10 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
       return `<td class="px-2 py-2 text-right font-bold text-[11px]">${_cptql > 0 ? `<span class="${_cls}" title="${_tql} TQL \u00b7 spend ${formatCurrency(spend)}">${formatCurrency(_cptql)}</span>` : '<span class="text-text-muted">\u2014</span>'}</td>`;
     })()}
     <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>${_cptdArrow}` : '<span class="text-text-muted">\u2014</span>'}</td>
-    <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5 max-h-[2.5rem] overflow-hidden">${tagHtml || '<span class="text-text-muted text-[9px]">\u2014</span>'}</div></td>
+    <td class="px-2 py-2">
+      <div class="flex flex-wrap gap-0.5 max-h-[2.5rem] overflow-hidden">${tagHtml || '<span class="text-text-muted text-[9px]">\u2014</span>'}</div>
+      ${_renderV3Pills(name)}
+    </td>
   </tr>`;
 }
 
@@ -18242,6 +18385,18 @@ function renderWinningByAudience() {
   });
 
   let html = '';
+
+  // ── Content-verified frames (creative_tags_v3) ──
+  const _v3Cards = _renderV3InsightsHTML(data);
+  if (_v3Cards) {
+    html += `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-bold">Content-verified Frames <span class="text-[10px] font-bold text-accent-teal align-middle ml-1">v3</span></h3>
+        <span class="text-[10px] text-text-muted">CPTD by hook · master · close frame, joined to creative_tags_v3</span>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${_v3Cards}</div>
+    </div>`;
+  }
 
   // ── Monday Playbook: synthesized intelligence, not a data dump ──
   const withTD = audRows.filter(r => r.td >= 3 && r.ads >= 5);

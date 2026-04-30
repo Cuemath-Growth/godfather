@@ -4,6 +4,61 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Wire creative_tags_v3 into Tagger + Insights (2026-04-30)
+
+### Why this shipped
+`creative_tags_v3` (built Apr 30, 403 rows, 72% High confidence) was sitting in
+Supabase but unused by the UI. v3 carries content-verified frames (hook_frame,
+master_frame, close_type, specificity, pain_target) sourced from VO scripts and
+Notion ad copy — the missing axis Insights needs. Wired in parallel to the
+existing `creative_tags` loader so both datasets coexist; v3 surfaces only when
+its row joins by ad_name.
+
+### Changes (`index.html`)
+- **Loader** (after `creative_tags` IIFE, ~line 14807): new IIFE fetches
+  `creative_tags_v3` and builds `state._tagsV3Map` keyed by raw `ad_name` plus
+  lowercase fallback. Backs up to `localStorage.gf_creative_tags_v3_backup`,
+  read-only fallback on Supabase failure. No write path — v3 is read-only from
+  Godfather (writes happen via `04-reports/_tagger_v2/run_tagger_v2.py`).
+- **Helpers**: `getV3Tags(adName)` lookup, `_renderV3Pills(adName)` returns a
+  v3-pill row (5 fields, color-coded teal/indigo/blue/pink/amber, "v3" badge,
+  confidence + source in tooltip) and `_renderV3FrameInsight(data, fieldKey, label, color)` /
+  `_renderV3InsightsHTML(data)` build CPTD winner-vs-avoid cards by hook_frame,
+  master_frame, close_type. Cards require ≥3 ads, ≥2 TDs per value, ≥1.1x CPTD
+  spread before rendering — silent fallback when v3 has no signal.
+- **Tagger Data Table** (`renderTaggerAdRow`, ~line 16953): tag cell now contains
+  the existing v2 pill row PLUS `_renderV3Pills(name)` below a dashed teal
+  border. Rows without a v3 match render only the v2 pills (no empty separator).
+- **Tagger Insights panel** (`renderTaggerInsights`, ~line 15947): appends
+  `_renderV3InsightsHTML(filteredData)` to the same `taggerInsights` grid after
+  the existing 3 v2 winner/avoid cards.
+- **Insights view** (`renderWinningByAudience`, ~line 18603): prepends a
+  "Content-verified Frames" panel above Monday Playbook when v3 cards exist.
+  Same panel chrome as Winning Combos (white card, grid of 3).
+
+### Source priority (per `reference_creative_tags_v3.md`)
+v3-influencer (212 rows, all High) > v3-static (73 rows, 66% High) >
+v2.1-handcrafted (11) > v2.2-mature (107, mixed). All four sources land in the
+same `creative_tags_v3` table — Godfather treats them as one pool and surfaces
+`source` + `confidence` in pill tooltips for triage.
+
+### Verification
+- `node` syntax check on inline `<script>` blocks: 3 scanned, 0 errors.
+- View-div balance unchanged from baseline.
+- `npm run build` clean (dist contains `index.html` and `shared/`).
+- Helper functions defined exactly once each (`grep -c` = 1 for `getV3Tags`,
+  `_renderV3Pills`, `_renderV3FrameInsight`, `_renderV3InsightsHTML`).
+- Production curl + browser-verify pending after push.
+
+### What did NOT ship today
+- v3 write path from Godfather (still Python pipeline only — by design).
+- Tagger filters on v3 fields (e.g., "show only Behavioral-Outcome ads"). Add
+  if the new pills become the primary lens.
+- v3 displacement of v2 in Brief generation (`generateCreativeBriefs`) — left
+  on v2 hook/pain_benefit until v3 is live in production for one cycle.
+
+---
+
 ## Thumbnail backfill — exact-match only + dryRun mode (2026-04-29)
 
 ### Why this shipped
