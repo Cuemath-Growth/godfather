@@ -4,6 +4,90 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Stream 2: Kill Insights tab (2026-05-01)
+
+### Why this shipped
+Per the May 1 existential audit: every block in `view-intel` had a better/newer
+twin elsewhere. Deep Dive tab was unreachable (`deepDiveTabBtn` had hardcoded
+`hidden` class with no toggle code). Aggregate Metrics card already disabled
+("redundant with Dashboard KPIs"). What's Working by Audience was pixel-for-pixel
+duplicated by Action Queue Make More (same cards, same buttons). Recommended
+Briefs used pre-Apr-30 logic (CPQL not CPTD, no winner gates) — Create form's
+`computeRecommendedBriefs` is the modern version. Creative Health overlapped
+Pause Now Fatigue + Refresh-was-a-winner. Dropped to 7 nav items (was 8).
+
+### Changes (`index.html`, no other files)
+- Sidebar: removed `data-view="intel"` nav button (4 lines)
+- Removed `view-intel` div (~107 lines) — utility bar, loading/empty states,
+  hidden aggregate panel, 3 tabs (Working / Health / Deep Dive), country
+  filter, brief cards container
+- `navigateTo()` titles + subs maps: removed `intel` keys
+- `navigateTo()` view-render switch: removed `if (view === 'intel'...)` block
+- `onGlobalFilterChange()`: removed `else if (activeView === 'intel')` branch
+- `syncGeoFilter()` ids array: removed `'ciFilterCountry'` AND `'sentinelGeo'`
+  (Stream 1 cosmetic leftover, called out in last CHANGELOG)
+- `renderLensAggregateMetrics()`: simplified — single Tagger panel only
+  (was dual-pane Tagger+Insights)
+- `showTaggerResults()`: removed auto-refresh hook
+  `if (document.getElementById('ciContent')) renderCreativeIntel();`
+- `getFilteredTaggerData()` comment: removed CI-tab caveat
+- `runDiagnostic()`: cleaned `sentinelGeo` reads (3 lines, Stream 1 leftover)
+  + removed `Lens: Intel` viewTest entry + removed `'intel'` from views array
+  + reworded "All tabs unified" row text
+- Deleted functions (no longer referenced anywhere):
+  - `renderCreativeIntel()` — 16 lines
+  - `onCICountryChange()` — 8 lines
+  - `generateCreativeBriefs()` — 141 lines (incl ICP Mix Tracker)
+  - `switchCITab()` — 8 lines
+  - `renderWinningByAudience()` — 314 lines (incl Monday Playbook +
+    Winning Combos blocks)
+  - `renderPerfMatrix()` — 106 lines
+  - `renderDecayTracker()` — 119 lines
+  - `renderAudienceMap()` — 120 lines (incl pipeline-gap analysis)
+  - `exportIntelXLSX()` — 35 lines
+  - `_buildFatigueSparkline()` — 25 lines (only called by renderDecayTracker)
+  - `computeMetric()` — 10 lines (only called by Perf Matrix + Decay +
+    Audience Map)
+- **Total: 1,046 lines net removed (1063 − 17).**
+
+### Cross-callers preserved (not Insights-internal — used by AQ + Forge)
+- `generateFromCIBrief()` — called from AQ Make More cards
+- `generateDesignerBrief()` — called from AQ Make More
+- `prefillForgeFromIntel()` — called from `navigateTo('generate')`; reads
+  `state.taggerData` directly, not Insights view. Name kept; not blocking.
+- `renderLensAggregateMetrics()` itself — still wires Tagger's `lensAggContent`
+  panel.
+
+### NOT touched (deliberately)
+- `_v3InsightCards` — used by Pause Now budget leak diagnosis + Tagger
+  `renderTaggerInsights`. KEPT.
+- `diagnoseCPTD` — used by Pause Now (~line 7496) + geo modal (~7799). KEPT.
+- `fetchMetaAdInsights` / `_fetchMetaInsightsRange` / `backfillMetaAdInsights`
+  + the Settings "Backfill Full History" button — these power the daily ad
+  performance pipeline (perf tab data ingestion), unrelated to the killed
+  Insights view. KEPT.
+- Dashboard onboarding text "Insights appear — pause losers..." — generic
+  copy, not pointing at the tab. KEPT.
+
+### Verification
+- Both inline `<script>` blocks parse cleanly via `new Function()` after every
+  step (parse-checked multiple times during deletion sequence)
+- 7 view divs remaining (was 8), all at indent=6 — confirmed siblings, no
+  nesting via grep
+- Grep for `view-intel|data-view="intel"|view === 'intel'|ciWinningContainer|
+  ciDecayContainer|ciMatrixContainer|ciAudienceContainer|ciFilterCountry|
+  ciContent|ciBriefSection|ciBriefCards|ciCount|ciLoading|ciEmpty|ciTab-|
+  ciTabs|deepDiveTabBtn|icpMixTracker|intelAggregateMetrics|intelAgg|
+  renderCreativeIntel|exportIntelXLSX|generateCreativeBriefs|switchCITab|
+  onCICountryChange|renderWinningByAudience|renderPerfMatrix|renderAudienceMap|
+  renderDecayTracker|computeMetric|_buildFatigueSparkline`: 0 matches.
+
+### What did NOT ship
+- Any chassis verdict merges — Stream 3
+- Any Create / Library work — Streams 4, 5
+
+---
+
 ## Stream 1: Kill Performance tab (2026-05-01)
 
 ### Why this shipped

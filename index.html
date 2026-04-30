@@ -132,10 +132,6 @@
         <div class="flex-1"><span class="block">Action Queue <span class="text-[8px] px-1 py-0.5 rounded-sm bg-white/10 font-bold uppercase tracking-wider align-middle">beta</span></span><span class="text-[9px] text-white/50 block font-normal">Verdict-driven recommendations</span></div>
         <span id="actionQueueNavBadge" class="text-[8px] px-1.5 py-0.5 rounded-full bg-accent-purple font-bold text-white" style="display:none"></span>
       </button>
-      <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium" data-view="intel">
-        <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-        <div><span class="block">Insights</span><span class="text-[9px] text-white/50 block font-normal">What's working & why</span></div>
-      </button>
       <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium" data-view="generate">
         <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         <div><span class="block">Create</span><span class="text-[9px] text-white/50 block font-normal">Generate copy & visuals</span></div>
@@ -1183,115 +1179,6 @@
             <div id="tagDistributions" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"></div>
             <h3 class="text-sm font-bold mb-3">Spend Allocation by Tag</h3>
             <div id="spendByTag" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ========== CREATIVE INTELLIGENCE VIEW ========== -->
-      <div id="view-intel" class="view hidden p-6">
-        <!-- Header -->
-
-        <!-- Compact utility bar -->
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-accent-purple-light text-accent-purple" id="ciCount"></span>
-          <div class="flex gap-2">
-            <button onclick="renderCreativeIntel()" class="btn-primary px-3 py-1.5 rounded-lg text-xs font-semibold">Re-analyze</button>
-            <button onclick="exportIntelXLSX()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200">Export</button>
-          </div>
-        </div>
-
-        <!-- Loading State -->
-        <div id="ciLoading" class="hidden text-center py-16">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-brand flex items-center justify-center mx-auto mb-3 animate-pulse"><svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg></div>
-          <p class="text-sm text-text-muted">Computing creative intelligence...</p>
-          <div class="flex justify-center gap-1 mt-2"><div class="w-2 h-2 bg-accent-purple rounded-full dot-bounce"></div><div class="w-2 h-2 bg-accent-blue rounded-full dot-bounce" style="animation-delay:0.15s"></div><div class="w-2 h-2 bg-accent-teal rounded-full dot-bounce" style="animation-delay:0.3s"></div></div>
-        </div>
-        <!-- Empty State -->
-        <div id="ciEmpty" class="text-center py-16 hidden">
-          <div class="w-16 h-16 rounded-2xl bg-gradient-brand flex items-center justify-center mx-auto mb-4 opacity-80">
-            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-          </div>
-          <h3 class="text-lg font-bold mb-2">Tag Your Creatives First</h3>
-          <p class="text-text-secondary text-sm mb-4">Insights shows what's working, creative health, and performance deep dives. To get started: go to Tagger → click "Use Dashboard Data" or upload a CSV → then come back here.</p>
-          <button onclick="navigateTo('tagger')" class="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold">Go to Tagger</button>
-        </div>
-
-        <!-- Intel Content -->
-        <div id="ciContent" class="hidden">
-          <!-- Aggregate Metrics — hidden: redundant with Dashboard KPIs, wastes space above Monday Playbook -->
-          <div id="intelAggregateMetrics" class="mb-4 hidden" style="display:none">
-            <div class="bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl border border-purple-100 cursor-pointer" onclick="const c=document.getElementById('intelAggContent');const a=document.getElementById('intelAggArrow');c.classList.toggle('hidden');a.style.transform=c.classList.contains('hidden')?'':'rotate(180deg)'">
-              <div class="flex items-center justify-between px-4 py-2.5">
-                <p class="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Portfolio Metrics (Perf Tracker + CRM)</p>
-                <div class="flex items-center gap-2">
-                  <span class="text-[9px] text-purple-400" id="intelAggSource"></span>
-                  <svg id="intelAggArrow" class="w-3.5 h-3.5 text-purple-400 transition-transform" style="transform:rotate(180deg)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                </div>
-              </div>
-              <div id="intelAggContent" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 px-4 pb-3"></div>
-            </div>
-          </div>
-          <!-- Global country filter + Tabs -->
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1" id="ciTabs">
-              <button class="pill-btn active px-4 py-2 rounded-lg text-xs font-semibold" data-ci-tab="winning" onclick="switchCITab('winning')">What's Working</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold" data-ci-tab="decay" onclick="switchCITab('decay')">Creative Health</button>
-              <button class="pill-btn px-4 py-2 rounded-lg text-xs font-semibold hidden" data-ci-tab="matrix" onclick="switchCITab('matrix')" id="deepDiveTabBtn">Deep Dive</button>
-            </div>
-            <select id="ciFilterCountry" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="onCICountryChange()">
-              <option value="all">All Markets</option><option value="US">US</option><option value="India">India</option><option value="AUS">AUS</option><option value="MEA">MEA</option><option value="UK">UK</option><option value="APAC">APAC</option>
-            </select>
-          </div>
-
-          <!-- What's Working Tab (audience-first) -->
-          <div id="ciTab-winning" class="ci-tab">
-            <div id="ciWinningContainer"></div>
-            <!-- Brief generation section -->
-            <div id="ciBriefSection" class="mt-6 hidden">
-              <div id="icpMixTracker" class="mb-5 hidden"></div>
-              <div class="flex items-center justify-between mb-3">
-                <h3 class="text-base font-bold">Recommended Next Creatives</h3>
-                <button class="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 btn-primary" onclick="generateCreativeBriefs()">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                  Generate Briefs
-                </button>
-              </div>
-              <div id="ciBriefCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
-            </div>
-          </div>
-
-          <!-- Creative Health Tab -->
-          <div id="ciTab-decay" class="ci-tab hidden">
-            <div id="ciDecayContainer"></div>
-          </div>
-
-          <!-- Deep Dive Tab (power user matrix + audience map) -->
-          <div id="ciTab-matrix" class="ci-tab hidden">
-            <div class="flex gap-3 mb-4 flex-wrap items-center">
-              <select id="ciMetric" class="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary font-medium" onchange="renderPerfMatrix()">
-                <option value="cptd">CPTD</option>
-                <option value="cpql">CPTQL</option>
-                <option value="spend">Total Spend</option>
-                <option value="td">TD Count</option>
-              </select>
-              <span class="text-xs text-text-muted">of</span>
-              <select id="ciTagCat" class="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary font-medium" onchange="renderPerfMatrix()">
-                <option value="hook">Hook Type</option>
-                <option value="content_format">Format</option>
-                <option value="pain_benefit">Benefit Frame</option>
-                <option value="emotional_tone">Tone</option>
-                <option value="language">Language</option>
-              </select>
-              <span class="text-xs text-text-muted">by</span>
-              <select id="ciDimension" class="px-3 py-2 border border-gray-200 rounded-xl text-xs bg-surface-secondary font-medium" onchange="renderPerfMatrix()">
-                <option value="audience">Audience (Campaign)</option>
-                <option value="market">Market</option>
-                <option value="campaign_audience">Audience</option>
-                <option value="Creative type">Format</option>
-              </select>
-            </div>
-            <div id="ciMatrixContainer" class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 overflow-x-auto"></div>
-            <div class="mt-6"><h3 class="text-sm font-bold mb-3">Audience Performance Map</h3><div id="ciAudienceContainer"></div></div>
           </div>
         </div>
       </div>
@@ -3318,15 +3205,14 @@ function renderHealthPanel() {
   const oracleDateTo = document.getElementById('dashboardDateTo')?.value || 'not set';
   const globalLabel = (oracleDateFrom !== 'not set' && oracleDateTo !== 'not set') ? `${oracleDateFrom} to ${oracleDateTo}` : 'All Time (set dates on Oracle)';
   html += row('PASS', 'Global date range', globalLabel);
-  html += row('INFO', 'All tabs unified', 'Sentinel, Lens, Influencer all read Oracle date picker');
+  html += row('INFO', 'All tabs unified', 'Tagger and Influencer read Oracle date picker');
 
   // Geo filter check
   const oracleGeo = document.getElementById('dashboardCountryFilter')?.value || 'all';
-  const sentinelGeo = document.getElementById('sentinelGeo')?.value || 'all';
   const taggerGeo = document.getElementById('taggerFilterCountry')?.value || 'all';
   const influGeo = document.getElementById('influencerGeo')?.value || 'all';
-  const geoSync = (oracleGeo === sentinelGeo && sentinelGeo === taggerGeo && taggerGeo === influGeo);
-  html += row(geoSync ? 'PASS' : 'WARN', 'Geo filters synced', geoSync ? `All: ${oracleGeo}` : `Oracle:${oracleGeo} Sentinel:${sentinelGeo} Lens:${taggerGeo} Influ:${influGeo}`);
+  const geoSync = (oracleGeo === taggerGeo && taggerGeo === influGeo);
+  html += row(geoSync ? 'PASS' : 'WARN', 'Geo filters synced', geoSync ? `All: ${oracleGeo}` : `Oracle:${oracleGeo} Tagger:${taggerGeo} Influ:${influGeo}`);
 
   // Portfolio vs Creative layer comparison
   html += '<div class="mt-3 pt-3 border-t border-gray-200"><p class="font-bold text-xs mb-2">Data Layers</p>';
@@ -3594,8 +3480,8 @@ function navigateTo(view) {
   // Show/hide global filter bar (hidden on Settings and Forge)
   const filterBar = document.getElementById('globalFilterBar');
   if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'library') ? 'none' : '';
-  const titles = { dashboard:'Dashboard', actionq:'Action Queue', generate:'Create', tagger:'Tagger', intel:'Insights', library:'Library', influencer:'Creators', settings:'Settings' };
-  const subs = { dashboard:'What to do right now', actionq:'Verdict-driven recommendations', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', intel:'What\'s working & why', library:'Your creative assets', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
+  const titles = { dashboard:'Dashboard', actionq:'Action Queue', generate:'Create', tagger:'Tagger', library:'Library', influencer:'Creators', settings:'Settings' };
+  const subs = { dashboard:'What to do right now', actionq:'Verdict-driven recommendations', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', library:'Your creative assets', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
   document.getElementById('headerSubtitle').textContent = subs[view] || '';
   document.title = 'Godfather — ' + (titles[view] || 'Cuemath');
@@ -3641,9 +3527,7 @@ function navigateTo(view) {
   }
   // Action Queue (chassis-driven, Week 1 Day 4-5)
   if (view === 'actionq') { try { renderActionQueueView(); } catch(e) { console.error('renderActionQueueView crashed:', e); } }
-  // Render intel when switching to it
   if (view === 'dashboard') { try { onDashboardFilterChange(); } catch(e) { console.error('onDashboardFilterChange crashed:', e); } }
-  if (view === 'intel' && state.taggerData.length) { try { renderCreativeIntel(); } catch(e) { console.error('renderCreativeIntel crashed:', e); } }
   if (view === 'influencer') renderInfluencerView();
   if (view === 'settings') { loadSettingsFields(); setTimeout(renderHealthPanel, 100); }
   if (view === 'library') {
@@ -6861,7 +6745,7 @@ function _filterCostByFlow(data) {
 // All dropdowns now use same values: all, US, APAC, India, UK, AUS, MEA
 function syncGeoFilter(sourceId) {
   const val = document.getElementById(sourceId)?.value || 'all';
-  const ids = ['dashboardCountryFilter', 'sentinelGeo', 'taggerFilterCountry', 'ciFilterCountry', 'influencerGeo', 'libraryFilter'];
+  const ids = ['dashboardCountryFilter', 'taggerFilterCountry', 'influencerGeo', 'libraryFilter'];
   for (const id of ids) {
     if (id === sourceId) continue;
     const el = document.getElementById(id);
@@ -6903,7 +6787,6 @@ function onGlobalFilterChange() {
   // Re-render the currently active view with new filters
   const activeView = document.querySelector('.view:not(.hidden)')?.id?.replace('view-','') || 'dashboard';
   if (activeView === 'dashboard') onDashboardFilterChange();
-  else if (activeView === 'intel') renderCreativeIntel();
   else if (activeView === 'tagger' && typeof showTaggerResults === 'function') showTaggerResults();
   else if (activeView === 'influencer') renderInfluencerView();
   else if (activeView === 'library' && typeof renderLibrary === 'function') renderLibrary();
@@ -14939,13 +14822,9 @@ function matchAdsToLibrary() {
   }
 }
 
-// Render accurate aggregate metrics bar on Lens tabs (from Perf Tracker + CRM, not tagger proportional allocation)
+// Render accurate aggregate metrics bar on Tagger (from Perf Tracker + CRM, not tagger proportional allocation)
 function renderLensAggregateMetrics() {
-  // Check which Lens tab is active — each has its own country filter
-  const taggerGeo = document.getElementById('taggerFilterCountry')?.value || 'all';
-  const intelGeo = document.getElementById('ciFilterCountry')?.value || 'all';
-  const geoFilter = (state.currentView === 'intel') ? intelGeo : taggerGeo;
-  const resolvedGeo = geoFilter;
+  const resolvedGeo = document.getElementById('taggerFilterCountry')?.value || 'all';
 
   // Use getPortfolioMetrics (clean data layer) when available
   if (!leadsData.length && !metaAdData.length) return;
@@ -14978,16 +14857,14 @@ function renderLensAggregateMetrics() {
     metricCard('Enrolled', (m.enrolled||0) > 0 ? Math.round(m.enrolled).toString() : '\u2014', (m.cac||0) > 0 ? `CAC ${formatCurrency(m.cac)}` : '')
   ].join('');
 
-  // Portfolio metrics are now on Dashboard only — don't show on Tagger/Insights
-  // Keep the data computation for internal use but don't unhide the panels
-  ['lens', 'intel'].forEach(prefix => {
-    const content = document.getElementById(prefix + 'AggContent');
-    const source = document.getElementById(prefix + 'AggSource');
-    if (content) {
-      content.innerHTML = html;
-      if (source) source.textContent = srcLabel;
-    }
-  });
+  // Portfolio metrics are now on Dashboard only — don't show on Tagger
+  // Keep the data computation for internal use but don't unhide the panel
+  const content = document.getElementById('lensAggContent');
+  const source = document.getElementById('lensAggSource');
+  if (content) {
+    content.innerHTML = html;
+    if (source) source.textContent = srcLabel;
+  }
 }
 
 function showTaggerResults() {
@@ -15023,8 +14900,6 @@ function showTaggerResults() {
   if (_sentinelData.length) {
     state.sentinelOutput = runSentinelAnalysis(_sentinelData, 'US');
     saveState('sentinelOutput', state.sentinelOutput);
-    // Auto-refresh Lens Creative Intel after Sentinel completes
-    if (document.getElementById('ciContent')) renderCreativeIntel();
   }
 }
 
@@ -15252,7 +15127,6 @@ function getFilteredTaggerData(filterElId, minSpend) {
   const threshold = minSpend !== undefined ? minSpend : LENS_MIN_SPEND;
   let result = getAdPerformance(market, from || null, to || null, { includeNonLP: true }).filter(c => parseNumber(c['Spent']||c['spent']||0) >= threshold);
   // Global search filter (Phase 2 — search box in Tagger header)
-  // Only apply to Tagger tab callers (default filterElId), not CI tab callers ('ciFilterCountry')
   const q = (!filterElId || filterElId === 'taggerFilterCountry') ? state._taggerSearchQuery : '';
   if (q) {
     result = result.filter(c => {
@@ -17821,185 +17695,6 @@ function extractAudience(c) {
   return 'General';
 }
 
-function computeMetric(creatives, metric) {
-  const totalSpend = creatives.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
-  if (metric === 'spend') return totalSpend > 0 ? totalSpend : null;
-  if (metric === 'ql') { const t = creatives.reduce((s,c) => s + parseNumber(c['QL']||c['ql']||0), 0); return t; }
-  if (metric === 'count') return creatives.length;
-  if (metric === 'cpql') { const t = creatives.reduce((s,c) => s + parseNumber(c['QL']||c['ql']||0), 0); return t > 0 ? totalSpend/t : null; }
-  if (metric === 'cpnri') { const t = creatives.reduce((s,c) => s + parseNumber(c['NRI']||c['nri']||0), 0); return t > 0 ? totalSpend/t : null; }
-  if (metric === 'cptd') { const t = creatives.reduce((s,c) => s + parseNumber(c['TD']||c['td']||0), 0); return t >= 3 ? totalSpend/t : null; }
-  return null;
-}
-
-function renderCreativeIntel() {
-  document.getElementById('ciLoading')?.classList.remove('hidden');
-  document.getElementById('ciEmpty')?.classList.add('hidden');
-  document.getElementById('ciContent')?.classList.add('hidden');
-  setTimeout(() => {
-    document.getElementById('ciLoading')?.classList.add('hidden');
-    if (!state.taggerData.length) {
-      document.getElementById('ciEmpty').classList.remove('hidden');
-      return;
-    }
-    document.getElementById('ciContent').classList.remove('hidden');
-    document.getElementById('ciCount').textContent = `${getFilteredTaggerData('ciFilterCountry').length} creatives analyzed`;
-    renderLensAggregateMetrics();
-    renderWinningByAudience();
-  }, 10);
-}
-
-function onCICountryChange() {
-  syncGeoFilter('ciFilterCountry');
-  renderLensAggregateMetrics(); // Refresh aggregate metrics for new geo
-  const activeTab = document.querySelector('#ciTabs .pill-btn.active')?.dataset.ciTab || 'winning';
-  if (activeTab === 'winning') renderWinningByAudience();
-  else if (activeTab === 'matrix') { renderPerfMatrix(); renderAudienceMap(); }
-  else if (activeTab === 'decay') renderDecayTracker();
-}
-
-function generateCreativeBriefs() {
-  const data = getFilteredTaggerData('ciFilterCountry');
-  if (!data.length) { showToast('No tagged data for brief generation'); return; }
-
-  // Compute winning patterns per market
-  const markets = {};
-  data.forEach(c => {
-    const geo = extractMarket(c);
-    if (geo === 'Unknown') return;
-    if (!markets[geo]) markets[geo] = { hooks: {}, pbs: {}, formats: {}, icps: {}, total: 0 };
-    const m = markets[geo];
-    m.total++;
-
-    const spend = parseNumber(c['Spent']||c['spent']||0);
-    const ql = parseNumber(c['QL']||c['ql']||0);
-
-    ['hook','hook_secondary'].forEach(hk => {
-      const h = c.tags?.[hk];
-      if (h && h !== 'Unknown' && h !== 'null' && ql > 0) {
-        if (!m.hooks[h]) m.hooks[h] = { spend: 0, ql: 0, count: 0 };
-        m.hooks[h].spend += spend; m.hooks[h].ql += ql; m.hooks[h].count++;
-      }
-    });
-
-    const pb = c.tags?.pain_benefit || c.tags?.pain_point || c.tags?.benefit;
-    if (pb && pb !== 'Unknown' && ql > 0) {
-      if (!m.pbs[pb]) m.pbs[pb] = { spend: 0, ql: 0, count: 0 };
-      m.pbs[pb].spend += spend; m.pbs[pb].ql += ql; m.pbs[pb].count++;
-    }
-
-    const fmt = c.tags?.content_format;
-    if (fmt && fmt !== 'Unknown' && ql > 0) {
-      if (!m.formats[fmt]) m.formats[fmt] = { spend: 0, ql: 0, count: 0 };
-      m.formats[fmt].spend += spend; m.formats[fmt].ql += ql; m.formats[fmt].count++;
-    }
-
-    const icp = c.tags?.campaign_audience;
-    if (icp && icp !== 'Unknown' && ql > 0) {
-      if (!m.icps[icp]) m.icps[icp] = { spend: 0, ql: 0, count: 0 };
-      m.icps[icp].spend += spend; m.icps[icp].ql += ql; m.icps[icp].count++;
-    }
-  });
-
-  // Generate briefs: best hook + best PB + best format per market
-  const briefs = [];
-  Object.entries(markets).forEach(([geo, m]) => {
-    if (m.total < 5) return; // Need enough data
-
-    const bestHook = Object.entries(m.hooks).filter(([,v]) => v.count >= 2 && v.ql > 0).sort((a,b) => (a[1].spend/a[1].ql) - (b[1].spend/b[1].ql))[0];
-    const bestPB = Object.entries(m.pbs).filter(([,v]) => v.count >= 2 && v.ql > 0).sort((a,b) => (a[1].spend/a[1].ql) - (b[1].spend/b[1].ql))[0];
-    const bestFormat = Object.entries(m.formats).filter(([,v]) => v.count >= 2 && v.ql > 0).sort((a,b) => (a[1].spend/a[1].ql) - (b[1].spend/b[1].ql))[0];
-    const bestICP = Object.entries(m.icps).filter(([,v]) => v.count >= 2 && v.ql > 0).sort((a,b) => (a[1].spend/a[1].ql) - (b[1].spend/b[1].ql))[0];
-
-    // Also find worst hook to note as anti-pattern
-    const worstHook = Object.entries(m.hooks).filter(([,v]) => v.count >= 2 && v.ql > 0).sort((a,b) => (b[1].spend/b[1].ql) - (a[1].spend/a[1].ql))[0];
-
-    if (bestHook) {
-      briefs.push({
-        geo,
-        hook: bestHook[0],
-        hookCPQL: bestHook[1].spend / bestHook[1].ql,
-        hookCount: bestHook[1].count,
-        pb: bestPB ? bestPB[0] : null,
-        pbCPQL: bestPB ? bestPB[1].spend / bestPB[1].ql : 0,
-        format: bestFormat ? bestFormat[0] : 'Static image',
-        icp: bestICP ? bestICP[0] : 'NRI',
-        antiPattern: worstHook ? worstHook[0] : null,
-        antiCPQL: worstHook ? worstHook[1].spend / worstHook[1].ql : 0,
-        totalCreatives: m.total,
-        priority: bestHook[1].ql > 50 ? 'high' : bestHook[1].ql > 20 ? 'medium' : 'low'
-      });
-    }
-  });
-
-  // Sort by priority
-  const prioOrder = { high: 0, medium: 1, low: 2 };
-  briefs.sort((a, b) => prioOrder[a.priority] - prioOrder[b.priority]);
-
-  // ICP Content Mix Tracker (spec: 4 Foundation Rebuilder, 3 Personalisation Seeker, 2 Confidence Builder, 1 universal per 10)
-  const IDEAL_MIX = { 'Foundation Rebuilder': 40, 'Personalization Seeker': 30, 'Confidence Builder': 20, 'Universal': 10 };
-  const segCounts = {};
-  let segTotal = 0;
-  data.forEach(c => {
-    const seg = c.tags?.segment;
-    if (seg && seg !== 'Unknown') { segCounts[seg] = (segCounts[seg] || 0) + 1; segTotal++; }
-  });
-  const mixTracker = document.getElementById('icpMixTracker');
-  if (segTotal >= 5) {
-    let mixHtml = '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-4 mb-4"><h4 class="text-sm font-bold mb-2 flex items-center gap-2"><svg class="w-4 h-4 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>Audience Content Mix</h4>';
-    mixHtml += '<p class="text-[10px] text-text-muted mb-3">Ideal: 40% Foundation Rebuilder, 30% Personalisation Seeker, 20% Confidence Builder, 10% Universal</p>';
-    mixHtml += '<div class="space-y-2">';
-    Object.entries(IDEAL_MIX).forEach(([seg, ideal]) => {
-      const actual = Math.round(((segCounts[seg] || 0) / segTotal) * 100);
-      const diff = actual - ideal;
-      const color = Math.abs(diff) <= 10 ? 'accent-green' : (diff < -10 ? 'accent-red' : 'accent-orange');
-      const barW = Math.min(actual, 100);
-      mixHtml += `<div class="flex items-center gap-3">
-        <span class="text-[10px] font-semibold w-36 shrink-0">${seg}</span>
-        <div class="flex-1 bg-surface-tertiary rounded-full h-3 relative overflow-hidden">
-          <div class="h-full rounded-full bg-${color}" style="width:${barW}%"></div>
-          <div class="absolute top-0 h-full border-r-2 border-dashed border-gray-400" style="left:${ideal}%"></div>
-        </div>
-        <span class="text-[10px] font-bold w-20 text-right ${diff < -10 ? 'text-accent-red' : diff > 10 ? 'text-accent-orange' : 'text-accent-green'}">${actual}% (${diff > 0 ? '+' : ''}${diff})</span>
-      </div>`;
-    });
-    const gaps = Object.entries(IDEAL_MIX).filter(([seg, ideal]) => ((segCounts[seg] || 0) / segTotal * 100) < ideal - 10);
-    if (gaps.length) {
-      mixHtml += '<div class="mt-2 p-2 bg-accent-red-light rounded-lg"><p class="text-[10px] font-bold text-red-700">Gap Alert: Underweight in ' + gaps.map(([s]) => s).join(', ') + ' — prioritize these segments in next creative batch.</p></div>';
-    }
-    mixHtml += '</div></div>';
-    mixTracker.innerHTML = mixHtml;
-    mixTracker.classList.remove('hidden');
-  } else { mixTracker.classList.add('hidden'); }
-
-  // Render
-  const section = document.getElementById('ciBriefSection');
-  const container = document.getElementById('ciBriefCards');
-  if (!briefs.length) { section.classList.add('hidden'); return; }
-
-  section.classList.remove('hidden');
-  const GEO_BADGE = { US: 'purple', AUS: 'green', India: 'pink', MEA: 'orange', APAC: 'blue', EU: 'teal', UK: 'red' };
-  const prioStyles = { high: 'bg-accent-red-light text-red-700', medium: 'bg-accent-orange-light text-amber-700', low: 'bg-surface-tertiary text-text-muted' };
-
-  container.innerHTML = briefs.map(b => `
-    <div class="bg-white border border-gray-200/80 rounded-xl p-4 insight-card shadow-sm">
-      <div class="flex items-center justify-between mb-3">
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${prioStyles[b.priority]}">${b.priority}</span>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-accent-${GEO_BADGE[b.geo]||'purple'}-light text-accent-${GEO_BADGE[b.geo]||'purple'}">${b.geo}</span>
-      </div>
-      <p class="text-sm font-bold mb-2">${tagLabel(b.hook)} + ${tagLabel(b.pb)}</p>
-      <div class="space-y-1 text-xs text-text-secondary mb-3">
-        <p>Hook: <strong class="text-text-primary">${tagLabel(b.hook)}</strong> at ${formatCurrency(b.hookCPQL)} CPQL (${b.hookCount} ads)</p>
-        <p>Frame: <strong class="text-text-primary">${tagLabel(b.pb)}</strong> at ${formatCurrency(b.pbCPQL)} CPQL</p>
-        <p>Format: <strong class="text-text-primary">${tagLabel(b.format)}</strong> · Audience: <strong>${tagLabel(b.icp)}</strong></p>
-        ${b.antiPattern ? `<p class="text-accent-red">Avoid: ${tagLabel(b.antiPattern)} (${formatCurrency(b.antiCPQL)} CPQL)</p>` : ''}
-      </div>
-      <button onclick='generateFromCIBrief(${JSON.stringify({geo:b.geo,hook:b.hook,pb:b.pb,format:b.format,icp:b.icp}).replace(/'/g,"\\'")})'
-        class="w-full py-2 btn-primary rounded-lg text-xs font-semibold">Generate in Forge →</button>
-    </div>
-  `).join('');
-}
-
 function generateFromCIBrief(brief) {
   navigateTo('generate');
   if (brief.geo) document.getElementById('briefMarket').value = brief.geo;
@@ -18012,439 +17707,6 @@ function generateFromCIBrief(brief) {
   // Set angle
   document.getElementById('briefAngle').value = `Winning pattern: ${tagLabel(brief.hook)} hook + ${tagLabel(brief.pb)} frame. Data-proven for ${brief.geo}.`;
   setTimeout(() => generateContent(), 200);
-}
-
-function switchCITab(tab) {
-  document.querySelectorAll('.ci-tab').forEach(t => t.classList.add('hidden'));
-  document.getElementById('ciTab-'+tab).classList.remove('hidden');
-  document.querySelectorAll('#ciTabs .pill-btn').forEach(p => p.classList.toggle('active', p.dataset.ciTab === tab));
-  if (tab === 'winning') renderWinningByAudience();
-  if (tab === 'matrix') { renderPerfMatrix(); renderAudienceMap(); }
-  if (tab === 'decay') renderDecayTracker();
-}
-
-// ---- What's Working by Audience ----
-function renderWinningByAudience() {
-  const container = document.getElementById('ciWinningContainer');
-  const countryFilter = document.getElementById('ciFilterCountry')?.value || 'all';
-  let data = [...getFilteredTaggerData('ciFilterCountry')];
-
-  if (!data.length) { container.innerHTML = '<p class="text-sm text-text-muted text-center py-8">No tagged data. Go to Lens: Tag first.</p>'; return; }
-
-  // Group by audience (from campaign name)
-  const audiences = {};
-  data.forEach(c => {
-    const aud = extractAudience(c);
-    if (!audiences[aud]) audiences[aud] = [];
-    audiences[aud].push(c);
-  });
-
-  // For each audience, compute metrics and find winning hook+format
-  // Use adaptive minimums from taxonomy based on market tier
-  const geo = countryFilter !== 'all' ? countryFilter : 'US';
-  const mins = GODFATHER_TAXONOMY.getMinimums(geo);
-
-  const audRows = Object.entries(audiences).map(([aud, ads]) => {
-    const spend = ads.reduce((s, c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
-    const ql = ads.reduce((s, c) => s + parseNumber(c['QL']||c['ql']||0), 0);
-    const td = ads.reduce((s, c) => s + parseNumber(c['TD']||c['td']||0), 0);
-    const cpql = ql > 0 ? spend / ql : null;
-    const cptd = td >= 1 ? spend / td : null;
-    const qlTd = ql > 0 && td >= 1 ? Math.min((td / ql * 100), 100) : null;
-
-    // Best hook for this audience (using adaptive minimums, validated against taxonomy)
-    const validHooks = new Set(GODFATHER_TAXONOMY.getValues('hook'));
-    const hookPerf = {};
-    ads.forEach(ad => {
-      let hook = tagLabel(ad.tags?.hook);
-      if (!hook || hook === 'Unknown' || !validHooks.has(hook)) return;
-      if (!hookPerf[hook]) hookPerf[hook] = { spend: 0, ql: 0, td: 0, count: 0 };
-      hookPerf[hook].spend += parseNumber(ad['Spent']||ad['spent']||0);
-      hookPerf[hook].ql += parseNumber(ad['QL']||ad['ql']||0);
-      hookPerf[hook].td += parseNumber(ad['TD']||ad['td']||0);
-      hookPerf[hook].count++;
-    });
-    const bestHook = Object.entries(hookPerf).filter(([,v]) => v.count >= mins.creatives).sort((a,b) => {
-      const aCptd = a[1].td >= 3 ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
-      const bCptd = b[1].td >= 3 ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
-      return aCptd - bCptd;
-    })[0];
-
-    // Best format — validate against taxonomy values to avoid cross-field contamination
-    const validFormats = new Set(GODFATHER_TAXONOMY.getValues('content_format'));
-    const fmtPerf = {};
-    ads.forEach(ad => {
-      let fmt = ad.tags?.content_format || ad['Creative type'] || 'Unknown';
-      fmt = tagLabel(fmt); // migrate any codes
-      if (fmt === 'Unknown' || !validFormats.has(fmt)) return;
-      if (!fmtPerf[fmt]) fmtPerf[fmt] = { spend: 0, ql: 0, td: 0, count: 0 };
-      fmtPerf[fmt].spend += parseNumber(ad['Spent']||ad['spent']||0);
-      fmtPerf[fmt].ql += parseNumber(ad['QL']||ad['ql']||0);
-      fmtPerf[fmt].td += parseNumber(ad['TD']||ad['td']||0);
-      fmtPerf[fmt].count++;
-    });
-    const bestFmt = Object.entries(fmtPerf).filter(([,v]) => v.count >= mins.creatives).sort((a,b) => {
-      const aCptd = a[1].td >= mins.tds ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
-      const bCptd = b[1].td >= mins.tds ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
-      return aCptd - bCptd;
-    })[0];
-
-    // Worst hook (to avoid) + collect ad names using this hook
-    const worstHook = Object.entries(hookPerf).filter(([,v]) => v.count >= mins.creatives).sort((a,b) => {
-      const aCptd = a[1].td >= mins.tds ? a[1].spend/a[1].td : a[1].ql > 0 ? a[1].spend/a[1].ql * 3 : Infinity;
-      const bCptd = b[1].td >= mins.tds ? b[1].spend/b[1].td : b[1].ql > 0 ? b[1].spend/b[1].ql * 3 : Infinity;
-      return bCptd - aCptd;
-    })[0];
-    // Get top 3 ads for best hook (by lowest CPTD/CPQL) and worst hook (by highest spend)
-    const _adCard = (ad) => ({
-      name: shortAdName(ad['Ad name'] || ad['ad name'] || ''),
-      thumb: ad.thumbnail_url || ad.image_url || '',
-      spend: parseNumber(ad['Spent']||ad['spent']||0),
-      cptd: parseNumber(ad['TD']||ad['td']||0) > 0 ? parseNumber(ad['Spent']||ad['spent']||0) / parseNumber(ad['TD']||ad['td']||0) : null
-    });
-    let bestAds = [];
-    if (bestHook) {
-      bestAds = ads.filter(ad => ad.tags?.hook === bestHook[0] && parseNumber(ad['Spent']||ad['spent']||0) > 5000)
-        .sort((a,b) => {
-          const aTd = parseNumber(a['TD']||a['td']||0), bTd = parseNumber(b['TD']||b['td']||0);
-          if (aTd > 0 && bTd > 0) return (parseNumber(a['Spent']||a['spent']||0)/aTd) - (parseNumber(b['Spent']||b['spent']||0)/bTd);
-          return parseNumber(b['QL']||b['ql']||0) - parseNumber(a['QL']||a['ql']||0);
-        }).slice(0, 3).map(_adCard);
-    }
-    let worstAds = [];
-    if (worstHook) {
-      worstAds = ads.filter(ad => ad.tags?.hook === worstHook[0])
-        .sort((a,b) => parseNumber(b['Spent']||b['spent']||0) - parseNumber(a['Spent']||a['spent']||0))
-        .slice(0, 3).map(_adCard);
-    }
-
-    return { aud, ads: ads.length, spend, ql, td, cpql, cptd, qlTd, bestHook, bestFmt, worstHook, bestAds, worstAds };
-  }).filter(r => r.ads >= mins.creatives && r.cpql !== null).map(r => { r._lowSample = r.ads < mins.creatives + 2; return r; }).sort((a, b) => {
-    // Prioritize audiences with TDs over those without
-    const aHasTD = a.td > 0 ? 0 : 1;
-    const bHasTD = b.td > 0 ? 0 : 1;
-    if (aHasTD !== bHasTD) return aHasTD - bHasTD;
-    return (a.cptd || a.cpql * 3 || Infinity) - (b.cptd || b.cpql * 3 || Infinity);
-  });
-
-  let html = '';
-
-  // ── Frame Performance — Hook / Theme / Close / Pain by CPTD ──
-  const _v3Cards = _v3InsightCards(data);
-  const _v3Joined = [_v3Cards.hookHtml, _v3Cards.themeHtml, _v3Cards.closeHtml, _v3Cards.painHtml].filter(Boolean).join('');
-  if (_v3Joined) {
-    html += `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-bold">Frame Performance</h3>
-        <span class="text-[10px] text-text-muted">CPTD by hook, theme, close and pain — verified from ad copy + scripts</span>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${_v3Joined}</div>
-    </div>`;
-  }
-
-  // ── Monday Playbook: synthesized intelligence, not a data dump ──
-  const withTD = audRows.filter(r => r.td >= 3 && r.ads >= 5);
-  const withSpend = audRows.filter(r => r.spend >= 50000);
-  const totalSpendAll = data.reduce((s,c) => s + parseNumber(c['Spent']||c['spent']||0), 0);
-  const totalTDAll = data.reduce((s,c) => s + parseNumber(c['TD']||c['td']||0), 0);
-  const avgCPTD = totalTDAll > 0 ? totalSpendAll / totalTDAll : 0;
-
-  html += `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
-    <h3 class="text-base font-bold mb-3">Monday Playbook</h3>
-    <div class="space-y-3 text-sm text-text-primary">`;
-
-  let _pbNum = 0; // auto-incrementing playbook numbering
-
-  // 1. Scale signal — ternary combo (P3)
-  if (withTD.length > 0) {
-    _pbNum++;
-    const best = withTD[0];
-    const comboStr = [best.aud, best.bestHook ? tagLabel(best.bestHook[0]) : null, best.bestFmt ? tagLabel(best.bestFmt[0]) : null].filter(Boolean);
-    html += `<div class="flex items-start gap-2">
-      <span class="text-accent-green font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-      <div><strong>Scale:</strong> ${comboStr.length >= 3
-        ? `<span class="text-accent-green font-semibold">${comboStr.join(' + ')}</span> is your winning combo`
-        : `<span class="text-accent-green font-semibold">${best.aud}</span> audience is your best performer`} —
-        ${best.cptd ? formatCurrency(best.cptd) + ' CPTD' : formatCurrency(best.cpql) + ' CPTQL'} across ${best.ads} ads${best.td > 0 ? ', ' + Math.round(best.td) + ' trials' : ''}.
-        <span class="text-text-muted">Make 3-5 more creatives with this exact combo.</span></div>
-    </div>`;
-  }
-
-  // 2. Kill signal
-  if (withSpend.length > 0) {
-    const worst = withSpend[withSpend.length - 1];
-    const wastedSpend = worst.td === 0 ? worst.spend : (worst.cptd && worst.cptd > avgCPTD * 2 ? worst.spend : 0);
-    if (wastedSpend > 0) {
-      _pbNum++;
-      html += `<div class="flex items-start gap-2">
-        <span class="text-accent-red font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-        <div><strong>Kill:</strong> <span class="text-accent-red font-semibold">${worst.aud}</span> audience —
-          ${formatCurrency(worst.spend)} spent${worst.td === 0 ? ', <strong>zero trials</strong>' : ', ' + formatCurrency(worst.cptd) + ' CPTD (2x+ above average)'}.
-          ${worst.worstHook ? ' Worst hook: <strong>' + tagLabel(worst.worstHook[0]) + '</strong>.' : ''}
-          <span class="text-text-muted">Pause underperformers, reallocate to #1.</span></div>
-      </div>`;
-    }
-  }
-
-  // 3. Creative pattern
-  const allHooks = {};
-  data.forEach(c => { const h = c.tags?.hook; if (h && h !== 'Unknown') { if (!allHooks[h]) allHooks[h] = {spend:0,td:0,count:0}; allHooks[h].spend += parseNumber(c['Spent']||c['spent']||0); allHooks[h].td += parseNumber(c['TD']||c['td']||0); allHooks[h].count++; }});
-  const hooksSorted = Object.entries(allHooks).filter(([,v]) => v.td >= 3).sort((a,b) => (a[1].spend/a[1].td) - (b[1].spend/b[1].td));
-  if (hooksSorted.length >= 2) {
-    _pbNum++;
-    const winHook = hooksSorted[0];
-    const loseHook = hooksSorted[hooksSorted.length - 1];
-    html += `<div class="flex items-start gap-2">
-      <span class="text-accent-blue font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-      <div><strong>Creative pattern:</strong> <span class="text-accent-green font-semibold">${tagLabel(winHook[0])}</span> hooks cost ${formatCurrency(winHook[1].spend/winHook[1].td)} CPTD (${winHook[1].count} ads).
-        <span class="text-accent-red font-semibold">${tagLabel(loseHook[0])}</span> hooks cost ${formatCurrency(loseHook[1].spend/loseHook[1].td)} CPTD — ${Math.round(loseHook[1].spend/loseHook[1].td / (winHook[1].spend/winHook[1].td))}x more expensive.
-        <span class="text-text-muted">Shift new creative production toward ${tagLabel(winHook[0])} hooks.</span></div>
-    </div>`;
-  }
-
-  // 4. Volume check
-  const noTDAuds = audRows.filter(r => r.td === 0 && r.spend >= 50000);
-  if (noTDAuds.length > 0) {
-    _pbNum++;
-    html += `<div class="flex items-start gap-2">
-      <span class="text-accent-orange font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-      <div><strong>Blind spots:</strong> ${noTDAuds.length} audience${noTDAuds.length > 1 ? 's' : ''} with ${formatCurrency(noTDAuds.reduce((s,r) => s+r.spend, 0))} total spend but <strong>zero trials</strong>:
-        ${noTDAuds.slice(0,3).map(r => r.aud).join(', ')}${noTDAuds.length > 3 ? '...' : ''}.
-        <span class="text-text-muted">Either fix the funnel or cut the spend.</span></div>
-    </div>`;
-  }
-
-  // P1: Signal #5 — Root Cause diagnosis
-  const _pbDiag = diagnoseCPTD(data, countryFilter === 'all' ? 'US' : countryFilter);
-  if (_pbDiag.factors.length) {
-    _pbNum++;
-    html += `<div class="flex items-start gap-2 mt-2 pt-2 border-t border-gray-100">
-      <span class="text-accent-purple font-bold text-lg leading-none mt-0.5">${_pbNum}</span>
-      <div><strong>Root cause:</strong> ${_pbDiag.factors.slice(0,2).map(f => f.evidence).join('. ')}. <span class="font-medium text-accent-purple">${_pbDiag.actionable}</span></div>
-    </div>`;
-  }
-
-  html += `</div></div>`;
-
-  // ── Winning Combos — the 3 default pairs from taxonomy ──
-  const comboPairs = GODFATHER_TAXONOMY.comboPairs;
-  html += `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
-    <h3 class="text-base font-bold mb-1">Winning Combos</h3>
-    <p class="text-[10px] text-text-muted mb-4">Top-performing tag combinations. Minimum ${mins.creatives} creatives, ${mins.tds} TDs, ${formatCurrency(mins.spend)} spend.</p>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">`;
-  comboPairs.forEach(([dimA, dimB]) => {
-    const comboPerf = {};
-    data.forEach(c => {
-      const a = c.tags?.[dimA], b = c.tags?.[dimB];
-      if (!a || a === 'Unknown' || !b || b === 'Unknown') return;
-      const key = a + ' × ' + b;
-      if (!comboPerf[key]) comboPerf[key] = { spend: 0, ql: 0, td: 0, count: 0, a, b };
-      comboPerf[key].spend += parseNumber(c['Spent']||c['spent']||0);
-      comboPerf[key].ql += parseNumber(c['QL']||c['ql']||0);
-      comboPerf[key].td += parseNumber(c['TD']||c['td']||0);
-      comboPerf[key].count++;
-    });
-    const sorted = Object.entries(comboPerf)
-      .filter(([,v]) => v.count >= mins.creatives && v.td >= mins.tds && v.spend >= mins.spend)
-      .sort((a,b) => (a[1].spend/a[1].td) - (b[1].spend/b[1].td));
-    const labelA = GODFATHER_TAXONOMY.getLabel(dimA), labelB = GODFATHER_TAXONOMY.getLabel(dimB);
-    html += `<div class="border border-gray-100 rounded-xl p-4">
-      <p class="text-[10px] font-bold text-text-muted uppercase mb-3">${labelA} × ${labelB}</p>`;
-    if (sorted.length === 0) {
-      html += `<p class="text-[10px] text-text-muted">Not enough data for this combo (need ${mins.creatives}+ ads, ${mins.tds}+ TDs)</p>`;
-    } else {
-      const top3 = sorted.slice(0, 3);
-      const bottom = sorted.length > 3 ? sorted.slice(-1) : [];
-      top3.forEach(([combo, v], i) => {
-        const cptd = v.td > 0 ? formatCurrency(v.spend / v.td) : '—';
-        html += `<div class="flex items-center justify-between py-1.5 ${i > 0 ? 'border-t border-gray-50' : ''}">
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-black ${i === 0 ? 'text-accent-green' : 'text-text-primary'}">#${i+1}</span>
-            <span class="text-xs font-medium">${combo}</span>
-          </div>
-          <span class="text-xs font-bold ${i === 0 ? 'text-accent-green' : ''}">${cptd} <span class="text-[9px] font-normal text-text-muted">(${v.count})</span></span>
-        </div>`;
-      });
-      bottom.forEach(([combo, v]) => {
-        const cptd = v.td > 0 ? formatCurrency(v.spend / v.td) : '—';
-        html += `<div class="flex items-center justify-between py-1.5 border-t border-red-100 mt-1">
-          <div class="flex items-center gap-1.5">
-            <span class="text-[10px] font-black text-accent-red">✗</span>
-            <span class="text-xs font-medium text-text-secondary">${combo}</span>
-          </div>
-          <span class="text-xs font-bold text-accent-red">${cptd} <span class="text-[9px] font-normal">(${v.count})</span></span>
-        </div>`;
-      });
-    }
-    html += `</div>`;
-  });
-  html += `</div></div>`;
-
-  // Audience cards — thresholds per dashboard country filter's market
-  const _audViewMkt = document.getElementById('dashboardCountryFilter')?.value || 'US';
-  const _audViewTh = SENTINEL_THRESHOLDS[_audViewMkt === 'all' ? 'US' : _audViewMkt] || SENTINEL_THRESHOLDS['US'];
-  const _audGreen = _audViewTh.cptd?.green || 35000;
-  const _audAmber = _audViewTh.cptd?.amber || 50000;
-  const _audCpqlGreen = _audViewTh.cpql?.green || 10000;
-  const _audCpqlAmber = _audViewTh.cpql?.amber || 15000;
-  html += '<div class="space-y-4">';
-  audRows.forEach(r => {
-    const cptdColor = r.cptd ? (r.cptd < _audGreen ? 'text-accent-green' : r.cptd < _audAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
-    const cpqlColor = r.cpql ? (r.cpql < _audCpqlGreen ? 'text-accent-green' : r.cpql < _audCpqlAmber ? 'text-accent-orange' : 'text-accent-red') : 'text-text-muted';
-
-    html += `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-5">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h3 class="text-sm font-bold">${r.aud}${r._lowSample ? ' <span class="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 ml-1.5">Low sample</span>' : ''}</h3>
-          <p class="text-[10px] text-text-muted">${r.ads} ads · ${formatCurrency(r.spend)} spend · ${Math.round(r.ql)} QLs · ${Math.round(r.td)} TDs</p>
-        </div>
-        <div class="flex gap-4 text-right">
-          <div><p class="text-[9px] text-text-muted uppercase">CPTQL</p><p class="text-sm font-black ${cpqlColor}">${(r.ql === 0 && r.td > 0) ? '\u2014' : (r.cpql ? formatCurrency(r.cpql) : '\u2014')}</p></div>
-          <div><p class="text-[9px] text-text-muted uppercase">CPTD</p><p class="text-sm font-black ${cptdColor}">${r.cptd ? formatCurrency(r.cptd) : '\u2014'}</p></div>
-          <div><p class="text-[9px] text-text-muted uppercase">QL\u2192TD%</p><p class="text-sm font-black">${r.qlTd ? r.qlTd.toFixed(1) + '%' : '\u2014'}</p></div>
-        </div>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div class="bg-accent-green-light/50 rounded-lg p-3">
-          <p class="text-[10px] font-bold text-green-700 uppercase mb-1">Best Hook</p>
-          ${r.bestHook ? `<p class="text-xs font-semibold">${tagLabel(r.bestHook[0])}</p><p class="text-[10px] text-text-muted">${r.bestHook[1].count} ads · ${r.bestHook[1].td > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].td) + ' CPTD' : r.bestHook[1].ql > 0 ? formatCurrency(r.bestHook[1].spend/r.bestHook[1].ql) + ' CPQL' : 'no QLs'}</p>${r.bestAds?.length ? `<div class="flex gap-1.5 mt-2">${r.bestAds.map(a => `<div class="flex-1 min-w-0">${a.thumb ? `<img src="${a.thumb}" class="w-full h-12 object-cover rounded mb-1" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-green-800 truncate" title="${a.name}">${a.name}</p>${a.cptd ? `<p class="text-[8px] text-green-600 font-bold">${formatCurrency(a.cptd)}</p>` : ''}</div>`).join('')}</div>` : ''}` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
-        </div>
-        <div class="bg-accent-blue-light/50 rounded-lg p-3">
-          <p class="text-[10px] font-bold text-blue-700 uppercase mb-1">Best Format</p>
-          ${r.bestFmt ? `<p class="text-xs font-semibold">${tagLabel(r.bestFmt[0])}</p><p class="text-[10px] text-text-muted">${r.bestFmt[1].count} ads · ${r.bestFmt[1].td > 0 ? formatCurrency(r.bestFmt[1].spend/r.bestFmt[1].td) + ' CPTD' : r.bestFmt[1].ql > 0 ? formatCurrency(r.bestFmt[1].spend/r.bestFmt[1].ql) + ' CPQL' : 'no QLs'}</p>` : '<p class="text-[10px] text-text-muted">Not enough data</p>'}
-        </div>
-        <div class="bg-accent-red-light/50 rounded-lg p-3">
-          <p class="text-[10px] font-bold text-red-700 uppercase mb-1">Avoid</p>
-          ${r.worstHook && r.worstHook[0] !== r.bestHook?.[0] ? `<p class="text-xs font-semibold">${tagLabel(r.worstHook[0])}</p><p class="text-[10px] text-text-muted">${r.worstHook[1].count} ads · ${r.worstHook[1].td > 0 ? formatCurrency(r.worstHook[1].spend/r.worstHook[1].td) + ' CPTD' : r.worstHook[1].ql > 0 ? formatCurrency(r.worstHook[1].spend/r.worstHook[1].ql) + ' CPQL' : 'no QLs'}</p>${r.worstAds?.length ? `<div class="flex gap-1.5 mt-2">${r.worstAds.map(a => `<div class="flex-1 min-w-0">${a.thumb ? `<img src="${a.thumb}" class="w-full h-12 object-cover rounded mb-1" onerror="this.style.display='none'"/>` : ''}<p class="text-[8px] text-red-800 truncate" title="${a.name}">${a.name}</p><p class="text-[8px] text-red-600 font-bold">${formatCurrency(a.spend)} spent</p></div>`).join('')}</div>` : ''}<p class="text-[10px] text-orange-600 mt-1 font-medium">${r.worstHook[1].td > 0 ? 'Refresh visual, keep the hook' : 'Pause these ads'}</p>` : '<p class="text-[10px] text-text-muted">No clear loser</p>'}
-        </div>
-      </div>
-      ${r.bestHook && r.bestFmt ? `<div class="bg-surface-secondary rounded-lg p-3 mt-3">
-        <p class="text-[10px] font-bold text-text-muted uppercase mb-1">Brief</p>
-        <p class="text-xs text-text-secondary">Create 3 <strong>${tagLabel(r.bestFmt[0])}</strong> ads with <strong>${tagLabel(r.bestHook[0])}</strong> hook targeting <strong>${r.aud}</strong>.${r.worstHook && r.worstHook[0] !== r.bestHook[0] ? ' Avoid <strong>' + tagLabel(r.worstHook[0]) + '</strong> pattern.' : ''} Suggested format: 1:1 for Instagram, 9:16 for Stories.</p>
-      </div>` : ''}
-      ${r.bestHook ? `<div class="flex gap-2 mt-3">
-        <button onclick='generateFromCIBrief(${JSON.stringify({geo:countryFilter==="all"?"US":countryFilter,hook:r.bestHook[0],pb:'',format:r.bestFmt?r.bestFmt[0]:'Static image',icp:r.aud}).replace(/'/g,"\\\\'")})'
-        class="flex-1 py-2 btn-primary rounded-lg text-xs font-semibold">Generate ${tagLabel(r.bestHook[0])} + ${r.bestFmt ? tagLabel(r.bestFmt[0]) : 'Static'} \u2192</button>
-        <button onclick="generateDesignerBrief('${r.aud.replace(/'/g,"\\\\'")}','${r.bestHook[0]}','${r.bestFmt?r.bestFmt[0]:'Static image'}','${countryFilter==="all"?"US":countryFilter}')"
-        class="py-2 px-3 btn-secondary rounded-lg text-xs font-semibold border border-gray-200 flex items-center gap-1" title="Brief for Designer"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Brief</button>
-      </div>` : ''}
-    </div>`;
-  });
-  html += '</div>';
-
-  if (!audRows.length) html = '<p class="text-sm text-text-muted text-center py-8">Not enough data per audience (need 3+ ads). Try "All Markets".</p>';
-
-  container.innerHTML = html;
-  // Also trigger brief generation
-  generateCreativeBriefs();
-}
-
-// ---- Performance Matrix ----
-function renderPerfMatrix() {
-  const metric = document.getElementById('ciMetric').value;
-  const tagCat = document.getElementById('ciTagCat').value;
-  const dimension = document.getElementById('ciDimension').value;
-  const countryFilter = document.getElementById('ciFilterCountry')?.value || 'all';
-  const container = document.getElementById('ciMatrixContainer');
-
-  // Apply country + data quality filter
-  let ciData = [...getFilteredTaggerData('ciFilterCountry')];
-
-  const getDimVal = (c) => {
-    if (dimension === 'market') return extractMarket(c);
-    if (dimension === 'audience') return extractAudience(c);
-    if (dimension === 'Creative type') return c['Creative type']||c['creative type']||c['Creative Type']||'Unknown';
-    return c.tags?.[dimension] || 'Unknown';
-  };
-
-  const dimSet = new Set(), tagSet = new Set();
-  ciData.forEach(c => { dimSet.add(getDimVal(c)); const tv = c.tags?.[tagCat]; if(tv) tagSet.add(tv); });
-  const MIN_ADS_FOR_METRIC = 5; // Don't show metrics for <5 ads — not statistically meaningful
-  const dims = [...dimSet].filter(d => d !== 'Unknown' && d !== 'Other').sort();
-  const tags = [...tagSet].filter(t => t !== 'Unknown').sort();
-  if (!dims.length || !tags.length) { container.innerHTML = '<p class="text-sm text-text-muted py-8 text-center">Not enough tagged data</p>'; return; }
-
-  // Build matrix
-  const mx = {};
-  dims.forEach(d => { mx[d] = {}; tags.forEach(t => { mx[d][t] = []; }); });
-  ciData.forEach(c => { const dv = getDimVal(c), tv = c.tags?.[tagCat]; if(dv && tv && mx[dv]?.[tv]) mx[dv][tv].push(c); });
-
-  // Only keep dimensions that have at least one cell with MIN_ADS_FOR_METRIC
-  const activeDims = dims.filter(d => tags.some(t => mx[d][t].length >= MIN_ADS_FOR_METRIC));
-  const activeTags = tags.filter(t => activeDims.some(d => mx[d][t].length >= MIN_ADS_FOR_METRIC));
-  if (!activeDims.length || !activeTags.length) { container.innerHTML = '<p class="text-sm text-text-muted py-8 text-center">Not enough data per cell (need 5+ ads per combination)</p>'; return; }
-
-  const vals = {}, allV = [];
-  activeDims.forEach(d => { vals[d] = {}; activeTags.forEach(t => {
-    const v = mx[d][t].length >= MIN_ADS_FOR_METRIC ? computeMetric(mx[d][t], metric) : null;
-    vals[d][t] = v;
-    if (v !== null && v > 0) allV.push(v);
-  }); });
-
-  const minV = Math.min(...allV), maxV = Math.max(...allV);
-  const getColor = (v) => {
-    if (v === null || v === undefined || v <= 0) return '#F8F9FC';
-    const pct = (v - minV) / ((maxV - minV) || 1);
-    if (pct < 0.33) return '#D1FAE5';
-    if (pct < 0.66) return '#FEF3C7';
-    return '#FEE2E2';
-  };
-
-  const fmtVal = (v) => { if (metric === 'count') return v; if (metric === 'ql') return v.toLocaleString(); return formatCurrency(v); };
-  // For count/ql metrics, lower is NOT better — invert heatmap (green=high)
-  const invertHeat = metric === 'count' || metric === 'ql' || metric === 'spend';
-
-  const metricLabel = metric === 'cptd' ? 'CPTD' : metric === 'cpql' ? 'CPTQL' : metric === 'spend' ? 'Spend' : metric === 'td' ? 'TDs' : metric === 'ql' ? 'QLs' : metric;
-  const dimLabel = dimension === 'market' ? 'Market' : dimension === 'audience' ? 'Audience' : GODFATHER_TAXONOMY.getLabel(dimension);
-  const tagLabel2 = GODFATHER_TAXONOMY.getLabel(tagCat);
-
-  let html = `<p class="text-[11px] text-text-muted mb-3">Showing <strong>${metricLabel}</strong> for each <strong>${tagLabel2}</strong> × <strong>${dimLabel}</strong> combination. Only cells with 5+ ads shown. Green = best, Red = worst.</p>`;
-  html += `<div class="overflow-x-auto"><table class="w-full text-[11px]"><thead><tr><th class="text-left px-3 py-2.5 font-bold text-text-muted sticky left-0 bg-white z-10" style="min-width:120px">${dimLabel}</th>`;
-  activeTags.forEach(t => { html += `<th class="text-center px-2 py-2.5 font-bold text-text-muted" style="min-width:80px">${tagLabel(t)}</th>`; });
-  html += '</tr></thead><tbody>';
-  activeDims.forEach(d => {
-    html += `<tr class="border-t border-gray-100"><td class="px-3 py-3 font-semibold sticky left-0 bg-white z-10">${d}</td>`;
-    activeTags.forEach(t => {
-      const v = vals[d][t], cnt = mx[d][t].length;
-      if (cnt < MIN_ADS_FOR_METRIC) {
-        html += `<td class="px-2 py-3 text-center" style="background:#F8F9FC"><span class="text-text-muted">-</span></td>`;
-      } else {
-        const bg = (v !== null && v > 0) ? (invertHeat ? getColor(maxV + minV - v) : getColor(v)) : '#F8F9FC';
-        html += `<td class="px-2 py-3 text-center rounded" style="background:${bg}"><span class="font-bold text-[11px]">${fmtVal(v)}</span><br><span class="text-[9px] text-text-muted">${cnt} ads</span></td>`;
-      }
-    });
-    html += '</tr>';
-  });
-  html += '</tbody></table></div>';
-
-  // Key insights — find best/worst with sufficient data
-  let best = null, worst = null;
-  activeDims.forEach(d => activeTags.forEach(t => {
-    const v = vals[d][t], cnt = mx[d][t].length;
-    if (v === null || v === undefined || v <= 0 || cnt < MIN_ADS_FOR_METRIC) return;
-    if (invertHeat) {
-      if (!best || v > best.val) best = { dim: d, tag: t, val: v, cnt };
-      if (!worst || v < worst.val) worst = { dim: d, tag: t, val: v, cnt };
-    } else {
-      if (!best || v < best.val) best = { dim: d, tag: t, val: v, cnt };
-      if (!worst || v > worst.val) worst = { dim: d, tag: t, val: v, cnt };
-    }
-  }));
-  if (best && worst && best.val !== worst.val) {
-    const gap = invertHeat ? Math.round(((best.val - worst.val) / best.val) * 100) : Math.round(((worst.val - best.val) / worst.val) * 100);
-    const actionVerb = invertHeat ? 'Scale' : 'Shift budget to';
-    html += `<div class="mt-4 p-4 rounded-xl" style="background:linear-gradient(135deg,rgba(124,58,237,0.06),rgba(59,130,246,0.06))">
-      <p class="text-xs font-bold mb-2">What This Means</p>
-      <p class="text-xs text-text-secondary mb-2">
-        <span class="text-accent-green font-semibold">${tagLabel(best.tag)} × ${best.dim}</span> (${fmtVal(best.val)}, ${best.cnt} ads)
-        outperforms
-        <span class="text-accent-red font-semibold">${tagLabel(worst.tag)} × ${worst.dim}</span> (${fmtVal(worst.val)}, ${worst.cnt} ads)
-        by <strong>${gap}%</strong>.
-      </p>
-      <p class="text-xs font-semibold text-accent-purple">${actionVerb} "${tagLabel(best.tag)}" content for ${best.dim} audience. Reduce "${tagLabel(worst.tag)}" in ${worst.dim}.</p>
-    </div>`;
-  }
-  container.innerHTML = html;
 }
 
 // ---- Winning Formulas ----
@@ -18558,277 +17820,6 @@ function clearFormula() {
   document.getElementById('formulaIndicator').classList.add('hidden');
   document.getElementById('briefAngle').value = '';
 }
-
-// ---- Fatigue Tracker ----
-// Phase 2.4: Per-creative CPTD sparkline for fatigue detection
-function _buildFatigueSparkline(adName, geo) {
-  if (typeof computeSparklineData !== 'function') return '';
-  try {
-    // Use the existing sparkline engine but filter to this specific ad
-    // Build from daily ad performance if available
-    const daily = typeof getAdPerformanceDaily === 'function' ? getAdPerformanceDaily(geo === 'all' ? null : geo, null, null) : [];
-    const norm = normalizeAdName(adName);
-    const now = new Date();
-    const cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 30);
-    const cutoffStr = cutoff.toISOString().split('T')[0];
-    const adDaily = daily.filter(r => normalizeAdName(r.ad_name||r.adName||'') === norm && (r.date||'') >= cutoffStr).sort((a,b) => (a.date||'').localeCompare(b.date||''));
-    if (adDaily.length < 3) return '';
-    // 5-day rolling CPTD
-    const pts = [];
-    for (let i = 0; i < adDaily.length; i++) {
-      const start = Math.max(0, i - 4);
-      let rSpend = 0, rTD = 0;
-      for (let j = start; j <= i; j++) { rSpend += (adDaily[j].spend||0); rTD += (adDaily[j].td||0); }
-      if (rTD > 0) pts.push({ value: rSpend / rTD });
-    }
-    if (pts.length < 3) return '';
-    return generateSparklineSVG(pts, { width: 80, height: 20, lowerBetter: true });
-  } catch(e) { return ''; }
-}
-
-function renderDecayTracker() {
-  const container = document.getElementById('ciDecayContainer');
-  const countryFilter = document.getElementById('ciFilterCountry')?.value || 'all';
-  let ciDecayData = [...getFilteredTaggerData('ciFilterCountry')];
-  const data = ciDecayData.map(c => ({
-    name: c['Ad name']||c['ad name']||c['Ad Name']||'Unknown',
-    spend: parseNumber(c['Spent']||c['spent']||0),
-    cpql: parseNumber(c['CPQL']||c['cpql']||0),
-    ql: parseNumber(c['QL']||c['ql']||0),
-    td: parseNumber(c['TD']||c['td']||0),
-    impressions: parseNumber(c['Impressions']||c['impressions']||0),
-    tags: c.tags||{},
-    thumbnail_url: c['thumbnail_url']||'',
-    image_url: c['image_url']||''
-  })).filter(c => c.spend > 0 && c.cpql > 0).sort((a,b) => b.spend - a.spend);
-
-  if (data.length < 5) { container.innerHTML = '<p class="text-sm text-text-muted py-8 text-center">Not enough data</p>'; return; }
-
-  const avgCPQL = data.reduce((s,c) => s+c.cpql, 0) / data.length;
-  const topSpenders = data.slice(0, Math.ceil(data.length*0.25));
-  // Frequency proxy: impressions/QL ratio (high ratio = audience seeing ad too often)
-  const impQLRatios = data.filter(c => c.ql > 0).map(c => c.impressions/c.ql).sort((a,b) => a-b);
-  const impQLQ3 = impQLRatios.length ? impQLRatios[Math.floor(impQLRatios.length*0.75)] : Infinity;
-  // Creative Fatigue: CPQL >30% above avg (spec C-08)
-  const fatigued = topSpenders.filter(c => c.cpql > avgCPQL * 1.3)
-    .map(c => ({...c, _cpqlFlag: true, _freqFlag: false}));
-  // Audience Saturation: high impressions/QL ratio (spec C-09 — distinct from fatigue)
-  const saturated = topSpenders.filter(c => {
-    const notFatigued = c.cpql <= avgCPQL * 1.3;
-    const highFreqProxy = c.ql > 0 && (c.impressions/c.ql) >= impQLQ3;
-    return highFreqProxy && notFatigued;
-  }).map(c => ({...c, _cpqlFlag: false, _freqFlag: true}));
-
-  // Overused tag patterns — only check recognized taxonomy categories
-  const DECAY_CATS = ['hook','content_format','pain_benefit','emotional_tone','cta_type','language'];
-  const tagUsage = {};
-  const decayData = countryFilter !== 'all' ? ciDecayData : state.taggerData;
-  decayData.forEach(c => {
-    DECAY_CATS.forEach(cat => {
-      const val = c.tags?.[cat];
-      if(!val || val === 'Unknown' || val === 'unknown' || val === 'N/A') return;
-      const key = `${cat}:${val}`;
-      if(!tagUsage[key]) tagUsage[key] = {cat,val,creatives:[]};
-      tagUsage[key].creatives.push(c);
-    });
-  });
-
-  const overused = Object.values(tagUsage).filter(t => t.creatives.length >= 4).map(t => {
-    const sorted = [...t.creatives].sort((a,b) => parseNumber(b['Spent']||b['spent']||0) - parseNumber(a['Spent']||a['spent']||0));
-    const top = sorted.slice(0, Math.ceil(sorted.length/2));
-    const bottom = sorted.slice(Math.ceil(sorted.length/2));
-    const topCPQL = computeMetric(top, 'cpql');
-    const bottomCPQL = computeMetric(bottom, 'cpql');
-    if (topCPQL === null || bottomCPQL === null || bottomCPQL <= 0) return null;
-    return {...t, topCPQL, bottomCPQL, degradation: (topCPQL-bottomCPQL)/bottomCPQL*100};
-  }).filter(t => t && t.degradation > 20).sort((a,b) => b.degradation - a.degradation);
-
-  let html = '';
-
-  // Creative Fatigue section (spec C-08: CPQL >30% above avg)
-  html += `<div class="mb-6"><h3 class="text-sm font-bold mb-3 flex items-center gap-2"><svg class="w-4 h-4 text-accent-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>Creative Fatigue <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-semibold">${fatigued.length} flagged</span></h3>`;
-  html += '<p class="text-xs text-text-muted mb-3">Top-spend creatives with CPQL &gt;30% above portfolio average — creative is losing effectiveness, consider refreshing or pausing.</p>';
-  if (fatigued.length) {
-    html += '<div class="space-y-2">';
-    fatigued.forEach(c => {
-      const overAvg = Math.round(((c.cpql-avgCPQL)/avgCPQL)*100);
-      const fThumb = c['image_url']||c['thumbnail_url']||'';
-      // C-11: Kill/Fix recommendation based on severity
-      let recBadge = '';
-      if (c.td === 0 && c.spend > 5000) {
-        recBadge = '<span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-bold">KILL — No conversions, pause now</span>';
-      } else if (overAvg > 100 && c.spend > 100000) {
-        recBadge = '<span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-bold">KILL — Pause immediately, reallocate budget</span>';
-      } else if (overAvg >= 30) {
-        recBadge = '<span class="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-accent-orange-light text-amber-700 font-bold">FIX — Refresh visual (new layout/color), keep the hook</span>';
-      }
-      html += `<div class="bg-white border border-red-100 rounded-xl p-4 flex items-center justify-between">
-        <div class="flex items-center gap-3">${fThumb ? `<img src="${fThumb}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px] shrink-0 border border-gray-200">Ad</div>'}<div><p class="text-xs font-semibold">${shortAdName(c.name)}</p>
-        <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => GODFATHER_TAXONOMY.fields[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div></div>
-        <div class="flex items-center gap-3 shrink-0 ml-4"><div>${_buildFatigueSparkline(c.name, countryFilter)}</div><div class="text-right"><p class="text-xs font-bold text-accent-red">${formatCurrency(c.cpql)} CPQL</p><p class="text-[10px] text-text-muted">CPQL +${overAvg}% vs avg | ${formatCurrency(c.spend)} spent</p>${recBadge}</div></div></div>`;
-    });
-    html += '</div>';
-  } else html += '<p class="text-xs text-accent-green font-medium">No fatigued creatives detected.</p>';
-  html += '</div>';
-
-  // Audience Saturation section (spec C-09: distinct from fatigue — high frequency, CPQL still ok)
-  html += `<div class="mb-6"><h3 class="text-sm font-bold mb-3 flex items-center gap-2"><svg class="w-4 h-4 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>Audience Saturation <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-orange-light text-amber-700 font-semibold">${saturated.length} flagged</span></h3>`;
-  html += '<p class="text-xs text-text-muted mb-3">High-spend creatives with excessive impressions-per-QL (audience seeing ads too often) — CPQL still ok but frequency is a leading indicator. Consider broadening audience or rotating creative.</p>';
-  if (saturated.length) {
-    html += '<div class="space-y-2">';
-    saturated.forEach(c => {
-      const freqRatio = c.ql > 0 ? Math.round(c.impressions/c.ql) : 0;
-      html += `<div class="bg-white border border-amber-100 rounded-xl p-4 flex items-center justify-between">
-        <div><p class="text-xs font-semibold">${c.name.length>50?c.name.substring(0,50)+'...':c.name}</p>
-        <div class="flex gap-2 mt-1">${Object.entries(c.tags).filter(([cat,val]) => GODFATHER_TAXONOMY.fields[cat] && val && val !== 'Unknown' && val !== 'N/A').slice(0,3).map(([cat,val]) => {const tc=TAG_COLORS[GODFATHER_TAXONOMY.getColor(cat)||'purple']; return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(val)}</span>`;}).join('')}</div></div>
-        <div class="text-right shrink-0 ml-4"><p class="text-xs font-bold text-accent-orange">${freqRatio.toLocaleString()} imp/QL</p><p class="text-[10px] text-text-muted">${formatCurrency(c.cpql)} CPQL | ${formatCurrency(c.spend)} spent</p></div></div>`;
-    });
-    html += '</div>';
-  } else html += '<p class="text-xs text-accent-green font-medium">No audience saturation signals detected.</p>';
-  html += '</div>';
-
-  // Overused tags
-  html += `<div><h3 class="text-sm font-bold mb-3 flex items-center gap-2"><svg class="w-4 h-4 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/></svg>Declining Tag Patterns <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-orange-light text-amber-700 font-semibold">${overused.length} patterns</span></h3>`;
-  html += '<p class="text-xs text-text-muted mb-3">Tags where high-spend creatives perform worse than low-spend ones — diminishing returns signal.</p>';
-  if (overused.length) {
-    html += '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden"><table class="w-full text-xs table-fixed"><thead><tr class="bg-surface-tertiary"><th class="text-left px-4 py-2.5 font-bold text-text-muted" style="width:22%">Tag</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">High-Spend CPQL</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Low-Spend CPQL</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Degradation</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Ads</th></tr></thead><tbody>';
-    overused.slice(0,10).forEach(t => {
-      const tc = TAG_COLORS[GODFATHER_TAXONOMY.getColor(t.cat)||'purple'];
-      html += `<tr class="border-b border-gray-50"><td class="px-4 py-2.5"><span class="text-[10px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${GODFATHER_TAXONOMY.getLabel(t.cat)}</span> <span class="font-semibold">${tagLabel(t.val)}</span></td>
-        <td class="px-3 py-2.5 text-right font-bold text-accent-red">${formatCurrency(t.topCPQL)}</td>
-        <td class="px-3 py-2.5 text-right font-bold text-accent-green">${formatCurrency(t.bottomCPQL)}</td>
-        <td class="px-3 py-2.5 text-right"><span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-red-light text-red-700 font-bold">+${Math.round(t.degradation)}%</span></td>
-        <td class="px-3 py-2.5 text-right text-text-muted">${t.creatives.length}</td></tr>`;
-    });
-    html += '</tbody></table></div>';
-  } else html += '<p class="text-xs text-accent-green font-medium">No declining patterns detected.</p>';
-  html += '</div>';
-  container.innerHTML = html;
-}
-
-// ---- Audience Map with Predictive CPTD ----
-function renderAudienceMap() {
-  const container = document.getElementById('ciAudienceContainer');
-  let data = [...getFilteredTaggerData('ciFilterCountry')];
-
-  const audienceMap = {};
-  data.forEach(c => {
-    const aud = c.tags?.campaign_audience;
-    if (!aud || aud === 'Unknown' || aud === 'N/A') return;
-    if (!audienceMap[aud]) audienceMap[aud] = [];
-    audienceMap[aud].push(c);
-  });
-
-  const audiences = Object.keys(audienceMap);
-  if (!audiences.length) { container.innerHTML = '<p class="text-sm text-text-muted py-8 text-center">No audience-tagged creatives found</p>'; return; }
-
-  function bestTag(creatives, cat, metric) {
-    const groups = {};
-    creatives.forEach(c => { const v = c.tags?.[cat]; if (v && v !== 'Unknown' && v !== 'N/A') { (groups[v] = groups[v] || []).push(c); } });
-    let best = null, bestVal = Infinity;
-    Object.entries(groups).forEach(([val, crs]) => {
-      const m = computeMetric(crs, metric);
-      if (m !== null && m < bestVal) { bestVal = m; best = val; }
-    });
-    return best;
-  }
-
-  const rows = audiences.map(aud => {
-    const crs = audienceMap[aud];
-    const avgCPTD = computeMetric(crs, 'cptd');
-    const avgCPQL = computeMetric(crs, 'cpql');
-    const bHook = bestTag(crs, 'hook', 'cptd');
-    const bFormat = bestTag(crs, 'content_format', 'cptd');
-    const bBenefit = bestTag(crs, 'pain_benefit', 'cptd');
-
-    const bestTags = [['hook', bHook], ['content_format', bFormat], ['pain_benefit', bBenefit]].filter(([,v]) => v);
-    const matching = data.filter(c => {
-      let hits = 0;
-      bestTags.forEach(([cat, val]) => { if (c.tags?.[cat] === val) hits++; });
-      return hits >= 2;
-    });
-    let predMin = null, predMax = null;
-    if (matching.length >= 3) {
-      const cptds = matching.map(c => computeMetric([c], 'cptd')).filter(v => v !== null).sort((a,b) => a - b);
-      if (cptds.length) { predMin = cptds[0]; predMax = cptds[cptds.length - 1]; }
-    }
-    return { aud, count: crs.length, avgCPTD, avgCPQL, bHook, bFormat, bBenefit, predMin, predMax };
-  }).filter(r => !(r.count < 3 && r.avgCPTD === null && r.bHook === null)).sort((a,b) => (a.avgCPTD ?? Infinity) - (b.avgCPTD ?? Infinity));
-
-  let html = '<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden"><table class="w-full text-xs table-fixed">';
-  html += '<thead><tr class="bg-surface-tertiary"><th class="text-left px-4 py-2.5 font-bold text-text-muted" style="width:16%">Audience</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Creatives</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Avg CPTD</th><th class="text-left px-3 py-2.5 font-bold text-text-muted">Best Hook</th><th class="text-left px-3 py-2.5 font-bold text-text-muted">Best Format</th><th class="text-left px-3 py-2.5 font-bold text-text-muted">Best Benefit</th><th class="text-right px-3 py-2.5 font-bold text-text-muted">Predicted CPTD Range</th></tr></thead><tbody>';
-  rows.forEach(r => {
-    const pred = r.predMin !== null ? `${formatCurrency(r.predMin)} – ${formatCurrency(r.predMax)}` : '<span class="text-text-muted">—</span>';
-    html += `<tr class="border-b border-gray-50">
-      <td class="px-4 py-2.5 font-semibold">${tagLabel(r.aud)}</td>
-      <td class="px-3 py-2.5 text-right text-text-muted">${r.count}</td>
-      <td class="px-3 py-2.5 text-right font-bold">${r.avgCPTD !== null ? formatCurrency(r.avgCPTD) : '—'}</td>
-      <td class="px-3 py-2.5">${r.bHook ? tagLabel(r.bHook) : '—'}</td>
-      <td class="px-3 py-2.5">${r.bFormat ? tagLabel(r.bFormat) : '—'}</td>
-      <td class="px-3 py-2.5">${r.bBenefit ? tagLabel(r.bBenefit) : '—'}</td>
-      <td class="px-3 py-2.5 text-right font-medium text-accent-purple">${pred}</td></tr>`;
-  });
-  html += '</tbody></table></div>';
-  html += '<p class="text-[10px] text-text-muted mt-2">Predicted CPTD: range of creatives matching at least 2 of the 3 best tags (hook + format + benefit) for each audience.</p>';
-
-  // Content Pipeline Gap Analysis (spec 02-lens: gap analysis, format mix, underserved audiences)
-  const formatMix = {};
-  const geoFormatMix = {};
-  data.forEach(c => {
-    const fmt = c.tags?.content_format;
-    if (fmt && fmt !== 'Unknown') { formatMix[fmt] = (formatMix[fmt] || 0) + 1; }
-    const geo = extractMarket(c);
-    if (geo !== 'Unknown' && fmt && fmt !== 'Unknown') {
-      if (!geoFormatMix[geo]) geoFormatMix[geo] = {};
-      geoFormatMix[geo][fmt] = (geoFormatMix[geo][fmt] || 0) + 1;
-    }
-  });
-  const totalCreatives = data.length;
-  const gaps = [];
-  // Detect underserved formats per geo
-  const CORE_FORMATS = ['Static image','Video','Influencer UGC','Testimonial video','Brand video'];
-  Object.entries(geoFormatMix).forEach(([geo, fmts]) => {
-    const geoTotal = Object.values(fmts).reduce((s,v) => s+v, 0);
-    CORE_FORMATS.forEach(fmt => {
-      if (!fmts[fmt] || fmts[fmt] < 2) gaps.push({ geo, type: 'content_format', detail: `${tagLabel(fmt)} (${fmts[fmt]||0} creatives)`, severity: 'high' });
-    });
-    // Detect audiences with no creatives in this geo
-    const geoCreatives = data.filter(c => extractMarket(c) === geo);
-    const geoAuds = new Set(geoCreatives.map(c => c.tags?.campaign_audience).filter(a => a && a !== 'Unknown'));
-    if (getFlowFilter() !== 'pla' && !geoAuds.has('NRI') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'No NRI-targeted creatives', severity: 'high' });
-    if (!geoAuds.has('Broad/Advantage+') && !geoAuds.has('General') && geoTotal > 5) gaps.push({ geo, type: 'audience', detail: 'Broad/General audience untapped', severity: 'medium' });
-  });
-  // Forge undeployed creatives
-  const forgeUndeployed = (state.generationHistory || []).filter(g => !g.status || g.status === 'draft').length;
-
-  html += '<div class="mt-5 bg-white rounded-2xl border border-gray-200/80 shadow-sm p-4">';
-  html += '<h4 class="text-sm font-bold mb-3 flex items-center gap-2"><svg class="w-4 h-4 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>Content Pipeline Intelligence</h4>';
-  // Format mix snapshot
-  html += '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">';
-  CORE_FORMATS.forEach(fmt => {
-    const cnt = formatMix[fmt] || 0;
-    const pct = totalCreatives ? Math.round((cnt / totalCreatives) * 100) : 0;
-    html += `<div class="bg-surface-tertiary rounded-xl px-3 py-2 text-center"><p class="text-[10px] text-text-muted">${tagLabel(fmt)}</p><p class="text-sm font-bold">${cnt} <span class="text-[10px] text-text-muted">(${pct}%)</span></p></div>`;
-  });
-  if (forgeUndeployed > 0) html += `<div class="bg-accent-purple-light rounded-xl px-3 py-2 text-center"><p class="text-[10px] text-accent-purple">Forge Undeployed</p><p class="text-sm font-bold text-accent-purple">${forgeUndeployed}</p></div>`;
-  html += '</div>';
-  // Gaps
-  if (gaps.length) {
-    html += '<p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Pipeline Gaps</p><div class="space-y-1.5">';
-    gaps.forEach(g => {
-      const sev = g.severity === 'high' ? 'bg-accent-red-light text-red-700' : 'bg-accent-orange-light text-amber-700';
-      html += `<div class="flex items-center gap-2 text-xs"><span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${sev}">${g.geo}</span><span class="font-medium">${g.detail}</span></div>`;
-    });
-    html += '</div>';
-  } else {
-    html += '<p class="text-xs text-accent-green font-medium">No major pipeline gaps detected.</p>';
-  }
-  html += '</div>';
-
-  container.innerHTML = html;
-}
-
-// ---- Inject Formula into System Prompt ----
 
 // ==================== LIBRARY ====================
 function saveToLibrary() {
@@ -19558,42 +18549,6 @@ function exportOracleXLSX() {
 }
 
 // ==================== INTEL EXPORT ====================
-function exportIntelXLSX() {
-  const data = getFilteredTaggerData('ciFilterCountry');
-  if (!data.length) { showToast('No data to export'); return; }
-  const wb = XLSX.utils.book_new();
-
-  const buildRow = (c) => ({
-    'Ad Name': c['Ad name'] || '',
-    'Campaign': c['Campaign name'] || '',
-    'Type': c['Creative type'] || '',
-    'Market': extractMarket(c),
-    'Spend': parseNumber(c['Spent'] || 0),
-    'QL': parseNumber(c['QL'] || 0),
-    'CPQL': parseNumber(c['CPQL'] || 0),
-    'TD': parseNumber(c['TD'] || 0),
-    'CPTD': parseNumber(c['CPTD'] || 0),
-    'Hook': c.tags?.hook || '',
-    'Frame': c.tags?.frame || '',
-    'Language': c.tags?.language || '',
-    'Format': c.tags?.content_format || ''
-  });
-
-  // Tab 1: All creatives with tags
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data.map(buildRow)), 'All Creatives');
-
-  // Tab 2: Top performers (by CPTD)
-  const withTD = data.filter(c => parseNumber(c['TD'] || 0) > 0).sort((a, b) => parseNumber(a['CPTD'] || 0) - parseNumber(b['CPTD'] || 0));
-  if (withTD.length) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(withTD.slice(0, 20).map(buildRow)), 'Top 20 by CPTD');
-
-  // Tab 3: Highest spend
-  const bySpend = [...data].sort((a, b) => parseNumber(b['Spent'] || 0) - parseNumber(a['Spent'] || 0));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bySpend.slice(0, 20).map(buildRow)), 'Top 20 by Spend');
-
-  XLSX.writeFile(wb, `intel-${Date.now()}.xlsx`);
-  showToast('Intel exported (3 tabs)');
-}
-
 // ==================== INFLUENCER EXPORT ====================
 function exportInfluencerXLSX() {
   const data = getGlobalFilteredTaggerData('influencerGeo');
@@ -21350,7 +20305,6 @@ async function runDiagnostic() {
   const viewTests = [
     { name: 'Oracle', fn: () => { renderRegionalCards(); renderOracleModules(); renderMetricTicker(); renderPipeline(); } },
     { name: 'Lens: Tag', fn: () => { showTaggerResults(); } },
-    { name: 'Lens: Intel', fn: () => { renderCreativeIntel(); } },
     { name: 'Influencer', fn: () => { renderInfluencerView(); } },
   ];
   for (const vt of viewTests) {
@@ -21359,7 +20313,7 @@ async function runDiagnostic() {
   }
 
   // 8. HTML structure — check view divs
-  const views = ['dashboard','generate','tagger','intel','library','settings','influencer'];
+  const views = ['dashboard','generate','tagger','library','settings','influencer'];
   views.forEach(v => {
     const el = document.getElementById('view-' + v);
     if (!el) { fail('HTML: view-' + v, 'Element not found'); return; }
