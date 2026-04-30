@@ -3577,6 +3577,8 @@ function init() {
       state.activeWinningFormula = computeWinningFormula(document.getElementById('briefMarket').value, getActivePill('audiencePills'));
       updateFormulaIndicator();
     }
+    // Recommended briefs are market-scoped — refresh when the user switches market.
+    if (typeof renderRecommendedBriefs === 'function') renderRecommendedBriefs();
   });
   // ICP pill change — hook into pill click
   document.getElementById('audiencePills').addEventListener('click', () => {
@@ -22586,11 +22588,24 @@ function _renderActionLogInner(el, log) {
 }
 
 // ==================== RECOMMENDED BRIEFS (Create/Forge view) ====================
+// Per-market filter + winner gates so combos can't ride India-cheap CPTDs into the US form.
 function computeRecommendedBriefs() {
   if (!state.taggerData || state.taggerData.length < 10) return [];
-  const tagged = state.taggerData.filter(c => c.tags && parseNumber(c['Spent']||c['spent']||0) >= 5000);
+  const market = (document.getElementById('briefMarket')?.value || 'US').trim() || 'US';
+  const th = SENTINEL_THRESHOLDS[market] || SENTINEL_THRESHOLDS['US'];
+  const cptdGreen = th.cptd?.green || 35000;
+  const cptdAmber = th.cptd?.amber || 50000;
+  // CPTD below this is almost always TD attribution leaking from another campaign
+  // via ad-name match — reject as data-quality, not a real win.
+  const cptdFloor = cptdGreen / 3;
+
+  const tagged = state.taggerData.filter(c => {
+    if (!c.tags) return false;
+    if (parseNumber(c['Spent']||c['spent']||0) < 5000) return false;
+    return extractMarket(c) === market;
+  });
   if (tagged.length < 5) return [];
-  // Group by audience + hook, rank by CPTD
+
   const combos = {};
   tagged.forEach(c => {
     const aud = c.tags.campaign_audience || 'Unknown';
@@ -22603,9 +22618,17 @@ function computeRecommendedBriefs() {
     combos[key].ql += parseNumber(c['QL']||c['ql']||0);
     combos[key].count++;
   });
+
   return Object.values(combos)
-    .filter(c => c.td >= 2 && c.count >= 2)
-    .map(c => { c.cptd = c.spend / c.td; return c; })
+    .map(c => { c.cptd = c.td > 0 ? c.spend / c.td : Infinity; return c; })
+    .filter(c => {
+      if (c.count < 3) return false;             // need 3+ ads to call a pattern
+      if (c.td < 5) return false;                // need 5+ trials, not 2
+      if (c.ql < c.td * 2.5) return false;       // QL ≥ TD × 2.5 (max 40% conv) — catches attribution leaks
+      if (c.cptd < cptdFloor) return false;      // implausibly cheap → data error, skip
+      if (c.cptd > cptdAmber) return false;      // above amber → not a winner for this market
+      return true;
+    })
     .sort((a, b) => a.cptd - b.cptd)
     .slice(0, 3);
 }

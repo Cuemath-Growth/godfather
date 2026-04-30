@@ -4,6 +4,48 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Recommended Briefs: market filter + winner gates (2026-04-30)
+
+### The bug
+Create form set to **US** showed "HNI (BAU) + Authority — ₹412 CPTD" across 2
+ads / 71 TDs / ₹29.2K spend. ₹412 is below even India's ₹3K green floor, and
+HNI (BAU) is an India-targeting audience (line 13421). The combo was sorting
+to the top because TDs from India ads were being averaged into US's bucket.
+
+### Root cause (`computeRecommendedBriefs`, line ~22580)
+1. **No market filter** — function pooled `state.taggerData` across US/India/
+   AUS/etc. The Create form's `briefMarket` dropdown was ignored.
+2. **TD floor too low** — `td >= 2 && count >= 2` let any 2-ad cluster with 2
+   trials surface as a "winning pattern."
+3. **No CPTD sanity floor** — implausibly cheap CPTDs from ad-name match
+   leaks (TDs from a different campaign attributed to a similar-named ad)
+   sorted to the top because they minimize CPTD.
+4. **No conversion sanity** — combos with `ql < td * 2.5` (>40% conv) were
+   accepted, the same clamp/attribution artifact `_classifyWinner` already
+   rejects elsewhere.
+
+### Fix
+- Read `briefMarket` selection; filter `state.taggerData` to that market via
+  `extractMarket(c)`.
+- Pull per-market thresholds from `SENTINEL_THRESHOLDS[market]`.
+- Combo gates now match the winner-classification rules used elsewhere:
+  - `count >= 3` (was 2)
+  - `td >= 5` (was 2)
+  - `ql >= td * 2.5` (max 40% conv)
+  - `cptd >= cptdGreen / 3` — implausibly cheap → data error, skip
+  - `cptd <= cptdAmber` — above amber → not a winner for this market
+- Wired `renderRecommendedBriefs()` into the `briefMarket` change handler so
+  switching markets refreshes the cards.
+
+### Verification
+- `node` syntax check on inline `<script>` blocks: 3 scanned, 0 errors.
+- `npm run build` clean.
+- Functional check pending in browser: with US selected, no India-cheap
+  combos should surface; with India selected, surviving combos should
+  cluster around ₹2-5K CPTD per market thresholds.
+
+---
+
 ## Standardise v3 — single pill row, no version language (2026-04-30)
 
 ### Why this shipped
