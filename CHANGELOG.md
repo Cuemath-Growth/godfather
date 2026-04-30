@@ -4,6 +4,68 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Stream 1: Kill Performance tab (2026-05-01)
+
+### Why this shipped
+Per the May 1 existential-crisis review: Performance tab was redundant. Funnel
+diagnostic = Pause Now's "Dead Funnel" signal. Per-ad drill-down = Tagger Grid
+card-click. Nothing unique survived the audit. Deleted to reduce surface count
+from 8 nav items to 7.
+
+### Changes (`index.html`, no other files)
+- Sidebar: removed `data-view="leads"` nav button (4 lines)
+- Removed `view-leads` div (~187 lines, lines 1595-1781) — entire Sentinel UI
+  including geo/format selectors, KPI grid, narrative box, Top-5 / Bottom-5
+  tables, Anomalies panel, Sentinel table with campaign/adset/ad levels,
+  Day-by-Day table
+- `navigateTo()` titles + subs maps: removed `leads` keys
+- `navigateTo()` view-render switch: removed the `if (view === 'leads')` block
+  that fired `runSentinelView()` + `renderDayByDay()`
+- `navigateTo()` filter-bar visibility: removed `view === 'leads'` from the
+  hide-bar condition
+- `onGlobalFilterChange()`: removed `else if (activeView === 'leads')` branch
+- `invalidateAdPerfCache` post-edit hook: removed
+  `if (state.currentView === 'leads')` re-render trigger
+- `runDiagnostic()` viewTests array: removed `Sentinel` entry
+- `runDiagnostic()` views array: removed `'leads'` from the structural check list
+- Deleted functions (no longer referenced anywhere):
+  - `renderDayByDay()` — 82 lines
+  - `runSentinelView()` + `_runSentinelViewInner()` — 95 lines
+  - `clearSentinelCache()` — 12 lines
+  - `renderSentinelKPIs()` — 124 lines
+  - `renderSentinelNarrative()` — 156 lines
+  - `renderSentinelAnomalies()` — 7 lines
+  - `renderSentinelTop5()` — 55 lines
+  - `renderSentinelTable()` — 217 lines
+  - `toggleSentinelGroup()` — 9 lines
+  - `exportSentinelCSV()` — 64 lines
+  - `setSentinelViewLevel()` — 9 lines
+- **Total: ~1,000 lines removed.**
+
+### NOT touched (deliberately)
+- `SENTINEL_THRESHOLDS` constant — used app-wide for per-market threshold
+  tables (chassis verdicts, Tagger, Pause Now). KEPT.
+- `_sentTh` alias — same. KEPT.
+- Cosmetic leftovers in `runDiagnostic` referencing `sentinelGeo` element
+  (3 lines around L3516-3520) — harmless when element doesn't exist
+  (`getElementById('sentinelGeo')?.value || 'all'`). Optional cleanup later.
+
+### Verification
+- All 8 inline `<script>` blocks parse cleanly via `new Function()` after
+  every step (parse-checked 4 times during deletion sequence)
+- 8 view divs remaining (was 9), all at indent=6 — confirmed siblings, no
+  nesting via grep
+- Grep for `view-leads|runSentinelView|renderDayByDay|setSentinelViewLevel|
+  renderSentinel`: 0 matches in source
+- `npm run build` clean
+
+### What did NOT ship
+- Any Insights changes — Stream 2 (next)
+- Any chassis verdict merges — Stream 3
+- Any Create / Library work — Streams 4, 5
+
+---
+
 ## Recommended Briefs: market filter + winner gates (2026-04-30)
 
 ### The bug
