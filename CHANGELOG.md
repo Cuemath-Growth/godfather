@@ -4,6 +4,55 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Standardise v3 — single pill row, no version language (2026-04-30)
+
+### Why this shipped
+Earlier today's commit (`38a8bff`) shipped v3 as a second pill row + "v3" badges
+in tooltips, card headers, and the Lens panel. Content team flagged this as
+confusing — "two hooks on the screen, old and new" — because the team thinks in
+"hook / theme / close / pain," not in tag-pipeline versions.
+
+### Standardisation rule
+v3 is the authoritative source for fields it covers; v2 fills the rest. No
+version language surfaces anywhere in the UI. Provenance lives in tooltips only
+(`source` + `confidence`).
+
+| User-facing label | Source | Field on row |
+|---|---|---|
+| Hook   | v3 if present, else v2 | `hook_frame` → `hook` |
+| Pain   | v3 if present, else v2 | `pain_target` → `pain_benefit` |
+| Theme  | v3 only (net-new)      | `master_frame` |
+| Close  | v3 only (net-new)      | `close_type` |
+| Specificity | v3 only (net-new) | `specificity` |
+| Format · Production · Audience | v2 | unchanged |
+
+### Changes (`index.html`)
+- **`getV3InlinePills(adName)`** replaces `_renderV3Pills`. Returns `{ overrides, html }`
+  so the caller can inline pills into the v2 row + skip v2 cats v3 has overridden.
+- **`renderTaggerAdRow`**: builds a single pill row. v2 `hook` / `pain_benefit` are
+  filtered out of `catsToShow` when v3 produced an override pill. Tag-cell HTML
+  no longer has the dashed-teal separator or "v3" badge.
+- **`_v3InsightCards(data)`** replaces `_renderV3InsightsHTML`. Returns
+  `{ hookHtml, painHtml, themeHtml, closeHtml }` so callers can dedupe vs v2.
+- **`_renderV3FrameInsight`** card label drops the trailing `<span>v3</span>`.
+  Tooltip becomes "Verified from ad copy + scripts".
+- **`renderTaggerInsights`**: computes v3 cards first; v2 hook/pain_benefit are
+  suppressed when their v3 counterparts emit a card. Render order: v2 cards
+  (excluding suppressed), then v3 hook/pain (replacements), then v3 theme/close
+  (net-new). User sees one Hook card, one Pain card.
+- **`renderWinningByAudience`**: panel renamed "Frame Performance" (was
+  "Content-verified Frames v3"); subtitle reads "CPTD by hook, theme, close and
+  pain — verified from ad copy + scripts". No v3 markers.
+
+### Verification
+- `node` syntax check on inline `<script>` blocks: 3 scanned, 0 errors.
+- Old helpers fully removed from index.html (`_renderV3Pills`, `_V3_PILL_FIELDS`,
+  `_renderV3InsightsHTML`, "Content-verified Frames" string — all 0 hits).
+- New helpers present once each.
+- `npm run build` clean.
+
+---
+
 ## Wire creative_tags_v3 into Tagger + Insights (2026-04-30)
 
 ### Why this shipped

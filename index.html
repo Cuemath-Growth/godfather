@@ -14490,28 +14490,37 @@ function getV3Tags(adName) {
   return state._tagsV3Map[adName] || state._tagsV3Map[String(adName).toLowerCase()] || null;
 }
 
-const _V3_PILL_FIELDS = [
-  ['hook_frame', 'teal'],
-  ['master_frame', 'indigo'],
-  ['close_type', 'blue'],
-  ['specificity', 'pink'],
-  ['pain_target', 'amber']
+// Content-verified frames map onto user-facing categories. Where they overlap a v2
+// category (hook → hook_frame, pain_benefit → pain_target), v3 wins and the v2 pill is suppressed.
+// master_frame, close_type, specificity have no v2 equivalent.
+const _V3_FIELD_MAP = [
+  { f: 'hook_frame',   label: 'Hook',        color: 'purple', overrides: 'hook' },
+  { f: 'master_frame', label: 'Theme',       color: 'indigo', overrides: null },
+  { f: 'pain_target',  label: 'Pain',        color: 'red',    overrides: 'pain_benefit' },
+  { f: 'close_type',   label: 'Close',       color: 'orange', overrides: null },
+  { f: 'specificity',  label: 'Specificity', color: 'pink',   overrides: null }
 ];
 
-function _renderV3Pills(adName) {
+// Returns { overrides:Set, html:string } so the caller can inline pills + skip
+// v2 cats that v3 has already authoritatively tagged. No "v3" badge surfaces — the
+// version is in the tooltip via `source` + `confidence` only.
+function getV3InlinePills(adName) {
   const v = getV3Tags(adName);
-  if (!v) return '';
-  const pills = _V3_PILL_FIELDS.map(([f, color]) => {
-    const val = v[f];
-    if (!val || val === 'Unclear' || val === 'Unknown' || val === 'null') return '';
-    const tc = TAG_COLORS[color] || TAG_COLORS.teal;
-    const display = String(val).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2).join(', ');
-    if (!display) return '';
-    const title = `${f.replace('_',' ')} · v3 · ${v.confidence||'?'} · ${v.source||'?'}`;
-    return `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium" title="${title}">${display}</span>`;
-  }).filter(Boolean);
-  if (!pills.length) return '';
-  return `<div class="flex flex-wrap gap-0.5 items-center mt-1 pt-1 border-t border-dashed border-teal-200" title="Content-verified frames (creative_tags_v3)"><span class="text-[7px] font-bold text-accent-teal mr-1">v3</span>${pills.join('')}</div>`;
+  if (!v) return { overrides: new Set(), html: '' };
+  const overrides = new Set();
+  const parts = [];
+  _V3_FIELD_MAP.forEach(({ f, label, color, overrides: ov }) => {
+    const raw = v[f];
+    if (!raw || raw === 'Unclear' || raw === 'Unknown' || raw === 'null') return;
+    const display = String(raw).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2).join(', ');
+    if (!display) return;
+    if (ov) overrides.add(ov);
+    const tc = TAG_COLORS[color] || TAG_COLORS.purple;
+    const src = v.source ? String(v.source).replace(/^v3-/, '') : '';
+    const title = (`${label}: ${display}` + (src ? ` · verified from ${src}` : '') + (v.confidence ? ` · ${v.confidence}` : '')).replace(/"/g,'&quot;');
+    parts.push(`<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5" title="${title}">${display}</span>`);
+  });
+  return { overrides, html: parts.join('') };
 }
 
 // CPTD comparison cards by a v3 field. Used by Tagger Insights + Lens "What's Working".
@@ -14548,7 +14557,7 @@ function _renderV3FrameInsight(data, fieldKey, label, color) {
   const savings = ratio >= 2 ? (Math.round(ratio*10)/10) + 'x cheaper' : Math.round((1 - best[1].cptd/worst[1].cptd) * 100) + '% cheaper';
   return `<div class="bg-white border border-gray-200/80 rounded-xl p-4 insight-card shadow-sm">
     <div class="flex items-center justify-between mb-3">
-      <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${tc.bg} ${tc.text}" title="Content-verified frame from creative_tags_v3">${label} <span class="opacity-60 ml-1">v3</span></span>
+      <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${tc.bg} ${tc.text}" title="Verified from ad copy + scripts">${label}</span>
       <span class="text-[10px] font-bold gradient-text">${savings}</span>
     </div>
     <div class="space-y-2">
@@ -14571,13 +14580,16 @@ function _renderV3FrameInsight(data, fieldKey, label, color) {
   </div>`;
 }
 
-function _renderV3InsightsHTML(data) {
-  if (!data || !data.length) return '';
-  return [
-    _renderV3FrameInsight(data, 'hook_frame', 'Hook frame', 'teal'),
-    _renderV3FrameInsight(data, 'master_frame', 'Master frame', 'indigo'),
-    _renderV3FrameInsight(data, 'close_type', 'Close type', 'blue')
-  ].filter(Boolean).join('');
+// Returns { hookHtml, painHtml, themeHtml, closeHtml } so renderTaggerInsights can
+// suppress the v2 hook/pain cards when v3 has authoritative cards for those fields.
+function _v3InsightCards(data) {
+  if (!data || !data.length) return { hookHtml: '', painHtml: '', themeHtml: '', closeHtml: '' };
+  return {
+    hookHtml:  _renderV3FrameInsight(data, 'hook_frame',   'Hook',  'purple'),
+    painHtml:  _renderV3FrameInsight(data, 'pain_target',  'Pain',  'red'),
+    themeHtml: _renderV3FrameInsight(data, 'master_frame', 'Theme', 'indigo'),
+    closeHtml: _renderV3FrameInsight(data, 'close_type',   'Close', 'orange')
+  };
 }
 
 // Extract date from campaign/ad name suffix _DDMMYY → YYYY-MM-DD
@@ -15638,11 +15650,18 @@ function renderTaggerInsights() {
   const filteredData = getFilteredTaggerData();
   if (!filteredData.length) return;
 
+  // v3 first — content-verified frames win for Hook + Pain when they have signal.
+  // Suppress the v2 hook/pain_benefit cards in those cases so the user sees one Hook card, not two.
+  const v3Cards = _v3InsightCards(filteredData);
+  const v2Skip = new Set();
+  if (v3Cards.hookHtml) v2Skip.add('hook');
+  if (v3Cards.painHtml) v2Skip.add('pain_benefit');
+
   // Find best/worst performing tags per category (CPTD primary, CPQL fallback)
   const insights = [];
   // emotional_tone excluded (decision #4: too subjective, never primary grouping)
   // language excluded (audience-specific — "avoid Gujarati" without context is misleading)
-  ['hook','content_format','pain_benefit'].forEach(cat => {
+  ['hook','content_format','pain_benefit'].filter(cat => !v2Skip.has(cat)).forEach(cat => {
     const catInfo = GODFATHER_TAXONOMY.fields[cat];
     if (!catInfo) return;
     const tagPerf = {};
@@ -15721,9 +15740,8 @@ function renderTaggerInsights() {
     </div>`;
   });
 
-  // Content-verified frames (creative_tags_v3) — appended only when v3 data joins to filtered ads.
-  const v3Html = _renderV3InsightsHTML(filteredData);
-  if (v3Html) container.innerHTML += v3Html;
+  // Append v3 cards: Hook + Pain (replacing v2) and net-new Theme + Close.
+  container.innerHTML += [v3Cards.hookHtml, v3Cards.painHtml, v3Cards.themeHtml, v3Cards.closeHtml].filter(Boolean).join('');
 }
 
 // ==================== CREATIVE REVIEW (Landing View) ====================
@@ -16629,10 +16647,14 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
   const vStyles = { green: 'bg-green-50 text-green-700 border-green-200', amber: 'bg-amber-50 text-amber-700 border-amber-200', red: 'bg-red-50 text-red-700 border-red-200', gray: 'bg-gray-50 text-gray-500 border-gray-200' };
   const verdictBorder = v.color === 'green' ? 'border-l-green-500' : v.color === 'amber' ? 'border-l-amber-400' : v.color === 'red' ? 'border-l-red-500' : 'border-l-gray-200';
 
-  // Tags — show top 5 fields + confidence badge
+  // Tags — single pill row. v3 takes authority for hook (→ hook_frame) and pain_benefit
+  // (→ pain_target); master_frame, close_type, specificity are net-new pills. Whatever v2
+  // doesn't cover from `catsToShow` falls through.
   let tagHtml = '';
   const isAllFilter = (catFilter || 'all') === 'all';
-  const catsToShow = isAllFilter ? ['hook','pain_benefit','content_format','production_style','campaign_audience'] : [catFilter];
+  const v3Inline = isAllFilter ? getV3InlinePills(name) : { overrides: new Set(), html: '' };
+  const catsToShow = (isAllFilter ? ['hook','pain_benefit','content_format','production_style','campaign_audience'] : [catFilter])
+    .filter(cat => !v3Inline.overrides.has(cat));
   let tagCount = 0;
   let totalTags = 0;
   catsToShow.forEach(cat => {
@@ -16646,6 +16668,8 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
     const pillTitle = _tagPillTitle(baseCat, val).replace(/"/g,'&quot;');
     tagHtml += `<span class="inline-block text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium mr-0.5 mb-0.5" title="${pillTitle}">${tagLabel(val)}</span>`;
   });
+  // Append v3 pills inline (same row, same visual weight, no version badge).
+  if (v3Inline.html) { tagHtml += v3Inline.html; tagCount++; }
   // Count remaining valid tags beyond the 5 shown
   if (isAllFilter) {
     const allValidTags = GODFATHER_TAXONOMY.allFields.filter(f => tags[f] && tags[f] !== 'Unknown' && tags[f] !== 'null' && tags[f] !== 'N/A').length;
@@ -16729,10 +16753,7 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
       return `<td class="px-2 py-2 text-right font-bold text-[11px]">${_cptql > 0 ? `<span class="${_cls}" title="${_tql} TQL \u00b7 spend ${formatCurrency(spend)}">${formatCurrency(_cptql)}</span>` : '<span class="text-text-muted">\u2014</span>'}</td>`;
     })()}
     <td class="px-2 py-2 text-right font-bold text-[11px]">${cptd_val > 0 ? `<span class="${cptd_val <= (mktThresholds.cptd?.green||35000) ? 'text-accent-green' : cptd_val <= (mktThresholds.cptd?.amber||50000) ? 'text-accent-orange' : 'text-accent-red'}">${formatCurrency(cptd_val)}</span>${_cptdArrow}` : '<span class="text-text-muted">\u2014</span>'}</td>
-    <td class="px-2 py-2">
-      <div class="flex flex-wrap gap-0.5 max-h-[2.5rem] overflow-hidden">${tagHtml || '<span class="text-text-muted text-[9px]">\u2014</span>'}</div>
-      ${_renderV3Pills(name)}
-    </td>
+    <td class="px-2 py-2"><div class="flex flex-wrap gap-0.5 max-h-[2.5rem] overflow-hidden">${tagHtml || '<span class="text-text-muted text-[9px]">\u2014</span>'}</div></td>
   </tr>`;
 }
 
@@ -18386,15 +18407,16 @@ function renderWinningByAudience() {
 
   let html = '';
 
-  // ── Content-verified frames (creative_tags_v3) ──
-  const _v3Cards = _renderV3InsightsHTML(data);
-  if (_v3Cards) {
+  // ── Frame Performance — Hook / Theme / Close / Pain by CPTD ──
+  const _v3Cards = _v3InsightCards(data);
+  const _v3Joined = [_v3Cards.hookHtml, _v3Cards.themeHtml, _v3Cards.closeHtml, _v3Cards.painHtml].filter(Boolean).join('');
+  if (_v3Joined) {
     html += `<div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-6">
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-base font-bold">Content-verified Frames <span class="text-[10px] font-bold text-accent-teal align-middle ml-1">v3</span></h3>
-        <span class="text-[10px] text-text-muted">CPTD by hook · master · close frame, joined to creative_tags_v3</span>
+        <h3 class="text-base font-bold">Frame Performance</h3>
+        <span class="text-[10px] text-text-muted">CPTD by hook, theme, close and pain — verified from ad copy + scripts</span>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${_v3Cards}</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">${_v3Joined}</div>
     </div>`;
   }
 
