@@ -3364,8 +3364,21 @@ function init() {
         registerMetaPauseVerdicts(ci);
         // Make More verdict migrations (Tier 1, Tier 2, Refresh-was-winner).
         if (typeof registerMetaScaleVerdicts === 'function') registerMetaScaleVerdicts(ci);
-        const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
-        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced · Supabase wired`);
+        // Defer detection to a background tick — it takes ~10s and shouldn't block
+        // the boot spinner. AQ nav badge updates when detection completes;
+        // renderActionQueueView re-runs detection when the tab opens.
+        setTimeout(() => {
+          try {
+            const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
+            if (typeof _updateActionQueueNavBadge === 'function') {
+              _updateActionQueueNavBadge(result.stats.surfaced);
+            }
+            console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
+          } catch (e) {
+            console.error('[chassis] background detection failed:', e);
+          }
+        }, 100);
+        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · Supabase wired (detection deferred 100ms)`);
       } else {
         console.warn('[chassis] cuemathIntelligence not loaded — shared/cuemath-intelligence.js missing or failed to parse');
       }
