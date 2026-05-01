@@ -7337,15 +7337,58 @@ function _renderActionQueueCard(rec) {
     ? `<div class="text-xs text-text-secondary mt-1"><strong class="text-text-primary">Why now:</strong> ${_escapeHtml(rec.why_now)}</div>`
     : '';
 
+  // Lead with ad identity (thumb + name + audience pill) so the user can match
+  // these cards against the Dashboard's old Pause Now / Make More cards during
+  // the parity audit. Verdict metric (rec.signal) becomes a subline.
+  const adName = String(rec.entity_id || '');
+  const thumbHtml = (typeof _oracleThumbnail === 'function')
+    ? _oracleThumbnail(adName)
+    : '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
+  const adNameDisplay = (typeof shortAdName === 'function') ? shortAdName(adName) : adName;
+  // Pull audience + format from tagger data if available — same parity hooks the
+  // Dashboard uses.
+  let audienceLabel = '';
+  let formatLabel = '';
+  if (Array.isArray(state.taggerData) && state.taggerData.length && adName) {
+    const norm = (typeof normalizeAdName === 'function') ? normalizeAdName(adName) : adName;
+    const match = state.taggerData.find(c => {
+      const n = (typeof normalizeAdName === 'function') ? normalizeAdName(c['Ad name'] || c['ad name'] || '') : (c['Ad name'] || c['ad name'] || '');
+      return n === norm;
+    });
+    if (match) {
+      const aud = match.tags?.campaign_audience;
+      if (aud && aud !== 'Unknown' && aud !== 'N/A') audienceLabel = String(aud);
+      const fmt = match.tags?.content_format || match['Creative type'];
+      if (fmt && fmt !== 'Unknown') formatLabel = String(fmt);
+    }
+  }
+  const audPill = audienceLabel
+    ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold">${_escapeHtml(audienceLabel)}</span>`
+    : '';
+  const fmtPill = formatLabel
+    ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">${_escapeHtml(formatLabel)}</span>`
+    : '';
+
   return `
     <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+      <div class="flex items-start gap-3 mb-3">
+        ${thumbHtml}
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-bold text-text-primary truncate" title="${_escapeHtml(adName)}">${_escapeHtml(adNameDisplay)}</p>
+          <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">${_escapeHtml(rec.market || '?')}</span>
+            ${audPill}
+            ${fmtPill}
+            <code class="text-[9px] text-text-muted ml-auto">${_escapeHtml(rec.verdict_id)}</code>
+          </div>
+        </div>
+      </div>
       <div class="flex items-center gap-2 mb-2 flex-wrap">
         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${sevBgClass}">${sevDot} ${sevLabel}</span>
         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${confClass}">${rec.confidence || '?'}</span>
         <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${effortClass}">${effortLabel || '?'}</span>
-        <span class="text-[10px] text-text-muted ml-auto">${_escapeHtml(rec.market || '?')} · <code class="text-[9px]">${_escapeHtml(rec.verdict_id)}</code></span>
       </div>
-      <div class="font-semibold text-sm text-text-primary mb-1">${_escapeHtml(rec.signal || '(no signal text)')}</div>
+      <div class="text-xs font-semibold text-text-primary mb-1">${_escapeHtml(rec.signal || '(no signal text)')}</div>
       ${rec.why ? `<div class="text-xs text-text-secondary"><strong class="text-text-primary">Why:</strong> ${_escapeHtml(rec.why)}</div>` : ''}
       ${whyNowLine}
       ${guardrailsLine}
