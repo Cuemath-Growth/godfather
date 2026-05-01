@@ -346,6 +346,26 @@
             <div id="oraclePauseList" class="mt-2"></div>
           </details>
 
+          <!-- Section 1.5: REFRESH (was-a-winner now fatiguing — don't kill, refresh) -->
+          <details class="mb-6 oracle-accordion" id="oracleRefresh">
+            <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+              <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <div class="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></div>
+              <h3 class="text-sm font-bold">Refresh</h3>
+              <span class="text-[10px] text-blue-500 font-medium hidden sm:inline">Proven winners showing fatigue — refresh visual, keep audience</span>
+              <span id="refreshBadge" class="text-[10px] text-blue-700 font-bold px-1.5 py-0.5 rounded bg-blue-50"></span>
+              <div class="ml-auto relative" onclick="event.stopPropagation()">
+                <button onclick="event.preventDefault();this.nextElementSibling.classList.toggle('hidden')" class="text-text-muted hover:text-text-primary p-1 rounded-lg hover:bg-surface-tertiary"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg></button>
+                <div class="hidden absolute right-0 top-8 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 z-20 min-w-[160px]" onclick="this.classList.add('hidden')">
+                  <button onclick="oracleBulkAction('pause','done')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Mark all done</button>
+                  <button onclick="oracleBulkAction('pause','dismissed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Dismiss all</button>
+                  <button onclick="oracleBulkAction('pause','snoozed')" class="w-full text-left px-3 py-1.5 text-[11px] hover:bg-surface-tertiary">Snooze all 7d</button>
+                </div>
+              </div>
+            </summary>
+            <div id="oracleRefreshList" class="mt-2"></div>
+          </details>
+
           <!-- Action Log -->
           <div class="mb-6">
             <div class="flex items-center gap-2 mb-3">
@@ -9404,46 +9424,56 @@ function renderOracleCardsV2() {
     pauseAds = pauseAds.slice(0, 10);
   }
 
-  const visiblePause = pauseAds.filter(a => isItemVisible('pause:' + a.name));
-  const badge = document.getElementById('pauseNowBadge');
-  if (badge) badge.textContent = visiblePause.length > 0 ? `${visiblePause.length} ads flagged` : '';
+  const visibleAll = pauseAds.filter(a => isItemVisible('pause:' + a.name));
+  // Split into Pause (loser signals) and Refresh (was-a-winner) so each gets its own
+  // section on Dashboard. Same data + feedback loop, just visually separated.
+  const visiblePause = visibleAll.filter(a => a._type !== 'refresh');
+  const visibleRefresh = visibleAll.filter(a => a._type === 'refresh');
 
+  const pauseBadge = document.getElementById('pauseNowBadge');
+  if (pauseBadge) pauseBadge.textContent = visiblePause.length > 0 ? `${visiblePause.length} ads flagged` : '';
+  const refreshBadge = document.getElementById('refreshBadge');
+  if (refreshBadge) refreshBadge.textContent = visibleRefresh.length > 0 ? `${visibleRefresh.length} winners fatiguing` : '';
+
+  // Card builder shared by Pause + Refresh sections.
+  const _buildPauseCardHtml = (a, idx) => {
+    const itemId = 'pause:' + a.name;
+    const action = getOracleAction(itemId);
+    const isDone = action?.status === 'done';
+    const opacity = isDone ? 'opacity-50' : '';
+    const isTopOffender = idx === 0 && !isDone;
+    const isFatigue = a._type === 'fatigue';
+    const isRefresh = a._type === 'refresh';
+    const isBurn = a._type === 'burn';
+    const isUrgent = (isFatigue && a._priority === 0) || isBurn;
+    const isWarn = a._type === 'audience' || a._type === 'funnel' || a._type === 'spam' || isRefresh;
+    const cardBg = isRefresh ? 'bg-blue-50 border-blue-200' : (isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200');
+    const metricColor = isRefresh ? 'text-blue-700' : (isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted');
+    const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED', refresh: 'REFRESH · was a winner' }[a._type] || '';
+    let displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
+    if (/^\d{10,}/.test(displayName)) displayName = a.campaignContext || a.adName?.slice(0, 40) || displayName;
+    const campCtx = a.campaignContext || '';
+    const geoTag = a.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
+    const thumbHtml = _oracleThumbnail(a.name);
+    return `<div class="p-4 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
+      <div class="flex items-center gap-3">
+        ${thumbHtml}
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isRefresh ? 'bg-blue-100 text-blue-700' : isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
+          ${campCtx ? `<p class="text-[11px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
+          <p class="text-xs ${metricColor} mt-0.5">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
+          ${a._why ? `<p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : ''}
+          ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
+        </div>
+      </div>
+      ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
+    </div>`;
+  };
+
+  // Pause section (loser signals: burn, costly, wrong audience, funnel, spam, fatigued loser)
   if (visiblePause.length) {
     let html = '<div class="space-y-2">';
-    visiblePause.forEach((a, idx) => {
-      const itemId = 'pause:' + a.name;
-      const action = getOracleAction(itemId);
-      const isDone = action?.status === 'done';
-      const opacity = isDone ? 'opacity-50' : '';
-      const isTopOffender = idx === 0 && !isDone;
-      const isFatigue = a._type === 'fatigue';
-      const isRefresh = a._type === 'refresh';
-      const isBurn = a._type === 'burn';
-      const isUrgent = (isFatigue && a._priority === 0) || isBurn;
-      const isWarn = a._type === 'audience' || a._type === 'funnel' || a._type === 'spam' || isRefresh;
-      const cardBg = isRefresh ? 'bg-blue-50 border-blue-200' : (isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200');
-      const metricColor = isRefresh ? 'text-blue-700' : (isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted');
-      const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED', refresh: 'REFRESH · was a winner' }[a._type] || '';
-      // Fix numeric ad IDs: if displayName is all digits (>15 chars), fall back to campaign or adset
-      let displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
-      if (/^\d{10,}/.test(displayName)) displayName = a.campaignContext || a.adName?.slice(0, 40) || displayName;
-      const campCtx = a.campaignContext || '';
-      const geoTag = a.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
-      const thumbHtml = _oracleThumbnail(a.name);
-      html += `<div class="p-4 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
-        <div class="flex items-center gap-3">
-          ${thumbHtml}
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isRefresh ? 'bg-blue-100 text-blue-700' : isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
-            ${campCtx ? `<p class="text-[11px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
-            <p class="text-xs ${metricColor} mt-0.5">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
-            ${a._why ? `<p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : ''}
-            ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
-          </div>
-        </div>
-        ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
-      </div>`;
-    });
+    visiblePause.forEach((a, idx) => { html += _buildPauseCardHtml(a, idx); });
     const actionable = visiblePause.filter(a => !getOracleAction('pause:' + a.name)?.status && a.spend);
     const totalWaste = actionable.reduce((s, a) => s + (a.spend || 0), 0);
     const signalCounts = {};
@@ -9454,6 +9484,19 @@ function renderOracleCardsV2() {
     pauseList.innerHTML = html;
   } else {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 90 days).</p>';
+  }
+
+  // Refresh section (was-a-winner now fatiguing — refresh, don't kill)
+  const refreshList = document.getElementById('oracleRefreshList');
+  if (refreshList) {
+    if (visibleRefresh.length) {
+      let html = '<div class="space-y-2">';
+      visibleRefresh.forEach((a, idx) => { html += _buildPauseCardHtml(a, idx); });
+      html += '</div>';
+      refreshList.innerHTML = html;
+    } else {
+      refreshList.innerHTML = '<p class="text-xs text-text-muted py-3">No proven winners showing fatigue.</p>';
+    }
   }
 
   // ── MAKE MORE: ad-level winners with audience-adjacency suggestions ──
