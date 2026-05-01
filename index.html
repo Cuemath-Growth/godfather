@@ -748,28 +748,6 @@
               <input id="briefOffer" type="text" placeholder="e.g., Free trial, Summer camp..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 focus:border-accent-purple" />
             </div>
 
-            <!-- Output Mode -->
-            <div class="mb-4">
-              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Output</label>
-              <div class="flex gap-1.5" id="outputModePills" style="display:none!important">
-                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs flex items-center gap-1" data-value="text" onclick="setOutputMode(this)">
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
-                  Copy Only
-                </button>
-              </div>
-            </div>
-
-            <!-- Aspect Ratio (shown for image/both modes) -->
-            <div class="mb-5" id="aspectSection" style="display:none!important">
-              <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-2 block">Image Size</label>
-              <div class="flex flex-wrap gap-1.5" id="aspectPills">
-                <button class="pill-btn active px-3 py-1.5 rounded-lg text-xs" data-value="1:1" onclick="setAspect(this)">1:1</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="9:16" onclick="setAspect(this)">9:16</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="16:9" onclick="setAspect(this)">16:9</button>
-                <button class="pill-btn px-3 py-1.5 rounded-lg text-xs" data-value="4:5" onclick="setAspect(this)">4:5</button>
-              </div>
-            </div>
-
             <div class="flex flex-col gap-2">
               <div class="flex items-center gap-2">
                 <button onclick="generateContent()" id="generateBtn" class="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 btn-primary">
@@ -827,43 +805,6 @@
                   <div class="copy-output" id="resultContent"></div>
                   <div id="forgeCharCount" class="mt-3 pt-3 border-t border-gray-100 text-[10px] text-text-muted"></div>
 
-                  <!-- DEFERRED: Gemini image gen — UI hidden, code preserved -->
-                  <div class="mt-6 pt-5 border-t border-gray-100" id="imageGenSection" style="display:none!important">
-                    <div class="flex items-center justify-between mb-4">
-                      <div class="flex items-center gap-2">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-warm flex items-center justify-center">
-                          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                        </div>
-                        <h4 class="text-sm font-bold">Generate Visual</h4>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-orange-light text-amber-700 font-semibold">Powered by Gemini</span>
-                      </div>
-                    </div>
-
-                    <!-- Regenerate controls -->
-                    <div class="flex gap-2 mb-4">
-                      <input id="imagePromptOverride" type="text" placeholder="Tweak the image prompt and regenerate..." class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-xs bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30" />
-                      <button onclick="generateImage()" id="imageGenBtn" class="px-5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5" style="background:linear-gradient(135deg,#F59E0B,#EC4899);color:#fff">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                        Regenerate
-                      </button>
-                    </div>
-
-                    <!-- Image Output -->
-                    <div id="imageOutput" class="hidden">
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="imageGrid"></div>
-                    </div>
-                    <div id="imageLoading" class="hidden text-center py-8">
-                      <div class="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 animate-pulse" style="background:linear-gradient(135deg,#F59E0B,#EC4899)">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                      </div>
-                      <p class="text-xs text-text-muted">Generating visual with Gemini...</p>
-                      <div class="flex justify-center gap-1 mt-2">
-                        <div class="w-1.5 h-1.5 bg-accent-orange rounded-full dot-bounce"></div>
-                        <div class="w-1.5 h-1.5 bg-accent-pink rounded-full dot-bounce" style="animation-delay:0.15s"></div>
-                        <div class="w-1.5 h-1.5 bg-accent-orange rounded-full dot-bounce" style="animation-delay:0.3s"></div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
               <div id="generateLoading" class="hidden text-center py-16">
@@ -1433,10 +1374,6 @@
             <summary class="text-[11px] font-bold text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-primary">Advanced Settings</summary>
             <div class="mt-3 space-y-3">
               <div>
-                <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Gemini API Key <span class="font-normal normal-case">(deferred — image gen disabled)</span></label>
-                <input id="settingsGeminiKey" type="password" placeholder="AIza..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 font-mono" />
-              </div>
-              <div>
                 <label class="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Google API Key</label>
                 <input id="settingsGoogleKey" type="password" placeholder="AIza..." class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-surface-secondary focus:outline-none focus:ring-2 focus:ring-accent-purple/30 font-mono" />
               </div>
@@ -1590,8 +1527,6 @@
 const _IS_DEPLOYED = !location.hostname.includes('localhost') && !location.hostname.includes('127.0.0.1');
 
 const FEATURE_CHAT_ENABLED = false; // Set true to show Ask Godfather chat on Dashboard
-// DEFERRED: Gemini image gen — removed from UI per Section 1
-const GEMINI_KEY = '';
 
 // Proxy helpers — ALL calls route through /api/* functions (keys server-side)
 async function callClaudeAPI(model, system, messages, maxTokens) {
@@ -2612,7 +2547,6 @@ function onFormatChange(format) {
   const config = FORMAT_CONFIG[format];
   const section = document.getElementById('subFormatSection');
   const pills = document.getElementById('subFormatPills');
-  const aspectSection = document.getElementById('aspectSection');
   const badge = document.getElementById('modelBadge');
   // Sub-format pills
   if (config?.subFormats) {
@@ -2624,10 +2558,6 @@ function onFormatChange(format) {
   } else {
     section.classList.add('hidden');
     pills.innerHTML = '';
-  }
-  // Hide aspect ratio for text-only formats (Google Ads)
-  if (aspectSection) {
-    aspectSection.style.display = (format === 'Google Ads') ? 'none' : '';
   }
   // Model badge — always Haiku per decision #13
   if (badge) {
@@ -3757,13 +3687,11 @@ function updateMetaApiBadge() {
 
 function saveApiKeys() {
   const claudeKey = document.getElementById('settingsClaudeKey').value.trim();
-  const geminiKey = document.getElementById('settingsGeminiKey').value.trim();
   const googleKey = document.getElementById('settingsGoogleKey')?.value?.trim();
   const supabaseUrl = document.getElementById('settingsSupabaseUrl').value.trim();
   const supabaseKey = document.getElementById('settingsSupabaseKey').value.trim();
   const metaToken = document.getElementById('settingsMetaToken').value.trim();
   if (claudeKey) localStorage.setItem('gf_claudeKey', claudeKey);
-  if (geminiKey) localStorage.setItem('gf_geminiKey', geminiKey);
   if (googleKey) localStorage.setItem('gf_googleKey', googleKey);
   if (supabaseUrl) localStorage.setItem('gf_supabaseUrl', supabaseUrl);
   if (supabaseKey) localStorage.setItem('gf_supabaseKey', supabaseKey);
@@ -3773,12 +3701,10 @@ function saveApiKeys() {
 
 function initApiKeySettings() {
   const ck = document.getElementById('settingsClaudeKey');
-  const gk = document.getElementById('settingsGeminiKey');
   const gok = document.getElementById('settingsGoogleKey');
   const su = document.getElementById('settingsSupabaseUrl');
   const sk = document.getElementById('settingsSupabaseKey');
   if (ck && API_KEY) ck.value = API_KEY.substring(0, 12) + '...';
-  if (gk && GEMINI_KEY) gk.value = GEMINI_KEY.substring(0, 10) + '...';
   const GOOGLE_KEY = GOOGLE_API_KEY;
   if (gok && GOOGLE_KEY) gok.value = GOOGLE_KEY.substring(0, 10) + '...';
   if (su && SUPABASE_URL) su.value = SUPABASE_URL;
@@ -4338,7 +4264,6 @@ function loadSettingsFields() {
   if (gk) set('settingsGoogleApiKey', gk.substring(0, 10) + '...');
   // API keys
   set('settingsClaudeKey', API_KEY);
-  set('settingsGeminiKey', GEMINI_KEY);
   set('settingsSupabaseUrl', SUPABASE_URL);
   set('settingsSupabaseKey', SUPABASE_KEY);
   set('settingsMetaToken', META_API_TOKEN);
@@ -11955,7 +11880,6 @@ ${offerLine}
   document.getElementById('resultContent').innerHTML = markdownToHtml(content);
   addVariationCopyButtons();
   document.getElementById('refinementBar').style.display = '';
-  document.getElementById('imageGenSection').style.display = 'none';
   // Reset feedback buttons
   document.querySelectorAll('.forge-status-btn').forEach(b => b.style.opacity = '1');
   // Save to generation history for feedback tracking
@@ -12052,7 +11976,6 @@ async function generateContent() {
     state.conversationHistory = [{role:'user',content:msg}];
     const result = await callClaude([{role:'user',content:msg}], false, sys, model, maxTokens);
     showResult(result, brief);
-    document.getElementById('imageGenSection').style.display = 'none';
   } catch(e) {
     document.getElementById('generateLoading').classList.add('hidden');
     showToast('Haiku error — falling back to template: ' + e.message);
@@ -12829,16 +12752,12 @@ function showResult(content, brief) {
     id: Date.now(),
     brief: {...state.currentBrief},
     content: content,
-    mode: state.outputMode,
     date: new Date().toISOString(),
     status: 'draft'
   });
   saveState('generationHistory', state.generationHistory);
   // Track forge version history
   const _fvId = Date.now(); state.forgeVersions = [{id: _fvId, versions: [{content, timestamp: new Date().toISOString(), label: 'v1'}]}]; state._currentForgeId = _fvId; renderForgeVersions();
-  // Show image section only if mode includes image
-  document.getElementById('imageGenSection').style.display = 'none';
-  document.getElementById('imageOutput').classList.add('hidden');
   // Show feedback status bar
   document.getElementById('forgeStatusBar').classList.remove('hidden');
   document.querySelectorAll('.forge-status-btn').forEach(b => b.style.opacity = '1');
@@ -12976,59 +12895,6 @@ function showForgeVersion(idx) {
     b.className = `px-2.5 py-1 rounded-full text-[10px] font-semibold transition ${i === idx ? "bg-accent-purple text-white" : "bg-surface-tertiary text-text-muted hover:bg-gray-200"}`;
   });
 }
-// ==================== IMAGE GENERATION (GEMINI) ====================
-state.selectedAspect = '1:1';
-state.outputMode = 'both'; // 'text', 'image', 'both'
-const GEMINI_MODELS = ['gemini-2.5-flash-image', 'imagen-4.0-fast-generate-001'];
-
-function setOutputMode(btn) {
-  document.querySelectorAll('#outputModePills .pill-btn').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  state.outputMode = btn.dataset.value;
-  // Show/hide aspect ratio based on mode
-  document.getElementById('aspectSection').style.display = (state.outputMode === 'text') ? 'none' : '';
-}
-
-function setAspect(btn) {
-  document.querySelectorAll('#aspectPills .pill-btn').forEach(p => p.classList.remove('active'));
-  btn.classList.add('active');
-  state.selectedAspect = btn.dataset.value;
-}
-
-async function generateImage() {
-  if (!state.lastGeneratedContent) { showToast('Generate copy first'); return; }
-
-  const btn = document.getElementById('imageGenBtn');
-  btn.disabled = true;
-  document.getElementById('imageLoading').classList.remove('hidden');
-  document.getElementById('imageOutput').classList.add('hidden');
-
-  const customPrompt = document.getElementById('imagePromptOverride').value.trim();
-  const imagePrompt = customPrompt || buildImagePrompt();
-
-  let success = false;
-  // Try models in order of preference
-  for (const model of GEMINI_MODELS) {
-    try {
-      const images = await callGeminiImage(model, imagePrompt);
-      if (images.length > 0) {
-        displayImages(images, imagePrompt);
-        success = true;
-        break;
-      }
-    } catch(e) {
-      console.warn(`Model ${model} failed:`, e.message);
-      continue;
-    }
-  }
-
-  if (!success) {
-    showToast('Image generation failed. Quota may be exhausted — try again in a minute.');
-  }
-
-  document.getElementById('imageLoading').classList.add('hidden');
-  btn.disabled = false;
-}
 
 function getLibraryContext(brief) {
   if (!CREATIVE_ASSETS || !CREATIVE_ASSETS.length) return '';
@@ -13069,194 +12935,6 @@ function getLibraryContext(brief) {
   return ctx;
 }
 
-function getTopCreativeRefs() {
-  // Pull thumbnail/image URLs from top-performing creatives for visual reference
-  let refs = '';
-  const source = state.sentinelOutput?.top5 || [];
-  const withThumbs = source.filter(c => c['thumbnail_url'] || c['image_url']);
-  if (withThumbs.length) {
-    refs = 'REFERENCE CREATIVES (top performers — study their visual structure, layout, and element placement):\n';
-    withThumbs.slice(0, 3).forEach((c, i) => {
-      const name = c['Ad name'] || c['ad name'] || 'Unknown';
-      const url = c['image_url'] || c['thumbnail_url'] || '';
-      const cpql = c.metrics?.cpql ? formatCurrency(c.metrics.cpql) : '?';
-      refs += `${i+1}. "${name}" (CPQL: ${cpql}) — ${url}\n`;
-    });
-  } else if (state.taggerData.length) {
-    // Fallback: grab any tagger creatives with thumbnails, sorted by CPQL
-    const withImages = state.taggerData
-      .filter(c => (c['thumbnail_url'] || c['image_url']) && parseNumber(c['QL']||c['ql']||0) > 0)
-      .sort((a, b) => parseNumber(a['CPQL']||a['cpql']||999999) - parseNumber(b['CPQL']||b['cpql']||999999));
-    if (withImages.length) {
-      refs = 'REFERENCE CREATIVES (best performing with available thumbnails):\n';
-      withImages.slice(0, 3).forEach((c, i) => {
-        const name = c['Ad name'] || c['ad name'] || 'Unknown';
-        const url = c['image_url'] || c['thumbnail_url'] || '';
-        const cpql = c['CPQL'] || c['cpql'] || '?';
-        refs += `${i+1}. "${name}" (CPQL: ${formatCurrency(parseNumber(cpql))}) — ${url}\n`;
-      });
-    }
-  }
-  return refs;
-}
-
-function buildImagePrompt() {
-  const brief = state.currentBrief;
-  const copy = state.lastGeneratedContent || '';
-
-  // Extract creative copy (on-image text) from Option 1
-  const heroMatch = copy.match(/hero\s*line[:\s]*(.+)/i);
-  const sublineMatch = copy.match(/subline[:\s]*(.+)/i);
-  const badgeMatch = copy.match(/badge[:\s]*(.+)/i);
-  const ctaBtnMatch = copy.match(/cta\s*button[:\s]*(.+)/i);
-
-  const heroLine = heroMatch ? heroMatch[1].trim() : '';
-  const subline = sublineMatch ? sublineMatch[1].trim() : '';
-  const badge = badgeMatch ? badgeMatch[1].trim() : '';
-  const ctaBtn = ctaBtnMatch ? ctaBtnMatch[1].trim() : '';
-
-  // Extract visual direction
-  const visualMatch = copy.match(/visual\s*direction[:\s]*([\s\S]*?)(?=\n\*\*|why these|a\/b test|$)/i);
-  const visualDirection = visualMatch ? visualMatch[1].trim().substring(0, 300) : '';
-
-  const aspectDesc = {
-    '1:1': 'square 1080x1080 format',
-    '9:16': 'vertical 1080x1920 format for Reels/Stories',
-    '16:9': 'horizontal 1920x1080 widescreen format',
-    '4:5': 'portrait 1080x1350 format for feed'
-  };
-
-  return `Create a professional ad creative image for Cuemath, an ed-tech brand.
-
-FORMAT: ${aspectDesc[state.selectedAspect] || 'square 1080x1080'}
-
-TEXT ON THE IMAGE (include these as text overlays in the design):
-${heroLine ? `- HERO TEXT (large, bold): "${heroLine}"` : '- HERO TEXT: "Make Your Child MathFit(TM)"'}
-${subline ? `- SUBLINE (smaller, below hero): "${subline}"` : ''}
-${badge ? `- BADGE (small pill/tag in corner): "${badge}"` : '- BADGE: "Free Trial"'}
-${ctaBtn ? `- CTA BUTTON (bottom): "${ctaBtn}"` : '- CTA BUTTON: "Book Free Class"'}
-
-BRAND STYLE:
-- Colors: Cuemath yellow (#F5A623) as accent, navy (#1A1A2E) for text, white/light background
-- Font style: Clean, modern sans-serif (like Inter or Montserrat)
-- Aesthetic: Clean, calm, premium, aspirational — NOT childish or gimmicky
-- Layout: Professional ad layout with clear visual hierarchy
-
-VISUAL SCENE:
-${visualDirection || 'A warm, authentic scene showing a confident child engaged in math learning. Natural lighting, premium feel.'}
-- Platform: ${brief.platform || 'Meta'} ad
-- Target audience: ${brief.audience || 'NRI'} parents of kids aged 6-14
-- Tone: ${brief.funnel === 'TOFU' ? 'Aspirational' : brief.funnel === 'MOFU' ? 'Trust-building with proof' : 'Action-oriented with urgency'}
-
-${getTopCreativeRefs()}
-
-IMPORTANT:
-- Make text clearly legible against the background
-- Hero text should be the most prominent element
-- Include the Cuemath yellow color prominently
-- The image should look like a real ad creative, not a stock photo
-- Study the reference creatives above (if provided) to match their visual structure, layout patterns, and element placement`;
-}
-
-async function callGeminiImage(model, prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
-
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseModalities: ['TEXT', 'IMAGE'],
-      candidateCount: 1
-    }
-  };
-
-  // For Imagen models, use different format
-  if (model.startsWith('imagen')) {
-    const imagenUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${GEMINI_KEY}`;
-    const imagenBody = {
-      instances: [{ prompt: prompt }],
-      parameters: { sampleCount: 2, aspectRatio: state.selectedAspect.replace(':', ':') }
-    };
-    const resp = await fetch(imagenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(imagenBody)
-    });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Imagen error ${resp.status}`);
-    }
-    const data = await resp.json();
-    return (data.predictions || []).map(p => ({
-      data: p.bytesBase64Encoded,
-      mimeType: p.mimeType || 'image/png'
-    }));
-  }
-
-  // For Gemini models
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({}));
-    throw new Error(err.error?.message || `Gemini error ${resp.status}`);
-  }
-
-  const data = await resp.json();
-  const parts = data.candidates?.[0]?.content?.parts || [];
-  const images = parts.filter(p => p.inlineData).map(p => ({
-    data: p.inlineData.data,
-    mimeType: p.inlineData.mimeType
-  }));
-  // Also capture any text response
-  const textParts = parts.filter(p => p.text).map(p => p.text);
-  if (textParts.length) state.lastImageDescription = textParts.join('\n');
-  return images;
-}
-
-function displayImages(images, prompt) {
-  const grid = document.getElementById('imageGrid');
-  document.getElementById('imageOutput').classList.remove('hidden');
-
-  grid.innerHTML = images.map((img, i) => `
-    <div class="relative group">
-      <div class="rounded-xl overflow-hidden border border-gray-200 shadow-sm bg-surface-tertiary">
-        <img src="data:${img.mimeType};base64,${img.data}" class="w-full" alt="Generated creative ${i+1}" />
-      </div>
-      <div class="flex gap-1.5 mt-2">
-        <button onclick="downloadImage(${i})" class="flex-1 py-2 btn-secondary rounded-lg text-[11px] font-semibold border border-gray-200 flex items-center justify-center gap-1">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-          Download
-        </button>
-        <button onclick="generateImage()" class="flex-1 py-2 btn-secondary rounded-lg text-[11px] font-semibold border border-gray-200 flex items-center justify-center gap-1">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-          Regenerate
-        </button>
-      </div>
-    </div>
-  `).join('');
-
-  // Store for download
-  state.generatedImages = images;
-
-  // Show the prompt used
-  grid.innerHTML += `<div class="col-span-1 md:col-span-2 p-3 rounded-lg bg-surface-secondary mt-2">
-    <p class="text-[10px] text-text-muted"><strong>Prompt used:</strong> ${prompt.substring(0, 300)}...</p>
-  </div>`;
-}
-
-function downloadImage(index) {
-  const img = state.generatedImages?.[index];
-  if (!img) return;
-  const link = document.createElement('a');
-  link.href = `data:${img.mimeType};base64,${img.data}`;
-  const brief = state.currentBrief;
-  link.download = `godfather-${brief.platform||'ad'}-${brief.market||'global'}-${state.selectedAspect.replace(':','x')}-${Date.now()}.png`;
-  link.click();
-  showToast('Image downloaded!');
-}
 
 // ==================== CREATIVE TAGGER ====================
 // TAG_DISPLAY removed — new taxonomy uses plain English values directly

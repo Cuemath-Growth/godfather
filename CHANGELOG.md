@@ -4,6 +4,173 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Stream 4: Kill Gemini image generation (2026-05-01)
+
+### Why this shipped
+Per Naina's call: image generation is not coming back. The DEFERRED Gemini code
+was sitting in the Create tab — UI hidden via `display:none!important`, function
+bodies preserved "in case." Killed entirely. Frees ~322 lines and removes a dead
+dependency surface.
+
+### Changes (`index.html`, no other files)
+- Create tab HTML:
+  - Removed `outputModePills` div (text/image/both toggle)
+  - Removed `aspectSection` div (1:1 / 9:16 / 16:9 / 4:5 picker)
+  - Removed `imageGenSection` block — input, regenerate button, output grid,
+    loading spinner (~36 lines)
+- Settings tab HTML:
+  - Removed `settingsGeminiKey` input + label from Advanced Settings
+- Deleted functions (no longer referenced anywhere):
+  - `setOutputMode()` — 7 lines
+  - `setAspect()` — 5 lines
+  - `generateImage()` — 34 lines
+  - `getTopCreativeRefs()` — 30 lines (only consumed by buildImagePrompt)
+  - `buildImagePrompt()` — 57 lines
+  - `callGeminiImage()` — 57 lines
+  - `displayImages()` — 30 lines
+  - `downloadImage()` — 10 lines
+- Deleted state:
+  - `state.selectedAspect`
+  - `state.outputMode`
+  - `state.lastImageDescription` (set by callGeminiImage, never read elsewhere)
+  - `state.generatedImages` (set/read only inside displayImages + downloadImage)
+- Deleted constants:
+  - `GEMINI_MODELS`
+  - `GEMINI_KEY`
+- Reference cleanup:
+  - `onFormatChange()` — removed aspectSection branch (toggled visibility for
+    Google Ads)
+  - `showResult()` — removed `imageGenSection.style.display = 'none'` line
+  - `generateContent()` catch path — same line removed
+  - `generationHistory.push()` — removed `mode: state.outputMode` field
+  - `saveDataSource()` — removed Gemini key save logic (3 lines)
+  - `initApiKeySettings()` — removed Gemini key prefill (2 lines)
+  - `loadSettings()` — removed `set('settingsGeminiKey', GEMINI_KEY)`
+- **Total: 322 lines net removed.**
+
+### NOT touched (deliberately)
+- `getLibraryContext` — referenced by `buildSystemPrompt` for text generation.
+  Unrelated to image gen. KEPT.
+- Freeform chat mode (`freeformPanel` + `sendFreeform()`) — Naina hasn't used
+  Create tab yet but wants Freeform available. KEPT.
+- Recommended Briefs panel + `computeRecommendedBriefs` — modern winning-pattern
+  card row (Apr 30 fix). KEPT.
+
+### Verification
+- Both inline `<script>` blocks parse clean via `new Function()` after every
+  deletion step.
+- Grep for `imageGenSection|imageOutput|imageLoading|imageGrid|imagePromptOverride|
+  state.outputMode|state.selectedAspect|state.lastImageDescription|state.generatedImages|
+  GEMINI_KEY|GEMINI_MODELS|settingsGeminiKey|aspectSection|outputModePills|
+  aspectPills|imageGenBtn|generateImage()|callGeminiImage|displayImages|downloadImage|
+  buildImagePrompt|getTopCreativeRefs|setOutputMode|setAspect`: 0 matches.
+
+### What did NOT ship
+- Freeform mode audit — kept as-is, Naina wants it available.
+- Stream 5 (Library audit) — separate session.
+
+---
+
+## Stream 3 (continued): Dashboard restructure into Pause + Refresh + Make More (2026-05-01)
+
+### Why this shipped
+Action Queue tab is structurally a regression vs Dashboard's Pause Now / Make More:
+flat list, no group headers, no Done button, no notes. Naina's call: bring the
+chassis verdict layout to Dashboard instead. Step 1 is visual restructure — keep
+existing inline logic feeding the cards, just split Pause Now into Pause
+(loser signals) + Refresh (was-a-winner) sections.
+
+### Changes (`index.html`)
+- New `<details id="oracleRefresh">` accordion between Pause Now and Action Log,
+  same header pattern + bulk action menu as Pause Now
+- `renderOracleCardsV2()` — extracted card-html-build into `_buildPauseCardHtml`
+  closure shared by both sections; `visiblePause` filters out `_type === 'refresh'`
+  items, `visibleRefresh` holds them
+- New `refreshBadge` span shows count
+- Existing `oracle_actions` feedback loop (Done/Dismiss/Snooze/Note) works
+  unchanged — itemId prefix stays `pause:` so logged actions/notes carry over
+
+### Verification
+- Both inline scripts parse clean
+- `_oracleThumbnail`, `_pauseCardActions`, `getOracleAction`, `oracleSaveNote`
+  all preserved and called from the shared card builder
+
+### What did NOT ship
+- Data source swap (still uses inline `detectFatigue` + per-signal classification;
+  chassis runs but only AQ reads it)
+- Make More restructure into Tier 1 / Tier 2 split
+- AQ tab deletion
+
+---
+
+## AQ cards: lead with thumb + ad name (2026-05-01)
+
+Action Queue cards were unreadable: title was the metric ("CPTQL ₹29.4K above
+MEA amber..."), no ad name on the card, no thumbnail. Couldn't compare against
+Dashboard during parity audit.
+
+`_renderActionQueueCard` now leads with the same identity block the Dashboard
+cards use:
+- Thumbnail (40x40, via existing `_oracleThumbnail()`)
+- Ad name as the heading (truncated via `shortAdName`, full name in title attr)
+- Market + audience + format pills below the name (looked up from
+  `state.taggerData` by `normalizeAdName` match)
+- `verdict_id` moved to a small code chip on the right of the pill row
+
+Metric line (`rec.signal`) demotes to body. UI-only.
+
+---
+
+## Boot: defer chassis detection to background tick (2026-05-01)
+
+`runDetection` takes ~11s and was running synchronously after Promise.all but
+before the boot spinner hides. Moved into a 100ms `setTimeout` so the spinner
+clears as soon as Phase 2 (Supabase + sheets) finishes. Detection still runs;
+AQ nav badge updates when it completes; `renderActionQueueView` re-runs detection
+when the tab opens, so no functional change — just faster boot.
+
+Sheet chain (CRM → PLA → India CRM, sequential by dedup design) remains the
+dominant boot cost; future optimization targets Supabase pagination batching +
+truly-deferred Meta API sync.
+
+---
+
+## Stream 3b: Merge chassis-make-more (3 Make More verdicts) (2026-05-01)
+
+Brings the chassis-make-more branch into main. Action Queue now surfaces all
+3 Make More signals through the chassis verdict engine, running alongside the
+legacy Make More cards on Dashboard for parity audit.
+
+Verdicts now live in main:
+- `meta_scale_tier1_winner` — proven winner, scale to adjacent audience
+- `meta_scale_tier2_winner` — emerging winner, scale to adjacent audience
+- `meta_refresh_fatigued_winner` — already on the Pause branch (chassis-make-more
+  dropped its copy in `6fb4809` to avoid duplicate registration)
+
+Conflicts resolved: index.html boot block (both `registerMetaPauseVerdicts` and
+`registerMetaScaleVerdicts` called); CHANGELOG entry inserted in chronological
+order. Total chassis verdicts in production: 9.
+
+---
+
+## Stream 3a: Merge chassis-pause-remaining (7 Pause verdicts) (2026-05-01)
+
+Brings the chassis-pause-remaining branch into main. Action Queue now surfaces
+all 7 Pause Now signals through the chassis verdict engine.
+
+Verdicts now live in main: `meta_pause_cptql_leak`, `meta_pause_dead_funnel`,
+`meta_pause_budget_burn`, `meta_pause_wrong_audience`, `meta_pause_spam`,
+`meta_pause_fatigued_loser`, `meta_refresh_fatigued_winner`. All opt into
+cohort_matured + volume_floor + not_recently_dismissed guardrails.
+
+Conflicts: only CHANGELOG (entry ordering). index.html merged cleanly — chassis
+additions sit in Dashboard region that Streams 1+2 didn't touch.
+
+Old Pause Now card on Dashboard kept running. Once parity holds for 24-48hrs
+in production, follow-up deletes the old card.
+
+---
+
 ## Stream 2: Kill Insights tab (2026-05-01)
 
 ### Why this shipped
