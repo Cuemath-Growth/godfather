@@ -3351,14 +3351,17 @@ function init() {
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
 
-    // ── Intelligence chassis boot (Week 2 Day 1, Apr 29) ──
-    // configure() wires Supabase: dismissals persist to recommendation_dismissals,
-    // surfaced recs log to recommendation_log. Real verdicts migrate Week 2 Day 3+.
-    // See 02-skills/intelligence-chassis-spec.md.
+    // ── Intelligence chassis boot (Week 2 Day 3, Apr 29) ──
+    // configure() wires Supabase. registerMetaPauseVerdicts() registers all 6 Pause
+    // verdicts (cptql_leak, dead_funnel, budget_burn, wrong_audience, spam,
+    // fatigued_loser) plus the refresh-winner sibling. They run in parallel with the
+    // legacy Pause Now card on Dashboard for parity audit (Week 2 Day 5 will deprecate
+    // the old card if parity holds for 24-48hrs). See 02-skills/intelligence-chassis-spec.md.
     try {
       const ci = window.cuemathIntelligence;
       if (ci) {
         ci.configure({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
+        registerMetaPauseVerdicts(ci);
         const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
         console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced · Supabase wired`);
       } else {
@@ -6888,6 +6891,364 @@ function formatCurrency(val) {
   if (val >= 100000) return '\u20B9'+(val/100000).toFixed(1)+'L';
   if (val >= 1000) return '\u20B9'+(val/1000).toFixed(1)+'K';
   return '\u20B9'+val.toFixed(0);
+}
+
+// ==================== CHASSIS VERDICTS — Meta Pause (Week 2 Day 3) ====================
+// Real verdict migrations covering all 6 legacy Pause Now signals. Runs in parallel
+// with legacy Pause Now card on Dashboard for parity audit (Week 2 Day 5 will deprecate
+// old card if chassis matches for 24-48hrs). Verdicts registered:
+//   meta_pause_cptql_leak       — CPTQL above market amber (Pause Now Signal 2)
+//   meta_pause_dead_funnel      — ≥15 QLs but 0 TDs after maturity (Pause Now Signal 4)
+//   meta_pause_budget_burn      — ≥₹15K spend with 0 QLs (Pause Now Signal 1)
+//   meta_pause_wrong_audience   — US BAU ads with <30% NRI rate (Pause Now Signal 3)
+//   meta_pause_spam             — >25% invalid lead rate (Pause Now Signal 5)
+//   meta_pause_fatigued_loser   — Stage-2/3 fatigue, non-winner (Pause Now Signal 6 / loser)
+//   meta_refresh_fatigued_winner — Stage-2/3 fatigue, was Tier-1/2 winner → refresh, not kill
+// All Pause verdicts register: cohort_matured, volume_floor, historical_winner_check,
+// not_recently_dismissed. The Refresh-winner verdict OMITS historical_winner_check (would
+// self-block past winners). See feedback_cohort_maturity, feedback_business_context.
+
+// Volume floors mirror VERDICT_SPEND_FLOOR + the chassis volume_floor guardrail.
+// Used here for the scoreConfidence threshold (CONFIDENT iff spend ≥ 2× floor AND cohort ≥ 21d).
+const _CHASSIS_VOLUME_FLOORS_INR = { US: 15000, India: 3000, AUS: 8000, APAC: 8000, MEA: 5000, UK: 10000, EU: 10000, ROW: 5000 };
+const _CHASSIS_NOT_SERVING_STATUSES = new Set([
+  'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED',
+  'ARCHIVED', 'DELETED',
+  'DISAPPROVED', 'WITH_ISSUES', 'PENDING_REVIEW', 'PENDING_BILLING_INFO',
+  'IN_PROCESS'
+]);
+
+// Builds the prepared-ad list once per detect() call. Returns ads enriched with
+// cohort_age_days, was_top_tier, is_paused so verdicts can filter cleanly.
+function _chassisPrepAds() {
+  const rawPerf = (typeof getAdPerformance === 'function') ? getAdPerformance(null, null, null) : [];
+  const todayMs = Date.now();
+  const sevenAgoStr = new Date(todayMs - 7 * 86400000).toISOString().slice(0, 10);
+  const todayStr = new Date(todayMs).toISOString().slice(0, 10);
+  const dailyRecent = (typeof getAdPerformanceDaily === 'function') ? getAdPerformanceDaily(null, sevenAgoStr, todayStr) : [];
+
+  // Liveness: any ad with > 0 spend in last 7 days is "actively serving" by spend signal.
+  const livenessSet = new Set();
+  dailyRecent.forEach(r => { if ((r.spend || 0) > 0) livenessSet.add(normalizeAdName(r.ad_name)); });
+
+  // Meta creative status lookup (Map for O(1) per ad)
+  const creativeByName = new Map();
+  (Array.isArray(metaCreatives) ? metaCreatives : []).forEach(c => creativeByName.set(normalizeAdName(c.name), c));
+
+  return rawPerf.map(r => {
+    const adName = r['Ad name'] || '';
+    const campaignName = r['Campaign name'] || '';
+    const key = normalizeAdName(adName);
+    const market = r._market || 'US';
+    const spend = parseNumber(r['Spent']) || 0;
+    const ql = parseNumber(r['QL']) || 0;
+    const tql = parseNumber(r['TQL']) || 0;
+    const td = parseNumber(r['TD']) || 0;
+    const ts = parseNumber(r['TS']) || 0;
+    const nri = parseNumber(r['NRI']) || 0;
+    const cptql = parseNumber(r['CPTQL']) || null;
+    const cptd = parseNumber(r['CPTD']) || null;
+
+    // Audience + invalid-rate fields — mirror legacy Pause Now mapping at index.html:9098-9102
+    const nriPct = (parseNumber(r['NRI%']) || 0) / 100;
+    const invalidPct = (parseNumber(r['Invalid%']) || 0) / 100;
+    const invalid = invalidPct * (ql + td);
+    const totalLeads = ql + (invalidPct > 0 ? Math.round(ql / (1 - invalidPct)) - ql : 0);
+
+    // cohort_age_days — read _date or DDMMYY suffix in ad name
+    let dateStr = r['_date'] || null;
+    if (!dateStr) {
+      const m = adName.match(/(\d{6})$/);
+      if (m) dateStr = `20${m[1].slice(4, 6)}-${m[1].slice(2, 4)}-${m[1].slice(0, 2)}`;
+    }
+    const t = dateStr ? new Date(dateStr).getTime() : NaN;
+    const cohort_age_days = isFinite(t) ? Math.max(0, Math.floor((todayMs - t) / 86400000)) : 0;
+
+    // is_paused: Meta status in not-serving set OR no spend in last 7 days
+    const creative = creativeByName.get(key);
+    const stat = creative ? String(creative.status || '').toUpperCase() : null;
+    const is_paused = (stat && _CHASSIS_NOT_SERVING_STATUSES.has(stat)) || !livenessSet.has(key);
+
+    // was_top_tier: was this ad ever a Tier-1/2 winner per existing classifier
+    const was_top_tier = !!_classifyWinner({ market, spend, td, ql, cptd, cptql, mature: null });
+
+    return {
+      adName, campaignName, market,
+      spend, ql, tql, td, ts, nri,
+      nriPct, invalid, invalidPct, totalLeads,
+      cptql, cptd,
+      cohort_age_days, was_top_tier, is_paused
+    };
+  });
+}
+
+function _chassisPauseSeverity(signal) {
+  // ₹/wk waste = (spend / cohort_age_days) * 7. Floor cohort to avoid div-by-zero.
+  const cohortDays = Math.max(signal.cohort_age_days || 14, 1);
+  return Math.max(0, (signal.spend / cohortDays) * 7);
+}
+
+function _chassisPauseConfidence(signal, ci) {
+  // CONFIDENT iff cohort ≥ 21d AND spend ≥ 2× per-market volume floor.
+  const floor = _CHASSIS_VOLUME_FLOORS_INR[signal.market] || 15000;
+  return (signal.cohort_age_days >= 21 && signal.spend >= floor * 2)
+    ? ci.CONFIDENCE.CONFIDENT
+    : ci.CONFIDENCE.LIKELY;
+}
+
+function registerMetaPauseVerdicts(ci) {
+  // ── Verdict 1: CPTQL leak (Pause Now Signal 2 equivalent) ──
+  ci.registerVerdict({
+    id: 'meta_pause_cptql_leak',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      return _chassisPrepAds()
+        .filter(a => !a.is_paused && a.tql >= 5 && a.cptql)
+        .filter(a => {
+          const amber = (SENTINEL_THRESHOLDS[a.market] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000;
+          return a.cptql > amber;
+        })
+        .map(a => {
+          const amber = (SENTINEL_THRESHOLDS[a.market] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000;
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `CPTQL ${formatCurrency(a.cptql)} above ${a.market} amber ${formatCurrency(amber)} · ${a.tql} TQLs · ${formatCurrency(a.spend)}`,
+            why: `Costs too much per qualified lead (CPTQL ${formatCurrency(a.cptql)} vs market amber ${formatCurrency(amber)}). Any downstream enrollment margin is already gone — pause and reallocate.`,
+            // Required signal fields for guardrails:
+            spend: a.spend,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, cptql: a.cptql, tql: a.tql, market_amber: amber, market: a.market },
+          };
+        });
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    action: { label: 'Pause Ad', type: 'pause' },
+  });
+
+  // ── Verdict 2: Dead funnel (Pause Now Signal 4 equivalent) ──
+  ci.registerVerdict({
+    id: 'meta_pause_dead_funnel',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      return _chassisPrepAds()
+        .filter(a => !a.is_paused && a.spend >= 20000 && a.ql >= 15 && a.td === 0)
+        .map(a => {
+          const why = a.ts === 0
+            ? `${a.ql} QLs but 0 trial-bookings — leads aren't intent-qualified (LP click without form completion, or wrong audience).`
+            : `${a.ts} trials scheduled but 0 completed — no-show or sales-handoff issue, not a creative problem.`;
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `${a.ql} QLs → 0 TDs · ${formatCurrency(a.spend)}`,
+            why,
+            spend: a.spend,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, ql: a.ql, td: a.td, ts: a.ts, market: a.market },
+          };
+        });
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    action: { label: 'Pause Ad', type: 'pause' },
+  });
+
+  // ── Verdict 3: Budget burn (Pause Now Signal 1 equivalent) ──
+  // ₹15K+ spend with 0 QLs — pure waste, no qualified leads at all.
+  ci.registerVerdict({
+    id: 'meta_pause_budget_burn',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      return _chassisPrepAds()
+        .filter(a => !a.is_paused && a.spend >= 15000 && a.ql === 0)
+        .map(a => {
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `${formatCurrency(a.spend)} spent · 0 QLs — pure waste`,
+            why: `${formatCurrency(a.spend)} delivered 0 QLs — hook isn't landing or the audience isn't seeing enough value to sign up. Pause and reallocate.`,
+            spend: a.spend,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, ql: a.ql, market: a.market },
+          };
+        });
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    action: { label: 'Pause Ad', type: 'pause' },
+  });
+
+  // ── Verdict 4: Wrong audience (Pause Now Signal 3 equivalent) ──
+  // US-ONLY (skip non-US, skip PLA). NRI is the highest-converting US segment;
+  // <30% NRI rate at scale means creative/targeting is pulling the wrong audience.
+  ci.registerVerdict({
+    id: 'meta_pause_wrong_audience',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      return _chassisPrepAds()
+        .filter(a => !a.is_paused
+          && a.market === 'US'
+          && !_isPLACampaignName(a.campaignName)
+          && a.spend >= 20000
+          && a.ql >= 15
+          && a.nriPct < 0.30)
+        .map(a => {
+          const nriPctLabel = Math.round(a.nriPct * 100);
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `Only ${nriPctLabel}% NRI (${a.nri}/${a.ql}) · ${formatCurrency(a.spend)} — attracting wrong audience`,
+            why: `NRI is the highest-converting US segment (benchmark 40%+). Only ${nriPctLabel}% of this ad's QLs are NRI — the creative or targeting is pulling in non-converting audiences. Pause and either tighten the interest stack or refresh the hook to speak to expat parents.`,
+            spend: a.spend,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, ql: a.ql, nri: a.nri, nri_pct: a.nriPct, market: a.market },
+          };
+        });
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    action: { label: 'Pause Ad', type: 'pause' },
+  });
+
+  // ── Verdict 5: Spam magnet (Pause Now Signal 5 equivalent) ──
+  // ≥₹10K spend, ≥20 total leads, >25% invalid rate. Creative attracts pattern-matchers / bots.
+  ci.registerVerdict({
+    id: 'meta_pause_spam',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      return _chassisPrepAds()
+        .filter(a => !a.is_paused
+          && a.spend >= 10000
+          && a.totalLeads >= 20
+          && a.invalidPct > 0.25)
+        .map(a => {
+          const invalidPctLabel = Math.round(a.invalidPct * 100);
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `${invalidPctLabel}% invalid leads (${Math.round(a.invalid)}/${Math.round(a.totalLeads)}) · ${formatCurrency(a.spend)}`,
+            why: `${invalidPctLabel}% of this ad's leads are marked invalid (bots, junk forms, disposable emails). The creative is attracting pattern-matchers who auto-submit forms — usually a hook or offer that implies "easy money" / low-commitment signup. Pause and rebrief.`,
+            spend: a.spend,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, total_leads: a.totalLeads, invalid: a.invalid, invalid_pct: a.invalidPct, market: a.market },
+          };
+        });
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    action: { label: 'Pause Ad', type: 'pause' },
+  });
+
+  // ── Verdict 6a: Fatigued LOSER (Pause Now Signal 6, non-winner branch) ──
+  // Non-winner Stage-2/3 fatigue → Pause. Winners are handled by Verdict 6b.
+  // The chassis API takes a static `action`, so we register two sibling verdicts and let
+  // historical_winner_check route each ad to the correct path:
+  //   - was_top_tier === true  → blocked here, surfaces in 6b (Refresh)
+  //   - was_top_tier === false → surfaces here (Pause)
+  ci.registerVerdict({
+    id: 'meta_pause_fatigued_loser',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      const fatigued = (typeof detectFatigue === 'function') ? detectFatigue() : [];
+      const adByName = {};
+      _chassisPrepAds().forEach(a => { adByName[normalizeAdName(a.adName)] = a; });
+      return fatigued
+        .filter(f => f.stage >= 2)
+        .map(f => {
+          const a = adByName[normalizeAdName(f.ad_name)];
+          if (!a || a.is_paused) return null;
+          const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `${stageText} · ${f.signals.join(' · ')}${f.stage === 3 ? ' · URGENT' : ''}`,
+            why: `${stageText} — ${f.signals.join('; ')}. Audience has seen this creative too many times; pause before it drags down the account's learning phase.`,
+            spend: a.spend || (f.daily_spend * 7) || 0,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, fatigue_stage: f.stage, fatigue_signals: f.signals, frequency: f.frequency, market: a.market },
+          };
+        })
+        .filter(Boolean);
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    // historical_winner_check IN — blocks ads that were Tier-1/2 winners; those route to 6b.
+    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    action: { label: 'Pause Ad', type: 'pause' },
+  });
+
+  // ── Verdict 6b: Fatigued WINNER → Refresh (Pause Now Signal 6, winner branch) ──
+  // Same fatigue detection, but for ads that were a Tier-1/2 winner. The CREATIVE PATTERN
+  // worked — refresh visual/hook, keep audience + format, DON'T kill the pattern.
+  // historical_winner_check OMITTED here because by definition this fires only on past winners;
+  // including it would self-block (the sibling verdict 6a uses it to route losers separately).
+  ci.registerVerdict({
+    id: 'meta_refresh_fatigued_winner',
+    tool: 'godfather',
+    channel: 'meta',
+    detect: () => {
+      const fatigued = (typeof detectFatigue === 'function') ? detectFatigue() : [];
+      const adByName = {};
+      _chassisPrepAds().forEach(a => { adByName[normalizeAdName(a.adName)] = a; });
+      return fatigued
+        .filter(f => f.stage >= 2)
+        .map(f => {
+          const a = adByName[normalizeAdName(f.ad_name)];
+          if (!a || a.is_paused) return null;
+          if (!a.was_top_tier) return null; // only winners route here
+          const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
+          const cptdStr = a.cptd ? formatCurrency(a.cptd) : '—';
+          return {
+            entity_type: 'ad',
+            entity_id: a.adName,
+            market: a.market,
+            signal: `Proven winner fatiguing · ${f.signals.join(' · ')}${f.stage === 3 ? ' · URGENT' : ''}`,
+            why: `${stageText} — but this ad was a winner (CPTD ${cptdStr}, ${a.td || 0} TDs). ${f.signals.join('; ')}. The CREATIVE PATTERN works — refresh visual/hook, keep same audience + format, DON'T kill.`,
+            spend: a.spend || (f.daily_spend * 7) || 0,
+            cohort_age_days: a.cohort_age_days,
+            was_top_tier: a.was_top_tier,
+            raw_metrics: { spend: a.spend, fatigue_stage: f.stage, fatigue_signals: f.signals, frequency: f.frequency, td: a.td, cptd: a.cptd, market: a.market },
+          };
+        })
+        .filter(Boolean);
+    },
+    scoreSeverity: _chassisPauseSeverity,
+    scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
+    scoreEffort: () => ci.EFFORT.ONE_CLICK,
+    // historical_winner_check OMITTED — this verdict ONLY fires on past winners (would self-block).
+    guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+    action: { label: 'Refresh creative', type: 'refresh' },
+  });
 }
 
 // ==================== ACTION QUEUE (chassis-driven, Week 1 Day 4-5) ====================
