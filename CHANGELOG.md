@@ -4,6 +4,32 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Thumbnail migration: sanitize storage keys (2026-05-04)
+
+### Why this shipped
+First full migration run hit `400 InvalidKey` from Supabase Storage on every
+ad name containing `%` (e.g. `LAL-QL-0to2%`). Cause: `encodeURIComponent`
+encoded `%` to `%25`, but Supabase decodes the path back and rejects the bare
+`%` as an invalid key. Same pattern would fail for `+`, `?`, `#`, `=`,
+spaces, accented chars, etc.
+
+### Fix
+- New helper `_sanitizeStorageName(name)` — strict allow-list `[A-Za-z0-9._-]`
+  with NFKD-decomposed accents, collapsed `_` runs, trimmed leading/trailing.
+  Survives URL encode/decode round-trips.
+- `backfillThumbnails` now uses `_sanitizeStorageName(adName)` instead of
+  `encodeURIComponent(adName).slice(0, 200)`.
+- For the 100 ads migrated yesterday: their names had no special chars, so
+  sanitized output is identical to the encoded output. Their existing
+  Storage URLs remain valid.
+
+### Verification
+- Node test: `LAL-QL-0to2%` → `LAL-QL-0to2`, `Camp+Foo Bar?Q=1#frag` →
+  `Camp_Foo_Bar_Q_1_frag`, identity for already-safe names.
+- Both inline `<script>` blocks parse clean.
+
+---
+
 ## Thumbnail rewrite: bytes-not-URLs (2026-05-03)
 
 ### Why this shipped

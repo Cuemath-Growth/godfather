@@ -1669,6 +1669,19 @@ function _base64ToBytes(b64) {
   for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
   return u8;
 }
+// Storage keys must survive a URL encode/decode round-trip in the Supabase
+// path. encodeURIComponent fails for `%`, `+`, `?`, etc., because Supabase
+// decodes the path and then rejects the bare special char as "Invalid key".
+// Strict allow-list on safe chars only; collapses runs of `_`.
+function _sanitizeStorageName(name) {
+  return (name || '')
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '_')
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[_.-]+|[_.-]+$/g, '')
+    .slice(0, 200);
+}
 
 // ---- Supabase: library_assets loader ----
 async function loadLibraryFromSupabase() {
@@ -3904,7 +3917,8 @@ async function backfillThumbnails(opts) {
             const ext = mimeType.includes('png') ? 'png'
                       : mimeType.includes('gif') ? 'gif'
                       : mimeType.includes('webp') ? 'webp' : 'jpg';
-            const safe = encodeURIComponent(adName).slice(0, 200);
+            const safe = _sanitizeStorageName(adName);
+            if (!safe) { errors++; continue; }
             const path = `${account.id}/${safe}.${ext}`;
             const ok = await supabaseStorageUpload('creative-thumbnails', path, _base64ToBytes(base64), mimeType);
             if (!ok) { errors++; continue; }
