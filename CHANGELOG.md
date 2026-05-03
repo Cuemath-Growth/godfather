@@ -4,6 +4,83 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Thumbnail rewrite: bytes-not-URLs (2026-05-03)
+
+### Why this shipped
+Meta CDN thumbnail URLs carry an embedded TTL (`oe=` query param, ~24-48h).
+Caching the URL string guarantees future 403s, which then trigger fallback
+matching that has caused real corruption (Apr 28). Fix: cache image **bytes**
+in Supabase Storage, not URL strings. After this change, the dashboard is
+Meta-CDN-independent for any ad that has been migrated.
+
+Plan locked in `~/.claude/projects/-Users-nainajethalia/memory/project_thumbnail_rewrite_plan.md`.
+
+### Supabase setup (one-time, applied via MCP)
+- Migration `add_stored_thumbnail_to_creative_tags` — added `stored_thumbnail
+  text` column to `creative_tags`. Holds the permanent Storage public URL.
+  `thumbnail_url` retained for legacy/CDN fallback during partial migrations.
+- Migration `create_creative_thumbnails_bucket` — created public bucket
+  `creative-thumbnails` (5MB limit, jpg/png/gif/webp), with anon
+  SELECT/INSERT/UPDATE policies on `storage.objects` matching the existing
+  RLS-off pattern of `creative_tags`.
+- Migration `creative_thumbnails_anon_delete_policy` — added DELETE policy for
+  hygiene/reset use cases.
+- Smoke-tested with publishable anon key: 1×1 PNG round-tripped via REST
+  upload + public GET.
+
+### `index.html` changes
+- New helpers (just below `supabaseDeleteAll`):
+  - `supabaseStorageUpload(bucket, path, bytes, contentType)` — REST POST to
+    `/storage/v1/object/<bucket>/<path>` with `x-upsert: true`.
+  - `supabaseStoragePublicUrl(bucket, path)` — templated public URL builder.
+  - `_base64ToBytes(b64)` — `atob` → `Uint8Array` for the proxy-image payload.
+- `backfillThumbnails(opts)` rewritten end-to-end:
+  - Same strict-match name index (no fuzzy fallback — Apr 28 corruption fix
+    preserved).
+  - Idempotent: pre-builds `alreadyMigrated` set from
+    `state._tagLookup[*].stored_thumbnail`; ads with a Storage URL are
+    skipped.
+  - For each match: fetches Meta `creative.thumbnail_url` →
+    `/api/proxy-image` → bytes → `creative-thumbnails/<account_id>/<encoded
+    ad_name>.<ext>` → public URL written to BOTH `stored_thumbnail` and
+    `thumbnail_url` (so render code stays unchanged).
+  - New `opts.limit: number` for migration-test runs (`{ limit: 100 }`).
+  - Strategy 2 (`adcreatives` fallback) removed — Strategy 1 has been
+    sufficient; reintroduce if any account starts returning empty.
+- Hydration paths updated to prefer `stored_thumbnail` over `thumbnail_url`:
+  - Boot-time `creative_tags` → `taggerData` backfill (Phase 1).
+  - Tagger pipeline cache hydration (Phase 2 — `cachedResults.push`).
+  - Final post-tagging backfill loop (Phase 3).
+- Tagger button (`Fetch Thumbnails` at line 842) wired to the same
+  `backfillThumbnails()` no-arg call → runs full migration with no limit.
+
+### Verification before push
+- Both inline `<script>` blocks parse clean via `new Function()`.
+- Storage smoke test (anon write + public read) confirms publishable key has
+  the right policies on `storage.objects`.
+
+### How to run the 100-ad migration test
+1. Hard refresh `https://godfather-4t4.pages.dev` after deploy.
+2. Open DevTools console.
+3. Dry run first: `await backfillThumbnails({ dryRun: true, limit: 100 })` —
+   eyeball the proposed matches in the console output.
+4. Real run: `await backfillThumbnails({ limit: 100 })`.
+5. Check `state.taggerData.filter(c => c.stored_thumbnail).length` ≥ 95.
+6. Hard-refresh — thumbnails should render off
+   `…supabase.co/storage/v1/object/public/creative-thumbnails/…` URLs. No
+   Meta CDN dependency for migrated rows.
+
+### NOT touched (deliberately)
+- Legacy `thumbnail_url` values (including Apr 28 corrupted ones). Once a row
+  has `stored_thumbnail`, hydration ignores `thumbnail_url`. Wipe of orphan
+  legacy URLs deferred until full migration completes — handle as a separate
+  pass.
+- Tagger write site at line 14851 (`thumbnail_url: creative['thumbnail_url']`).
+  This is the tag-time write of the fresh CDN URL; the migration step then
+  replaces it. Keep separated.
+
+---
+
 ## Stream 4: Kill Gemini image generation (2026-05-01)
 
 ### Why this shipped

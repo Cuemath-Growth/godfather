@@ -1639,6 +1639,37 @@ async function supabaseDeleteAll(table) {
   }
 }
 
+// ---- Supabase Storage: upload bytes for permanent thumbnails ----
+// Bucket: creative-thumbnails (public-read). Public URL pattern:
+//   ${SUPABASE_URL}/storage/v1/object/public/creative-thumbnails/<path>
+async function supabaseStorageUpload(bucket, path, bytes, contentType) {
+  try {
+    const url = `${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': contentType || 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: bytes
+    });
+    if (!res.ok) { console.warn(`Storage upload ${res.status}: ${await res.text()}`); return false; }
+    return true;
+  } catch(e) { console.warn('supabaseStorageUpload error:', e.message); return false; }
+}
+function supabaseStoragePublicUrl(bucket, path) {
+  return `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}`;
+}
+function _base64ToBytes(b64) {
+  const bin = atob(b64);
+  const len = bin.length;
+  const u8 = new Uint8Array(len);
+  for (let i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+
 // ---- Supabase: library_assets loader ----
 async function loadLibraryFromSupabase() {
   try {
@@ -3775,18 +3806,32 @@ function recordMetaPull() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // Backfill thumbnails for existing tagger data without re-pulling all ads
+// Bytes-not-URLs migration (May 3, 2026):
+//   Meta CDN thumbnail URLs carry an embedded TTL (~24-48h). Caching the URL string
+//   guarantees future 403s. This function downloads the bytes ONCE through the
+//   /api/proxy-image worker, uploads them to Supabase Storage (bucket
+//   "creative-thumbnails"), and writes the permanent public URL to
+//   creative_tags.stored_thumbnail. Hydration prefers stored_thumbnail over
+//   thumbnail_url, so the dashboard becomes Meta-CDN-independent.
+//
+// opts: { dryRun?: bool, limit?: number }  // limit = 0 means no cap
 async function backfillThumbnails(opts) {
-  const dryRun = !!(opts && opts.dryRun);
+  opts = opts || {};
+  const dryRun = !!opts.dryRun;
+  const limit = Number.isFinite(opts.limit) && opts.limit > 0 ? opts.limit : 0;
   const token = state.metaApi?.token || META_API_TOKEN;
   if (!token) { showToast('Enter Meta API token in Settings first'); return; }
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
   if (!accounts.length) { showToast('No Meta ad accounts configured'); return; }
   if (!state.taggerData.length) { showToast('No tagger data to backfill'); return; }
 
-  showToast(dryRun ? 'DRY RUN: fetching from Meta API (no writes)...' : 'Fetching thumbnails + ad copy from Meta API...');
-  // Build index: exact + lowercase + normalizeAdName match
-  // Apr 29: removed token-overlap fuzzy fallback — it caused wrong-thumbnail corruption Apr 28.
-  // See project_thumbnail_corruption_apr28. Better no thumbnail than wrong thumbnail.
+  showToast(
+    dryRun ? 'DRY RUN: scanning Meta API (no writes)...'
+           : limit ? `Migrating up to ${limit} thumbnails to Storage...`
+                   : 'Migrating thumbnails to Supabase Storage...'
+  );
+
+  // Strict-match name index (no fuzzy — Apr 28 corruption fix stays).
   const adNameIndex = {};
   const adNameIndexLower = {};
   const adNameIndexNorm = {};
@@ -3799,7 +3844,6 @@ async function backfillThumbnails(opts) {
       if (norm) adNameIndexNorm[norm] = i;
     }
   });
-
   const findMatch = (apiName) => {
     if (!apiName) return undefined;
     let idx = adNameIndex[apiName];
@@ -3807,132 +3851,126 @@ async function backfillThumbnails(opts) {
     idx = adNameIndexLower[apiName.toLowerCase().trim()];
     if (idx !== undefined) return idx;
     const norm = normalizeAdName(apiName);
-    if (norm) {
-      idx = adNameIndexNorm[norm];
-      if (idx !== undefined) return idx;
-    }
-    return undefined; // STRICT: no fuzzy fallback (Apr 28 corruption fix)
+    if (norm) { idx = adNameIndexNorm[norm]; if (idx !== undefined) return idx; }
+    return undefined;
   };
 
-  // Track every proposed assignment for dry-run inspection + audit
+  // Idempotency: skip ads that already have a stored_thumbnail in Supabase.
+  const lookup = state._tagLookup || {};
+  const alreadyMigrated = new Set();
+  state.taggerData.forEach(c => {
+    const adName = c['Ad name'] || c['ad name'] || '';
+    const acct = c['_account'] || '';
+    const row = lookup[adName + '||' + acct] || lookup[adName];
+    if (row?.stored_thumbnail) alreadyMigrated.add(adName);
+  });
+
   const proposed = [];
+  const writes = [];
+  let migrated = 0, apiAds = 0, errors = 0;
+  let skippedAlready = 0, skippedNoUrl = 0, skippedNoMatch = 0;
 
-  let matched = 0, apiAds = 0, errors = 0;
+  outer:
   for (const account of accounts) {
-    // Strategy 1: Try creative field expansion (gets thumbnail + copy in one call)
-    let success = false;
+    if (limit && migrated >= limit) break;
+    let data;
     try {
-      // Strategy 1: creative field expansion via proxy
-      let data = await callMetaAPI(`${account.id}/ads`, { fields: 'name,effective_image_url,creative{thumbnail_url,image_url,body,title}', limit: '50' });
-      let page = 1;
-      while (data && page <= 15) {
-        if (data.data?.length) {
-          success = true;
-          apiAds += data.data.length;
-          if (page === 1) console.log(`[${account.name}] Page 1: ${data.data.length} ads. Sample:`, data.data[0]?.name?.substring(0,60));
-          data.data.forEach(ad => {
-            const idx = findMatch(ad.name);
-            if (idx !== undefined && ad.creative) {
-              const t = state.taggerData[idx];
-              const _bestImg = ad.effective_image_url || ad.creative.image_url || ad.creative.thumbnail_url || '';
-              proposed.push({ apiName: ad.name, taggerAdName: t['Ad name'] || t['ad name'] || '', imageUrl: _bestImg, account: account.name });
-              if (!dryRun) {
-                t['image_url'] = _bestImg || t['image_url'] || '';
-                t['thumbnail_url'] = _bestImg || t['thumbnail_url'] || '';
-                if (ad.creative.body) t['ad_body'] = ad.creative.body;
-                if (ad.creative.title) t['ad_title'] = ad.creative.title;
-                if (ad.creative.description) t['ad_description'] = ad.creative.description;
-                if (ad.creative.call_to_action_type) t['ad_cta'] = ad.creative.call_to_action_type;
-              }
-              matched++;
-            }
-          });
-        }
-        const nextUrl = data?.paging?.next;
-        if (!nextUrl) break;
-        page++;
-        await sleep(300);
-        const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, ''); const _params = {};
-        _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
-        data = await callMetaAPI(_ep, _params);
-      }
-    } catch(e) { console.error(`Thumbnails ${account.name}:`, e.message); }
+      data = await callMetaAPI(`${account.id}/ads`, { fields: 'name,effective_image_url,creative{thumbnail_url,image_url,body,title}', limit: '50' });
+    } catch(e) { console.error(`Meta API ${account.name}:`, e.message); errors++; continue; }
 
-    // Strategy 2: adcreatives fallback via proxy
-    if (!success) {
-      console.log(`[${account.name}] Creative expansion failed, trying adcreatives fallback...`);
-      try {
-        let data = await callMetaAPI(`${account.id}/adcreatives`, { fields: 'name,thumbnail_url,image_url,body,title,object_story_spec', limit: '500' });
-        let page = 1;
-        while (data && page <= 30) {
-          if (data.data?.length) {
-            apiAds += data.data.length;
-            data.data.forEach(creative => {
-              const idx = findMatch(creative.name);
-              if (idx !== undefined) {
-                const t = state.taggerData[idx];
-                const _bestImg2 = creative.effective_image_url || creative.image_url || creative.thumbnail_url || '';
-                proposed.push({ apiName: creative.name, taggerAdName: t['Ad name'] || t['ad name'] || '', imageUrl: _bestImg2, account: account.name });
-                if (!dryRun) {
-                  t['thumbnail_url'] = _bestImg2 || t['thumbnail_url'] || '';
-                  t['image_url'] = _bestImg2 || t['image_url'] || '';
-                  if (creative.body) t['ad_body'] = creative.body;
-                  if (creative.title) t['ad_title'] = creative.title;
-                }
-                matched++;
-              }
-            });
+    let page = 1;
+    while (data && page <= 30) {
+      if (data.data?.length) {
+        apiAds += data.data.length;
+        if (page === 1) console.log(`[${account.name}] Page 1: ${data.data.length} ads`);
+        for (const ad of data.data) {
+          if (limit && migrated >= limit) break outer;
+          const idx = findMatch(ad.name);
+          if (idx === undefined) { skippedNoMatch++; continue; }
+          const target = state.taggerData[idx];
+          const adName = target['Ad name'] || target['ad name'] || '';
+          if (alreadyMigrated.has(adName)) { skippedAlready++; continue; }
+          const freshUrl = ad.effective_image_url || ad.creative?.image_url || ad.creative?.thumbnail_url || '';
+          if (!freshUrl) { skippedNoUrl++; continue; }
+
+          if (dryRun) {
+            proposed.push({ adName, account: account.name, freshUrl: freshUrl.substring(0, 80) + '...' });
+            migrated++;
+            continue;
           }
-          const nextUrl = data?.paging?.next;
-          if (!nextUrl) break;
-          page++;
-          await sleep(300);
-          const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, ''); const _params = {};
-          _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
-          data = await callMetaAPI(_ep, _params);
+
+          try {
+            const { base64, mimeType } = await fetchImageAsBase64(freshUrl);
+            const ext = mimeType.includes('png') ? 'png'
+                      : mimeType.includes('gif') ? 'gif'
+                      : mimeType.includes('webp') ? 'webp' : 'jpg';
+            const safe = encodeURIComponent(adName).slice(0, 200);
+            const path = `${account.id}/${safe}.${ext}`;
+            const ok = await supabaseStorageUpload('creative-thumbnails', path, _base64ToBytes(base64), mimeType);
+            if (!ok) { errors++; continue; }
+            const publicUrl = supabaseStoragePublicUrl('creative-thumbnails', path);
+
+            // In-memory hydration: render code reads thumbnail_url, so set both.
+            target.thumbnail_url = publicUrl;
+            target.image_url = publicUrl;
+            target.stored_thumbnail = publicUrl;
+            if (ad.creative?.body) target.ad_body = ad.creative.body;
+            if (ad.creative?.title) target.ad_title = ad.creative.title;
+
+            // Match composite PK on existing row's account, not taggerData's (often empty).
+            const existingRow = lookup[adName + '||' + (target['_account'] || '')] || lookup[adName];
+            const account_pk = target['_account'] || existingRow?.account || '';
+            writes.push({
+              ad_name: adName,
+              account: account_pk,
+              stored_thumbnail: publicUrl,
+              thumbnail_url: publicUrl
+            });
+            alreadyMigrated.add(adName);
+            migrated++;
+          } catch(e) {
+            console.warn(`Migrate ${adName.substring(0,60)}: ${e.message}`);
+            errors++;
+          }
         }
-      } catch(e) { console.error(`Adcreatives fallback ${account.name}:`, e.message); errors++; }
+      }
+      const nextUrl = data?.paging?.next;
+      if (!nextUrl) break;
+      page++;
+      await sleep(300);
+      const _nu = new URL(nextUrl); const _ep = _nu.pathname.replace(/\/v\d+\.\d+\//, ''); const _params = {};
+      _nu.searchParams.forEach((v, k) => { if (k !== 'access_token') _params[k] = v; });
+      try { data = await callMetaAPI(_ep, _params); } catch(e) { console.warn('Meta pagination:', e.message); break; }
     }
     await sleep(500);
   }
 
-  console.log(`${dryRun ? '[DRY RUN] ' : ''}Thumbnail backfill ${dryRun ? 'would-match' : 'done'}: ${matched} matched out of ${apiAds} API ads across ${accounts.length} accounts. ${errors} errors.`);
+  console.log(`${dryRun ? '[DRY RUN] ' : ''}Thumbnail migration: migrated=${migrated} apiAds=${apiAds} skippedAlready=${skippedAlready} skippedNoMatch=${skippedNoMatch} skippedNoUrl=${skippedNoUrl} errors=${errors}`);
 
   if (dryRun) {
-    // Stash full proposed list for inspection; print 10 samples
     window._lastBackfillProposed = proposed;
-    console.log(`[DRY RUN] ${proposed.length} proposed assignments. First 10 samples:`);
-    proposed.slice(0, 10).forEach((p, i) => {
-      console.log(`  ${i + 1}. apiName="${(p.apiName || '').substring(0, 80)}"`);
-      console.log(`     → tagger="${(p.taggerAdName || '').substring(0, 80)}"  [${p.account}]`);
-    });
-    console.log(`[DRY RUN] Full list at window._lastBackfillProposed (${proposed.length} entries). Eyeball before running for real.`);
-    showToast(`DRY RUN: ${matched}/${apiAds} would match. Check console for samples — ${proposed.length} proposed.`);
-    return { dryRun: true, matched, apiAds, errors, proposed };
+    console.log(`[DRY RUN] ${proposed.length} would migrate. First 10:`);
+    proposed.slice(0, 10).forEach((p, i) => console.log(`  ${i + 1}. ${p.adName.substring(0, 70)} [${p.account}]`));
+    showToast(`DRY RUN: ${migrated} would migrate (${apiAds} API ads scanned).`);
+    return { dryRun: true, migrated, apiAds, errors, proposed };
   }
 
-  // Persist thumbnails to Supabase creative_tags
-  // IMPORTANT: must match existing row's account field, not taggerData's _account (often empty)
-  if (matched > 0) {
-    const thumbUpdates = state.taggerData.filter(c => c.thumbnail_url).map(c => {
-      const adName = c['Ad name'] || c['ad name'] || '';
-      // Find the existing Supabase row's account to match the composite PK
-      const existingRow = state._tagLookup?.[adName];
-      const account = c['_account'] || existingRow?.account || '';
-      return { ad_name: adName, account, thumbnail_url: c.thumbnail_url };
-    }).filter(r => r.ad_name && r.thumbnail_url);
-    if (thumbUpdates.length) {
-      for (let i = 0; i < thumbUpdates.length; i += 100) {
-        supabaseUpsert('creative_tags', thumbUpdates.slice(i, i + 100), 'ad_name,account').catch(e => console.warn('Thumb save error:', e.message));
-      }
-      console.log(`Saved ${thumbUpdates.length} thumbnails to Supabase (matched existing accounts)`);
+  if (writes.length) {
+    const filtered = writes.filter(r => r.ad_name);
+    for (let i = 0; i < filtered.length; i += 100) {
+      await supabaseUpsert('creative_tags', filtered.slice(i, i + 100), 'ad_name,account')
+        .catch(e => console.warn('creative_tags upsert error:', e.message));
     }
+    console.log(`Saved ${filtered.length} stored_thumbnail rows to Supabase`);
   }
   rebuildTagMap();
   saveTaggerData();
-  showToast(matched > 0 ? `Thumbnails + ad copy: ${matched} ads enriched` : `0 matches (${apiAds} API ads fetched, ${errors} errors). Check console.`);
+  showToast(migrated > 0
+    ? `Migrated ${migrated} thumbnails to Storage (${errors} errors)`
+    : `0 migrated (${apiAds} API ads, ${errors} errors). Check console.`);
   if (state.currentView === 'tagger') showTaggerResults();
   runDiagnostics();
+  return { migrated, apiAds, errors, skippedAlready, skippedNoMatch, skippedNoUrl };
 }
 window.backfillThumbnails = backfillThumbnails;
 
@@ -14394,14 +14432,18 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
         if (!state._tagLookup[t.ad_name]) state._tagLookup[t.ad_name] = t;
       });
       console.log(`creative_tags: ${tags.length} rows loaded into tag lookup`);
-      // Backfill thumbnails from creative_tags into taggerData + _tagMap
+      // Backfill thumbnails from creative_tags into taggerData + _tagMap.
+      // Prefer stored_thumbnail (permanent Supabase Storage URL) over thumbnail_url
+      // (legacy Meta CDN URL — TTLs out, see project_thumbnail_rewrite_plan).
       let thumbBackfilled = 0;
       state.taggerData.forEach(c => {
         if (c.thumbnail_url || c.image_url) return; // already has one
         const name = c['Ad name'] || c['ad name'] || '';
         const lookup = state._tagLookup[name];
-        if (lookup?.thumbnail_url) {
-          c.thumbnail_url = lookup.thumbnail_url;
+        const bestUrl = lookup?.stored_thumbnail || lookup?.thumbnail_url;
+        if (bestUrl) {
+          c.thumbnail_url = bestUrl;
+          if (lookup.stored_thumbnail) c.stored_thumbnail = lookup.stored_thumbnail;
           thumbBackfilled++;
         }
       });
@@ -14698,8 +14740,9 @@ async function tagCreatives(rawData, opts = {}) {
     // Check Supabase cache first — keyed by "ad_name||account" or "ad_name"
     const acctKey = adName + '||' + (c['_account'] || '');
     const cacheRow = supabaseCache[acctKey] || supabaseCache[adName];
-    // Always grab thumbnail from Supabase, even if tags are empty
-    const _supaThumb = cacheRow?.thumbnail_url || '';
+    // Always grab thumbnail from Supabase, even if tags are empty.
+    // Prefer stored_thumbnail (permanent Storage URL) over thumbnail_url (legacy CDN, TTLd).
+    const _supaThumb = cacheRow?.stored_thumbnail || cacheRow?.thumbnail_url || '';
     if (cacheRow && (cacheRow.hook || cacheRow.talent_type)) {
       const row = cacheRow;
       const tags = {};
@@ -14707,11 +14750,11 @@ async function tagCreatives(rawData, opts = {}) {
       GODFATHER_TAXONOMY.allFields.forEach(f => { if (row[f] != null) tags[f] = row[f]; });
       tags.confidence = row.confidence || 'cached';
       tags.tagged_at = row.tagged_at || '';
-      cachedResults.push({ ...c, tags, thumbnail_url: _supaThumb || c.thumbnail_url || '', image_url: c.image_url || _supaThumb || '', id: Date.now() + cachedResults.length, _cached: true });
+      cachedResults.push({ ...c, tags, thumbnail_url: _supaThumb || c.thumbnail_url || '', image_url: c.image_url || _supaThumb || '', stored_thumbnail: row.stored_thumbnail || '', id: Date.now() + cachedResults.length, _cached: true });
       return;
     }
     // Even if no tags cached, copy thumbnail from Supabase (saved by Fetch Thumbnails)
-    if (_supaThumb) { c.thumbnail_url = c.thumbnail_url || _supaThumb; c.image_url = c.image_url || _supaThumb; }
+    if (_supaThumb) { c.thumbnail_url = c.thumbnail_url || _supaThumb; c.image_url = c.image_url || _supaThumb; if (cacheRow?.stored_thumbnail) c.stored_thumbnail = cacheRow.stored_thumbnail; }
 
     // Check localStorage cache (old or new taxonomy — migrate if needed)
     const localCached = tagCache[adName];
@@ -14874,14 +14917,21 @@ async function tagCreatives(rawData, opts = {}) {
       c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
     }
   });
-  // Final pass: backfill thumbnails from Supabase _tagLookup for any creative still missing one
+  // Final pass: backfill thumbnails from Supabase _tagLookup for any creative still missing one.
+  // Prefer stored_thumbnail (permanent) over thumbnail_url (TTLd CDN).
   if (state._tagLookup) {
     let _thumbFilled = 0;
     state.taggerData.forEach(c => {
       if (c.thumbnail_url || c.image_url) return;
       const name = c['Ad name'] || c['ad name'] || '';
       const row = state._tagLookup[name];
-      if (row?.thumbnail_url) { c.thumbnail_url = row.thumbnail_url; c.image_url = row.thumbnail_url; _thumbFilled++; }
+      const bestUrl = row?.stored_thumbnail || row?.thumbnail_url;
+      if (bestUrl) {
+        c.thumbnail_url = bestUrl;
+        c.image_url = bestUrl;
+        if (row.stored_thumbnail) c.stored_thumbnail = row.stored_thumbnail;
+        _thumbFilled++;
+      }
     });
     if (_thumbFilled > 0) console.log(`Backfilled ${_thumbFilled} thumbnails from Supabase in Phase 3`);
   }
