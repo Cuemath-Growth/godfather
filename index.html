@@ -3093,7 +3093,7 @@ function runDiagnostics() {
 
   if (state.taggerData?.length) {
     // ── Thumbnails ──
-    const withThumb = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+    const withThumb = state.taggerData.filter(c => c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url']).length;
     const thumbPct = Math.round(withThumb / state.taggerData.length * 100);
     check('Thumbnails present', thumbPct > 10, `${withThumb}/${state.taggerData.length} (${thumbPct}%)`);
     if (thumbPct === 0) warn('Zero thumbnails', 'Meta API thumbnail fetch may have failed. Re-pull data or check API token.');
@@ -4986,12 +4986,12 @@ function getCreativeThumbnail(adName) {
   if (!norm) return null;
   // Exact match first, then fuzzy
   const exact = metaCreatives.find(c => normalizeAdName(c.name) === norm);
-  if (exact) return exact.thumbnail_url || exact.image_url || null;
+  if (exact) return exact.stored_thumbnail || exact.thumbnail_url || exact.image_url || null;
   const fuzzy = metaCreatives.find(c => {
     const n = normalizeAdName(c.name);
     return n.includes(norm) || norm.includes(n);
   });
-  return fuzzy ? (fuzzy.thumbnail_url || fuzzy.image_url || null) : null;
+  return fuzzy ? (fuzzy.stored_thumbnail || fuzzy.thumbnail_url || fuzzy.image_url || null) : null;
 }
 
 function updateDataStatusLine() {
@@ -5263,7 +5263,7 @@ function buildLookupMaps() {
   metaCreatives.forEach(c => {
     const key = normalizeAdName(c.name);
     if (!key) return;
-    _adMap[key] = { thumbnail_url: c.thumbnail_url || '', image_url: c.image_url || '', campaign_name: '' };
+    _adMap[key] = { stored_thumbnail: c.stored_thumbnail || '', thumbnail_url: c.thumbnail_url || '', image_url: c.image_url || '', campaign_name: '' };
   });
   // Enrich with campaign_name from tagger data if available
   (state.taggerData || []).forEach(c => {
@@ -5731,7 +5731,7 @@ function rebuildTagMap() {
     _tagMap[key] = {
       tags: c.tags || {},
       type: c['Creative type'] || c['creative type'] || '',
-      thumb: c.thumbnail_url || c.image_url || '',
+      thumb: c.stored_thumbnail || c.thumbnail_url || c.image_url || '',
       campaign: c['Campaign name'] || c['campaign name'] || '',
       adset: c['Ad set name'] || c['ad set name'] || '',
     };
@@ -6009,7 +6009,7 @@ function mergeCRMWithMeta() {
   // Diagnostic: tagger market distribution + thumbnails
   const mktDist = {};
   let thumbCount = 0;
-  state.taggerData.forEach(c => { const m = extractMarket(c); mktDist[m] = (mktDist[m]||0)+1; if (c['thumbnail_url'] || c['image_url']) thumbCount++; });
+  state.taggerData.forEach(c => { const m = extractMarket(c); mktDist[m] = (mktDist[m]||0)+1; if (c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url']) thumbCount++; });
   console.log('Tagger market distribution:', mktDist);
   console.log('Tagger thumbnails:', thumbCount, 'of', state.taggerData.length, 'have image URLs');
   if (!rows?.length) return;
@@ -8049,7 +8049,7 @@ function renderOracleActions() {
             ${lastWeekAds > 0 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full ${parseInt(velocityTrend) > 0 ? 'bg-accent-green-light text-green-700' : parseInt(velocityTrend) < 0 ? 'bg-accent-red-light text-red-700' : 'bg-surface-tertiary text-text-muted'} font-bold ml-1">${parseInt(velocityTrend) > 0 ? '↑' : parseInt(velocityTrend) < 0 ? '↓' : '→'}${Math.abs(parseInt(velocityTrend)||0)>999?(Math.abs(parseInt(velocityTrend)/100).toFixed(0)+'x'):(Math.abs(parseInt(velocityTrend)||0)+'%')} vs last week (${lastWeekAds})</span>` : ''}
           </div>
           ${bestRecent ? `<div class="border-l border-gray-200 pl-4 flex items-center gap-2">
-            ${bestRecent.thumbnail_url || bestRecent.image_url ? `<img src="${bestRecent.thumbnail_url || bestRecent.image_url}" class="w-8 h-8 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}
+            ${bestRecent.stored_thumbnail || bestRecent.thumbnail_url || bestRecent.image_url ? `<img src="${bestRecent.stored_thumbnail || bestRecent.thumbnail_url || bestRecent.image_url}" class="w-8 h-8 rounded object-cover shrink-0" onerror="this.style.display='none'"/>` : ''}
             <div>
               <span class="text-[9px] text-accent-green font-bold uppercase">Best in last 7 days:</span>
               <span class="text-xs font-semibold ml-1">${shortAdName(bestRecent['Ad name']||bestRecent['ad name']||'')}</span>
@@ -8122,7 +8122,7 @@ function renderOracleActions() {
       const name = c['Ad name']||c['ad name']||'';
       const market = extractMarket(c);
       const audience = extractAudience(c);
-      const thumb = c['image_url']||c['thumbnail_url']||'';
+      const thumb = c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url']||'';
       // WHY reason — uses market-specific CPTD thresholds from SENTINEL_THRESHOLDS
       const _cTD = td(c), _cQL = ql(c), _cSpend = spend(c);
       const _mktTh = (typeof SENTINEL_THRESHOLDS !== 'undefined' ? SENTINEL_THRESHOLDS[market] : null) || { cptd: { green: 35000 } };
@@ -8594,9 +8594,9 @@ function _oracleThumbnail(name) {
   // Try: ad map → metaCreatives → campaign tagger match → tagger fuzzy → grey placeholder
   const key = normalizeAdName(name);
   const adEntry = _adMap?.[key];
-  const url = (adEntry?.thumbnail_url || adEntry?.image_url)
+  const url = (adEntry?.stored_thumbnail || adEntry?.thumbnail_url || adEntry?.image_url)
     || getCreativeThumbnail(name) || getCampaignThumbnail(name)
-    || (() => { const m = (state.taggerData || []).find(c => { const n = normalizeAdName(c['Ad name']), q = key; return n && q && (n.includes(q) || q.includes(n)); }); return m?.thumbnail_url || m?.image_url || ''; })();
+    || (() => { const m = (state.taggerData || []).find(c => { const n = normalizeAdName(c['Ad name']), q = key; return n && q && (n.includes(q) || q.includes(n)); }); return m?.stored_thumbnail || m?.thumbnail_url || m?.image_url || ''; })();
   if (url) return `<img src="${url}" class="w-10 h-10 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\\'w-10 h-10 rounded-lg bg-surface-tertiary shrink-0\\'></div>'" />`;
   return '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
 }
@@ -8607,14 +8607,14 @@ function getCampaignThumbnail(campaignName) {
   // Look up tagger data by Campaign name field → get first ad's thumbnail
   const taggerMatch = (state.taggerData || []).find(c => normalizeAdName(c['Campaign name']) === q);
   if (taggerMatch) {
-    const url = taggerMatch.thumbnail_url || taggerMatch.image_url;
+    const url = taggerMatch.stored_thumbnail || taggerMatch.thumbnail_url || taggerMatch.image_url;
     if (url) return url;
   }
   // Fallback: any metaCreative whose ad name shares a prefix with campaign name (first 25 chars)
   if (metaCreatives.length) {
     const prefix = q.slice(0, 25);
     const match = metaCreatives.find(c => normalizeAdName(c.name).startsWith(prefix));
-    if (match) return match.thumbnail_url || match.image_url || null;
+    if (match) return match.stored_thumbnail || match.thumbnail_url || match.image_url || null;
   }
   return null;
 }
@@ -9725,7 +9725,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     const action = (typeof getOracleAction === 'function') ? getOracleAction(itemId) : null;
     const isDone = action?.status === 'done';
     const opacity = isDone ? 'opacity-50' : '';
-    const thumb = w.thumbnail_url || w.image_url || '';
+    const thumb = w.stored_thumbnail || w.thumbnail_url || w.image_url || '';
     const mkt = w.market || 'US';
     const mktTh = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
     const _dispCPTD = w._displayCPTD;
@@ -13211,7 +13211,7 @@ function _getTagExamples(category, value, count = 3) {
   });
   return matches.slice(0, count).map(c => ({
     name: c['Ad name'] || c['ad name'] || 'Unknown',
-    thumb: c['thumbnail_url'] || c['image_url'] || '',
+    thumb: c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url'] || '',
     spend: parseNumber(c['Spent']||c['spent']||0),
     td: parseNumber(c['TD']||c['td']||0),
     cptd: parseNumber(c['TD']||0) > 0 ? parseNumber(c['Spent']||0) / parseNumber(c['TD']||0) : null
@@ -14455,7 +14455,7 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
         const name = c['Ad name'] || c['ad name'] || '';
         const lookup = state._tagLookup[name];
         if (lookup?.stored_thumbnail) {
-          // Renderers read `c.image_url || c.thumbnail_url` (creativeCard at 16147,
+          // Renderers read `c.stored_thumbnail || c.image_url || c.thumbnail_url` (creativeCard at 16147,
           // _winningCreativesTable at 15986, AQ cards, etc). Overwrite BOTH so the
           // permanent URL wins regardless of which field the renderer checks first.
           c.thumbnail_url = lookup.stored_thumbnail;
@@ -14464,7 +14464,7 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
           thumbBackfilled++;
           return;
         }
-        if (c.thumbnail_url || c.image_url) return; // already has a (legacy) URL
+        if (c.stored_thumbnail || c.thumbnail_url || c.image_url) return; // already has a (legacy) URL
         const bestUrl = lookup?.thumbnail_url;
         if (bestUrl) {
           c.thumbnail_url = bestUrl;
@@ -14965,7 +14965,7 @@ async function tagCreatives(rawData, opts = {}) {
         _thumbFilled++;
         return;
       }
-      if (c.thumbnail_url || c.image_url) return;
+      if (c.stored_thumbnail || c.thumbnail_url || c.image_url) return;
       const bestUrl = row?.thumbnail_url;
       if (bestUrl) {
         c.thumbnail_url = bestUrl;
@@ -14981,7 +14981,7 @@ async function tagCreatives(rawData, opts = {}) {
   document.getElementById('taggerCount').textContent = `${state.taggerData.length} creatives`;
   document.getElementById('taggerExportBtn').style.display = '';
   document.getElementById('taggerBackupBtn').style.display = '';
-  const _tc = state.taggerData.filter(c => c['thumbnail_url'] || c['image_url']).length;
+  const _tc = state.taggerData.filter(c => c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url']).length;
   const _te = document.getElementById('taggerThumbCount');
   if (_te) _te.textContent = _tc > 0 ? `${_tc} with thumbnails` : 'No thumbnails';
   const _tb = document.getElementById('taggerThumbBtn');
@@ -15023,7 +15023,7 @@ async function visionScanCreators() {
   // Find influencer ads with thumbnails that haven't been scanned
   const candidates = (state.taggerData || []).filter(c => {
     if (!_isInfluencerAd(c)) return false;
-    const thumb = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
+    const thumb = _hdThumb(c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '');
     if (!thumb) return false;
     const adName = c['Ad name'] || c['ad name'] || '';
     return adName && !visionCache[adName];
@@ -15158,7 +15158,7 @@ async function buildTaggerMessage(creative) {
   const headline = creative['ad_title'] || '';
   const primaryText = creative['ad_body'] || '';
   const description = creative['ad_description'] || '';
-  let imageUrl = creative['thumbnail_url'] || creative['image_url'] || '';
+  let imageUrl = creative['stored_thumbnail'] || creative['thumbnail_url'] || creative['image_url'] || '';
   const adId = creative['ad_id'] || creative['Ad ID'] || '';
 
   const content = [];
@@ -15179,7 +15179,7 @@ async function buildTaggerMessage(creative) {
   if (!imageUrl && adId && state.metaApi?.token) {
     try {
       const freshData = await callMetaAPI(`${adId}`, { fields: 'creative{thumbnail_url,image_url}' });
-      imageUrl = freshData?.creative?.thumbnail_url || freshData?.creative?.image_url || '';
+      imageUrl = freshData?.creative?.stored_thumbnail || freshData?.creative?.thumbnail_url || freshData?.creative?.image_url || '';
       if (imageUrl) {
         creative['thumbnail_url'] = imageUrl;
         console.log('Fetched thumbnail via Meta API for:', adName);
@@ -15358,7 +15358,7 @@ function showTaggerResults() {
   const _expBtn = document.getElementById('taggerExportBtn'); if (_expBtn) _expBtn.style.display = '';
   const _bkpBtn = document.getElementById('taggerBackupBtn'); if (_bkpBtn) _bkpBtn.style.display = '';
   const _taggerSource = metaAdData.length > 0 ? getAdPerformance(null, null, null, { includeNonLP: true }) : sanitizeTaggerData(state.taggerData || []);
-  const _tc = _taggerSource.filter(c => c['thumbnail_url'] || c['image_url']).length;
+  const _tc = _taggerSource.filter(c => c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url']).length;
   const _te = document.getElementById('taggerThumbCount');
   if (_te) _te.textContent = _tc > 0 ? `${_tc} thumbnails` : 'No thumbnails';
   const _tb = document.getElementById('taggerThumbBtn');
@@ -16010,7 +16010,7 @@ function _winningCreativesTable(data) {
       const c = q.c;
       const name = c['Ad name']||c['ad name']||'Unknown';
       const aud = c.tags?.campaign_audience && c.tags.campaign_audience !== 'Unknown' ? c.tags.campaign_audience : '—';
-      const thumb = _hdThumb(c['image_url']||c['thumbnail_url']||'');
+      const thumb = _hdThumb(c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url']||'');
       const v = getCreativeVerdict(c);
       const vBadge = v.key === 'scale' ? 'bg-green-100 text-green-800' : 'bg-emerald-100 text-emerald-700';
       const action = v.key === 'scale' ? 'Scale +30% budget' : 'Hold spend; brief V2';
@@ -16148,7 +16148,7 @@ function renderCreativeReview() {
     const mkt = extractMarket(c) || 'US';
     const b = benchmarks[mkt] || {};
     const type = c['Creative type'] || 'Unknown';
-    const thumb = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
+    const thumb = _hdThumb(c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '');
     const campaign = c['Campaign name'] || c['campaign name'] || '';
     const tags = c.tags || {};
     // Build ALL non-empty tag pills from taxonomy
@@ -16762,7 +16762,7 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
   else if (conf === 'inferred') tagHtml += ' <span class="text-[7px] text-amber-400" title="Tagged from text only (no image)">&#9679;</span>';
   else if (!tagHtml || tagCount === 0) tagHtml = '<span class="text-[9px] text-gray-400 italic" title="Not yet tagged with new taxonomy. Use Pilot 50 or Re-tag All.">Needs tagging</span>';
 
-  const thumb = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
+  const thumb = _hdThumb(c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '');
   const market = extractMarket(c);
   const pl = indent ? `pl-${indent * 4 + 3}` : 'pl-3';
   const mktThresholds = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
@@ -17374,7 +17374,7 @@ function renderTagCombos() {
         })[0];
       if (!match) return null;
       const name = shortAdName(match['Ad name']||match['ad name']||'');
-      const thumb = match.thumbnail_url || match.image_url || '';
+      const thumb = match.stored_thumbnail || match.thumbnail_url || match.image_url || '';
       return { name, thumb };
     }
 
@@ -17587,7 +17587,7 @@ function renderCreativeGrid() {
         return `<span class="text-[9px] px-1.5 py-0.5 rounded ${tc.bg} ${tc.text} font-medium">${tagLabel(tags[cat])}</span>`;
       }).join('');
 
-    const thumbUrl = _hdThumb(c['image_url'] || c['thumbnail_url'] || '');
+    const thumbUrl = _hdThumb(c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '');
     const _hasCRM = ql > 0 || tdVal > 0 || c._hasCRM;
     const _noCRMLabel = '<span class="text-[9px] text-gray-400 italic">No CRM</span>';
     return `<div class="bg-white border border-gray-200/80 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
@@ -17960,7 +17960,7 @@ function renderLeaderboard() {
         const td = parseNumber(c['TD']||0);
         const adCptd = td > 0 ? spend / td : 0;
         const adV = typeof getCreativeVerdict === 'function' ? getCreativeVerdict(c) : verdict({spend,td,ql:parseNumber(c['QL']||0),cptd:adCptd,ctr:0});
-        const thumb = c.thumbnail_url || c.image_url || '';
+        const thumb = c.stored_thumbnail || c.thumbnail_url || c.image_url || '';
         const tags = attrMap[adName] || [];
         const tagPills = tags.map(t => {
           const tc = TAG_COLORS[t.color] || TAG_COLORS.purple;
@@ -20022,7 +20022,7 @@ function renderInfluLeaderboard(filteredCreators) {
       <td class="px-3 py-2.5 font-semibold sticky-col bg-white">
         <div class="flex items-center gap-2">
           ${hasAdSets ? '<span class="text-[9px] text-text-muted">▶</span>' : ''}
-          ${r.bestAd?.['thumbnail_url'] || r.bestAd?.['image_url'] ? `<img src="${r.bestAd['thumbnail_url'] || r.bestAd['image_url']}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\'w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px]\'>No img</div>'" />` : ''}
+          ${r.bestAd?.['stored_thumbnail'] || r.bestAd?.['thumbnail_url'] || r.bestAd?.['image_url'] ? `<img src="${r.bestAd['thumbnail_url'] || r.bestAd['image_url']}" class="w-8 h-8 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.outerHTML='<div class=\'w-8 h-8 rounded-lg bg-surface-tertiary flex items-center justify-center text-text-muted text-[8px]\'>No img</div>'" />` : ''}
           <div>
             <span>${r.displayName}</span>
             ${r.handle ? `<span class="text-[9px] text-text-muted ml-1">@${r.handle}</span>` : ''}
@@ -20563,7 +20563,7 @@ function generateDesignerBrief(audience, hook, format, geo) {
   // Reference creatives with metrics
   const refCreatives = top3.map(c => ({
     name: c['Ad name'] || c['ad name'] || 'Unknown',
-    thumbnail: c['image_url'] || c['thumbnail_url'] || '',
+    thumbnail: c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '',
     cpql: parseNumber(c['QL']||c['ql']||0) > 0 ? parseNumber(c['Spent']||c['spent']||0) / parseNumber(c['QL']||c['ql']||0) : null,
     cptd: parseNumber(c['TD']||c['td']||0) > 0 ? parseNumber(c['Spent']||c['spent']||0) / parseNumber(c['TD']||c['td']||0) : null,
   }));
@@ -20582,7 +20582,7 @@ function generateDesignerBrief(audience, hook, format, geo) {
       if (refCreatives.find(r => r.name === name)) continue;
       refCreatives.push({
         name,
-        thumbnail: c['image_url'] || c['thumbnail_url'] || '',
+        thumbnail: c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '',
         cpql: parseNumber(c['QL']||c['ql']||0) > 0 ? parseNumber(c['Spent']||c['spent']||0) / parseNumber(c['QL']||c['ql']||0) : null,
         cptd: parseNumber(c['TD']||c['td']||0) > 0 ? parseNumber(c['Spent']||c['spent']||0) / parseNumber(c['TD']||c['td']||0) : null,
       });

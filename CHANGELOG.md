@@ -4,6 +4,45 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Thumbnail sweep: every renderer prefers stored_thumbnail (2026-05-05)
+
+### Why this shipped
+The two prior commits (796cf09, 9a9385e) only fixed hydration — they relied
+on stored_thumbnail propagating through `c.thumbnail_url` and `c.image_url`.
+But ~20 render sites and getters across the dashboard still read those
+fields directly, and any data flow that copied `c` into a derived structure
+(e.g. `_adMap`, ad-name lookups, ref-creative arrays) silently dropped
+stored_thumbnail. Defense-in-depth: every reader should look for
+stored_thumbnail FIRST.
+
+### Sweep applied
+Renderer sites (now `stored_thumbnail || ... existing fallback chain`):
+- `_winningCreativesTable` (15986/16013) — Winners table
+- `creativeCard` (16151) — Tagger Grid card
+- AQ cards (8125, 16765, 17590, 17963)
+- Make More references (15026, 17377, 20566, 20585)
+- Best-recent inline render (8052)
+- Top-of-table thumb chooser (5734, 13214, 9728)
+
+Getters / lookup helpers (used by other renderers):
+- `getThumbnailByAdName` (4989, 4994, 8597, 8599, 8617)
+- Tagger fresh fetch (15161, 15182)
+
+Derived structures:
+- `_adMap[key]` (5266) now stores `stored_thumbnail` alongside thumbnail_url
+  and image_url, so callers reading from `_adMap` see the permanent URL.
+
+Counter sites (3096, 6012, 14984, 15361) also touched for consistency, but
+those are stat counters, not render paths.
+
+### Verification
+- Brace balance unchanged (7226/7226).
+- `node --check` on combined inline JS exits 0.
+- ~30 substitution lines applied across the file in a single mechanical pass
+  using regex on idiomatic patterns; no manual hand-edits per site.
+
+---
+
 ## Thumbnail hydration follow-up: also overwrite c.image_url (2026-05-05)
 
 ### Why this shipped
