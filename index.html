@@ -14455,7 +14455,11 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
         const name = c['Ad name'] || c['ad name'] || '';
         const lookup = state._tagLookup[name];
         if (lookup?.stored_thumbnail) {
+          // Renderers read `c.image_url || c.thumbnail_url` (creativeCard at 16147,
+          // _winningCreativesTable at 15986, AQ cards, etc). Overwrite BOTH so the
+          // permanent URL wins regardless of which field the renderer checks first.
           c.thumbnail_url = lookup.stored_thumbnail;
+          c.image_url     = lookup.stored_thumbnail;
           c.stored_thumbnail = lookup.stored_thumbnail;
           thumbBackfilled++;
           return;

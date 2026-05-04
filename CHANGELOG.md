@@ -4,6 +4,21 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Thumbnail hydration follow-up: also overwrite c.image_url (2026-05-05)
+
+### Why this shipped
+Initial fix updated `c.thumbnail_url` to `stored_thumbnail` but left
+`c.image_url` alone. Several renderers (creativeCard at 16147,
+_winningCreativesTable at 15986, AQ cards) read `c.image_url || c.thumbnail_url`
+— image_url FIRST. Rows whose Sheets/Meta load had populated image_url with a
+legacy 24-48h-TTLd CDN URL kept showing blank.
+
+### Fix
+Site 14449: when lookup has stored_thumbnail, write it into BOTH
+`c.thumbnail_url` AND `c.image_url`. Sites 14773 and 14951 already did this.
+
+---
+
 ## Thumbnail hydration: stored_thumbnail must always win (2026-05-05)
 
 ### Why this shipped
