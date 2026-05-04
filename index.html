@@ -3469,6 +3469,11 @@ function init() {
         fetchMetaCreatives();
         fetchMetaAdInsights();
       }, 3000); // 3s delay so UI is responsive first
+
+      // Phase 1+2: auto-bootstrap thumbnails + vision tagging for new ads.
+      // Runs once per session, ~10s after boot so primary UI lands first.
+      // Idempotent: zero cost when nothing is new.
+      setTimeout(() => { _autoBootstrapTagging(); }, 10000);
     }
 
     // Legacy: fetch tagger/Meta sheet data + Supabase
@@ -3987,6 +3992,92 @@ async function backfillThumbnails(opts) {
   return { migrated, apiAds, errors, skippedAlready, skippedNoMatch, skippedNoUrl };
 }
 window.backfillThumbnails = backfillThumbnails;
+
+// ─── Phase 1+2: Auto-bootstrap thumbnails + vision tags on dashboard load ───
+// Runs once per session. Detects ads in state.taggerData missing a thumbnail
+// or v3 tag, fires the existing backfillThumbnails (Meta -> Storage), then
+// pings /api/auto-vision-tag to write creative_tags_v3 rows. Idempotent: if
+// nothing's new, this is a single counting pass and returns immediately.
+async function _autoBootstrapTagging(opts) {
+  opts = opts || {};
+  if (state._autoBootstrapFired && !opts.force) return; // once per session
+  state._autoBootstrapFired = true;
+
+  if (!state.taggerData?.length) return;
+
+  // Step A: which ads need a thumbnail?
+  const lookup = state._tagLookup || {};
+  const adsNeedingThumb = state.taggerData.filter(c => {
+    const name = c['Ad name'] || c['ad name'] || '';
+    if (!name) return false;
+    const row = lookup[name + '||' + (c['_account'] || '')] || lookup[name];
+    if (row?.stored_thumbnail) return false;
+    if (c.stored_thumbnail) return false;
+    return true;
+  });
+
+  if (adsNeedingThumb.length > 0 && state.metaApi?.token) {
+    try {
+      showToast(`Capturing thumbnails for ${adsNeedingThumb.length} new ad${adsNeedingThumb.length>1?'s':''}…`);
+      // Existing function pages through ALL Meta ads but is idempotent — skips
+      // anything already in stored_thumbnail. Limit caps work per session so
+      // a single load can't burn the rate limit.
+      await backfillThumbnails({ limit: Math.min(adsNeedingThumb.length, 50) });
+    } catch (e) {
+      console.warn('[auto-bootstrap] thumb capture failed:', e?.message || e);
+    }
+  }
+
+  // Step B: which ads have a thumbnail but no v3 tag?
+  const v3 = state._tagsV3Map || {};
+  const adsNeedingTag = state.taggerData
+    .filter(c => {
+      const name = c['Ad name'] || c['ad name'] || '';
+      if (!name) return false;
+      if (v3[name] || v3[String(name).toLowerCase()]) return false;
+      const row = lookup[name + '||' + (c['_account'] || '')] || lookup[name];
+      const hasThumb = !!(row?.stored_thumbnail || c.stored_thumbnail);
+      return hasThumb;
+    })
+    .map(c => c['Ad name'] || c['ad name'])
+    .filter(Boolean)
+    .slice(0, 10); // Workers wall-time cap; one batch per load.
+
+  if (!adsNeedingTag.length) {
+    console.log('[auto-bootstrap] nothing to vision-tag');
+    return;
+  }
+
+  showToast(`Vision-tagging ${adsNeedingTag.length} new ad${adsNeedingTag.length>1?'s':''}…`);
+  try {
+    const res = await fetch('/api/auto-vision-tag', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ad_names: adsNeedingTag }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (j?.tagged > 0) {
+      // Re-pull v3 so the dashboard reflects the new tags without forcing a refresh.
+      try {
+        const fresh = await supabaseGet('creative_tags_v3', `select=*&ad_name=in.(${adsNeedingTag.map(n => '"' + encodeURIComponent(n) + '"').join(',')})`);
+        if (Array.isArray(fresh)) {
+          fresh.forEach(r => {
+            if (!r.ad_name) return;
+            state._tagsV3Map[r.ad_name] = r;
+            state._tagsV3Map[String(r.ad_name).toLowerCase()] = r;
+          });
+        }
+      } catch (e) { /* hydration retry not critical */ }
+      showToast(`Tagged ${j.tagged} new ad${j.tagged>1?'s':''}. Refreshing.`);
+      if (state.currentView === 'tagger') { try { renderCreativeReview(); } catch(_) {} }
+    } else if (j?.skipped) {
+      console.log(`[auto-bootstrap] ${j.skipped} skipped:`, j.results);
+    }
+  } catch (e) {
+    console.warn('[auto-bootstrap] vision-tag call failed:', e?.message || e);
+  }
+}
+window._autoBootstrapTagging = _autoBootstrapTagging;
 
 async function connectMetaApi() {
   // Rate limit check

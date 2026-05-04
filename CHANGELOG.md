@@ -4,6 +4,54 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Auto-tagging on dashboard load — Phase 1+2 (2026-05-05)
+
+### Why this shipped
+Before this commit, when a new ad launched in Meta, nothing happened on
+its own — the operator had to click "Fetch Thumbnails" then run
+`vision_tagger.py` from `/tmp` (now `04-reports/_tagger_v2/auto_pipeline/`).
+Result: dashboard silently accumulated untagged, thumb-less ads. Naina
+called this out: "how are you going to ensure when a new ad gets tagged,
+the thumbnails get tagged too through vision tagging?"
+
+### What runs now (every dashboard load)
+At T+10s after boot, `_autoBootstrapTagging()` fires once per session:
+
+1. **Thumbnail capture** — finds taggerData ads with no `stored_thumbnail`
+   in `creative_tags`. Calls existing `backfillThumbnails({ limit: 50 })`.
+   Idempotent: zero cost when nothing's new.
+
+2. **Vision tagging** — for ads that now have `stored_thumbnail` but no
+   `creative_tags_v3` row, posts up to 10 ad_names to the new
+   `/api/auto-vision-tag` Cloudflare Pages function. The function:
+   - Looks up each ad_id by name across all 3 ad accounts
+   - Resolves full-res asset (statics: image_hash → adimages permalink_url
+     1080×1080; videos: video_id → /thumbnails preferred 1080×1920; AFS
+     fallback 160×160 for permission-blocked creator videos)
+   - Sends image to Haiku 4.5 vision with locked prompt
+   - Upserts to `creative_tags_v3` with source = v3-vision-static |
+     v3-vision-video-frame | v3-vision-video-frame-lores
+
+   After response, dashboard re-pulls just the affected v3 rows so the
+   tagger view updates without a hard refresh. Cap of 10/call respects
+   Cloudflare Workers' 30s wall time (~2.5s per ad).
+
+### Tokens
+Both `META_ACCESS_TOKEN` and `CLAUDE_API_KEY` already live in Cloudflare
+Pages env. No browser-side keys.
+
+### Cost
+- Thumbnail capture: free (Meta API + Supabase Storage on free tier)
+- Vision tag: ~$0.005 per ad. Max 10 per dashboard load = $0.05/session.
+
+### Files
+- `functions/api/auto-vision-tag.js` (new) — server-side tagger.
+- `index.html:3471` — boot hook calls `_autoBootstrapTagging()` 10s after init.
+- `index.html:~3990` — `_autoBootstrapTagging()` definition. Idempotent on
+  `state._autoBootstrapFired`.
+
+---
+
 ## Thumbnail sweep: every renderer prefers stored_thumbnail (2026-05-05)
 
 ### Why this shipped
