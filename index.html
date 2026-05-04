@@ -14447,17 +14447,23 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
       });
       console.log(`creative_tags: ${tags.length} rows loaded into tag lookup`);
       // Backfill thumbnails from creative_tags into taggerData + _tagMap.
-      // Prefer stored_thumbnail (permanent Supabase Storage URL) over thumbnail_url
-      // (legacy Meta CDN URL — TTLs out, see project_thumbnail_rewrite_plan).
+      // stored_thumbnail (permanent Storage URL) ALWAYS wins over c.thumbnail_url
+      // because the latter is typically a Meta CDN URL with a 24-48h TTL — once
+      // it expires, the browser 403s and the card renders blank.
       let thumbBackfilled = 0;
       state.taggerData.forEach(c => {
-        if (c.thumbnail_url || c.image_url) return; // already has one
         const name = c['Ad name'] || c['ad name'] || '';
         const lookup = state._tagLookup[name];
-        const bestUrl = lookup?.stored_thumbnail || lookup?.thumbnail_url;
+        if (lookup?.stored_thumbnail) {
+          c.thumbnail_url = lookup.stored_thumbnail;
+          c.stored_thumbnail = lookup.stored_thumbnail;
+          thumbBackfilled++;
+          return;
+        }
+        if (c.thumbnail_url || c.image_url) return; // already has a (legacy) URL
+        const bestUrl = lookup?.thumbnail_url;
         if (bestUrl) {
           c.thumbnail_url = bestUrl;
-          if (lookup.stored_thumbnail) c.stored_thumbnail = lookup.stored_thumbnail;
           thumbBackfilled++;
         }
       });
@@ -14764,11 +14770,21 @@ async function tagCreatives(rawData, opts = {}) {
       GODFATHER_TAXONOMY.allFields.forEach(f => { if (row[f] != null) tags[f] = row[f]; });
       tags.confidence = row.confidence || 'cached';
       tags.tagged_at = row.tagged_at || '';
-      cachedResults.push({ ...c, tags, thumbnail_url: _supaThumb || c.thumbnail_url || '', image_url: c.image_url || _supaThumb || '', stored_thumbnail: row.stored_thumbnail || '', id: Date.now() + cachedResults.length, _cached: true });
+      // stored_thumbnail wins: legacy thumbnail_url is a 24-48h TTLd Meta CDN URL.
+      const _winThumb = cacheRow?.stored_thumbnail || _supaThumb || c.thumbnail_url || '';
+      cachedResults.push({ ...c, tags, thumbnail_url: _winThumb, image_url: _winThumb || c.image_url || '', stored_thumbnail: cacheRow?.stored_thumbnail || '', id: Date.now() + cachedResults.length, _cached: true });
       return;
     }
-    // Even if no tags cached, copy thumbnail from Supabase (saved by Fetch Thumbnails)
-    if (_supaThumb) { c.thumbnail_url = c.thumbnail_url || _supaThumb; c.image_url = c.image_url || _supaThumb; if (cacheRow?.stored_thumbnail) c.stored_thumbnail = cacheRow.stored_thumbnail; }
+    // Even if no tags cached, copy thumbnail from Supabase (saved by Fetch Thumbnails).
+    // stored_thumbnail wins; only fall back to legacy when no permanent URL exists.
+    if (cacheRow?.stored_thumbnail) {
+      c.thumbnail_url = cacheRow.stored_thumbnail;
+      c.image_url = cacheRow.stored_thumbnail;
+      c.stored_thumbnail = cacheRow.stored_thumbnail;
+    } else if (_supaThumb) {
+      c.thumbnail_url = c.thumbnail_url || _supaThumb;
+      c.image_url = c.image_url || _supaThumb;
+    }
 
     // Check localStorage cache (old or new taxonomy — migrate if needed)
     const localCached = tagCache[adName];
@@ -14931,19 +14947,25 @@ async function tagCreatives(rawData, opts = {}) {
       c.tags.campaign_audience = GODFATHER_TAXONOMY.fields.campaign_audience.parse(camp);
     }
   });
-  // Final pass: backfill thumbnails from Supabase _tagLookup for any creative still missing one.
-  // Prefer stored_thumbnail (permanent) over thumbnail_url (TTLd CDN).
+  // Final pass: backfill thumbnails from Supabase _tagLookup.
+  // stored_thumbnail (permanent) ALWAYS wins over c.thumbnail_url (TTLd CDN).
   if (state._tagLookup) {
     let _thumbFilled = 0;
     state.taggerData.forEach(c => {
-      if (c.thumbnail_url || c.image_url) return;
       const name = c['Ad name'] || c['ad name'] || '';
       const row = state._tagLookup[name];
-      const bestUrl = row?.stored_thumbnail || row?.thumbnail_url;
+      if (row?.stored_thumbnail) {
+        c.thumbnail_url = row.stored_thumbnail;
+        c.image_url = row.stored_thumbnail;
+        c.stored_thumbnail = row.stored_thumbnail;
+        _thumbFilled++;
+        return;
+      }
+      if (c.thumbnail_url || c.image_url) return;
+      const bestUrl = row?.thumbnail_url;
       if (bestUrl) {
         c.thumbnail_url = bestUrl;
         c.image_url = bestUrl;
-        if (row.stored_thumbnail) c.stored_thumbnail = row.stored_thumbnail;
         _thumbFilled++;
       }
     });

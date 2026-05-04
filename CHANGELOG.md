@@ -4,6 +4,45 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Thumbnail hydration: stored_thumbnail must always win (2026-05-05)
+
+### Why this shipped
+After the May 4 bytes-not-URLs migration, 2,186 ads have a permanent
+`creative_tags.stored_thumbnail` (Supabase Storage URL, no TTL). But the
+dashboard still rendered blank cards on the Winning Creatives table and
+tagger surfaces because hydration treated stored_thumbnail as a *fallback*
+when c.thumbnail_url was empty — not as the primary source.
+
+What actually happened: Meta's `/ads` API stamps `c.thumbnail_url` with a
+signed CDN URL valid for ~24-48h. When the user reopens the dashboard 2 days
+later, the URL has expired, but hydration's `if (c.thumbnail_url) return;`
+guard skipped over the row, leaving the dead URL in place. The browser 403s
+the image, the `onerror` handler hides it, and the cell renders gray.
+
+### Fix — three hydration sites flipped
+- `index.html:14449` (post-tag-load backfill): if lookup has stored_thumbnail,
+  overwrite `c.thumbnail_url` with it; only fall back to legacy thumbnail_url
+  when no permanent URL exists.
+- `index.html:14773` (Phase 1 cached-results push): introduce `_winThumb`
+  with stored_thumbnail at the front of the chain, write it into the
+  pushed object's thumbnail_url + image_url.
+- `index.html:14951` (final pass): same flip — stored_thumbnail wins
+  unconditionally before the existing-URL early-return.
+
+No change to migration code, storage policies, or Supabase schema. Pure
+render-path correctness. Renderers that read `c.thumbnail_url` (Winning
+Creatives table at `_winningCreativesTable`, tagger grid, AQ cards, etc.)
+all benefit automatically because the field now holds the permanent URL.
+
+### Verification
+- Brace balance unchanged (7226/7226).
+- All 6 inline scripts still parse via `node --check` (exit 0).
+- Sample Supabase row for `ANZ_FB_Leads_Conv_Parents-All_Australia_LeadGen-LP_Static_W-NAPLAN-Boost-Math_100126`
+  has stored_thumbnail set → after deploy, that ad's Winning Creatives row
+  should render the cached PNG instead of a gray placeholder.
+
+---
+
 ## Thumbnail migration: sanitize storage keys (2026-05-04)
 
 ### Why this shipped
