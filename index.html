@@ -4037,6 +4037,7 @@ async function _autoBootstrapTagging(opts) {
       if (!name) return false;
       if (v3[name] || v3[String(name).toLowerCase()]) return false;
       const row = lookup[name + '||' + (c['_account'] || '')] || lookup[name];
+      if (row?.is_tombstone) return false; // skip ads no longer in Meta's /ads
       const hasThumb = !!(row?.stored_thumbnail || c.stored_thumbnail);
       return hasThumb;
     })
@@ -4091,17 +4092,18 @@ function _updateTagCoveragePill(state_msg) {
   if (!ads.length) { pill.classList.add('hidden'); return; }
   const v3 = state._tagsV3Map || {};
   const lookup = state._tagLookup || {};
-  let tagged = 0, withThumb = 0;
+  let tagged = 0, withThumb = 0, tombstones = 0;
   const seen = new Set();
   for (const c of ads) {
     const name = c['Ad name'] || c['ad name'] || '';
     if (!name || seen.has(name)) continue;
     seen.add(name);
-    if (v3[name] || v3[name.toLowerCase()]) tagged++;
     const row = lookup[name + '||' + (c['_account'] || '')] || lookup[name];
+    if (row?.is_tombstone) { tombstones++; continue; } // exclude unfixable ads from the metric
+    if (v3[name] || v3[name.toLowerCase()]) tagged++;
     if (row?.stored_thumbnail || c.stored_thumbnail) withThumb++;
   }
-  const total = seen.size;
+  const total = seen.size - tombstones;
   const pct = total > 0 ? Math.round(tagged / total * 100) : 0;
   const untagged = total - tagged;
   // Color: green >=85%, amber 60-84%, red <60%

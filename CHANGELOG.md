@@ -4,6 +4,34 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 5: tombstone flag for unresolvable ads (2026-05-05)
+
+### Why
+~35 ads in `creative_tags` no longer appear in any of our 3 Meta `/ads`
+listings (deleted, archived past Meta's retention, or paused so long the
+endpoint drops them). Auto-tagging fires `findAdId` per ad, which made
+3 wasted Meta API calls per tombstone every dashboard load. They also
+dragged down the displayed coverage % even though there's nothing
+actionable about them.
+
+### Schema
+`ALTER TABLE creative_tags ADD COLUMN is_tombstone boolean NOT NULL
+DEFAULT false`. Marker script reads the cached name→id map for each
+account (32,857 known ad_names total) and PATCHes any creative_tags row
+not present in that map. 34 of 35 marked successfully.
+
+### Wiring
+- `_autoBootstrapTagging` skips tombstones in the candidate list
+- `_updateTagCoveragePill` excludes them from the denominator so the %
+  reflects fixable ads only
+
+### Recovery
+If Meta surfaces an old ad again (e.g. on un-archive), the next cache
+rebuild will include it and the auto-pipeline will re-tag. `is_tombstone`
+can be flipped back via SQL whenever needed.
+
+---
+
 ## Phase 3+4: schema discipline + observability pill (2026-05-05)
 
 ### Phase 3 — schema discipline
