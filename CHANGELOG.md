@@ -4,6 +4,38 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Phase 3+4: schema discipline + observability pill (2026-05-05)
+
+### Phase 3 — schema discipline
+The dup-row class of bug existed because `creative_tags` PK was
+`(ad_name, account)` and writers used 3 different `account` formats:
+empty string, `act_<id>`, and account label like "Cuemath - US & Canada".
+Same ad_name with two account values = two rows = lookup picks one
+randomly = blank thumbnail.
+
+After the May 5 dup merge (2,720 rows, all ad_name unique), this
+migration drops the composite PK and adds `UNIQUE (ad_name)`. Future
+writes with different account values will fail loudly instead of
+silently creating dups.
+
+Code follow-up: `supabaseUpsert('creative_tags', ..., 'ad_name,account')`
+at index.html:3982 and 15060 changed to use `'ad_name'` as the conflict
+key. Account is still written, just no longer part of the uniqueness
+contract.
+
+### Phase 4 — header tag-coverage pill
+Small pill in dashboard header reads from `state._tagsV3Map` and shows
+live coverage. Color-coded:
+- green ≥85%, amber 60–84%, red <60%
+- includes inline state during auto-bootstrap: "capturing 4 thumbs…",
+  "tagging 8…", refreshes when complete.
+- 30s tick refresh + manual refresh on data sync.
+
+Adds at index.html:213 (`<span id="tagCoveragePill">`) plus
+`_updateTagCoveragePill()` helper near the auto-bootstrap function.
+
+---
+
 ## Auto-tagging on dashboard load — Phase 1+2 (2026-05-05)
 
 ### Why this shipped

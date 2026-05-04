@@ -210,6 +210,7 @@
         <span class="text-[9px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 cursor-help" title="Godfather scope: Meta only. Google/Influencer/WhatsApp/BTL leads are excluded from KPIs. For all-channel BAU MTD, see the perf tracker leads tab.">Meta only</span>
         <span id="dataDateRange" class="text-[9px] text-text-muted shrink-0" style="display:none"></span>
         <div class="ml-auto flex items-center gap-1 shrink-0">
+          <span id="tagCoveragePill" class="hidden text-[9px] font-semibold px-1.5 py-0.5 rounded border whitespace-nowrap cursor-help" title="Tag coverage = creative_tags_v3 rows / unique ads in current data. Auto-tagging fires once per session."></span>
           <span class="text-[9px] text-text-muted whitespace-nowrap" id="dataTimestamp"></span>
           <span class="status-badge disconnected text-[9px] shrink-0 pointer-events-none whitespace-nowrap" id="statusBadge"></span>
         </div>
@@ -3455,6 +3456,7 @@ function init() {
 
     // SINGLE RENDER PASS — all data available, no race conditions
     updateDataStatusLine();
+    try { _updateTagCoveragePill(); } catch(_) {}
     navigateTo('dashboard');
     renderLibrary();
 
@@ -3977,7 +3979,7 @@ async function backfillThumbnails(opts) {
   if (writes.length) {
     const filtered = writes.filter(r => r.ad_name);
     for (let i = 0; i < filtered.length; i += 100) {
-      await supabaseUpsert('creative_tags', filtered.slice(i, i + 100), 'ad_name,account')
+      await supabaseUpsert('creative_tags', filtered.slice(i, i + 100), 'ad_name')
         .catch(e => console.warn('creative_tags upsert error:', e.message));
     }
     console.log(`Saved ${filtered.length} stored_thumbnail rows to Supabase`);
@@ -4004,6 +4006,7 @@ async function _autoBootstrapTagging(opts) {
   state._autoBootstrapFired = true;
 
   if (!state.taggerData?.length) return;
+  try { _updateTagCoveragePill('checking…'); } catch(_) {}
 
   // Step A: which ads need a thumbnail?
   const lookup = state._tagLookup || {};
@@ -4018,10 +4021,8 @@ async function _autoBootstrapTagging(opts) {
 
   if (adsNeedingThumb.length > 0 && state.metaApi?.token) {
     try {
+      _updateTagCoveragePill(`capturing ${adsNeedingThumb.length} thumbs…`);
       showToast(`Capturing thumbnails for ${adsNeedingThumb.length} new ad${adsNeedingThumb.length>1?'s':''}…`);
-      // Existing function pages through ALL Meta ads but is idempotent — skips
-      // anything already in stored_thumbnail. Limit caps work per session so
-      // a single load can't burn the rate limit.
       await backfillThumbnails({ limit: Math.min(adsNeedingThumb.length, 50) });
     } catch (e) {
       console.warn('[auto-bootstrap] thumb capture failed:', e?.message || e);
@@ -4045,9 +4046,11 @@ async function _autoBootstrapTagging(opts) {
 
   if (!adsNeedingTag.length) {
     console.log('[auto-bootstrap] nothing to vision-tag');
+    try { _updateTagCoveragePill(); } catch(_) {}
     return;
   }
 
+  _updateTagCoveragePill(`tagging ${adsNeedingTag.length}…`);
   showToast(`Vision-tagging ${adsNeedingTag.length} new ad${adsNeedingTag.length>1?'s':''}…`);
   try {
     const res = await fetch('/api/auto-vision-tag', {
@@ -4076,8 +4079,44 @@ async function _autoBootstrapTagging(opts) {
   } catch (e) {
     console.warn('[auto-bootstrap] vision-tag call failed:', e?.message || e);
   }
+  try { _updateTagCoveragePill(); } catch(_) {}
 }
 window._autoBootstrapTagging = _autoBootstrapTagging;
+
+// Header pill — live tag coverage. Updates on data change + after auto-bootstrap.
+function _updateTagCoveragePill(state_msg) {
+  const pill = document.getElementById('tagCoveragePill');
+  if (!pill) return;
+  const ads = state.taggerData || [];
+  if (!ads.length) { pill.classList.add('hidden'); return; }
+  const v3 = state._tagsV3Map || {};
+  const lookup = state._tagLookup || {};
+  let tagged = 0, withThumb = 0;
+  const seen = new Set();
+  for (const c of ads) {
+    const name = c['Ad name'] || c['ad name'] || '';
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    if (v3[name] || v3[name.toLowerCase()]) tagged++;
+    const row = lookup[name + '||' + (c['_account'] || '')] || lookup[name];
+    if (row?.stored_thumbnail || c.stored_thumbnail) withThumb++;
+  }
+  const total = seen.size;
+  const pct = total > 0 ? Math.round(tagged / total * 100) : 0;
+  const untagged = total - tagged;
+  // Color: green >=85%, amber 60-84%, red <60%
+  const cls = pct >= 85 ? 'border-green-300 bg-green-50 text-green-800'
+            : pct >= 60 ? 'border-amber-300 bg-amber-50 text-amber-800'
+            : 'border-red-300 bg-red-50 text-red-800';
+  pill.className = `text-[9px] font-semibold px-1.5 py-0.5 rounded border whitespace-nowrap cursor-help ${cls}`;
+  pill.title = `Tag coverage: ${tagged}/${total} ads tagged. ${withThumb} have thumbnails. ${state_msg || 'Auto-tag runs once per session, ~10s after boot.'}`;
+  const sfx = state_msg ? ` · ${state_msg}` : '';
+  pill.textContent = `Tags ${pct}% · ${untagged} untagged${sfx}`;
+  pill.classList.remove('hidden');
+}
+window._updateTagCoveragePill = _updateTagCoveragePill;
+// Refresh pill every 30s + after each data sync
+setInterval(() => { try { _updateTagCoveragePill(); } catch(_) {} }, 30000);
 
 async function connectMetaApi() {
   // Rate limit check
@@ -15018,7 +15057,7 @@ async function tagCreatives(rawData, opts = {}) {
         image_fetched: imageFetched,
         thumbnail_url: creative['thumbnail_url'] || null
       };
-      supabaseUpsert('creative_tags', [supaRow], 'ad_name,account').catch(e => console.warn('Supabase write failed:', e.message));
+      supabaseUpsert('creative_tags', [supaRow], 'ad_name').catch(e => console.warn('Supabase write failed:', e.message));
 
       newlyTagged.push({ ...creative, tags, id: Date.now() + i });
     } catch(e) {
