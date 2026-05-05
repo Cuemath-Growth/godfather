@@ -15883,7 +15883,7 @@ function _updateTaggerThresholdNote(countryVal) {
 
 function onTaggerCountryChange() {
   syncGeoFilter('taggerFilterCountry');
-  state._taggerTablePage = 1; state._heatmapPage = 1; state._gridPage = 1;
+  state._taggerTablePage = 1; state._heatmapPage = 1; state._gridPage = 1; state._funnelTablePage = 1;
   renderLensAggregateMetrics(); // Refresh aggregate metrics for new geo
   renderTaggerInsights();
   renderActiveTaggerTab();
