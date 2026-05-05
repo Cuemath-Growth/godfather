@@ -7588,7 +7588,32 @@ function actionQueueDismiss(verdictId, entityId, reason) {
   const ci = window.cuemathIntelligence;
   if (!ci) return;
   ci.dismiss(verdictId, entityId, reason);
-  renderActionQueueView();
+  // AQ tab re-render — guarded so this stays safe after the AQ surface is
+  // removed in a follow-up commit.
+  try { if (document.getElementById('actionQueueContainer')) renderActionQueueView(); } catch (_) {}
+  // Dashboard re-render — Pause + Refresh + Make More filter against the chassis
+  // dismissal localStorage at render time (see _isChassisDismissed), so a
+  // re-render is enough to drop the dismissed card without rerunning chassis
+  // detection (which takes ~10s).
+  if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
+    try { renderOracleCardsV2(); } catch (_) {}
+  }
+}
+
+// Read chassis dismissal state from localStorage. The chassis writes both
+// localStorage + Supabase on dismiss(), and the not_recently_dismissed guardrail
+// reads from an in-memory cache primed at boot. Dashboard render paths use this
+// helper to suppress chassis-dismissed cards in addition to the legacy oracle
+// _oracleActions filter (the two stores are separate).
+function _isChassisDismissed(verdictId, entityId) {
+  if (!verdictId || !entityId) return false;
+  try {
+    const raw = localStorage.getItem(`_dismiss_${verdictId}_${entityId}`);
+    if (!raw) return false;
+    const expiresMs = Number(raw);
+    if (!isFinite(expiresMs)) return true; // never_again sentinel
+    return expiresMs > Date.now();
+  } catch (_) { return false; }
 }
 
 function _updateActionQueueNavBadge(count) {
@@ -8840,6 +8865,21 @@ function _pauseCardActions(itemId, shortName) {
   </div>`;
 }
 
+// Chassis dismissal controls (Snooze 24h / Skip 7d / Never again). Migrated from
+// the Action Queue tab so the chassis dismissal store keeps getting written after
+// the AQ surface is removed. Visually subordinate to oracleAction Done/Dismiss/Snooze
+// above — these dismiss the verdict+ad pair against the chassis not_recently_dismissed
+// guardrail (separate store from _oracleActions).
+function _chassisDismissActions(verdictId, entityId) {
+  const v = String(verdictId || '').replace(/'/g, "\\'");
+  const e = String(entityId || '').replace(/'/g, "\\'");
+  return `<div class="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
+    <button onclick="actionQueueDismiss('${v}','${e}','snooze_24h')" class="text-[10px] px-2 py-1 rounded-md bg-surface-secondary text-text-secondary hover:bg-surface-tertiary border border-gray-200">Snooze 24h</button>
+    <button onclick="actionQueueDismiss('${v}','${e}','skip_7d')" class="text-[10px] px-2 py-1 rounded-md bg-surface-secondary text-text-secondary hover:bg-surface-tertiary border border-gray-200">Skip 7d</button>
+    <button onclick="actionQueueDismiss('${v}','${e}','never_again')" class="text-[10px] px-2 py-1 rounded-md bg-surface-secondary text-text-secondary hover:bg-surface-tertiary border border-gray-200">Never again</button>
+  </div>`;
+}
+
 // ── Section 4: Day-by-Day table rendering ──
 function renderBauPlaComparison() {
   const section = document.getElementById('bauPlaSection');
@@ -9447,7 +9487,10 @@ function renderOracleCardsV2() {
 
   // Filter Done/Dismissed/Snoozed BEFORE the cap so actioned ads don't eat cap slots —
   // the next-best ad takes their place instead of leaving an empty card.
-  pauseAds = pauseAds.filter(a => isItemVisible('pause:' + a.name));
+  // Two suppressions stacked: legacy oracle store (Done/Dismiss/Snooze 7d) AND
+  // chassis dismissal store (Snooze 24h / Skip 7d / Never again on the verdict+ad pair).
+  pauseAds = pauseAds.filter(a => isItemVisible('pause:' + a.name)
+    && !_isChassisDismissed(a._verdictId, a.name));
 
   // Phase 5: when country filter = all, cap at 2 per market so every geo surfaces; else top 10
   if (!market || market === 'all') {
@@ -9506,6 +9549,7 @@ function renderOracleCardsV2() {
         </div>
       </div>
       ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
+      ${!isDone && a._verdictId ? _chassisDismissActions(a._verdictId, a.name) : ''}
     </div>`;
   };
 
@@ -9773,7 +9817,9 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
   });
 
   // Filter Done/Dismissed/Snoozed BEFORE the cap so actioned winners don't eat cap slots.
-  winners = winners.filter(w => isItemVisible('make:ad:' + w.adName));
+  // Stack legacy oracle filter + chassis dismissal filter (verdict-id-scoped suppression).
+  winners = winners.filter(w => isItemVisible('make:ad:' + w.adName)
+    && !_isChassisDismissed(w._verdictId, w.adName));
 
   // 3. When "all" — 2 per market; else top 5
   let pick = [];
@@ -9854,7 +9900,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
         <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
         <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
         <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
-      </div>` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>`}
+      </div>${w._verdictId ? _chassisDismissActions(w._verdictId, w.adName) : ''}` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>`}
     </div>`;
   });
   html += '</div>';

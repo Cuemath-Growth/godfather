@@ -4,6 +4,64 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Chassis dismiss buttons migrated onto Dashboard cards (2026-05-06)
+
+### Why
+`actionQueueDismiss(…)` (the only UI path that writes to `ci.dismiss(…)`)
+lived solely on the Action Queue tab. The chassis `not_recently_dismissed`
+guardrail — used today by every Pause + Refresh + Make More verdict — has no
+fresh inputs unless users can mark "Snooze 24h / Skip 7d / Never again" on a
+verdict×ad pair. Deleting AQ before this migration would silently freeze the
+feedback loop. Migrating onto Dashboard cards unblocks the AQ deletion
+follow-up.
+
+### What changed (`index.html`)
+- **`actionQueueDismiss` (`:7587`)** — wraps the AQ re-render in a guard
+  (`getElementById('actionQueueContainer')`) + try/catch so it won't throw
+  when the AQ surface is removed in the follow-up commit. Adds a Dashboard
+  re-render via `renderOracleCardsV2()` so the dismissed card disappears
+  immediately.
+- **`_isChassisDismissed(verdictId, entityId)` (`:7608`)** — new helper.
+  Reads `localStorage._dismiss_${verdictId}_${entityId}` (chassis writes both
+  localStorage + Supabase on dismiss). Used at render time by the Pause /
+  Refresh / Make More filters to suppress dismissed cards without needing a
+  ~10s chassis re-detection run.
+- **`_chassisDismissActions(verdictId, entityId)` (`:8873`)** — new helper.
+  Renders 3 small text buttons (Snooze 24h / Skip 7d / Never again) styled
+  visually subordinate to the existing oracle Done/Dismiss/Snooze 7d row
+  (`text-[10px]`, `bg-surface-secondary`, no icons). Wired to
+  `actionQueueDismiss(…)`.
+- **Pause filter (`:9493`)** — stacks `_isChassisDismissed(a._verdictId, a.name)`
+  alongside the existing `isItemVisible('pause:' + a.name)` filter.
+- **Pause card (`:9552`, in `_buildPauseCardHtml`)** — appends
+  `_chassisDismissActions(a._verdictId, a.name)` after `_pauseCardActions`.
+- **Make More filter (`:9822`)** — stacks `_isChassisDismissed(w._verdictId, w.adName)`.
+- **Make More card (`:9903`, in `_renderMakeMoreAds`)** — appends
+  `_chassisDismissActions(w._verdictId, w.adName)` after the existing oracle
+  Done/Dismiss/Snooze row.
+
+### Net effect
+- Net +~50 LOC (helpers + button rows + filter clauses).
+- Two suppression stores now stack on every Dashboard card: legacy oracle
+  store (`_oracleActions`, item-id-scoped) and chassis store (verdict-id +
+  entity-id scoped). They are intentionally separate — oracle handles
+  "I've actioned this specific ad", chassis handles "stop showing me this
+  pattern on this ad".
+- Cards without `_verdictId` (none expected on the chassis-only paths) skip
+  rendering the chassis dismiss row; they still get oracle actions.
+- AQ tab still functional — its dismiss buttons feed the same path.
+
+### Validation
+- JS syntax check via `new Function(combinedScripts)` → SYNTAX OK.
+- Manual trace: dismiss → `ci.dismiss` writes localStorage → `renderOracleCardsV2()`
+  re-runs → pause/make-more filters call `_isChassisDismissed` → card filtered.
+
+### Out of scope (next commit)
+- Delete AQ tab + sidebar nav (`actionQueueNavBadge`, `actionQueueContainer`,
+  `renderActionQueueView`, `_renderActionQueueCard`, AQ boot wiring).
+
+---
+
 ## Path A cleanup — chassis is the only source for Pause + Make More (2026-05-06)
 
 ### Why
