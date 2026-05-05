@@ -4,49 +4,118 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
-## Action Queue surface deleted (2026-05-06)
+## Funnel Health table — Phase 1: QL→TB→TC→TD per ad with cohort/MTD toggle (2026-05-06)
 
 ### Why
-The AQ tab + sidebar nav stayed alive only because `actionQueueDismiss`
-(`:7587`) was the lone UI path writing to the chassis dismissal store.
-Yesterday's commit (`73bebe6`) migrated Snooze 24h / Skip 7d / Never again
-onto Dashboard Pause + Refresh + Make More cards, so AQ is now dead UI.
-Locked decision #2: "AQ tab will be deleted once Dashboard 3-section model
-fed by chassis is stable."
+Performance, sales, and CEO need one place to see funnel health per ad — not
+just CPTQL/CPTD aggregates. Each stage of the funnel (Qualified Lead → Trial
+Booked → Trial Confirmed → Trial Done) has its own conversion ratio that
+flags where the leak is. Two attribution rules matter for different teams:
+- **Cohort** answers "for leads that signed up in this window, how did
+  *they* convert?" (Cuemath-classic — locks lead-cohort to event window.)
+- **MTD** answers "in this window, what events did we observe regardless
+  of when the lead originated?" (CEO/sales view — spend-period truth.)
 
 ### What changed (`index.html`)
-- **Sidebar nav button (`:130–134`)** — removed the `data-view="actionq"`
-  button + `actionQueueNavBadge` span.
-- **AQ view container (`:497–538`)** — removed `<div id="view-actionq">`,
-  including `actionQueueContainer`, `actionQueueEmpty`, `actionQueueStats`,
-  `actionQueueChassisVer`, and the migration-roadmap empty state.
-- **`renderActionQueueView` + `_renderActionQueueCard` (`:7438–7592`)** —
-  removed both functions. The "1-CLICK" effort badge label map (locked
-  decision #3: "1-CLICK effort badge is misleading — drop or rename") went
-  with `_renderActionQueueCard`.
-- **`_updateActionQueueNavBadge` (`:7619`)** — removed (no nav badge to
-  update).
-- **Boot wiring (`:3400–3402`)** — removed the `_updateActionQueueNavBadge`
-  call inside the `ci.runDetection(...)` background callback. Detection
-  itself + `state._chassisLastRun = result` kept (Dashboard reads it).
-- **View routing** — removed `actionq` entries from `titles`/`subs` maps
-  (`:3538–3539`), the `view === 'actionq'` dispatch in `navigateTo` (`:3584`),
-  and the `activeView === 'actionq'` branch in the filter-change re-render
-  (`:6976`).
-- **`actionQueueDismiss` (`:7587`)** kept — Dashboard cards still call it.
-  Stripped the now-dead `getElementById('actionQueueContainer') &&
-  renderActionQueueView()` re-render guard since the container is gone.
-- Cleaned a stale boot comment that referred to the deleted
-  `renderActionQueueView`.
+- **`LEADS_CACHE_FIELDS` (`:4544`)** — added `trials_conf` and
+  `trial_conf_date` so the slim cache carries the new TC fields.
+- **PLA normalizer (`:4583+`)** — emits `trial_conf_date` /
+  `trials_conf` (defaults to `''` / `'0'` when PLA sheet lacks the
+  column; reads `r.trial_confirmed === '1'` if present).
+- **India CRM normalizer (`:4731+`)** — passthrough `r.trial_conf_date`
+  / `r.trials_conf` (matches BAU naming).
+- **`getAdFunnelMetrics(market, start, end, mode)` (`:5895+`)** — new
+  per-ad funnel aggregator. Cohort mode requires lead AND event both in
+  window. MTD mode filters each stage by its own event-date column. Reuses
+  best-name fallback (`mx_utm_adcontent` → `mx_utm_term`) like the existing
+  daily aggregator. India CRM rows flagged `_isAdsetGrain: true` (ad-level
+  UTM gap, known blocker). Cached on `_adFunnelCache`; invalidated by
+  `invalidateAdPerfCache()`.
+- **Tagger › Explore — third sub-view "Funnel"** (`:1080+`). New
+  `taggerTab-funnel` container with cohort/MTD pill, campaign/adset/ad
+  level pill, and table with Spend · QL · TB · TC · TD · QL→TB% · TB→TC% ·
+  TC→TD% · QL→TD% · CPTQL · CPTD · Audience (Phase 2) · Dest (Phase 2) ·
+  Meta (Phase 3) · Notion (Phase 3) · Recommendation.
+- **`setExploreView` / `switchTaggerTab` / `renderActiveTaggerTab`
+  (`:15740+`)** — extended to route to `funnel` sub-view alongside
+  `tree` / `grid`.
+- **`setFunnelMode`, `setFunnelLevel`, `goFunnelTablePage`,
+  `_funnelChassisByAd`, `_funnelRecCell`, `_funnelPctCell`,
+  `renderFunnelHealthTable` (`:16048+`)** — UI controls + render path.
+  Recommendation column reads `state._chassisLastRun.all` and surfaces the
+  highest-priority verdict (pause > refresh > scale) per ad with action
+  badge + why-text.
 
-### Net delta
-−213 lines. JS syntax validated with `node --check`.
+### Out of scope (Phase 2 / Phase 3 placeholders rendered as "Phase 2/3")
+- **Audience type + Age/Gender/Interests/Locations** — needs Meta
+  Marketing API extension to fetch adset `targeting` specs into a new
+  `meta_adset_targeting` Supabase table.
+- **IF/LP destination** — needs `creative.object_story_spec.link_data` +
+  `lead_gen_form_id` + `asset_feed_spec.link_urls` added to the existing
+  Meta creative fetcher (`:4261`, `:4856`).
+- **Meta link / Notion link** — driven by a Google Sheet
+  (`ad_name → meta_ad_link, notion_link`) Naina will provide.
+- **🪄 Deepen button** — per-row Haiku call, gated by per-row click.
 
-### Verify
-- Open Dashboard. Pause / Refresh / Make More cards still render.
-- Snooze 24h / Skip 7d / Never again on a Dashboard card still suppress the
-  card on next render (chassis localStorage read in `_isChassisDismissed`).
-- No "Action Queue" item in the sidebar. No `actionq` route resolvable.
+### Behavioral changes
+- New view is opt-in via the third pill in Explore. Tree and Grid
+  unaffected.
+- India ads roll up to ad-set level inside the table (badge: "India ·
+  ad-set grain (UTM gap)"). Other markets render at ad-level.
+- Default mode = Cohort (matches existing dashboard KPIs). Default level
+  = Ad.
+
+### Verification
+- All `<script>` blocks pass `new Function(code)` syntax check.
+- Reuses existing helpers (`normalizeAdName`, `_filterLeadsByFlow`,
+  `filterLeadsByMarket`, `getFlowFilter`, `matchMarketFromText`,
+  `_isPLACampaignName`, `formatCurrency`, `getGlobalDateRange`,
+  `state._chassisLastRun`).
+
+---
+
+## Funnel waterfall card on Dashboard — Phase 3.4 (2026-05-06)
+
+### Why
+ROADMAP Phase 3.4 calls for a side-by-side BAU + PLA funnel visualization
+(QL → TQL → TS → TD → Paid) with leak % per stage. The existing inline
+funnel inside `renderMetricTicker` (`#funnelTable`) only renders the active
+flow; when flow=All a CMO can't see at a glance which flow is leaking
+where. New card sits between KPI ticker and Pause Now.
+
+### What changed (`index.html`)
+- **HTML container (`:322`)** — new `<div class="mb-6" id="funnelWaterfall"></div>`
+  immediately after `#bauPlaSection`.
+- **`_renderFunnelWaterfallCard()` (`:10612`)** — new helper. Reads market +
+  date range + flow filter, partitions `leadsData`/`costData` into BAU and
+  PLA buckets using the same predicates as `renderBauPlaComparison`
+  (`_source==='pla'` OR `_isPLACampaignName`), computes 5 stage counts
+  per flow via the same partition logic as `getOracleMetrics`
+  (BAU TQL = NRI for US/Canada, board-gated for India/MEA, else QL;
+  PLA TQL = `_trialBooked==='1'`). Renders one card per visible flow
+  (both side-by-side on flow=All, single panel on flow=BAU/PLA). Bars
+  width-scaled to QL count, leak pill between stages
+  (green ≤30%, amber 30–60%, red >60%).
+- **Call site (`:10602`)** — `renderOracleCardsV2()` now invokes
+  `_renderFunnelWaterfallCard()` inside try/catch right before
+  `checkStaleData()` so a render bug never tanks the Dashboard.
+
+### Net effect
+- +~95 LOC. Plain `<div>` bars + Tailwind, no chart lib.
+- No new filter/toggle/legend — driven entirely by existing geo + date +
+  flow filters at top of Dashboard.
+- Card chrome matches sibling Dashboard cards
+  (`rounded-xl border border-gray-200 bg-white px-4 py-3`).
+- Function name avoids collision with the existing inline
+  `_renderFunnelWaterfall(crm, isPLA, cac)` string-returning helper at
+  `:13881` used by `renderMetricTicker → #funnelTable`.
+
+### Validation
+- JS syntax check: extracted all `<script>` blocks, ran `node --check`
+  on each → 0 errors.
+- Local server (`python3 -m http.server`) serves index.html with HTTP 200
+  and the new `id="funnelWaterfall"` + `_renderFunnelWaterfallCard`
+  identifiers present.
 
 ---
 
@@ -117,118 +186,49 @@ Ahead   if usedPct >  monthPct + 0.10  (red    — overspending; more dangerous)
 
 ---
 
-## Funnel waterfall card on Dashboard — Phase 3.4 (2026-05-06)
+## Action Queue surface deleted (2026-05-06)
 
 ### Why
-ROADMAP Phase 3.4 calls for a side-by-side BAU + PLA funnel visualization
-(QL → TQL → TS → TD → Paid) with leak % per stage. The existing inline
-funnel inside `renderMetricTicker` (`#funnelTable`) only renders the active
-flow; when flow=All a CMO can't see at a glance which flow is leaking
-where. New card sits between KPI ticker and Pause Now.
+The AQ tab + sidebar nav stayed alive only because `actionQueueDismiss`
+(`:7587`) was the lone UI path writing to the chassis dismissal store.
+Yesterday's commit (`73bebe6`) migrated Snooze 24h / Skip 7d / Never again
+onto Dashboard Pause + Refresh + Make More cards, so AQ is now dead UI.
+Locked decision #2: "AQ tab will be deleted once Dashboard 3-section model
+fed by chassis is stable."
 
 ### What changed (`index.html`)
-- **HTML container (`:322`)** — new `<div class="mb-6" id="funnelWaterfall"></div>`
-  immediately after `#bauPlaSection`.
-- **`_renderFunnelWaterfallCard()` (`:10612`)** — new helper. Reads market +
-  date range + flow filter, partitions `leadsData`/`costData` into BAU and
-  PLA buckets using the same predicates as `renderBauPlaComparison`
-  (`_source==='pla'` OR `_isPLACampaignName`), computes 5 stage counts
-  per flow via the same partition logic as `getOracleMetrics`
-  (BAU TQL = NRI for US/Canada, board-gated for India/MEA, else QL;
-  PLA TQL = `_trialBooked==='1'`). Renders one card per visible flow
-  (both side-by-side on flow=All, single panel on flow=BAU/PLA). Bars
-  width-scaled to QL count, leak pill between stages
-  (green ≤30%, amber 30–60%, red >60%).
-- **Call site (`:10602`)** — `renderOracleCardsV2()` now invokes
-  `_renderFunnelWaterfallCard()` inside try/catch right before
-  `checkStaleData()` so a render bug never tanks the Dashboard.
+- **Sidebar nav button (`:130–134`)** — removed the `data-view="actionq"`
+  button + `actionQueueNavBadge` span.
+- **AQ view container (`:497–538`)** — removed `<div id="view-actionq">`,
+  including `actionQueueContainer`, `actionQueueEmpty`, `actionQueueStats`,
+  `actionQueueChassisVer`, and the migration-roadmap empty state.
+- **`renderActionQueueView` + `_renderActionQueueCard` (`:7438–7592`)** —
+  removed both functions. The "1-CLICK" effort badge label map (locked
+  decision #3: "1-CLICK effort badge is misleading — drop or rename") went
+  with `_renderActionQueueCard`.
+- **`_updateActionQueueNavBadge` (`:7619`)** — removed (no nav badge to
+  update).
+- **Boot wiring (`:3400–3402`)** — removed the `_updateActionQueueNavBadge`
+  call inside the `ci.runDetection(...)` background callback. Detection
+  itself + `state._chassisLastRun = result` kept (Dashboard reads it).
+- **View routing** — removed `actionq` entries from `titles`/`subs` maps
+  (`:3538–3539`), the `view === 'actionq'` dispatch in `navigateTo` (`:3584`),
+  and the `activeView === 'actionq'` branch in the filter-change re-render
+  (`:6976`).
+- **`actionQueueDismiss` (`:7587`)** kept — Dashboard cards still call it.
+  Stripped the now-dead `getElementById('actionQueueContainer') &&
+  renderActionQueueView()` re-render guard since the container is gone.
+- Cleaned a stale boot comment that referred to the deleted
+  `renderActionQueueView`.
 
-### Net effect
-- +~95 LOC. Plain `<div>` bars + Tailwind, no chart lib.
-- No new filter/toggle/legend — driven entirely by existing geo + date +
-  flow filters at top of Dashboard.
-- Card chrome matches sibling Dashboard cards
-  (`rounded-xl border border-gray-200 bg-white px-4 py-3`).
-- Function name avoids collision with the existing inline
-  `_renderFunnelWaterfall(crm, isPLA, cac)` string-returning helper at
-  `:13881` used by `renderMetricTicker → #funnelTable`.
+### Net delta
+−213 lines. JS syntax validated with `node --check`.
 
-### Validation
-- JS syntax check: extracted all `<script>` blocks, ran `node --check`
-  on each → 0 errors.
-- Local server (`python3 -m http.server`) serves index.html with HTTP 200
-  and the new `id="funnelWaterfall"` + `_renderFunnelWaterfallCard`
-  identifiers present.
-
----
-
-## Funnel Health table — Phase 1: QL→TB→TC→TD per ad with cohort/MTD toggle (2026-05-06)
-
-### Why
-Performance, sales, and CEO need one place to see funnel health per ad — not
-just CPTQL/CPTD aggregates. Each stage of the funnel (Qualified Lead → Trial
-Booked → Trial Confirmed → Trial Done) has its own conversion ratio that
-flags where the leak is. Two attribution rules matter for different teams:
-- **Cohort** answers "for leads that signed up in this window, how did
-  *they* convert?" (Cuemath-classic — locks lead-cohort to event window.)
-- **MTD** answers "in this window, what events did we observe regardless
-  of when the lead originated?" (CEO/sales view — spend-period truth.)
-
-### What changed (`index.html`)
-- **`LEADS_CACHE_FIELDS` (`:4544`)** — added `trials_conf` and
-  `trial_conf_date` so the slim cache carries the new TC fields.
-- **PLA normalizer (`:4583+`)** — emits `trial_conf_date` /
-  `trials_conf` (defaults to `''` / `'0'` when PLA sheet lacks the
-  column; reads `r.trial_confirmed === '1'` if present).
-- **India CRM normalizer (`:4731+`)** — passthrough `r.trial_conf_date`
-  / `r.trials_conf` (matches BAU naming).
-- **`getAdFunnelMetrics(market, start, end, mode)` (`:5895+`)** — new
-  per-ad funnel aggregator. Cohort mode requires lead AND event both in
-  window. MTD mode filters each stage by its own event-date column. Reuses
-  best-name fallback (`mx_utm_adcontent` → `mx_utm_term`) like the existing
-  daily aggregator. India CRM rows flagged `_isAdsetGrain: true` (ad-level
-  UTM gap, known blocker). Cached on `_adFunnelCache`; invalidated by
-  `invalidateAdPerfCache()`.
-- **Tagger › Explore — third sub-view "Funnel"** (`:1080+`). New
-  `taggerTab-funnel` container with cohort/MTD pill, campaign/adset/ad
-  level pill, and table with Spend · QL · TB · TC · TD · QL→TB% · TB→TC% ·
-  TC→TD% · QL→TD% · CPTQL · CPTD · Audience (Phase 2) · Dest (Phase 2) ·
-  Meta (Phase 3) · Notion (Phase 3) · Recommendation.
-- **`setExploreView` / `switchTaggerTab` / `renderActiveTaggerTab`
-  (`:15740+`)** — extended to route to `funnel` sub-view alongside
-  `tree` / `grid`.
-- **`setFunnelMode`, `setFunnelLevel`, `goFunnelTablePage`,
-  `_funnelChassisByAd`, `_funnelRecCell`, `_funnelPctCell`,
-  `renderFunnelHealthTable` (`:16048+`)** — UI controls + render path.
-  Recommendation column reads `state._chassisLastRun.all` and surfaces the
-  highest-priority verdict (pause > refresh > scale) per ad with action
-  badge + why-text.
-
-### Out of scope (Phase 2 / Phase 3 placeholders rendered as "Phase 2/3")
-- **Audience type + Age/Gender/Interests/Locations** — needs Meta
-  Marketing API extension to fetch adset `targeting` specs into a new
-  `meta_adset_targeting` Supabase table.
-- **IF/LP destination** — needs `creative.object_story_spec.link_data` +
-  `lead_gen_form_id` + `asset_feed_spec.link_urls` added to the existing
-  Meta creative fetcher (`:4261`, `:4856`).
-- **Meta link / Notion link** — driven by a Google Sheet
-  (`ad_name → meta_ad_link, notion_link`) Naina will provide.
-- **🪄 Deepen button** — per-row Haiku call, gated by per-row click.
-
-### Behavioral changes
-- New view is opt-in via the third pill in Explore. Tree and Grid
-  unaffected.
-- India ads roll up to ad-set level inside the table (badge: "India ·
-  ad-set grain (UTM gap)"). Other markets render at ad-level.
-- Default mode = Cohort (matches existing dashboard KPIs). Default level
-  = Ad.
-
-### Verification
-- All `<script>` blocks pass `new Function(code)` syntax check.
-- Reuses existing helpers (`normalizeAdName`, `_filterLeadsByFlow`,
-  `filterLeadsByMarket`, `getFlowFilter`, `matchMarketFromText`,
-  `_isPLACampaignName`, `formatCurrency`, `getGlobalDateRange`,
-  `state._chassisLastRun`).
+### Verify
+- Open Dashboard. Pause / Refresh / Make More cards still render.
+- Snooze 24h / Skip 7d / Never again on a Dashboard card still suppress the
+  card on next render (chassis localStorage read in `_isChassisDismissed`).
+- No "Action Queue" item in the sidebar. No `actionq` route resolvable.
 
 ---
 
