@@ -4,6 +4,65 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Path A cleanup — chassis is the only source for Pause + Make More (2026-05-06)
+
+### Why
+Earlier today's parity-fix commit produced a clean reading: Make More
+`✅ perfect match` and Pause's 6 legacy-only ads diagnosed as legacy
+false-positives (no winner-aware suppression on `cptqlLeaks`, no
+dismissal-aware suppression on `fatigueAds`). Chassis already enforces
+both via `historical_winner_check` and `not_recently_dismissed`
+guardrails — so deleting legacy *upgrades* Pause Now rather than
+losing signal.
+
+### What changed (`index.html`, net −224 LOC)
+- **Pause filter block deleted** (`renderOracleCardsV2`, was `:9400-:9558`).
+  Removed: `_mm0` + `avgCPTQL`, `_livenessSet`, `isPaused`, all six signal
+  filters (budgetBurns, cptqlLeaks, wrongAudience, deadFunnel, spamAds,
+  fatigueAds), `seenNames`, the combine+sort `let pauseAds = [...]`, and the
+  `_legacyPauseAds` parity snapshot. Replaced with `_adByName` lookup +
+  `let pauseAds = []` scaffold (~10 lines).
+- **Make More legacy classifier walk deleted** (`_renderMakeMoreAds`).
+  Removed the ~22-line `adCampData.forEach` walk over `_classifyWinner` plus
+  the `_legacyWinners` parity snapshot.
+- **Both parity diff blocks deleted** (Pause: was `:9472-:9493`,
+  Make More: was `:9786-:9802`) along with `_chassisPauseAdsPreCap` snapshot.
+
+### What was deferred (out of scope for this commit)
+- **AQ tab + sidebar nav.** `actionQueueDismiss` (`:7587`) is the only path
+  that writes to `ci.dismiss(…)` — i.e., the only UI for users to record
+  "snooze 24h / skip 7d / never again" against an ad. That feed is what
+  powers the chassis `not_recently_dismissed` guardrail (the same guardrail
+  that justified deleting legacy fatigue today). Removing AQ before
+  migrating dismissal buttons onto Dashboard cards would silently break
+  the feedback loop. Defer until Dashboard cards have a dismiss path.
+- **"1-CLICK" effort badge rename** (`:7502`). Lives inside `renderActionQueueView`
+  → ships with the AQ deletion when that lands.
+
+### Behavioral changes
+- **No legacy fallback during boot warmup.** Pause Now and Make More render
+  empty for the ~10 seconds between page load and chassis completing
+  detection. Dashboard re-renders when chassis result lands (boot tick at
+  `:3406`). Acceptable trade-off for clean single-source rendering.
+- **No more `[parity]` / `[parity:makeMore]` console logs.** They were
+  diagnostic-only and served their purpose.
+
+### Source-of-truth contract
+Pause + Refresh + Make More are now driven entirely by chassis verdicts:
+- `meta_pause_budget_burn` / `meta_pause_cptql_leak` /
+  `meta_pause_wrong_audience` / `meta_pause_dead_funnel` /
+  `meta_pause_spam` / `meta_pause_fatigued_loser` (`:7211+`)
+- `meta_refresh_fatigued_winner` (`:7395+`)
+- `meta_scale_tier1_winner` / `meta_scale_tier2_winner` (`:7700+`)
+
+All seven Pause/Refresh verdicts share the same chassis guardrails:
+`cohort_matured`, `volume_floor`, `historical_winner_check`,
+`not_recently_dismissed`. Scale verdicts share `cohort_matured`,
+`volume_floor`, `not_recently_dismissed` (winner-check omitted —
+they're recommending winners by definition).
+
+---
+
 ## Path A parity fixes — symmetric snapshots before deletion (2026-05-06)
 
 ### Why
@@ -45,6 +104,87 @@ Re-run dashboard, hard-reload, paste both parity logs.
   (delete legacy filter blocks, classifier walk, parity diff blocks,
   AQ tab + nav, "1-CLICK" badge).
 - Still divergent → diagnose remaining gap before deletion.
+
+---
+
+## Content workflow: brief → write → radar (2026-05-05, third pass)
+
+### Why
+`/godfather copy` was duplicating Forge. Naina wanted three simple memorable doors instead of one mode-switching megacommand. Locked-in `/radar` muscle memory (ship-readiness gate) was colliding with Radar agent name (forward-look briefer). Resolved by renaming the briefer to Scout.
+
+### What changed (no `index.html` edits)
+- **`01-agents/05-radar.md` renamed → `01-agents/05-scout.md`.** Identity rewritten as Scout. Same job (forward-look briefer, Context Cards), new name.
+- **`~/.claude/commands/brief.md`** — new slash command. Invokes Scout. Sub-modes: empty/all (every market), market name, "next" (LP needed ≤14d), "gap".
+- **`~/.claude/commands/write.md`** — new slash command. Invokes Forge. Sub-modes: `meta`, `rsa`/`google`, `video`/`script`, `lp`, `email`, `testimonial`, `concept`/`campaign`, `soundhuman`/`rewrite`. Reads brand truth on startup (creative-direction-v1, brand-voice, brand-guidelines, guardrails, ICP). Mandatory quality gate (brand-validator + SACI + Forge guardrails + Why-this-works) before any output.
+- **`~/.claude/commands/radar.md`** — new slash command. Ship-readiness gate. Verdict: 🟢 SHIP / 🟡 SHIP WITH FIXES / 🔴 REWRITE. Calls out invented facts, banned/bleached words, missing MathFit + tutor essence, SACI failures, format mismatches. Strips internal scaffolding per Naina's May 4 rule.
+- **`~/.claude/commands/godfather.md` `/godfather copy` mode redirected** to point users at `/write`. No longer generates content from this surface.
+- **All `01-agents/05-radar` references and "Radar" (briefer context) renamed → Scout** across: 00-agent-architecture, 03-forge, 04-oracle, 06-curator, 02-skills/production-skills/landing-page-content, 05-reference/lp-planning/README, 03-guardrails/00-master-guardrails, project_lp_radar_writer_setup memory. Architecture diagram + agent table + cadence + See Also all updated.
+- **MEMORY.md updated** — pointer added for `project_content_workflow_may5.md` so future sessions surface the new doors. The May 4 LP Scout + Writer line updated to use Scout name.
+
+### Naming model (locked)
+
+| Door | Agent | Job |
+|---|---|---|
+| `/brief` | Scout | Forward-look. Calendar → Context Card. |
+| `/write` | Forge | Make the thing. Sub-modes per content type. |
+| `/radar` | — | Ship-ready gate. Verdict-only. |
+| `/godfather` | Godfather | Strategy / dashboard / data / review. (Copy mode redirects to /write.) |
+
+Read it as a sentence: **brief → write → radar**.
+
+### Verification
+- All four slash commands resolve and load brand truth from real paths (no `Documents/Brain/` rot remaining).
+- `feedback_radar_means_production_ready.md` (May 4) now aligns with the actual `/radar` slash command behaviour.
+
+---
+
+## Curator hygiene pass — yellow-list cleanup (2026-05-05, second pass)
+
+### Why
+Following the structural drift fixes earlier today, cleared the deferred 🟡 hygiene items per Naina's go-ahead.
+
+### What changed (no `index.html` edits)
+- **`04-reports/_archive/` created.** Moved 6× `ceo-perf-creatives-apr2026-v2-FINAL.pptx.backup-*` files (~3.8 GB) out of working reports into archive.
+- **`04-reports/audits/` created.** Moved `AUDIT-2026-04-01.md` into it. Future `/curator` reports land here.
+- **`02-skills/production-skills/brand-guidelines.md` renamed → `brand-guidelines-uploadable.md`** to remove the name collision with `05-reference/brand-guidelines.md` (canonical). Forge agent reference updated.
+- **`02-skills/production-skills/README.md` added** — explains uploadable Claude Project skills vs internal agent skills, with a file index.
+- **MEMORY.md updated:** indexed `tagging-rubric.md` (v3 tagger spec, active) and `claude-ai-projects.md` under Skills. Added a "Reference (Brain-folder docs)" section indexing 7 previously orphaned reference docs (brand-guidelines, icp-guide, data-schemas, funnel-definitions, hs-performance-marketing-brief, seasonal-calendar, project-overview-original).
+- **`03-guardrails/00-master-guardrails.md`** agent → guardrail mapping table extended with Radar (G-12, G-19) and Curator (read-only, none). Forge row corrected to include G-05b.
+- **`.gitignore` extended** — `04-reports/_deck_data/`, `04-reports/_tagger_v2/notion_cache/`, `04-reports/_archive/` no longer tracked for future commits. (Existing tracked files remain tracked; use `git rm --cached <path>` if you want to untrack.)
+
+### Deferred (Naina said "not sure"; left as-is)
+- `04-reports/_deck_data/` raw lead CSV dumps (~32 MB) — gitignored going forward; not moved or deleted. Surface for triage when convenient.
+- `shared/tests/` — `package.json` has no `test` script. Tests still present, harmless. Triage when test infra is set up.
+
+---
+
+## Curator first-run cleanup: structural drift fixes (2026-05-05)
+
+### Why
+Curator agent (`01-agents/06-curator.md`) ran its first audit. Found 26+ broken pointers across slash commands, MEMORY.md, agent files, and adjacent docs. The Brain was structurally rotting: every `Documents/Brain/godfather/` reference was wrong because actual root is `Documents/CM Brain /godfather/`. Slash commands `/godfather` and `/agent007` failed silently on startup. Forge cited 5 nonexistent skill files. Oracle cited 2. Architecture doc described 4 agents but 6 exist.
+
+### What changed (no `index.html` edits)
+- `~/.claude/commands/godfather.md` — paths fixed to `05-reference/` + creative-direction-v1 added to startup reads.
+- `~/.claude/commands/agent007.md` — paths fixed; funnel-definitions added to startup reads.
+- `~/.claude/projects/-Users-nainajethalia/memory/MEMORY.md` — global path replace; 14 cross-folder links now resolve.
+- `~/.claude/projects/-Users-nainajethalia/memory/*.md` — 14 individual memory files patched (all `Documents/Brain/godfather/` → `Documents/CM Brain /godfather/`).
+- `~/.claude/projects/-Users-nainajethalia/agents/guard.md` — 3 paths fixed (this file's own startup paths).
+- `01-agents/00-agent-architecture.md` — rewrite for 6 agents (Sentinel, Lens, Forge, Oracle, Radar, Curator) with refreshed mesh diagram, refresh-cadence table, and data-flow narrative.
+- `01-agents/03-forge.md` — Skills Invoked rewritten to cite real production-skills filenames. Added Radar + creative-direction-v1 to See Also.
+- `01-agents/04-oracle.md` — Skills Invoked rewritten with real skill files; deduplicated See Also; added Radar.
+- `01-agents/06-curator.md` — removed stale "known issue" note now that the bug is fixed.
+- `02-skills/intelligence-chassis-spec.md` + `02-skills/google-intelligence-skills.md` — paths corrected.
+
+### Verification
+Final sweep returned zero `Documents/Brain/godfather/` (no-CM) hits across Brain + commands + memory + agents.
+
+### Outstanding (deferred, 🟡)
+- ~3.8 GB of `.pptx.backup-*` files in `04-reports/` — needs `_archive/` move or delete decision.
+- `brand-guidelines.md` exists in both `05-reference/` (103 lines) and `02-skills/production-skills/` (211 lines) with different content — name collision risk; rename the production-skills version.
+- Orphaned skills: `02-skills/tagging-rubric.md`, `02-skills/claude-ai-projects.md` — index in MEMORY.md or archive.
+- 7 reference files orphaned in MEMORY.md (HS brief, data-schemas, funnel-definitions, etc.).
+- Radar + Curator missing from the master-guardrails agent → guardrail mapping table.
+- No QA agent for tagger output, no `_archive/` convention.
 
 ---
 

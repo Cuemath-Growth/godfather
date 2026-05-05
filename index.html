@@ -9397,172 +9397,17 @@ function renderOracleCardsV2() {
     _spendSource: r._spendSource,
     _hasCRM: r._hasCRM,
   }));
-  // Use getMarketMetrics for baseline (costData = source of truth, not Meta API)
-  const _mm0 = getMarketMetrics(market || 'all', from, to);
-  const avgCPTQL = _mm0.cptql || (getQL() > 0 ? getSpend() / getQL() : 20000);
-
-  // Liveness signal: an ad is considered RUNNING only if it spent money in the last 7 days.
-  // This catches the case where metaCreatives lookup fails (name mismatch) — we still filter
-  // out ads that Meta has stopped serving, based on daily spend activity.
-  const _livenessSet = new Set();
-  _dailyData.forEach(r => {
-    if ((r.spend || 0) > 0 && r.date >= _twStr) _livenessSet.add(normalizeAdName(r.ad_name));
-  });
-
-  // Returns TRUE if ad is paused/deleted/archived/not-running for ANY reason.
-  // Honors all Meta effective_status states, plus a last-7-days spend check as safety net.
-  const isPaused = (adName) => {
-    const key = normalizeAdName(adName);
-    const creative = metaCreatives.find(c => normalizeAdName(c.name) === key);
-    if (creative) {
-      const stat = String(creative.status || '').toUpperCase();
-      // Any state that means "not actively serving"
-      const notServing = new Set([
-        'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED',
-        'ARCHIVED', 'DELETED',
-        'DISAPPROVED', 'WITH_ISSUES', 'PENDING_REVIEW', 'PENDING_BILLING_INFO',
-        'IN_PROCESS'
-      ]);
-      if (notServing.has(stat)) return true;
-    }
-    // Fallback — no Meta match OR Meta says ACTIVE but daily data shows no recent spend
-    if (!_livenessSet.has(key)) return true;
-    return false;
-  };
-
-  // ── SIGNAL 1: Budget burns — spending ₹15K+ with zero QLs ──
-  const budgetBurns = adCampData
-    .filter(a => a.spend >= 15000 && a.ql === 0 && !isPaused(a.adName))
-    .sort((a, b) => b.spend - a.spend)
-    .slice(0, 4)
-    .map(a => {
-      const wt = _getWeeklyTrend(a.adName);
-      const trendStr = wt ? ` · ${wt.label} ${formatCurrency(wt.twSpend)} this wk` : '';
-      const why = a._hasCRM
-        ? `${formatCurrency(a.spend)} delivered 0 QLs \u2014 hook isn't landing or the audience isn't seeing enough value to sign up`
-        : `No CRM row found for this ad \u2014 matching may have broken. Verify in Meta Ads Manager before pausing (the ad may be converting but we can't see it).`;
-      return { ...a, name: a.adName, _type: 'burn', _priority: a._hasCRM ? 1 : 2, _trend: wt,
-        _signal: `${formatCurrency(a.spend)} spent \u00B7 0 QLs${a._hasCRM ? ' \u2014 pure waste' : ' \u2014 \u26A0\uFE0F no CRM link'}${trendStr}`,
-        _why: why };
-    });
-
-  // ── SIGNAL 2: CPTQL too high — above ad's own market amber OR 2x+ the overall avg ──
-  // Uses per-market thresholds so "bad CPTQL" means the same thing regardless of dashboard filter.
-  const cptqlLeaks = adCampData
-    .filter(a => {
-      if (a.spend === null || a.tql < 5 || a.cptql === null || isPaused(a.adName)) return false;
-      const adMkt = a.market || 'US';
-      const adMktAmber = (SENTINEL_THRESHOLDS[adMkt] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000;
-      // Flag if above the ad's own market amber, OR above 2x the current-filter portfolio avg.
-      return a.cptql > adMktAmber || a.cptql > avgCPTQL * 2;
-    })
-    .sort((a, b) => b.spend - a.spend)
-    .slice(0, 5)
-    .map(a => {
-      const wt = _getWeeklyTrend(a.adName);
-      const trendStr = wt ? ` · ${wt.label} ${wt.twQL}QL this wk vs ${wt.lwQL} last` : '';
-      const adMkt = a.market || 'US';
-      const adMktTh = SENTINEL_THRESHOLDS[adMkt] || SENTINEL_THRESHOLDS['US'];
-      const adMktAmber = adMktTh.cpql?.amber || 15000;
-      const adMktGreen = adMktTh.cpql?.green || 10000;
-      const aboveAmber = a.cptql > adMktAmber;
-      const multiplier = avgCPTQL > 0 ? Math.round(a.cptql / avgCPTQL) : 0;
-      const why = aboveAmber
-        ? `CPTQL ${formatCurrency(a.cptql)} exceeds the ${adMkt} amber threshold of ${formatCurrency(adMktAmber)} (green is ${formatCurrency(adMktGreen)}). Costs too much per qualified lead \u2014 any downstream enrollment margin is already gone.`
-        : `CPTQL ${formatCurrency(a.cptql)} is ${multiplier}\u00D7 the portfolio average (${formatCurrency(avgCPTQL)}). Delivering TQLs but at a cost that wipes out margin.`;
-      return { ...a, name: a.adName, _type: 'cptql', _priority: 2, _trend: wt,
-        _signal: `CPTQL ${formatCurrency(a.cptql)}${aboveAmber ? ' (above ' + adMkt + ' amber)' : ' (' + multiplier + 'x avg)'} \u00B7 ${a.tql} TQLs${trendStr}`,
-        _why: why };
-    });
-
-  // ── SIGNAL 3: Wrong audience — US ads with < 30% NRI rate (spend > ₹20K, QL >= 5) ──
-  // SKIP for PLA: PLA targets broad audience, low NRI% is expected and correct
-  // Must check EACH AD's campaign name (not global flow toggle) because flow=All shows both BAU+PLA
-  const _flowForSignals = getFlowFilter();
-  const wrongAudience = _flowForSignals === 'pla' ? [] : adCampData
-    .filter(a => !_isPLACampaignName(a.campaignName) && a.market === 'US' && a.spend >= 20000 && a.ql >= 15 && a.nriPct < 0.30 && !isPaused(a.adName))
-    .sort((a, b) => a.nriPct - b.nriPct)
-    .slice(0, 3)
-    .map(a => ({ ...a, name: a.adName, _type: 'audience', _priority: 2,
-      _signal: `Only ${Math.round(a.nriPct * 100)}% NRI (${a.nri}/${a.ql}) \u00B7 ${formatCurrency(a.spend)} \u2014 attracting wrong audience`,
-      _why: `NRI is the highest-converting US segment. Only ${Math.round(a.nriPct*100)}% of this ad's QLs are NRI (benchmark 40%+). The creative or targeting is pulling in non-converting audiences \u2014 tighten interest stack or refresh the hook to speak to expat parents.` }));
-
-  // ── SIGNAL 4: Dead funnel — QLs but zero TDs (QL >= 15, spend > ₹20K) ──
-  // Diagnostic priority: TS=0 (intent gap) > high invalid (spam) > high non-NRI (US, wrong audience) > all-scheduled-no-show (capacity)
-  const deadFunnel = adCampData
-    .filter(a => a.spend >= 20000 && a.ql >= 15 && a.td === 0 && !isPaused(a.adName))
-    .sort((a, b) => b.ql - a.ql)
-    .slice(0, 3)
-    .map(a => {
-      const reasons = [];
-      // Intent gap: leads exist, never even tried to schedule
-      if (a.ts === 0) reasons.push(`${a.ql} QLs but 0 trial-bookings \u2014 leads aren't intent-qualified (LP click without form completion, or wrong audience)`);
-      // No-show: scheduled but didn't attend
-      else if (a.ts > 0 && a.td === 0) reasons.push(`${a.ts} trials scheduled, 0 completed \u2014 no-show / sales-handoff issue, not a creative problem`);
-      // Spam
-      if (a.invalidPct > 0.25) reasons.push(`${Math.round(a.invalidPct*100)}% invalid leads (${Math.round(a.invalid)}/${Math.round(a.totalLeads)}) \u2014 spam magnet`);
-      // Wrong audience (US BAU only)
-      if (a.market === 'US' && !_isPLACampaignName(a.campaignName) && a.nriPct < 0.20) reasons.push(`only ${Math.round(a.nriPct*100)}% NRI (${a.nri}/${a.ql}) \u2014 attracting wrong audience`);
-      // Default: pure funnel stall, no obvious cause from data we have
-      if (!reasons.length) reasons.push(`${a.ql} QLs scheduled trials but none completed \u2014 check trial scheduler capacity or LP form quality`);
-      return { ...a, name: a.adName, _type: 'funnel', _priority: 2,
-        _signal: `${a.ql} QLs \u2192 0 TDs \u00B7 ${formatCurrency(a.spend)}`,
-        _why: reasons[0] };
-    });
-
-  // ── SIGNAL 5: Spam magnet — high invalid rate (> 25%, QL >= 5) ──
-  const spamAds = adCampData
-    .filter(a => a.spend >= 10000 && a.totalLeads >= 20 && a.invalidPct > 0.25 && !isPaused(a.adName))
-    .sort((a, b) => b.invalidPct - a.invalidPct)
-    .slice(0, 3)
-    .map(a => ({ ...a, name: a.adName, _type: 'spam', _priority: 2,
-      _signal: `${Math.round(a.invalidPct * 100)}% invalid leads (${Math.round(a.invalid)}/${Math.round(a.totalLeads)}) \u00B7 ${formatCurrency(a.spend)}`,
-      _why: `${Math.round(a.invalidPct * 100)}% of this ad's leads are marked invalid (bots, junk forms, disposable emails). The creative is attracting pattern-matchers who auto-submit forms \u2014 usually a hook or offer that implies "easy money" / low-commitment signup.` }));
-
-  // ── SIGNAL 6: Fatigue — declining CPM / CTR / spend efficiency over time ──
-  // Phase 4: for fatigued ads that were previously TIER-1 winners, label as "Refresh"
-  // instead of "Kill" — the creative direction worked, it just wore out. Brief a variant,
-  // don't pause the pattern entirely.
-  const seenNames = new Set([...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds].map(a => normalizeAdName(a.name)));
+  // Build ad-name → full-ad lookup; the chassis override below uses it to enrich each
+  // verdict signal with the per-ad fields (campaignName, tags, spend, etc.) the card
+  // renderer expects.
   const _adByName = {};
   adCampData.forEach(a => { _adByName[normalizeAdName(a.adName)] = a; });
-  const fatigueAds = detectFatigue()
-    .filter(f => f.stage >= 2 && !seenNames.has(normalizeAdName(f.ad_name)))
-    .slice(0, 4)
-    .map(f => {
-      const fullAd = _adByName[normalizeAdName(f.ad_name)] || null;
-      const historicalTier = fullAd ? _classifyWinner(fullAd) : null;
-      const wasWinner = historicalTier === 'tier1' || historicalTier === 'tier2';
-      const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
-      const why = wasWinner
-        ? `${stageText} \u2014 but this ad was a ${historicalTier === 'tier1' ? 'proven' : 'emerging'} winner (CPTD ${fullAd?.cptd ? formatCurrency(fullAd.cptd) : '\u2014'}, ${fullAd?.td || 0} TDs). ${f.signals.join('; ')}. The CREATIVE PATTERN works \u2014 refresh visual/hook, keep same audience + format, DON'T kill.`
-        : `${stageText} \u2014 ${f.signals.join('; ')}. Audience has seen this creative too many times; refresh the visual and hook before it drags down the account's learning phase.`;
-      return {
-        ...(fullAd || {}),
-        name: f.ad_name,
-        spend: fullAd?.spend || (f.daily_spend * 3),
-        ql: fullAd?.ql || 0,
-        td: fullAd?.td || 0,
-        market: fullAd?.market || '',
-        _type: wasWinner ? 'refresh' : 'fatigue',
-        _priority: f.stage === 3 ? 0 : 1,
-        _signal: (wasWinner ? 'Proven winner fatiguing \u00B7 ' : '') + f.signals.join(' \u00B7 ') + (f.stage === 3 ? ' \u00B7 URGENT' : ''),
-        _why: why,
-        _wasWinner: wasWinner,
-        _historicalTier: historicalTier
-      };
-    });
 
-  // Combine + sort: priority 0 (urgent fatigue) → 1 (burns, early fatigue) → 2 (leaks/audience/funnel)
-  let pauseAds = [...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds, ...fatigueAds]
-    .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0));
-
-  // ── Path A swap (2026-05-05): chassis is the source of truth for Pause + Refresh ──
-  // When chassis result is available, override pauseAds with chassis verdicts. Legacy filters
-  // above stay running as warmup fallback (chassis takes ~10s after boot) and as the
-  // comparison baseline for the parity diff below. After one clean session, delete legacy
-  // filter block + this comment.
-  const _legacyPauseAds = pauseAds; // preserve for parity diff
+  // Chassis is the source of truth for Pause + Refresh. While chassis detection is in flight
+  // (~10s after boot), pauseAds stays empty — the Dashboard re-renders when chassis completes
+  // (boot tick at :3406). No legacy fallback: legacy and chassis already reached parity, and
+  // legacy was noisier (no winner-aware suppression, no dismissal-aware suppression).
+  let pauseAds = [];
   const _verdictTypeMap = {
     'meta_pause_budget_burn': 'burn',
     'meta_pause_cptql_leak': 'cptql',
@@ -9600,11 +9445,6 @@ function renderOracleCardsV2() {
       .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0));
   }
 
-  // Snapshot chassis result BEFORE the visibility filter + per-market cap so the parity
-  // diff below compares apples-to-apples against the (also pre-cap, pre-visibility-filter)
-  // legacy snapshot in `_legacyPauseAds`.
-  const _chassisPauseAdsPreCap = pauseAds.slice();
-
   // Filter Done/Dismissed/Snoozed BEFORE the cap so actioned ads don't eat cap slots —
   // the next-best ad takes their place instead of leaving an empty card.
   pauseAds = pauseAds.filter(a => isItemVisible('pause:' + a.name));
@@ -9621,29 +9461,6 @@ function renderOracleCardsV2() {
     pauseAds = capped.slice(0, 14); // soft total cap
   } else {
     pauseAds = pauseAds.slice(0, 10);
-  }
-
-  // ── Parity diff: legacy filter result vs chassis-driven pauseAds (TEMP, delete next session) ──
-  // Now that pauseAds IS chassis output, compare to the legacy filter snapshot saved above.
-  // Runs once per session; first call when chassis result is available wins.
-  if (!state._parityRan && _chassisRun) {
-    try {
-      state._parityRan = true;
-      // Compare uncapped legacy vs uncapped chassis (`_chassisPauseAdsPreCap`) so the diff
-      // is apples-to-apples. Comparing against the post-cap `pauseAds` showed false divergence
-      // because the per-market cap of 2 chops chassis output before the diff sees it.
-      const _legacyKeys = new Set(_legacyPauseAds.map(a => normalizeAdName(a.name)));
-      const _chassisKeys = new Set(_chassisPauseAdsPreCap.map(a => normalizeAdName(a.name)));
-      const _legacyOnly = _legacyPauseAds.filter(a => !_chassisKeys.has(normalizeAdName(a.name)));
-      const _chassisOnly = _chassisPauseAdsPreCap.filter(a => !_legacyKeys.has(normalizeAdName(a.name)));
-      if (_legacyOnly.length || _chassisOnly.length) {
-        console.warn(`[parity] legacy=${_legacyPauseAds.length} chassis=${_chassisPauseAdsPreCap.length} · legacy-only=${_legacyOnly.length} · chassis-only=${_chassisOnly.length}`);
-        if (_legacyOnly.length) console.table(_legacyOnly.map(a => ({ ad: a.name, type: a._type, market: a.market, spend: a.spend, ql: a.ql, td: a.td })));
-        if (_chassisOnly.length) console.table(_chassisOnly.map(a => ({ ad: a.name, verdict: a._verdictId, market: a.market, spend: a.spend })));
-      } else {
-        console.log(`[parity] ✅ legacy=${_legacyPauseAds.length} chassis=${_chassisPauseAdsPreCap.length} · perfect match`);
-      }
-    } catch (e) { console.error('[parity] diff failed:', e); }
   }
 
   const visibleAll = pauseAds.filter(a => isItemVisible('pause:' + a.name));
@@ -9907,35 +9724,12 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
   if (!container) return;
   const flow = (typeof getFlowFilter === 'function') ? getFlowFilter() : 'all';
 
-  // 1. Classify all ads against their MATURE cohort (leads ≥14 days old — Phase 7).
-  //    Ads without mature history are skipped (too new to judge reliably).
+  // Chassis Scale verdicts (meta_scale_tier1_winner + meta_scale_tier2_winner) are the
+  // source of truth for winners. While chassis detection is in flight (~10s after boot),
+  // winners stays empty — the Dashboard re-renders when chassis completes (boot tick at
+  // :3406). Each verdict carries the same mature-cohort gates _classifyWinner enforces, so
+  // there's no deletion-shaped change in what surfaces — just one source instead of two.
   let winners = [];
-  adCampData.forEach(a => {
-    if (pausedAdNames.has(normalizeAdName(a.adName))) return;
-    if (a._matureMissing) return; // no mature cohort yet — wait 14 days
-    const tier = _classifyWinner(a);
-    if (!tier) return;
-    // Respect flow filter: exclude PLA winners in BAU view and vice versa
-    if (flow === 'bau' && /\(PLA\)/i.test(a.tags?.campaign_audience || '')) return;
-    if (flow === 'pla' && !/\(PLA\)/i.test(a.tags?.campaign_audience || '')) return;
-    // Carry mature metrics forward — the card displays these (not the filter-window snapshot)
-    // so the number the user sees matches the number that classified this ad as a winner.
-    const m = a.mature || {};
-    winners.push({
-      ...a,
-      _tier: tier,
-      _displayCPTD: m.cptd !== undefined ? m.cptd : a.cptd,
-      _displayTD: m.td !== undefined ? m.td : a.td,
-      _displayQL: m.ql !== undefined ? m.ql : a.ql,
-      _displaySpend: m.spend !== undefined ? m.spend : a.spend
-    });
-  });
-
-  // ── Path A swap (2026-05-05): chassis Scale verdicts drive Make More ──
-  // When chassis is ready, override winners[] with chassis-derived list. Legacy classifier
-  // above stays running as warmup fallback + parity baseline. Once parity holds for a
-  // session, delete the legacy block + this comment.
-  const _legacyWinners = winners;
   const _chassisMakeMoreRun = state._chassisLastRun;
   if (_chassisMakeMoreRun && Array.isArray(_chassisMakeMoreRun.all)) {
     const _adByName = {};
@@ -9946,7 +9740,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
       .map(r => {
         const fullAd = _adByName[normalizeAdName(r.entity_id)] || {};
         if (pausedAdNames.has(normalizeAdName(r.entity_id))) return null;
-        // Respect flow filter (mirror legacy logic above)
+        // Respect BAU/PLA flow filter — Make More on BAU view excludes PLA winners and vice versa.
         const aud = fullAd.tags?.campaign_audience || '';
         if (flow === 'bau' && /\(PLA\)/i.test(aud)) return null;
         if (flow === 'pla' && !/\(PLA\)/i.test(aud)) return null;
@@ -9963,24 +9757,6 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
         };
       })
       .filter(Boolean);
-  }
-
-  // Make More parity diff (TEMP, delete next session alongside legacy classifier above)
-  if (!state._parityRanMakeMore && _chassisMakeMoreRun) {
-    try {
-      state._parityRanMakeMore = true;
-      const _legacyKeys = new Set(_legacyWinners.map(w => normalizeAdName(w.adName)));
-      const _chassisKeys = new Set(winners.map(w => normalizeAdName(w.adName)));
-      const _legacyOnly = _legacyWinners.filter(w => !_chassisKeys.has(normalizeAdName(w.adName)));
-      const _chassisOnly = winners.filter(w => !_legacyKeys.has(normalizeAdName(w.adName)));
-      if (_legacyOnly.length || _chassisOnly.length) {
-        console.warn(`[parity:makeMore] legacy=${_legacyWinners.length} chassis=${winners.length} · legacy-only=${_legacyOnly.length} · chassis-only=${_chassisOnly.length}`);
-        if (_legacyOnly.length) console.table(_legacyOnly.map(w => ({ ad: w.adName, tier: w._tier, market: w.market, td: w._displayTD, cptd: w._displayCPTD })));
-        if (_chassisOnly.length) console.table(_chassisOnly.map(w => ({ ad: w.adName, verdict: w._verdictId, market: w.market, td: w._displayTD, cptd: w._displayCPTD })));
-      } else {
-        console.log(`[parity:makeMore] ✅ legacy=${_legacyWinners.length} chassis=${winners.length} · perfect match`);
-      }
-    } catch (e) { console.error('[parity:makeMore] diff failed:', e); }
   }
 
   if (!winners.length) {
