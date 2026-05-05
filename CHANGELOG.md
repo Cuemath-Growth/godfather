@@ -117,6 +117,51 @@ Ahead   if usedPct >  monthPct + 0.10  (red    — overspending; more dangerous)
 
 ---
 
+## Funnel waterfall card on Dashboard — Phase 3.4 (2026-05-06)
+
+### Why
+ROADMAP Phase 3.4 calls for a side-by-side BAU + PLA funnel visualization
+(QL → TQL → TS → TD → Paid) with leak % per stage. The existing inline
+funnel inside `renderMetricTicker` (`#funnelTable`) only renders the active
+flow; when flow=All a CMO can't see at a glance which flow is leaking
+where. New card sits between KPI ticker and Pause Now.
+
+### What changed (`index.html`)
+- **HTML container (`:322`)** — new `<div class="mb-6" id="funnelWaterfall"></div>`
+  immediately after `#bauPlaSection`.
+- **`_renderFunnelWaterfallCard()` (`:10612`)** — new helper. Reads market +
+  date range + flow filter, partitions `leadsData`/`costData` into BAU and
+  PLA buckets using the same predicates as `renderBauPlaComparison`
+  (`_source==='pla'` OR `_isPLACampaignName`), computes 5 stage counts
+  per flow via the same partition logic as `getOracleMetrics`
+  (BAU TQL = NRI for US/Canada, board-gated for India/MEA, else QL;
+  PLA TQL = `_trialBooked==='1'`). Renders one card per visible flow
+  (both side-by-side on flow=All, single panel on flow=BAU/PLA). Bars
+  width-scaled to QL count, leak pill between stages
+  (green ≤30%, amber 30–60%, red >60%).
+- **Call site (`:10602`)** — `renderOracleCardsV2()` now invokes
+  `_renderFunnelWaterfallCard()` inside try/catch right before
+  `checkStaleData()` so a render bug never tanks the Dashboard.
+
+### Net effect
+- +~95 LOC. Plain `<div>` bars + Tailwind, no chart lib.
+- No new filter/toggle/legend — driven entirely by existing geo + date +
+  flow filters at top of Dashboard.
+- Card chrome matches sibling Dashboard cards
+  (`rounded-xl border border-gray-200 bg-white px-4 py-3`).
+- Function name avoids collision with the existing inline
+  `_renderFunnelWaterfall(crm, isPLA, cac)` string-returning helper at
+  `:13881` used by `renderMetricTicker → #funnelTable`.
+
+### Validation
+- JS syntax check: extracted all `<script>` blocks, ran `node --check`
+  on each → 0 errors.
+- Local server (`python3 -m http.server`) serves index.html with HTTP 200
+  and the new `id="funnelWaterfall"` + `_renderFunnelWaterfallCard`
+  identifiers present.
+
+---
+
 ## Chassis dismiss buttons migrated onto Dashboard cards (2026-05-06)
 
 ### Why

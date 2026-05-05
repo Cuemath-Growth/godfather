@@ -313,6 +313,9 @@
           <!-- BAU vs PLA Comparison -->
           <div class="mb-6 hidden" id="bauPlaSection"></div>
 
+          <!-- Funnel Waterfall (Phase 3.4) -->
+          <div class="mb-6" id="funnelWaterfall"></div>
+
           <!-- Week-over-Week Digest -->
           <div class="mb-6" id="wowSection"></div>
           <!-- Trend Charts -->
@@ -10382,8 +10385,98 @@ function renderOracleModules() {
     });
   }
 
+  // Funnel Waterfall (Phase 3.4) — render between KPIs and Pause Now (try/catch so failure can't tank the dashboard)
+  try { _renderFunnelWaterfallCard(); } catch (e) { console.error('_renderFunnelWaterfallCard:', e); }
+
   // Render stale data check (renderMetricTicker called separately by onDashboardFilterChange — not here to avoid duplicate cards)
   checkStaleData();
+}
+
+// ==================== FUNNEL WATERFALL (Phase 3.4) ====================
+// Visual stage-by-stage drop-off: QL -> TQL/TB -> TS -> TD -> Paid.
+// Mirrors renderBauPlaComparison partition logic (BAU = !PLA, PLA = _source==='pla' || PLA campaign name).
+// On flow=All, shows BAU + PLA panels side by side. On flow=BAU/PLA, shows the active flow only.
+function _renderFunnelWaterfallCard() {
+  const el = document.getElementById('funnelWaterfall');
+  if (!el) return;
+  if (!leadsData || !leadsData.length) { el.innerHTML = ''; return; }
+
+  const market = document.getElementById('dashboardCountryFilter')?.value || 'all';
+  const { from, to } = getGlobalDateRange();
+  const flow = (typeof getFlowFilter === 'function') ? getFlowFilter() : 'all';
+
+  const _isPLALead = r => r._source === 'pla' || _isPLACampaignName(r.mx_utm_medium || r.mx_utm_campaign);
+  const _isPLACost = r => r._source === 'pla' || _isPLACampaignName(r.campaign_name);
+  const inRange = d => d && (!from || d >= from) && (!to || d <= to);
+
+  function _stages(leads, cost, isPLA) {
+    const fLeads = market && market !== 'all' ? filterLeadsByMarket(leads, market) : leads;
+    const fCost = market && market !== 'all' ? filterCostByMarket(cost, market) : cost;
+    const spend = fCost.filter(r => inRange(r.day || '')).reduce((s, r) => s + (parseFloat(r.amount_spent) || 0), 0);
+    const qlLeads = fLeads.filter(r => inRange(r.lead_created_date) && String(r.qls) === '1');
+    const ql = qlLeads.length;
+    // PLA TQL = Trials Booked. BAU TQL = NRI for US/Canada, board-gated for India/MEA, else QL (matches getOracleMetrics).
+    let tql;
+    if (isPLA) tql = qlLeads.filter(r => r._trialBooked === '1').length;
+    else if (market === 'US' || market === 'Canada') tql = qlLeads.filter(isNRIEthnicity).length;
+    else if (market === 'India') tql = qlLeads.filter(r => INDIA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length;
+    else if (market === 'MEA' || market === 'ME') tql = qlLeads.filter(r => MEA_TQL_BOARDS.has(r['board (ME)'] || r['board'] || '')).length;
+    else tql = ql;
+    const ts = fLeads.filter(r => inRange(r.lead_created_date) && String(r.trials_sch) === '1').length;
+    const td = fLeads.filter(r => inRange(r.trial_done_date) && String(r.trials_done) === '1').length;
+    const paid = fLeads.filter(r => inRange(r.paid_date) && String(r.paid) === '1').length;
+    return { spend, ql, tql, ts, td, paid };
+  }
+
+  const bauLeads = leadsData.filter(r => !_isPLALead(r));
+  const bauCost = (costData || []).filter(r => !_isPLACost(r));
+  const plaLeads = leadsData.filter(_isPLALead);
+  const plaCost = (costData || []).filter(_isPLACost);
+
+  const showBau = flow === 'all' || flow === 'bau';
+  const showPla = flow === 'all' || flow === 'pla';
+  const bau = showBau ? _stages(bauLeads, bauCost, false) : null;
+  const pla = showPla ? _stages(plaLeads, plaCost, true) : null;
+
+  // Hide entirely if neither flow has any QL data in range
+  const hasAny = (bau && bau.ql > 0) || (pla && pla.ql > 0);
+  if (!hasAny) { el.innerHTML = ''; return; }
+
+  const fmtN = v => (v > 0 ? Math.round(v).toLocaleString() : '0');
+  function _panel(title, s, tqlLabel) {
+    if (!s || s.ql === 0) return '';
+    const stages = [
+      { k: 'QL', n: s.ql }, { k: tqlLabel, n: s.tql },
+      { k: 'TS', n: s.ts }, { k: 'TD', n: s.td }, { k: 'Paid', n: s.paid }
+    ];
+    const top = s.ql || 1;
+    let body = '';
+    stages.forEach((st, i) => {
+      const w = Math.max(2, Math.round(st.n / top * 100));
+      const pct = s.ql > 0 ? Math.round(st.n / s.ql * 100) : 0;
+      body += `<div class="flex items-center gap-2 text-[11px] mb-1">
+        <span class="w-20 shrink-0 font-semibold text-text-secondary">${st.k}</span>
+        <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden relative">
+          <div class="h-full bg-indigo-500 rounded" style="width:${w}%"></div>
+          <span class="absolute inset-0 flex items-center px-2 font-mono text-[10px] text-gray-900">${fmtN(st.n)} (${pct}% of QL)</span>
+        </div>
+      </div>`;
+      if (i < stages.length - 1) {
+        const next = stages[i + 1].n;
+        const leak = st.n > 0 ? Math.round((st.n - next) / st.n * 100) : 0;
+        const cls = leak <= 30 ? 'text-green-700 bg-green-50 border-green-200' : leak <= 60 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-700 bg-red-50 border-red-200';
+        body += `<div class="flex items-center gap-2 mb-1"><span class="w-20 shrink-0"></span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded border ${cls}">${leak}% leak</span></div>`;
+      }
+    });
+    return `<div class="rounded-xl border border-gray-200 bg-white px-4 py-3 flex-1">
+      <div class="flex items-center justify-between mb-2"><h3 class="text-sm font-bold">${title}</h3><span class="text-[10px] text-text-muted">${market === 'all' ? 'All Markets' : market}</span></div>
+      ${body}
+    </div>`;
+  }
+
+  const bauHtml = _panel('BAU Funnel', bau, 'TQL');
+  const plaHtml = _panel('PLA Funnel', pla, 'Trials Booked');
+  el.innerHTML = `<div class="flex flex-col md:flex-row gap-3">${bauHtml}${plaHtml}</div>`;
 }
 
 // ==================== ORACLE: PIPELINE + TICKER + STALE WARNING ====================
