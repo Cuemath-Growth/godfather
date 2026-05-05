@@ -162,6 +162,76 @@ where. New card sits between KPI ticker and Pause Now.
 
 ---
 
+## Funnel Health table — Phase 1: QL→TB→TC→TD per ad with cohort/MTD toggle (2026-05-06)
+
+### Why
+Performance, sales, and CEO need one place to see funnel health per ad — not
+just CPTQL/CPTD aggregates. Each stage of the funnel (Qualified Lead → Trial
+Booked → Trial Confirmed → Trial Done) has its own conversion ratio that
+flags where the leak is. Two attribution rules matter for different teams:
+- **Cohort** answers "for leads that signed up in this window, how did
+  *they* convert?" (Cuemath-classic — locks lead-cohort to event window.)
+- **MTD** answers "in this window, what events did we observe regardless
+  of when the lead originated?" (CEO/sales view — spend-period truth.)
+
+### What changed (`index.html`)
+- **`LEADS_CACHE_FIELDS` (`:4544`)** — added `trials_conf` and
+  `trial_conf_date` so the slim cache carries the new TC fields.
+- **PLA normalizer (`:4583+`)** — emits `trial_conf_date` /
+  `trials_conf` (defaults to `''` / `'0'` when PLA sheet lacks the
+  column; reads `r.trial_confirmed === '1'` if present).
+- **India CRM normalizer (`:4731+`)** — passthrough `r.trial_conf_date`
+  / `r.trials_conf` (matches BAU naming).
+- **`getAdFunnelMetrics(market, start, end, mode)` (`:5895+`)** — new
+  per-ad funnel aggregator. Cohort mode requires lead AND event both in
+  window. MTD mode filters each stage by its own event-date column. Reuses
+  best-name fallback (`mx_utm_adcontent` → `mx_utm_term`) like the existing
+  daily aggregator. India CRM rows flagged `_isAdsetGrain: true` (ad-level
+  UTM gap, known blocker). Cached on `_adFunnelCache`; invalidated by
+  `invalidateAdPerfCache()`.
+- **Tagger › Explore — third sub-view "Funnel"** (`:1080+`). New
+  `taggerTab-funnel` container with cohort/MTD pill, campaign/adset/ad
+  level pill, and table with Spend · QL · TB · TC · TD · QL→TB% · TB→TC% ·
+  TC→TD% · QL→TD% · CPTQL · CPTD · Audience (Phase 2) · Dest (Phase 2) ·
+  Meta (Phase 3) · Notion (Phase 3) · Recommendation.
+- **`setExploreView` / `switchTaggerTab` / `renderActiveTaggerTab`
+  (`:15740+`)** — extended to route to `funnel` sub-view alongside
+  `tree` / `grid`.
+- **`setFunnelMode`, `setFunnelLevel`, `goFunnelTablePage`,
+  `_funnelChassisByAd`, `_funnelRecCell`, `_funnelPctCell`,
+  `renderFunnelHealthTable` (`:16048+`)** — UI controls + render path.
+  Recommendation column reads `state._chassisLastRun.all` and surfaces the
+  highest-priority verdict (pause > refresh > scale) per ad with action
+  badge + why-text.
+
+### Out of scope (Phase 2 / Phase 3 placeholders rendered as "Phase 2/3")
+- **Audience type + Age/Gender/Interests/Locations** — needs Meta
+  Marketing API extension to fetch adset `targeting` specs into a new
+  `meta_adset_targeting` Supabase table.
+- **IF/LP destination** — needs `creative.object_story_spec.link_data` +
+  `lead_gen_form_id` + `asset_feed_spec.link_urls` added to the existing
+  Meta creative fetcher (`:4261`, `:4856`).
+- **Meta link / Notion link** — driven by a Google Sheet
+  (`ad_name → meta_ad_link, notion_link`) Naina will provide.
+- **🪄 Deepen button** — per-row Haiku call, gated by per-row click.
+
+### Behavioral changes
+- New view is opt-in via the third pill in Explore. Tree and Grid
+  unaffected.
+- India ads roll up to ad-set level inside the table (badge: "India ·
+  ad-set grain (UTM gap)"). Other markets render at ad-level.
+- Default mode = Cohort (matches existing dashboard KPIs). Default level
+  = Ad.
+
+### Verification
+- All `<script>` blocks pass `new Function(code)` syntax check.
+- Reuses existing helpers (`normalizeAdName`, `_filterLeadsByFlow`,
+  `filterLeadsByMarket`, `getFlowFilter`, `matchMarketFromText`,
+  `_isPLACampaignName`, `formatCurrency`, `getGlobalDateRange`,
+  `state._chassisLastRun`).
+
+---
+
 ## Chassis dismiss buttons migrated onto Dashboard cards (2026-05-06)
 
 ### Why

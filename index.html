@@ -920,11 +920,12 @@
           <div id="taggerTab-table" class="tagger-tab hidden">
             <!-- View Level Toggle + Filter Bar -->
             <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
-              <!-- Row 1: Tree/Grid switch + hierarchy level + verdict summary -->
+              <!-- Row 1: Tree/Grid/Funnel switch + hierarchy level + verdict summary -->
               <div class="flex items-center gap-3 mb-3 flex-wrap">
-                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table and thumbnail grid">
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table, thumbnail grid, or funnel health">
                   <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-explore-view="tree" onclick="setExploreView('tree')">Tree</button>
                   <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="grid" onclick="setExploreView('grid')">Grid</button>
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="funnel" onclick="setExploreView('funnel')" title="QL → TB → TC → TD per ad with cohort/MTD toggle">Funnel</button>
                 </div>
                 <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Level:</span>
                 <div class="flex bg-surface-tertiary rounded-lg p-0.5">
@@ -1042,9 +1043,10 @@
           <div id="taggerTab-grid" class="tagger-tab hidden">
             <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
               <div class="flex items-center gap-3 flex-wrap">
-                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table and thumbnail grid">
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table, thumbnail grid, or funnel health">
                   <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="tree" onclick="setExploreView('tree')">Tree</button>
                   <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-explore-view="grid" onclick="setExploreView('grid')">Grid</button>
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="funnel" onclick="setExploreView('funnel')" title="QL → TB → TC → TD per ad with cohort/MTD toggle">Funnel</button>
                 </div>
                 <div class="flex-1"></div>
                 <select id="gridSortBy" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-surface-secondary font-medium" onchange="state._gridPage=1;renderCreativeGrid()">
@@ -1062,6 +1064,61 @@
             </div>
             <div id="taggerGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
             <div id="taggerGridPager" class="flex items-center justify-between px-1 py-3 text-xs"></div>
+          </div>
+
+          <!-- Tab: Funnel Health — QL → TB → TC → TD per ad with cohort/MTD toggle -->
+          <div id="taggerTab-funnel" class="tagger-tab hidden">
+            <div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-3 mb-4">
+              <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Switch between tree table, thumbnail grid, or funnel health">
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="tree" onclick="setExploreView('tree')">Tree</button>
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-explore-view="grid" onclick="setExploreView('grid')">Grid</button>
+                  <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-explore-view="funnel" onclick="setExploreView('funnel')">Funnel</button>
+                </div>
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Attribution:</span>
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Cohort = lead AND event both in window. MTD = event-date in window regardless of when lead signed up.">
+                  <button id="funnelModeCohortBtn" class="funnel-mode-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-funnel-mode="cohort" onclick="setFunnelMode('cohort')">Cohort</button>
+                  <button id="funnelModeMTDBtn" class="funnel-mode-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-funnel-mode="mtd" onclick="setFunnelMode('mtd')">MTD</button>
+                </div>
+                <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Level:</span>
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5">
+                  <button class="funnel-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="campaign" onclick="setFunnelLevel('campaign')">Campaign</button>
+                  <button class="funnel-level-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-level="adset" onclick="setFunnelLevel('adset')">Ad Set</button>
+                  <button class="funnel-level-btn active px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-level="ad" onclick="setFunnelLevel('ad')">Ad</button>
+                </div>
+                <div class="flex-1"></div>
+                <span id="funnelModeNote" class="text-[10px] text-text-muted italic"></span>
+              </div>
+            </div>
+            <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+              <div class="overflow-x-auto">
+                <table class="w-full text-[11px]">
+                  <thead id="funnelTableHead">
+                    <tr class="bg-surface-tertiary border-b border-gray-200">
+                      <th class="text-left px-3 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px] sticky left-0 bg-surface-tertiary" style="min-width:200px">Campaign / Ad set / Ad</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Total Meta spend in window">Spend</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]">QL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Trial Booked">TB</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Trial Confirmed">TC</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Trial Done">TD</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]">QL→TB%</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]">TB→TC%</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]">TC→TD%</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]">QL→TD%</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Spend ÷ TB (PLA TQL proxy)">CPTQL</th>
+                      <th class="text-right px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]">CPTD</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:140px" title="Audience targeting (Saved/Created — coming Phase 2)">Audience</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Instant Form vs Landing Page (coming Phase 2)">Dest</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Meta Ads Manager / Library link (coming Phase 3)">Meta</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" title="Notion ad doc link (coming Phase 3)">Notion</th>
+                      <th class="text-left px-2 py-2.5 font-bold text-text-muted uppercase tracking-wider text-[10px]" style="min-width:200px">Recommendation</th>
+                    </tr>
+                  </thead>
+                  <tbody id="funnelTableBody"></tbody>
+                </table>
+              </div>
+              <div id="funnelTablePager" class="flex items-center justify-between px-4 py-3 border-t border-gray-100 text-[11px]"></div>
+            </div>
           </div>
 
           <!-- Tab: Leaderboard (2.1 + 2.2 + 2.3) -->
@@ -4490,7 +4547,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
   console.log(`costData: ${allCost.length} total, ${costData.length} meta-only`);
 
   // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
-  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term','prospectid'];
+  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','trial_conf_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','trials_conf','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term','prospectid'];
   const slimLeads = leadsData.map(r => {
     const s = {};
     LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
@@ -4533,12 +4590,14 @@ function normalizePLALead(r) {
     lead_created_date: r.created_on || '',
     trial_done_date: r.trial_done === '1' ? (r.trial_start_time_ist || r.created_on || '') : '',
     trial_sch_date: r.trial_scheduled === '1' ? (r.created_on || '') : '',
+    trial_conf_date: r.trial_confirmed === '1' ? (r.created_on || '') : (r.trial_conf_date || ''),
     paid_date: r.paid_on || '',
     country_bucket: country,
     ethnicity: r.Auto_ethnicity || r.mx_backend_auto_ethnicity || '',
     qls: isQL ? '1' : '0',
     trials_done: r.trial_done === '1' ? '1' : '0',
     trials_sch: r.trial_scheduled === '1' ? '1' : '0',
+    trials_conf: r.trial_confirmed === '1' ? '1' : (r.trials_conf || '0'),
     paid: (parseFloat(r.payments) > 0 || (r.paid_on && r.paid_on.length > 0)) ? '1' : '0',
     invalid: '0',
     'board (ME)': '',
@@ -4688,6 +4747,7 @@ function normalizeIndiaLead(r) {
     trial_done_month: r.trial_done_month || '',
     trial_sch_date: r.trial_sch_date || '',
     trial_sch_month: r.trial_sch_month || '',
+    trial_conf_date: r.trial_conf_date || '',
     paid_date: r.paid_date || '',
     paid_month: r.paid_month || '',
     country_bucket: 'India', // Override "Asia" → "India" for filterLeadsByMarket
@@ -4696,6 +4756,7 @@ function normalizeIndiaLead(r) {
     qls: r.qls || '0',
     trials_done: r.trials_done || '0',
     trials_sch: r.trials_sch || '0',
+    trials_conf: r.trials_conf || '0',
     paid: r.paid || '0',
     invalid: r.invalid || '0',
     'board (ME)': r.board || '', // India uses "board" column, map to board (ME) for TQL logic
@@ -5835,7 +5896,138 @@ function getPortfolioMetrics(market, from, to) {
 }
 
 // Invalidate cache when data sources change
-function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; _dailyCache = { key: '', data: [] }; }
+function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; _dailyCache = { key: '', data: [] }; _adFunnelCache = { key: '', data: [] }; }
+
+// ── Funnel Health: per-ad QL→TB→TC→TD with cohort/MTD attribution toggle ──
+// Mode = 'cohort' : event date AND lead_created_date both in [start,end]
+// Mode = 'mtd'    : each stage filtered by its own event-date column in [start,end]
+// India rolls up to adset (no ad-level UTM). Spend always by metaAdData.date.
+let _adFunnelCache = { key: '', data: [] };
+function getAdFunnelMetrics(market, startDate, endDate, mode) {
+  const start = startDate || COST_DATA_START || '';
+  const end = endDate || new Date().toISOString().slice(0, 10);
+  const _flow = getFlowFilter();
+  const _mode = mode === 'mtd' ? 'mtd' : 'cohort';
+  const cacheKey = `funnel|${market||'all'}|${start}|${end}|${_flow}|${_mode}`;
+  if (_adFunnelCache.key === cacheKey && _adFunnelCache.data.length) return _adFunnelCache.data;
+
+  const inRange = (d) => d && d >= start && d <= end;
+
+  // Step 1: spend per ad (always by Meta API date — mode-independent)
+  const spendMap = {}; // normName → { spend, impressions, clicks, adName, campaign, adset, ad_id, account, market }
+  metaAdData.forEach(r => {
+    const d = r.date || '';
+    if (!inRange(d)) return;
+    if (_flow !== 'all') {
+      const _isPLA = _isPLACampaignName(r.campaign_name);
+      if (_flow === 'pla' && !_isPLA) return;
+      if (_flow === 'bau' && _isPLA) return;
+    }
+    const normName = normalizeAdName(r.ad_name);
+    if (!normName) return;
+    if (!spendMap[normName]) {
+      const campaignMarket = matchMarketFromText(' ' + (r.campaign_name || '').toUpperCase() + ' ');
+      const accountMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'APAC' })[r._account] || '';
+      const mkt = (campaignMarket !== 'Unknown' ? campaignMarket : '') || accountMarket;
+      spendMap[normName] = {
+        adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '',
+        ad_id: r.ad_id || '', account: r._account || '', market: mkt === 'Unknown' ? '' : mkt,
+        spend: 0, impressions: 0, clicks: 0
+      };
+    }
+    const m = spendMap[normName];
+    m.spend += r.spend || 0;
+    m.impressions += parseInt(r.impressions) || 0;
+    m.clicks += parseInt(r.clicks) || 0;
+  });
+
+  // Step 2: walk leads once, attribute to ad, count stages with mode-aware date filters.
+  // India: key by adset (mx_utm_adcontent holds adset name) — no ad-level UTM.
+  const funnelMap = {}; // key → { ql, tb, tc, td, market, _isAdsetGrain }
+  const _flowLeads = _filterLeadsByFlow(leadsData);
+  const filtered = market && market !== 'all' ? filterLeadsByMarket(_flowLeads, market) : _flowLeads;
+
+  filtered.forEach(r => {
+    // Resolve ad name (best-name fallback to utm_term, same as getAdPerformanceDaily)
+    let adName = r.mx_utm_adcontent || '';
+    if ((!adName || /^\d{10,}$/.test(adName.trim())) && r.mx_utm_term && !/^\d+$/.test(r.mx_utm_term)) {
+      adName = r.mx_utm_term.replace(/-/g, '_');
+    }
+    const normName = normalizeAdName(adName);
+    if (!normName) return;
+
+    const isIndia = r._source === 'india_crm' || (r.country_bucket || '').toLowerCase() === 'india';
+    const key = normName;
+
+    if (!funnelMap[key]) {
+      funnelMap[key] = {
+        normName, adName, ql: 0, tb: 0, tc: 0, td: 0,
+        market: r.country_bucket || '',
+        _isAdsetGrain: isIndia, // India CRM lacks ad-level UTM
+        _hasCRM: true
+      };
+    }
+    const f = funnelMap[key];
+
+    // QL: by lead_created_date in both modes
+    const leadIn = inRange(r.lead_created_date || '');
+    if (leadIn && String(r.qls) === '1') f.ql++;
+
+    // TB / TC / TD: mode-aware
+    if (String(r.trials_sch) === '1') {
+      if (_mode === 'cohort') { if (leadIn && inRange(r.trial_sch_date || '')) f.tb++; }
+      else { if (inRange(r.trial_sch_date || '')) f.tb++; }
+    }
+    if (String(r.trials_conf) === '1') {
+      if (_mode === 'cohort') { if (leadIn && inRange(r.trial_conf_date || '')) f.tc++; }
+      else { if (inRange(r.trial_conf_date || '')) f.tc++; }
+    }
+    if (String(r.trials_done) === '1') {
+      if (_mode === 'cohort') { if (leadIn && inRange(r.trial_done_date || '')) f.td++; }
+      else { if (inRange(r.trial_done_date || '')) f.td++; }
+    }
+  });
+
+  // Step 3: join spend + funnel; emit one row per ad
+  const results = [];
+  const seenKeys = new Set();
+  Object.entries(spendMap).forEach(([normName, m]) => {
+    seenKeys.add(normName);
+    const f = funnelMap[normName] || { ql: 0, tb: 0, tc: 0, td: 0, _hasCRM: false, _isAdsetGrain: false };
+    results.push(_buildFunnelRow(m, f));
+  });
+  // CRM-only rows (leads with no Meta spend in window) — keep if QL > 0
+  Object.entries(funnelMap).forEach(([normName, f]) => {
+    if (seenKeys.has(normName)) return;
+    if (f.ql === 0 && f.tb === 0 && f.tc === 0 && f.td === 0) return;
+    results.push(_buildFunnelRow({
+      adName: f.adName, campaign: '', adset: '', ad_id: '', account: '',
+      market: f.market, spend: 0, impressions: 0, clicks: 0
+    }, f));
+  });
+
+  results.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+
+  console.log(`getAdFunnelMetrics(${market||'all'}, ${start}, ${end}, ${_mode}): ${results.length} ads | ${results.filter(r => r._hasCRM).length} CRM-matched | ${results.filter(r => r._isAdsetGrain).length} adset-grain (India)`);
+  _adFunnelCache = { key: cacheKey, data: results };
+  return results;
+}
+
+function _buildFunnelRow(m, f) {
+  const ql = f.ql, tb = f.tb, tc = f.tc, td = f.td;
+  const safePct = (num, den) => den > 0 ? (num / den) * 100 : null;
+  return {
+    ad_name: m.adName, ad_id: m.ad_id || '', campaign_name: m.campaign, adset_name: m.adset,
+    account: m.account, market: m.market || f.market || '',
+    spend: m.spend, impressions: m.impressions, clicks: m.clicks,
+    ql, tb, tc, td,
+    qlTbPct: safePct(tb, ql), tbTcPct: safePct(tc, tb),
+    tcTdPct: safePct(td, tc), qlTdPct: safePct(td, ql),
+    cptql: m.spend > 0 && tb > 0 ? m.spend / tb : null, // PLA TQL = TB; for v1 use TB as TQL proxy
+    cptd: m.spend > 0 && td > 0 ? m.spend / td : null,
+    _hasCRM: f._hasCRM, _isAdsetGrain: f._isAdsetGrain
+  };
+}
 
 // Rebuild _tagMap from state.taggerData + invalidate perf cache.
 // MUST be called every time state.taggerData is set or mutated.
@@ -15714,10 +15906,10 @@ const TAGGER_PAGE_SIZE = 15;
 // Patterns  = Tag Performance Insights (headline) + Combos + Heatmap (collapsed)
 const TAGGER_TAB_GROUPS = {
   signals: ['review'],
-  explore: ['table', 'grid'],
+  explore: ['table', 'grid', 'funnel'],
   patterns: ['combos', 'heatmap']
 };
-let _exploreView = 'tree'; // 'tree' or 'grid'
+let _exploreView = 'tree'; // 'tree', 'grid', or 'funnel'
 function setExploreView(v) {
   _exploreView = v;
   document.querySelectorAll('.explore-view-btn').forEach(b => {
@@ -15734,8 +15926,8 @@ function switchTaggerTab(tab) {
   const group = TAGGER_TAB_GROUPS[tab] || [tab];
   document.querySelectorAll('.tagger-tab').forEach(t => t.classList.add('hidden'));
   if (tab === 'explore') {
-    // Show either tree (table) or grid — one at a time
-    const show = _exploreView === 'grid' ? 'grid' : 'table';
+    // Show one of tree (table) / grid / funnel
+    const show = _exploreView === 'grid' ? 'grid' : (_exploreView === 'funnel' ? 'funnel' : 'table');
     const el = document.getElementById('taggerTab-' + show);
     if (el) el.classList.remove('hidden');
   } else {
@@ -15752,6 +15944,7 @@ function renderActiveTaggerTab(tab) {
   if (tab === 'signals') { try { renderCreativeReview(); } catch(_) {} }
   else if (tab === 'explore') {
     if (_exploreView === 'grid') { try { renderCreativeGrid(); } catch(_) {} }
+    else if (_exploreView === 'funnel') { try { renderFunnelHealthTable(); } catch(_) {} }
     else { try { renderTaggerTable(); } catch(_) {} }
   }
   else if (tab === 'patterns') {
@@ -15765,6 +15958,7 @@ function renderActiveTaggerTab(tab) {
   else if (tab === 'heatmap') { try { renderTaggerHeatmap(); } catch(_) {} }
   else if (tab === 'combos') { try { renderTagCombos(); } catch(_) {} }
   else if (tab === 'grid') { try { renderCreativeGrid(); } catch(_) {} }
+  else if (tab === 'funnel') { try { renderFunnelHealthTable(); } catch(_) {} }
   else if (tab === 'leaderboard') { try { renderLeaderboard(); } catch(_) {} }
 }
 function renderPager(containerId, page, totalItems, onPageChange) {
@@ -15781,6 +15975,203 @@ function renderPager(containerId, page, totalItems, onPageChange) {
 function goTaggerTablePage(p) { state._taggerTablePage = p; renderTaggerTable(); }
 function goHeatmapPage(p) { state._heatmapPage = p; renderTaggerHeatmap(); }
 function goGridPage(p) { state._gridPage = p; renderCreativeGrid(); }
+
+// ── Funnel Health view ─────────────────────────────────────────────────────
+state._funnelMode = state._funnelMode || 'cohort'; // 'cohort' | 'mtd'
+state._funnelLevel = state._funnelLevel || 'ad';    // 'campaign' | 'adset' | 'ad'
+state._funnelTablePage = state._funnelTablePage || 1;
+
+function setFunnelMode(m) {
+  state._funnelMode = (m === 'mtd') ? 'mtd' : 'cohort';
+  document.querySelectorAll('.funnel-mode-btn').forEach(b => {
+    const on = b.dataset.funnelMode === state._funnelMode;
+    b.classList.toggle('bg-white', on);
+    b.classList.toggle('shadow-sm', on);
+    b.classList.toggle('text-accent-purple', on);
+  });
+  state._funnelTablePage = 1;
+  renderFunnelHealthTable();
+}
+function setFunnelLevel(l) {
+  state._funnelLevel = ['campaign','adset','ad'].includes(l) ? l : 'ad';
+  document.querySelectorAll('.funnel-level-btn').forEach(b => {
+    const on = b.dataset.level === state._funnelLevel;
+    b.classList.toggle('bg-white', on);
+    b.classList.toggle('shadow-sm', on);
+    b.classList.toggle('text-accent-purple', on);
+    b.classList.toggle('active', on);
+  });
+  state._funnelTablePage = 1;
+  renderFunnelHealthTable();
+}
+function goFunnelTablePage(p) { state._funnelTablePage = p; renderFunnelHealthTable(); }
+
+// Build a quick lookup of chassis verdicts by ad name → { action, signal, why, verdictId }
+function _funnelChassisByAd() {
+  const out = {};
+  const run = state._chassisLastRun;
+  if (!run || !Array.isArray(run.all)) return out;
+  run.all.forEach(r => {
+    if (!r.entity_id || !r.action) return;
+    const k = normalizeAdName(r.entity_id);
+    if (!k) return;
+    // Keep highest-priority verdict (pause > refresh > scale)
+    const rank = { pause: 0, refresh: 1, scale: 2 };
+    const cur = out[k];
+    if (!cur || (rank[r.action.type] ?? 9) < (rank[cur.action.type] ?? 9)) {
+      out[k] = { action: r.action, signal: r.signal || '', why: r.why || '', verdictId: r.verdict_id || '' };
+    }
+  });
+  return out;
+}
+
+function _funnelRecCell(row, chassisByAd) {
+  const v = chassisByAd[normalizeAdName(row.ad_name)];
+  if (!v) {
+    if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>`;
+    if (row.spend < 5000) return `<span class="text-[10px] text-text-muted italic">Monitor — under volume floor</span>`;
+    return `<span class="text-[10px] text-text-muted italic">Monitor — within thresholds</span>`;
+  }
+  const t = v.action.type;
+  const palette = t === 'pause' ? 'bg-red-50 text-red-800 border-red-200'
+                : t === 'refresh' ? 'bg-amber-50 text-amber-800 border-amber-200'
+                : 'bg-green-50 text-green-800 border-green-200';
+  const label = t === 'pause' ? 'PAUSE' : t === 'refresh' ? 'REFRESH' : 'SCALE';
+  const why = (v.why || v.signal || '').replace(/"/g, '&quot;');
+  return `<div class="flex flex-col gap-0.5">
+    <span class="inline-block self-start px-1.5 py-0.5 rounded text-[9px] font-bold border ${palette}">${label}</span>
+    <span class="text-[10px] text-text-secondary leading-snug" title="${why}">${why.length > 140 ? why.slice(0,140)+'…' : why}</span>
+  </div>`;
+}
+
+function _funnelPctCell(pct, goodAbove, watchAbove) {
+  if (pct == null) return `<td class="px-2 py-2 text-right text-text-muted">—</td>`;
+  const cls = pct >= goodAbove ? 'text-accent-green' : pct >= watchAbove ? 'text-accent-orange' : 'text-accent-red';
+  return `<td class="px-2 py-2 text-right font-bold ${cls}">${pct.toFixed(1)}%</td>`;
+}
+
+const FUNNEL_PAGE_SIZE = 50;
+
+function renderFunnelHealthTable() {
+  const tbody = document.getElementById('funnelTableBody');
+  if (!tbody) return;
+  const noteEl = document.getElementById('funnelModeNote');
+  const mode = state._funnelMode;
+  const level = state._funnelLevel;
+
+  if (noteEl) {
+    noteEl.textContent = mode === 'cohort'
+      ? 'Cohort: lead AND event both inside window.'
+      : 'MTD: each stage by its own event-date in window.';
+  }
+
+  // Country filter — same control the rest of Tagger uses
+  const country = document.getElementById('taggerFilterCountry')?.value || 'all';
+  const market = country === 'all' ? null : country;
+  const { from, to } = (typeof getGlobalDateRange === 'function') ? getGlobalDateRange() : { from: null, to: null };
+
+  let rows = getAdFunnelMetrics(market, from || null, to || null, mode);
+
+  // Optional: hide ads with zero of everything (likely UTM mis-attribution noise)
+  rows = rows.filter(r => r.spend > 0 || r.ql > 0 || r.tb > 0 || r.tc > 0 || r.td > 0);
+
+  // Roll up to chosen level
+  if (level === 'campaign' || level === 'adset') {
+    const groupKey = level === 'campaign' ? r => r.campaign_name || '(unknown campaign)'
+                                           : r => (r.campaign_name || '(unknown campaign)') + ' › ' + (r.adset_name || '(unknown adset)');
+    const groups = {};
+    rows.forEach(r => {
+      const k = groupKey(r);
+      if (!groups[k]) groups[k] = {
+        _label: k, ad_name: k, campaign_name: r.campaign_name, adset_name: r.adset_name,
+        spend: 0, ql: 0, tb: 0, tc: 0, td: 0, market: r.market, _hasCRM: false, _isAdsetGrain: r._isAdsetGrain,
+        _adCount: 0
+      };
+      const g = groups[k];
+      g.spend += r.spend || 0;
+      g.ql += r.ql; g.tb += r.tb; g.tc += r.tc; g.td += r.td;
+      if (r._hasCRM) g._hasCRM = true;
+      g._adCount++;
+    });
+    rows = Object.values(groups).map(g => {
+      const safePct = (n, d) => d > 0 ? (n / d) * 100 : null;
+      g.qlTbPct = safePct(g.tb, g.ql); g.tbTcPct = safePct(g.tc, g.tb);
+      g.tcTdPct = safePct(g.td, g.tc); g.qlTdPct = safePct(g.td, g.ql);
+      g.cptql = g.spend > 0 && g.tb > 0 ? g.spend / g.tb : null;
+      g.cptd = g.spend > 0 && g.td > 0 ? g.spend / g.td : null;
+      return g;
+    });
+  }
+
+  rows.sort((a, b) => (b.spend || 0) - (a.spend || 0));
+
+  const totalRows = rows.length;
+  const page = state._funnelTablePage || 1;
+  const paged = rows.slice((page - 1) * FUNNEL_PAGE_SIZE, page * FUNNEL_PAGE_SIZE);
+
+  const chassisByAd = _funnelChassisByAd();
+
+  if (totalRows === 0) {
+    tbody.innerHTML = `<tr><td colspan="17" class="px-4 py-8 text-center text-text-muted text-[11px]">
+      No ads match this filter. Try widening date range or switching market.
+    </td></tr>`;
+    document.getElementById('funnelTablePager').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = paged.map(r => {
+    const adLabel = level === 'ad'
+      ? `<div class="flex flex-col gap-0.5">
+           <span class="font-semibold text-text-primary">${(r.ad_name||'').slice(0,80)}</span>
+           <span class="text-[9px] text-text-muted">${(r.campaign_name||'')} › ${(r.adset_name||'')}</span>
+           ${r._isAdsetGrain ? '<span class="text-[9px] text-amber-600 font-semibold">India · ad-set grain (UTM gap)</span>' : ''}
+           ${r.market ? `<span class="inline-block self-start px-1.5 py-0.5 rounded bg-surface-tertiary text-[9px] font-bold text-text-muted">${r.market}</span>` : ''}
+         </div>`
+      : `<div class="flex flex-col gap-0.5">
+           <span class="font-semibold text-text-primary">${(r._label||'').slice(0,100)}</span>
+           <span class="text-[9px] text-text-muted">${r._adCount} ad${r._adCount===1?'':'s'}</span>
+         </div>`;
+
+    const recCell = level === 'ad' ? _funnelRecCell(r, chassisByAd)
+                                    : `<span class="text-[10px] text-text-muted italic">Drill into Ad level</span>`;
+
+    return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/40">
+      <td class="px-3 py-2 sticky left-0 bg-white" style="min-width:200px">${adLabel}</td>
+      <td class="px-2 py-2 text-right font-semibold">${r.spend > 0 ? formatCurrency(r.spend) : '—'}</td>
+      <td class="px-2 py-2 text-right">${r.ql || '—'}</td>
+      <td class="px-2 py-2 text-right">${r.tb || '—'}</td>
+      <td class="px-2 py-2 text-right">${r.tc || '—'}</td>
+      <td class="px-2 py-2 text-right font-semibold">${r.td || '—'}</td>
+      ${_funnelPctCell(r.qlTbPct, 60, 35)}
+      ${_funnelPctCell(r.tbTcPct, 70, 50)}
+      ${_funnelPctCell(r.tcTdPct, 70, 50)}
+      ${_funnelPctCell(r.qlTdPct, 25, 15)}
+      <td class="px-2 py-2 text-right">${r.cptql != null ? formatCurrency(r.cptql) : '—'}</td>
+      <td class="px-2 py-2 text-right font-semibold">${r.cptd != null ? formatCurrency(r.cptd) : '—'}</td>
+      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 2</td>
+      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 2</td>
+      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 3</td>
+      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 3</td>
+      <td class="px-2 py-2" style="min-width:200px">${recCell}</td>
+    </tr>`;
+  }).join('');
+
+  // Pager (reuses TAGGER_PAGE_SIZE convention via custom helper)
+  const pagerEl = document.getElementById('funnelTablePager');
+  const totalPages = Math.ceil(totalRows / FUNNEL_PAGE_SIZE);
+  if (pagerEl) {
+    if (totalPages <= 1) {
+      pagerEl.innerHTML = `<span class="text-text-muted">${totalRows} row${totalRows===1?'':'s'}</span><span></span>`;
+    } else {
+      pagerEl.innerHTML = `<span class="text-text-muted">Showing ${(page-1)*FUNNEL_PAGE_SIZE+1}–${Math.min(page*FUNNEL_PAGE_SIZE, totalRows)} of ${totalRows}</span>
+        <div class="flex items-center gap-1">
+          <button onclick="goFunnelTablePage(${page-1})" class="px-2.5 py-1 rounded-lg ${page<=1?'text-gray-300 cursor-default':'text-text-secondary hover:bg-surface-tertiary'}" ${page<=1?'disabled':''}>← Prev</button>
+          <span class="px-2 font-semibold">${page} / ${totalPages}</span>
+          <button onclick="goFunnelTablePage(${page+1})" class="px-2.5 py-1 rounded-lg ${page>=totalPages?'text-gray-300 cursor-default':'text-text-secondary hover:bg-surface-tertiary'}" ${page>=totalPages?'disabled':''}>Next →</button>
+        </div>`;
+    }
+  }
+}
 
 function renderTaggerInsights() {
   const container = document.getElementById('taggerInsights');
