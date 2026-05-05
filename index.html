@@ -8732,10 +8732,11 @@ function isItemVisible(itemId) {
   const action = getOracleAction(itemId);
   if (!action) return true;
   if (action.status === 'dismissed') return false;
+  if (action.status === 'done') return false;
   if (action.status === 'snoozed' && action.snooze_until) {
     return new Date() >= new Date(action.snooze_until);
   }
-  return true; // 'done' items are visible but greyed out
+  return true;
 }
 
 async function oracleAction(itemId, cardType, status, name, silent) {
@@ -9599,6 +9600,10 @@ function renderOracleCardsV2() {
       .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0));
   }
 
+  // Filter Done/Dismissed/Snoozed BEFORE the cap so actioned ads don't eat cap slots —
+  // the next-best ad takes their place instead of leaving an empty card.
+  pauseAds = pauseAds.filter(a => isItemVisible('pause:' + a.name));
+
   // Phase 5: when country filter = all, cap at 2 per market so every geo surfaces; else top 10
   if (!market || market === 'all') {
     const byMkt = {};
@@ -9979,6 +9984,9 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     return (a._displayCPTD || Infinity) - (b._displayCPTD || Infinity);
   });
 
+  // Filter Done/Dismissed/Snoozed BEFORE the cap so actioned winners don't eat cap slots.
+  winners = winners.filter(w => isItemVisible('make:ad:' + w.adName));
+
   // 3. When "all" — 2 per market; else top 5
   let pick = [];
   if (!market || market === 'all') {
@@ -9992,7 +10000,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
   } else {
     pick = winners.slice(0, 5);
   }
-  const visible = pick.filter(w => isItemVisible('make:ad:' + w.adName));
+  const visible = pick;
   const makeBadge = document.getElementById('makeMoreBadge');
   if (makeBadge) makeBadge.textContent = visible.length > 0 ? `${visible.length} winner${visible.length>1?'s':''}` : '';
 
