@@ -50,6 +50,73 @@ fed by chassis is stable."
 
 ---
 
+## Budget Pace card on Dashboard (2026-05-06)
+
+### Why
+Phase 3.5 from `02-skills/ROADMAP.md`. Dashboard had four KPI cards
+(Spend / CPTQL / QL→TD% / Enrolled) but no signal on whether spend was
+tracking to the monthly plan. A small inline card answers that in one glance
+and respects the existing dashboard country filter.
+
+### What changed (`index.html`)
+- **`MONTHLY_BUDGET_PLAN` (`:10693`)** — new static config keyed by market
+  → `'YYYY-MM'` → planned INR. Populated from
+  `04-reports/Cuemath-progress-strategy-roadmap-2026.md` §9.4 (US monthly
+  table) and §2.2 Q1 totals (India / APAC / MEA / UK / AUS as Q1 ÷3
+  averages pending per-market AOPs). Doc is source of truth; we update both
+  at month boundaries.
+- **`_renderBudgetPace(market)` (`:10702`)** — new helper. Computes MTD
+  spend from `costData` directly, bypassing `getFlowFilter()` (budgets are
+  BAU+PLA combined per the task brief). Compares to plan and emits a single
+  card with verdict pill. Asymmetric on-pace band: green within
+  −5%/+10% of month%, amber (Behind) below −5%, red (Ahead) above
+  +10%. Renders nothing when no plan exists for the market/month (no UI
+  pollution).
+- **`renderMetricTicker()` insertion (`:10955`)** — appends the budget
+  pace card to the KPI HTML right after the 4-card KPI grid, before
+  `container.innerHTML = html`. Lives inside the existing CRM/PerfTracker
+  branch (skipped on the tagger-only fallback to avoid showing a card with
+  zero plausible spend).
+
+### Math
+```
+daysInMonth      = last day of current month
+monthProgressPct = today.getDate() / daysInMonth
+budgetUsedPct    = MTD spend / monthly plan
+On pace if usedPct ∈ [monthPct − 0.05, monthPct + 0.10]
+Behind  if usedPct <  monthPct − 0.05  (orange — under-spending)
+Ahead   if usedPct >  monthPct + 0.10  (red    — overspending; more dangerous)
+```
+
+### Constraints honoured
+- Internal tool, ≤ 80 LOC (actual: 53). No "set budget" UI
+  (`feedback_no_unrequested_ui.md`). No remote fetch — static config
+  edited at month boundaries. Markets stay siloed
+  (`feedback_markets_are_silos.md`): `'all'` shows portfolio aggregate but
+  copy never recommends cross-market moves. JS validated with `node --check`.
+
+### Source of plan numbers (May 2026)
+| Market    | Plan      | Source |
+|-----------|-----------|--------|
+| US        | ₹1.72 Cr | doc §9.4 May trough |
+| India     | ₹0.22 Cr | Q1 ₹0.66 Cr ÷ 3 |
+| APAC      | ₹0.66 Cr | Q1 ₹1.97 Cr ÷ 3 |
+| AUS       | ₹0.55 Cr | APAC ex-SG estimate |
+| MEA       | ₹0.31 Cr | Q1 ₹0.92 Cr ÷ 3 |
+| UK        | ₹0.08 Cr | Q1 ₹0.23 Cr ÷ 3 |
+| EU        | ₹0.05 Cr | placeholder until AOP shared |
+| Portfolio | ₹3.59 Cr | sum of above |
+
+### Test plan
+- [ ] Open Dashboard, market = All Geo → card reads `Portfolio May`,
+  ~19% through month on May 6.
+- [ ] Switch to US, India, AUS — card label + plan number update; pill
+  verdict matches usedPct vs monthPct.
+- [ ] Toggle Flow All / BAU / PLA — card unaffected (intentional).
+- [ ] Pick a market with no plan in `MONTHLY_BUDGET_PLAN` — card hidden.
+
+---
+
 ## Chassis dismiss buttons migrated onto Dashboard cards (2026-05-06)
 
 ### Why

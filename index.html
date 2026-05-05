@@ -10473,6 +10473,54 @@ function renderPipeline() {
   }
 }
 
+// Monthly budget plan (INR) — keyed by market → 'YYYY-MM' → planned spend.
+// Source: 04-reports/Cuemath-progress-strategy-roadmap-2026.md §9.4 US monthly table
+// (lines 463–477) + §2.2 Q1 market totals (lines 65–69; ÷3 for monthly avg until
+// per-market AOPs are pasted in here). BAU+PLA combined. Update at month boundaries.
+const MONTHLY_BUDGET_PLAN = {
+  US:    { '2026-05': 17200000 }, // ₹1.72 Cr — May trough per AOP §9.4
+  India: { '2026-05':  2200000 }, // ~₹0.22 Cr — Q1 ₹0.66 Cr ÷3
+  APAC:  { '2026-05':  6600000 }, // ~₹0.66 Cr — Q1 ₹1.97 Cr ÷3 (AUS+SG)
+  AUS:   { '2026-05':  5500000 }, // ~₹0.55 Cr — APAC ex-SG estimate
+  MEA:   { '2026-05':  3100000 }, // ~₹0.31 Cr — Q1 ₹0.92 Cr ÷3
+  UK:    { '2026-05':   800000 }, // ~₹0.08 Cr — Q1 ₹0.23 Cr ÷3
+  EU:    { '2026-05':   500000 }, // placeholder until AOP shared
+};
+function _renderBudgetPace(market) {
+  const now = new Date();
+  const ym = now.toISOString().slice(0,7);
+  const monthStart = ym + '-01';
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const monthEnd = ym + '-' + String(daysInMonth).padStart(2,'0');
+  // Plan: sum across markets when 'all', else market-specific.
+  let plan = 0;
+  if (market === 'all') Object.keys(MONTHLY_BUDGET_PLAN).forEach(k => { plan += MONTHLY_BUDGET_PLAN[k][ym] || 0; });
+  else plan = (MONTHLY_BUDGET_PLAN[market] && MONTHLY_BUDGET_PLAN[market][ym]) || 0;
+  if (!plan) return ''; // no plan = render nothing
+  // Spend MTD: bypass flow filter — budgets are BAU+PLA combined.
+  const rows = filterCostByMarket(costData, market).filter(r => {
+    const d = r.day || ''; return d >= monthStart && d <= monthEnd;
+  });
+  const spend = rows.reduce((s,r) => s + (parseFloat(r.amount_spent) || 0), 0);
+  const monthPct = now.getDate() / daysInMonth;
+  const usedPct  = plan > 0 ? spend / plan : 0;
+  let verdict, color;
+  if (usedPct > monthPct + 0.10)      { verdict = 'Ahead';   color = 'red'; }
+  else if (usedPct < monthPct - 0.05) { verdict = 'Behind';  color = 'orange'; }
+  else                                { verdict = 'On pace'; color = 'green'; }
+  const label = market === 'all' ? 'Portfolio' : market;
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  return `<div class="metric-card bg-white rounded-xl p-3 mb-4 border-l-4 border-accent-${color}">
+    <div class="flex items-center justify-between gap-2">
+      <div class="min-w-0">
+        <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Budget Pace · ${label} ${monthName}</p>
+        <p class="text-xs mt-0.5"><strong>${formatCurrency(spend)}</strong> of ${formatCurrency(plan)} planned · ${Math.round(monthPct*100)}% through month, ${Math.round(usedPct*100)}% budget used</p>
+      </div>
+      <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-accent-${color}-light text-accent-${color} shrink-0">${verdict}</span>
+    </div>
+  </div>`;
+}
+
 function renderMetricTicker() {
   const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
   const container = document.getElementById('metricTicker');
@@ -10690,6 +10738,9 @@ function renderMetricTicker() {
       </div>`;
     });
     html += `</div>`;
+
+    // Budget pace card — monthly plan vs MTD spend (Phase 3.5)
+    html += _renderBudgetPace(market);
 
     container.innerHTML = html;
 
