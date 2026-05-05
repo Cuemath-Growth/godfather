@@ -4,6 +4,50 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Path A parity fixes — symmetric snapshots before deletion (2026-05-06)
+
+### Why
+First parity reading after the Path A swap (May 5) showed false divergence:
+`[parity] legacy=13 chassis=7 · legacy-only=9 · chassis-only=3` and
+`[parity:makeMore] legacy=64 chassis=58 · legacy-only=9 · chassis-only=3`.
+Tracing the diff blocks revealed two asymmetries — the parity wasn't
+comparing apples to apples, so the gap couldn't be trusted as a real
+verdict-logic divergence.
+
+### What changed (`index.html`)
+1. **Pause parity symmetry** (`:9601` + `:9624`)
+   - Snapshot chassis result into `_chassisPauseAdsPreCap` BEFORE the
+     visibility filter (`:9610`) and per-market cap of 2 (`:9613-:9624`).
+   - Parity diff now compares `_legacyPauseAds` (uncapped) vs
+     `_chassisPauseAdsPreCap` (uncapped). Previously compared against
+     post-cap `pauseAds`, which made every chassis run look like it was
+     missing ~half of legacy's set.
+2. **Make More mature window alignment** (`:9730`)
+   - `_matFromStr` was `from || (matTo - 90d)`. When dashboard date filter
+     covered 6 months, legacy classified winners on a 6-month mature
+     snapshot while chassis used a 3-month snapshot. Older inefficient
+     periods inflated CPTD in the legacy snapshot, knocking ads below
+     `_classifyWinner`'s CPTD-green gate that chassis still classified
+     as winners.
+   - Collapsed legacy to chassis's hardcoded 90d window. Both now classify
+     against the same mature universe. After Path A deletion this is the
+     only window for Make More.
+
+### Impact during warmup window (~10s after boot, before chassis ready)
+- Pause: unchanged (snapshot-only edit; legacy still drives the warmup
+  fallback path).
+- Make More: warmup fallback now uses 90d mature window instead of
+  dashboard-range mature window. User-visible only during the boot gap.
+
+### Next session
+Re-run dashboard, hard-reload, paste both parity logs.
+- Both `✅ perfect match` → ship the ~−250 LOC Path A cleanup commit
+  (delete legacy filter blocks, classifier walk, parity diff blocks,
+  AQ tab + nav, "1-CLICK" badge).
+- Still divergent → diagnose remaining gap before deletion.
+
+---
+
 ## Path A swap: chassis drives Make More (2026-05-05)
 
 ### Why
