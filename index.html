@@ -9555,6 +9555,50 @@ function renderOracleCardsV2() {
   // Combine + sort: priority 0 (urgent fatigue) → 1 (burns, early fatigue) → 2 (leaks/audience/funnel)
   let pauseAds = [...budgetBurns, ...cptqlLeaks, ...wrongAudience, ...deadFunnel, ...spamAds, ...fatigueAds]
     .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0));
+
+  // ── Path A swap (2026-05-05): chassis is the source of truth for Pause + Refresh ──
+  // When chassis result is available, override pauseAds with chassis verdicts. Legacy filters
+  // above stay running as warmup fallback (chassis takes ~10s after boot) and as the
+  // comparison baseline for the parity diff below. After one clean session, delete legacy
+  // filter block + this comment.
+  const _legacyPauseAds = pauseAds; // preserve for parity diff
+  const _verdictTypeMap = {
+    'meta_pause_budget_burn': 'burn',
+    'meta_pause_cptql_leak': 'cptql',
+    'meta_pause_wrong_audience': 'audience',
+    'meta_pause_dead_funnel': 'funnel',
+    'meta_pause_spam': 'spam',
+    'meta_pause_fatigued_loser': 'fatigue',
+    'meta_refresh_fatigued_winner': 'refresh',
+  };
+  const _chassisRun = state._chassisLastRun;
+  if (_chassisRun && Array.isArray(_chassisRun.all)) {
+    pauseAds = _chassisRun.all
+      .filter(r => r.action && (r.action.type === 'pause' || r.action.type === 'refresh'))
+      .filter(r => !market || r.market === market)
+      .map(r => {
+        const fullAd = _adByName[normalizeAdName(r.entity_id)] || {};
+        const _type = _verdictTypeMap[r.verdict_id] || 'pause';
+        const wt = _getWeeklyTrend(r.entity_id);
+        const trendStr = wt ? ` · ${wt.label} ${formatCurrency(wt.twSpend)} this wk` : '';
+        const isUrgent = /URGENT/i.test(r.signal || '');
+        const _priority = (_type === 'fatigue' && isUrgent) ? 0 : (_type === 'burn' ? 1 : 2);
+        return {
+          ...fullAd,
+          name: r.entity_id,
+          _type,
+          _priority,
+          _signal: (r.signal || '') + trendStr,
+          _why: r.why || '',
+          _trend: wt,
+          _verdictId: r.verdict_id,
+          spend: fullAd.spend != null ? fullAd.spend : r.spend,
+          market: fullAd.market || r.market,
+        };
+      })
+      .sort((a, b) => (a._priority || 2) - (b._priority || 2) || (b.spend || 0) - (a.spend || 0));
+  }
+
   // Phase 5: when country filter = all, cap at 2 per market so every geo surfaces; else top 10
   if (!market || market === 'all') {
     const byMkt = {};
@@ -9569,26 +9613,22 @@ function renderOracleCardsV2() {
     pauseAds = pauseAds.slice(0, 10);
   }
 
-  // ── Parity diff: legacy Pause+Refresh vs chassis verdicts (TEMP, delete after 24hr observation) ──
-  // Naina May 5: ship Path A swap with parity guard. If chassis is missing legacy ads → fix before swap.
+  // ── Parity diff: legacy filter result vs chassis-driven pauseAds (TEMP, delete next session) ──
+  // Now that pauseAds IS chassis output, compare to the legacy filter snapshot saved above.
   // Runs once per session; first call when chassis result is available wins.
-  if (!state._parityRan) {
+  if (!state._parityRan && _chassisRun) {
     try {
-      const _chassis = state._chassisLastRun;
-      if (_chassis && Array.isArray(_chassis.all)) {
-        state._parityRan = true;
-        const _legacyKeys = new Set(pauseAds.map(a => normalizeAdName(a.name)));
-        const _chassisPauseRefresh = _chassis.all.filter(r => r.action && (r.action.type === 'pause' || r.action.type === 'refresh'));
-        const _chassisKeys = new Set(_chassisPauseRefresh.map(r => normalizeAdName(r.entity_id)));
-        const _legacyOnly = pauseAds.filter(a => !_chassisKeys.has(normalizeAdName(a.name)));
-        const _chassisOnly = _chassisPauseRefresh.filter(r => !_legacyKeys.has(normalizeAdName(r.entity_id)));
-        if (_legacyOnly.length || _chassisOnly.length) {
-          console.warn(`[parity] legacy=${pauseAds.length} chassis=${_chassisKeys.size} · legacy-only=${_legacyOnly.length} · chassis-only=${_chassisOnly.length}`);
-          if (_legacyOnly.length) console.table(_legacyOnly.map(a => ({ ad: a.name, type: a._type, market: a.market, spend: a.spend, ql: a.ql, td: a.td })));
-          if (_chassisOnly.length) console.table(_chassisOnly.map(r => ({ ad: r.entity_id, verdict: r.verdict_id, market: r.market, severity: r.severity_raw })));
-        } else {
-          console.log(`[parity] ✅ legacy=${pauseAds.length} chassis=${_chassisKeys.size} · perfect match`);
-        }
+      state._parityRan = true;
+      const _legacyKeys = new Set(_legacyPauseAds.map(a => normalizeAdName(a.name)));
+      const _chassisKeys = new Set(pauseAds.map(a => normalizeAdName(a.name)));
+      const _legacyOnly = _legacyPauseAds.filter(a => !_chassisKeys.has(normalizeAdName(a.name)));
+      const _chassisOnly = pauseAds.filter(a => !_legacyKeys.has(normalizeAdName(a.name)));
+      if (_legacyOnly.length || _chassisOnly.length) {
+        console.warn(`[parity] legacy=${_legacyPauseAds.length} chassis=${pauseAds.length} · legacy-only=${_legacyOnly.length} · chassis-only=${_chassisOnly.length}`);
+        if (_legacyOnly.length) console.table(_legacyOnly.map(a => ({ ad: a.name, type: a._type, market: a.market, spend: a.spend, ql: a.ql, td: a.td })));
+        if (_chassisOnly.length) console.table(_chassisOnly.map(a => ({ ad: a.name, verdict: a._verdictId, market: a.market, spend: a.spend })));
+      } else {
+        console.log(`[parity] ✅ legacy=${_legacyPauseAds.length} chassis=${pauseAds.length} · perfect match`);
       }
     } catch (e) { console.error('[parity] diff failed:', e); }
   }

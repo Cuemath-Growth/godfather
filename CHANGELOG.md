@@ -4,6 +4,49 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Path A swap: chassis drives Dashboard Pause+Refresh (2026-05-05)
+
+### Why
+Stream 3 Path A. Friday's commits restructured the Dashboard layout (split into
+Pause + Refresh + Make More) but kept the inline filter logic feeding the cards.
+This commit makes the chassis the source of truth: when `state._chassisLastRun`
+is set, `pauseAds` gets overridden with chassis-driven verdict output.
+
+### What changed (`index.html`)
+- After legacy `pauseAds` is computed (still runs as warmup fallback), a new
+  `_verdictTypeMap` translates `meta_pause_*` / `meta_refresh_*` verdict_ids
+  back to the `_type` strings the existing card builder expects (`burn`, `cptql`,
+  `audience`, `funnel`, `spam`, `fatigue`, `refresh`).
+- When `_chassisLastRun` is present, `pauseAds = chassis.all.filter(pause|refresh).map(...)`.
+  Per-ad enrichment (campaignContext, displayName, ql/td, thumbnail, weekly trend)
+  comes from the existing `_adByName` lookup so cards render identically.
+- Per-market cap (2 per market when filter=all, else top 10) applies to whichever
+  pauseAds we ended up with. Existing `_buildPauseCardHtml` is untouched.
+- Parity diff updated: now compares preserved `_legacyPauseAds` vs the
+  chassis-driven `pauseAds`. Same 24hr observation pattern — if it logs
+  `legacy-only=N`, the chassis is missing ads legacy was catching.
+
+### What's still legacy (deletion candidates after one clean session)
+- The 6 inline signal filter blocks (`budgetBurns`, `cptqlLeaks`, `wrongAudience`,
+  `deadFunnel`, `spamAds`, `fatigueAds`)
+- `_livenessSet`, `isPaused`, `avgCPTQL` — only used by the inline filters
+- `_legacyPauseAds` snapshot
+- The parity diff block
+
+### What did NOT ship
+- Make More restructure into Tier 1 / Tier 2 split (uses `_renderMakeMoreAds`,
+  next session)
+- AQ tab deletion (waits for Make More + one observation cycle)
+- Inline filter deletion (waits for one clean parity session)
+
+### Verification
+- Inline JS parses clean
+- `npm run build` writes `dist/index.html`
+- Browser-side check tomorrow: open Dashboard, expect `[parity] ✅ perfect match`
+  or a small `chassis-only` set (chassis catching ads legacy thresholds missed)
+
+---
+
 ## Parity diff: legacy Pause+Refresh vs chassis (2026-05-05)
 
 ### Why
