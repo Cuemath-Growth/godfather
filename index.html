@@ -1582,12 +1582,23 @@ function updateSyncBadge(status) {
 }
 
 async function supabaseGet(table, query) {
-  // Paginates 1000 rows at a time via Range header. PostgREST defaults to
-  // 1000 max; without pagination, large tables (creative_tags, creative_tags_v3,
-  // meta_ad_data) silently truncate and downstream lookups miss rows. The
-  // missing-thumbnail saga of May 5 root-caused to this exact loop being absent.
+  // Auto-paginates only when the caller has NOT already specified offset/limit
+  // in the query. This matters because PostgREST returns 416 if you combine
+  // a query `limit=N` with a `Range` header that asks for rows past row N.
+  // Callers like loadCachedAdData already paginate via `offset=&limit=`; for
+  // those we honor the explicit pagination and do a single fetch. For naive
+  // `select=*` callers we Range-paginate so they don't silently truncate.
+  const q = query || 'select=*';
+  const callerPaginates = /\boffset=|\blimit=/i.test(q);
   try {
-    const base = `${SUPABASE_URL}/rest/v1/${table}?${query || 'select=*'}`;
+    const base = `${SUPABASE_URL}/rest/v1/${table}?${q}`;
+    if (callerPaginates) {
+      const res = await fetch(base, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (!res.ok) throw new Error(`Supabase GET ${res.status}`);
+      return await res.json();
+    }
     const PAGE = 1000;
     let offset = 0, out = [];
     while (true) {
@@ -1599,13 +1610,14 @@ async function supabaseGet(table, query) {
           'Range': `${offset}-${offset + PAGE - 1}`,
         },
       });
+      if (res.status === 416) break; // past end of dataset
       if (!res.ok) throw new Error(`Supabase GET ${res.status}`);
       const chunk = await res.json();
-      if (!Array.isArray(chunk)) return chunk; // non-array response (e.g. single row): return as-is
+      if (!Array.isArray(chunk)) return chunk; // single-row / object response
       out = out.concat(chunk);
       if (chunk.length < PAGE) break;
       offset += PAGE;
-      if (offset > 200000) { console.warn(`supabaseGet ${table}: stopping at 200k rows safety cap`); break; }
+      if (offset > 200000) { console.warn(`supabaseGet ${table}: 200k row safety cap`); break; }
     }
     return out;
   } catch(e) {
