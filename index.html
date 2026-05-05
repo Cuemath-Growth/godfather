@@ -9892,7 +9892,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
 
   // 1. Classify all ads against their MATURE cohort (leads ≥14 days old — Phase 7).
   //    Ads without mature history are skipped (too new to judge reliably).
-  const winners = [];
+  let winners = [];
   adCampData.forEach(a => {
     if (pausedAdNames.has(normalizeAdName(a.adName))) return;
     if (a._matureMissing) return; // no mature cohort yet — wait 14 days
@@ -9913,6 +9913,58 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
       _displaySpend: m.spend !== undefined ? m.spend : a.spend
     });
   });
+
+  // ── Path A swap (2026-05-05): chassis Scale verdicts drive Make More ──
+  // When chassis is ready, override winners[] with chassis-derived list. Legacy classifier
+  // above stays running as warmup fallback + parity baseline. Once parity holds for a
+  // session, delete the legacy block + this comment.
+  const _legacyWinners = winners;
+  const _chassisMakeMoreRun = state._chassisLastRun;
+  if (_chassisMakeMoreRun && Array.isArray(_chassisMakeMoreRun.all)) {
+    const _adByName = {};
+    adCampData.forEach(a => { _adByName[normalizeAdName(a.adName)] = a; });
+    winners = _chassisMakeMoreRun.all
+      .filter(r => r.action && r.action.type === 'scale')
+      .filter(r => !market || r.market === market)
+      .map(r => {
+        const fullAd = _adByName[normalizeAdName(r.entity_id)] || {};
+        if (pausedAdNames.has(normalizeAdName(r.entity_id))) return null;
+        // Respect flow filter (mirror legacy logic above)
+        const aud = fullAd.tags?.campaign_audience || '';
+        if (flow === 'bau' && /\(PLA\)/i.test(aud)) return null;
+        if (flow === 'pla' && !/\(PLA\)/i.test(aud)) return null;
+        const m = fullAd.mature || {};
+        const tier = r.verdict_id === 'meta_scale_tier1_winner' ? 'tier1' : 'tier2';
+        return {
+          ...fullAd,
+          _tier: tier,
+          _displayCPTD: m.cptd !== undefined ? m.cptd : fullAd.cptd,
+          _displayTD: m.td !== undefined ? m.td : fullAd.td,
+          _displayQL: m.ql !== undefined ? m.ql : fullAd.ql,
+          _displaySpend: m.spend !== undefined ? m.spend : fullAd.spend,
+          _verdictId: r.verdict_id,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  // Make More parity diff (TEMP, delete next session alongside legacy classifier above)
+  if (!state._parityRanMakeMore && _chassisMakeMoreRun) {
+    try {
+      state._parityRanMakeMore = true;
+      const _legacyKeys = new Set(_legacyWinners.map(w => normalizeAdName(w.adName)));
+      const _chassisKeys = new Set(winners.map(w => normalizeAdName(w.adName)));
+      const _legacyOnly = _legacyWinners.filter(w => !_chassisKeys.has(normalizeAdName(w.adName)));
+      const _chassisOnly = winners.filter(w => !_legacyKeys.has(normalizeAdName(w.adName)));
+      if (_legacyOnly.length || _chassisOnly.length) {
+        console.warn(`[parity:makeMore] legacy=${_legacyWinners.length} chassis=${winners.length} · legacy-only=${_legacyOnly.length} · chassis-only=${_chassisOnly.length}`);
+        if (_legacyOnly.length) console.table(_legacyOnly.map(w => ({ ad: w.adName, tier: w._tier, market: w.market, td: w._displayTD, cptd: w._displayCPTD })));
+        if (_chassisOnly.length) console.table(_chassisOnly.map(w => ({ ad: w.adName, verdict: w._verdictId, market: w.market, td: w._displayTD, cptd: w._displayCPTD })));
+      } else {
+        console.log(`[parity:makeMore] ✅ legacy=${_legacyWinners.length} chassis=${winners.length} · perfect match`);
+      }
+    } catch (e) { console.error('[parity:makeMore] diff failed:', e); }
+  }
 
   if (!winners.length) {
     container.innerHTML = '<p class="text-xs text-text-muted py-3">No winning ads yet (need TD \u2265 3 with CPTD below market green, or TD \u2265 1 with CPTQL in green). Give recent tests 3\u20137 more days to mature.</p>';

@@ -4,6 +4,48 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Path A swap: chassis drives Make More (2026-05-05)
+
+### Why
+Path A continuation. Pause+Refresh swap shipped earlier today (`c28246d`).
+This commit completes the data-source swap for Make More — `_renderMakeMoreAds`
+now consumes `meta_scale_tier1_winner` + `meta_scale_tier2_winner` chassis
+verdicts when `state._chassisLastRun` is ready.
+
+### What changed (`index.html` `:9889+`)
+- Inside `_renderMakeMoreAds`, after legacy `winners[]` is built (still runs as
+  warmup fallback + parity baseline), a chassis override maps Scale verdict
+  output to winner objects.
+- `r.verdict_id === 'meta_scale_tier1_winner'` → `_tier='tier1'`; tier2 → tier2.
+- Per-ad enrichment via `_adByName` lookup so `_winnerWhy` and
+  `_findAdjacentAudience` (called downstream during card render) both keep
+  working — they need `tags`, `_displayCPTD/TD/QL`, `mature` — all preserved.
+- Pause and flow filters (BAU/PLA) re-applied on the chassis-driven path so
+  behavior matches legacy.
+- Make More parity diff added: `[parity:makeMore]` logs once per session,
+  separate flag (`state._parityRanMakeMore`) from the Pause+Refresh diff.
+
+### What's still legacy (deletion candidates after one clean session)
+- Legacy `winners[]` block at `:9895-9914` (`_classifyWinner` walk over
+  adCampData)
+- `_legacyWinners` snapshot
+- Make More parity diff block
+
+### What did NOT ship
+- AQ tab deletion (waits for one observation cycle on both swaps)
+- Inline filter / classifier deletion (waits for clean parity)
+- Tier 1 / Tier 2 visual split into separate sections (deferred — current single
+  list with PROVEN/EMERGING badge is fine for the user; restructure was an
+  outdated note from the spec)
+
+### Verification
+- Inline JS parses clean
+- `npm run build` writes `dist/index.html`
+- Browser-side check tomorrow: open Dashboard, expect TWO parity logs:
+  `[parity] ✅ ...` (Pause+Refresh) and `[parity:makeMore] ✅ ...` (Make More)
+
+---
+
 ## Path A swap: chassis drives Dashboard Pause+Refresh (2026-05-05)
 
 ### Why
