@@ -1076,7 +1076,7 @@
                   <button class="explore-view-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-explore-view="funnel" onclick="setExploreView('funnel')">Funnel</button>
                 </div>
                 <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Attribution:</span>
-                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Cohort = lead AND event both in window. MTD = event-date in window regardless of when lead signed up.">
+                <div class="flex bg-surface-tertiary rounded-lg p-0.5" title="Cohort = lead AND event both in window. MTD = event-date in window regardless of when lead signed up. NOTE: PLA leads use lead-creation date for all stage timestamps, so MTD ≈ Cohort for PLA flow.">
                   <button id="funnelModeCohortBtn" class="funnel-mode-btn px-3 py-1 text-[10px] font-bold rounded-md transition bg-white shadow-sm text-accent-purple" data-funnel-mode="cohort" onclick="setFunnelMode('cohort')">Cohort</button>
                   <button id="funnelModeMTDBtn" class="funnel-mode-btn px-3 py-1 text-[10px] font-bold rounded-md transition" data-funnel-mode="mtd" onclick="setFunnelMode('mtd')">MTD</button>
                 </div>
@@ -5707,7 +5707,7 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   return results;
 }
 
-function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; }
+function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; _adFunnelCache = { key: '', data: [] }; }
 
 // ── CLEAN DATA LAYER: getAdPerformance() ──
 // Single source of truth for ALL views. Joins leadsData (date-aware QLs/TDs) + metaAdData (date-aware spend).
@@ -5913,8 +5913,10 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
 
   const inRange = (d) => d && d >= start && d <= end;
 
-  // Step 1: spend per ad (always by Meta API date — mode-independent)
-  const spendMap = {}; // normName → { spend, impressions, clicks, adName, campaign, adset, ad_id, account, market }
+  // Step 1: spend per ad (always by Meta API date — mode-independent).
+  // India: roll spend up to adset grain so it joins to funnel rows (India CRM lacks
+  // ad-level UTM, so funnel keys India leads by adset name; we mirror that here).
+  const spendMap = {}; // key → { spend, impressions, clicks, adName, campaign, adset, ad_id, account, market }
   metaAdData.forEach(r => {
     const d = r.date || '';
     if (!inRange(d)) return;
@@ -5923,16 +5925,21 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
       if (_flow === 'pla' && !_isPLA) return;
       if (_flow === 'bau' && _isPLA) return;
     }
-    const normName = normalizeAdName(r.ad_name);
+    const isIndiaAccount = r._account === 'India';
+    const grainName = isIndiaAccount ? (r.adset_name || r.ad_name) : r.ad_name;
+    const normName = normalizeAdName(grainName);
     if (!normName) return;
     if (!spendMap[normName]) {
       const campaignMarket = matchMarketFromText(' ' + (r.campaign_name || '').toUpperCase() + ' ');
       const accountMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'APAC' })[r._account] || '';
       const mkt = (campaignMarket !== 'Unknown' ? campaignMarket : '') || accountMarket;
       spendMap[normName] = {
-        adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '',
-        ad_id: r.ad_id || '', account: r._account || '', market: mkt === 'Unknown' ? '' : mkt,
-        spend: 0, impressions: 0, clicks: 0
+        adName: isIndiaAccount ? (r.adset_name || r.ad_name) : r.ad_name,
+        campaign: r.campaign_name || '', adset: r.adset_name || '',
+        ad_id: isIndiaAccount ? '' : (r.ad_id || ''),
+        account: r._account || '', market: mkt === 'Unknown' ? '' : mkt,
+        spend: 0, impressions: 0, clicks: 0,
+        _isAdsetGrain: isIndiaAccount
       };
     }
     const m = spendMap[normName];
@@ -5969,9 +5976,14 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
     }
     const f = funnelMap[key];
 
+    // All stages require qls=1 — non-QL leads can't appear in any funnel stage
+    // (mirrors getAdPerformanceDaily clamping td≤ql at :5555).
+    const isQL = String(r.qls) === '1';
+    if (!isQL) return;
+
     // QL: by lead_created_date in both modes
     const leadIn = inRange(r.lead_created_date || '');
-    if (leadIn && String(r.qls) === '1') f.ql++;
+    if (leadIn) f.ql++;
 
     // TB / TC / TD: mode-aware
     if (String(r.trials_sch) === '1') {
@@ -5988,12 +6000,14 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
     }
   });
 
-  // Step 3: join spend + funnel; emit one row per ad
+  // Step 3: join spend + funnel; emit one row per ad (or adset for India)
   const results = [];
   const seenKeys = new Set();
   Object.entries(spendMap).forEach(([normName, m]) => {
     seenKeys.add(normName);
-    const f = funnelMap[normName] || { ql: 0, tb: 0, tc: 0, td: 0, _hasCRM: false, _isAdsetGrain: false };
+    const f = funnelMap[normName] || { ql: 0, tb: 0, tc: 0, td: 0, _hasCRM: false, _isAdsetGrain: m._isAdsetGrain };
+    // Inherit India adset-grain flag from spend side too (so spend-only India rows are labeled)
+    if (m._isAdsetGrain) f._isAdsetGrain = true;
     results.push(_buildFunnelRow(m, f));
   });
   // CRM-only rows (leads with no Meta spend in window) — keep if QL > 0
@@ -7106,6 +7120,7 @@ function setDatePreset(preset) {
 
 function onGlobalFilterChange() {
   invalidateAdPerfCache(); // filters changed, clear cached data
+  state._funnelTablePage = 1; // Funnel pagination resets on date/flow/geo change
   syncGeoFilter('dashboardCountryFilter');
   syncDateLabels();
   // Re-render the currently active view with new filters
@@ -16006,14 +16021,17 @@ function setFunnelLevel(l) {
 }
 function goFunnelTablePage(p) { state._funnelTablePage = p; renderFunnelHealthTable(); }
 
-// Build a quick lookup of chassis verdicts by ad name → { action, signal, why, verdictId }
-function _funnelChassisByAd() {
+// Build a quick lookup of chassis verdicts by adName+market → { action, signal, why, verdictId }
+// Keying on market too prevents cross-market verdict bleed when two markets share a name.
+function _funnelChassisByAd(activeMarket) {
   const out = {};
   const run = state._chassisLastRun;
   if (!run || !Array.isArray(run.all)) return out;
   run.all.forEach(r => {
     if (!r.entity_id || !r.action) return;
-    const k = normalizeAdName(r.entity_id);
+    // Mirror existing pause-card filter at :9446 — skip out-of-market verdicts
+    if (activeMarket && activeMarket !== 'all' && r.market && r.market !== activeMarket) return;
+    const k = normalizeAdName(r.entity_id) + '||' + (r.market || '');
     if (!k) return;
     // Keep highest-priority verdict (pause > refresh > scale)
     const rank = { pause: 0, refresh: 1, scale: 2 };
@@ -16025,8 +16043,20 @@ function _funnelChassisByAd() {
   return out;
 }
 
+// Escape user-controlled strings (Meta names, chassis why-text) before innerHTML interpolation
+function _funnelEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function _funnelRecCell(row, chassisByAd) {
-  const v = chassisByAd[normalizeAdName(row.ad_name)];
+  // Pre-chassis loading state: state._chassisLastRun is null until ~10s after boot
+  if (!state._chassisLastRun) {
+    return `<span class="text-[10px] text-text-muted italic">Loading verdicts…</span>`;
+  }
+  const k = normalizeAdName(row.ad_name) + '||' + (row.market || '');
+  const v = chassisByAd[k];
   if (!v) {
     if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>`;
     if (row.spend < 5000) return `<span class="text-[10px] text-text-muted italic">Monitor — under volume floor</span>`;
@@ -16037,10 +16067,11 @@ function _funnelRecCell(row, chassisByAd) {
                 : t === 'refresh' ? 'bg-amber-50 text-amber-800 border-amber-200'
                 : 'bg-green-50 text-green-800 border-green-200';
   const label = t === 'pause' ? 'PAUSE' : t === 'refresh' ? 'REFRESH' : 'SCALE';
-  const why = (v.why || v.signal || '').replace(/"/g, '&quot;');
+  const whyRaw = v.why || v.signal || '';
+  const whyTrunc = whyRaw.length > 140 ? whyRaw.slice(0,140)+'…' : whyRaw;
   return `<div class="flex flex-col gap-0.5">
     <span class="inline-block self-start px-1.5 py-0.5 rounded text-[9px] font-bold border ${palette}">${label}</span>
-    <span class="text-[10px] text-text-secondary leading-snug" title="${why}">${why.length > 140 ? why.slice(0,140)+'…' : why}</span>
+    <span class="text-[10px] text-text-secondary leading-snug" title="${_funnelEsc(whyRaw)}">${_funnelEsc(whyTrunc)}</span>
   </div>`;
 }
 
@@ -16074,6 +16105,15 @@ function renderFunnelHealthTable() {
 
   // Optional: hide ads with zero of everything (likely UTM mis-attribution noise)
   rows = rows.filter(r => r.spend > 0 || r.ql > 0 || r.tb > 0 || r.tc > 0 || r.td > 0);
+
+  // Search filter — match Tree/Grid behavior. Reads the same taggerSearch input.
+  const searchQ = (document.getElementById('taggerSearch')?.value || '').trim().toLowerCase();
+  if (searchQ) {
+    rows = rows.filter(r => {
+      const hay = ((r.ad_name||'') + ' ' + (r.campaign_name||'') + ' ' + (r.adset_name||'')).toLowerCase();
+      return hay.includes(searchQ);
+    });
+  }
 
   // Roll up to chosen level
   if (level === 'campaign' || level === 'adset') {
@@ -16109,7 +16149,7 @@ function renderFunnelHealthTable() {
   const page = state._funnelTablePage || 1;
   const paged = rows.slice((page - 1) * FUNNEL_PAGE_SIZE, page * FUNNEL_PAGE_SIZE);
 
-  const chassisByAd = _funnelChassisByAd();
+  const chassisByAd = _funnelChassisByAd(market);
 
   if (totalRows === 0) {
     tbody.innerHTML = `<tr><td colspan="17" class="px-4 py-8 text-center text-text-muted text-[11px]">
@@ -16122,13 +16162,13 @@ function renderFunnelHealthTable() {
   tbody.innerHTML = paged.map(r => {
     const adLabel = level === 'ad'
       ? `<div class="flex flex-col gap-0.5">
-           <span class="font-semibold text-text-primary">${(r.ad_name||'').slice(0,80)}</span>
-           <span class="text-[9px] text-text-muted">${(r.campaign_name||'')} › ${(r.adset_name||'')}</span>
+           <span class="font-semibold text-text-primary">${_funnelEsc((r.ad_name||'').slice(0,80))}</span>
+           <span class="text-[9px] text-text-muted">${_funnelEsc(r.campaign_name||'')} › ${_funnelEsc(r.adset_name||'')}</span>
            ${r._isAdsetGrain ? '<span class="text-[9px] text-amber-600 font-semibold">India · ad-set grain (UTM gap)</span>' : ''}
-           ${r.market ? `<span class="inline-block self-start px-1.5 py-0.5 rounded bg-surface-tertiary text-[9px] font-bold text-text-muted">${r.market}</span>` : ''}
+           ${r.market ? `<span class="inline-block self-start px-1.5 py-0.5 rounded bg-surface-tertiary text-[9px] font-bold text-text-muted">${_funnelEsc(r.market)}</span>` : ''}
          </div>`
       : `<div class="flex flex-col gap-0.5">
-           <span class="font-semibold text-text-primary">${(r._label||'').slice(0,100)}</span>
+           <span class="font-semibold text-text-primary">${_funnelEsc((r._label||'').slice(0,100))}</span>
            <span class="text-[9px] text-text-muted">${r._adCount} ad${r._adCount===1?'':'s'}</span>
          </div>`;
 
