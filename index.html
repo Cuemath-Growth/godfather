@@ -127,11 +127,6 @@
         <div class="flex-1"><span class="block">Dashboard</span><span class="text-[9px] text-white/50 block font-normal">What to do right now</span></div>
         <span id="navActionBadge" class="text-[8px] px-1.5 py-0.5 rounded-full bg-accent-purple font-bold text-white" style="display:none"></span>
       </button>
-      <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium" data-view="actionq">
-        <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-        <div class="flex-1"><span class="block">Action Queue <span class="text-[8px] px-1 py-0.5 rounded-sm bg-white/10 font-bold uppercase tracking-wider align-middle">beta</span></span><span class="text-[9px] text-white/50 block font-normal">Verdict-driven recommendations</span></div>
-        <span id="actionQueueNavBadge" class="text-[8px] px-1.5 py-0.5 rounded-full bg-accent-purple font-bold text-white" style="display:none"></span>
-      </button>
       <button class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium" data-view="generate">
         <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         <div><span class="block">Create</span><span class="text-[9px] text-white/50 block font-normal">Generate copy & visuals</span></div>
@@ -492,49 +487,6 @@
         </div>
       </div>
       </div><!-- /view-dashboard -->
-
-      <!-- ========== ACTION QUEUE VIEW (chassis Day 4-5) ========== -->
-      <div id="view-actionq" class="view hidden p-6">
-        <div class="max-w-4xl mx-auto">
-          <!-- Header -->
-          <div class="flex items-center gap-3 mb-2 flex-wrap">
-            <div class="w-9 h-9 rounded-lg bg-gradient-brand flex items-center justify-center shrink-0"><span class="text-white font-bold text-base">🎯</span></div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <h2 class="text-lg font-bold">Action Queue</h2>
-                <span class="text-[9px] px-1.5 py-0.5 rounded-sm bg-amber-100 text-amber-800 font-bold uppercase tracking-wider">beta</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200" title="Chassis version — verdict engine">chassis v<span id="actionQueueChassisVer">—</span></span>
-              </div>
-              <p class="text-xs text-text-muted">Verdict-driven recommendations. Markets are silos — queue is per-market.</p>
-            </div>
-          </div>
-          <!-- Stat strip -->
-          <div id="actionQueueStats" class="text-xs text-text-muted mb-4 px-1"></div>
-
-          <!-- Empty state — shown until first real verdict ships (Week 2 Day 3+) -->
-          <div id="actionQueueEmpty" class="hidden">
-            <div class="bg-white border border-gray-200 rounded-xl p-6 text-center">
-              <div class="text-3xl mb-3">🎯</div>
-              <h3 class="text-base font-semibold mb-1">Action Queue is being built</h3>
-              <p class="text-xs text-text-muted max-w-md mx-auto mb-4">Today this page is empty on purpose. Real recommendations land here over the next 3 weeks. Use Dashboard for now.</p>
-              <div class="text-left max-w-md mx-auto">
-                <p class="text-[10px] uppercase tracking-wider font-bold text-text-muted mb-2">Migration roadmap</p>
-                <div class="space-y-1.5 text-xs">
-                  <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-green-100 text-green-700 text-[9px] font-bold flex items-center justify-center shrink-0">✓</span><span class="text-text-secondary">Week 1 — Engine + this page</span></div>
-                  <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold flex items-center justify-center shrink-0">·</span><span class="text-text-secondary">Week 2 — Pause Now (CPTD Leak) moves here</span></div>
-                  <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-gray-100 text-gray-600 text-[9px] font-bold flex items-center justify-center shrink-0">·</span><span class="text-text-secondary">Week 3 — Make More + Refresh + Market Health</span></div>
-                  <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-gray-100 text-gray-600 text-[9px] font-bold flex items-center justify-center shrink-0">·</span><span class="text-text-secondary">Week 4 — Funnel Leak + Influencer alerts</span></div>
-                  <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full bg-gray-100 text-gray-600 text-[9px] font-bold flex items-center justify-center shrink-0">·</span><span class="text-text-secondary">Week 5 — Old cards removed, this becomes the only "do this now" page</span></div>
-                </div>
-              </div>
-              <button onclick="navigateTo('dashboard')" class="mt-5 btn-primary px-4 py-2 rounded-lg text-xs font-semibold">Open Dashboard</button>
-            </div>
-          </div>
-
-          <!-- Cards container -->
-          <div id="actionQueueContainer" class="space-y-3"></div>
-        </div>
-      </div><!-- /view-actionq -->
 
       <!-- ========== GENERATE VIEW ========== -->
       <div id="view-generate" class="view hidden p-6">
@@ -3391,15 +3343,11 @@ function init() {
         // Make More verdict migrations (Tier 1, Tier 2, Refresh-was-winner).
         if (typeof registerMetaScaleVerdicts === 'function') registerMetaScaleVerdicts(ci);
         // Defer detection to a background tick — it takes ~10s and shouldn't block
-        // the boot spinner. AQ nav badge updates when detection completes;
-        // renderActionQueueView re-runs detection when the tab opens.
+        // the boot spinner. Dashboard re-renders once detection completes.
         setTimeout(() => {
           try {
             const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
             state._chassisLastRun = result;
-            if (typeof _updateActionQueueNavBadge === 'function') {
-              _updateActionQueueNavBadge(result.stats.surfaced);
-            }
             console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
             // Re-render Dashboard once chassis result is ready, so the parity diff has data to compare against.
             if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
@@ -3535,8 +3483,8 @@ function navigateTo(view) {
   // Show/hide global filter bar (hidden on Settings and Forge)
   const filterBar = document.getElementById('globalFilterBar');
   if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'library') ? 'none' : '';
-  const titles = { dashboard:'Dashboard', actionq:'Action Queue', generate:'Create', tagger:'Tagger', library:'Library', influencer:'Creators', settings:'Settings' };
-  const subs = { dashboard:'What to do right now', actionq:'Verdict-driven recommendations', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', library:'Your creative assets', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
+  const titles = { dashboard:'Dashboard', generate:'Create', tagger:'Tagger', library:'Library', influencer:'Creators', settings:'Settings' };
+  const subs = { dashboard:'What to do right now', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', library:'Your creative assets', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
   document.getElementById('headerSubtitle').textContent = subs[view] || '';
   document.title = 'Godfather — ' + (titles[view] || 'Cuemath');
@@ -3580,8 +3528,6 @@ function navigateTo(view) {
       if (_taggerLoader) _taggerLoader.classList.add('hidden');
     });
   }
-  // Action Queue (chassis-driven, Week 1 Day 4-5)
-  if (view === 'actionq') { try { renderActionQueueView(); } catch(e) { console.error('renderActionQueueView crashed:', e); } }
   if (view === 'dashboard') { try { onDashboardFilterChange(); } catch(e) { console.error('onDashboardFilterChange crashed:', e); } }
   if (view === 'influencer') renderInfluencerView();
   if (view === 'settings') { loadSettingsFields(); setTimeout(renderHealthPanel, 100); }
@@ -6973,7 +6919,6 @@ function onGlobalFilterChange() {
   else if (activeView === 'tagger' && typeof showTaggerResults === 'function') showTaggerResults();
   else if (activeView === 'influencer') renderInfluencerView();
   else if (activeView === 'library' && typeof renderLibrary === 'function') renderLibrary();
-  else if (activeView === 'actionq' && typeof renderActionQueueView === 'function') renderActionQueueView();
 }
 
 function onDashboardFilterChange() {
@@ -7431,154 +7376,6 @@ function registerMetaPauseVerdicts(ci) {
   });
 }
 
-// ==================== ACTION QUEUE (chassis-driven, Week 1 Day 4-5) ====================
-// Per intelligence-chassis-spec.md. Renders verdict-engine output as cards.
-// Markets are silos — queue is per-market. "All" interleaves top-N from each market.
-// Today only the chassis_smoke_test dummy verdict is registered. Real migrations Week 2+.
-function renderActionQueueView() {
-  const ci = window.cuemathIntelligence;
-  const container = document.getElementById('actionQueueContainer');
-  const emptyEl = document.getElementById('actionQueueEmpty');
-  const statsEl = document.getElementById('actionQueueStats');
-  const verEl = document.getElementById('actionQueueChassisVer');
-  if (!container) return;
-
-  if (!ci) {
-    container.innerHTML = '<div class="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">Intelligence chassis failed to load. Check that <code>shared/cuemath-intelligence.js</code> is reachable.</div>';
-    if (statsEl) statsEl.textContent = '';
-    return;
-  }
-
-  if (verEl) verEl.textContent = ci.CHASSIS_VERSION;
-
-  let detectionResult;
-  try {
-    detectionResult = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
-  } catch (e) {
-    console.error('[chassis] runDetection failed:', e);
-    container.innerHTML = `<div class="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">Detection threw: ${e.message}</div>`;
-    return;
-  }
-
-  const market = document.getElementById('dashboardCountryFilter')?.value || 'all';
-  const list = (market === 'all')
-    ? ci.interleaveTopNPerMarket(detectionResult.byMarket, 7)
-    : (detectionResult.byMarket[market] || []).slice(0, 7);
-
-  const totalSurfaced = detectionResult.stats.surfaced;
-  const totalSkipped = detectionResult.stats.skipped;
-  const atStake = detectionResult.all.reduce((s, r) => s + (Number(r.severity_raw) || 0), 0);
-
-  if (!list.length) {
-    container.innerHTML = '';
-    if (statsEl) statsEl.innerHTML = '';
-    if (emptyEl) emptyEl.classList.remove('hidden');
-    _updateActionQueueNavBadge(0);
-    return;
-  }
-  if (emptyEl) emptyEl.classList.add('hidden');
-
-  if (statsEl) {
-    const parts = [];
-    parts.push(`<strong class="text-text-primary">${totalSurfaced}</strong> action${totalSurfaced === 1 ? '' : 's'}`);
-    if (atStake > 0) parts.push(`${formatCurrency(atStake)}/wk at stake`);
-    if (totalSkipped) parts.push(`${totalSkipped} skipped by guardrails`);
-    parts.push(`market: <strong class="text-text-primary">${market}</strong>`);
-    statsEl.innerHTML = parts.join(' · ');
-  }
-
-  container.innerHTML = list.map(_renderActionQueueCard).join('');
-  _updateActionQueueNavBadge(totalSurfaced);
-}
-
-function _renderActionQueueCard(rec) {
-  const sev = Number(rec.severity_raw) || 0;
-  const sevTier = sev >= 50000 ? 'red' : sev >= 10000 ? 'amber' : 'gray';
-  const sevBgClass = { red: 'bg-red-100 text-red-700', amber: 'bg-amber-100 text-amber-700', gray: 'bg-gray-100 text-gray-700' }[sevTier];
-  const sevLabel = sev > 0 ? `${formatCurrency(sev)}/wk` : 'low impact';
-  const sevDot = { red: '🔴', amber: '🟠', gray: '⚪' }[sevTier];
-
-  const confClass = { CONFIDENT: 'bg-green-100 text-green-700', LIKELY: 'bg-blue-100 text-blue-700', LOW: 'bg-gray-100 text-gray-600' }[rec.confidence] || 'bg-gray-100 text-gray-600';
-  const effortLabel = { '1_CLICK': '1-CLICK', '5_MIN': '5-MIN', 'INVESTIGATE': 'INVESTIGATE' }[rec.effort] || rec.effort;
-  const effortClass = { '1_CLICK': 'bg-purple-100 text-purple-700', '5_MIN': 'bg-indigo-100 text-indigo-700', 'INVESTIGATE': 'bg-gray-100 text-gray-700' }[rec.effort] || 'bg-gray-100 text-gray-700';
-
-  const verdictId = String(rec.verdict_id || '').replace(/'/g, "\\'");
-  const entityId = String(rec.entity_id || '').replace(/'/g, "\\'");
-  const actionLabel = rec.action?.label || 'Act';
-  const isNoop = rec.action?.type === 'noop';
-
-  const guardrailsLine = (rec.guardrails_passed && rec.guardrails_passed.length)
-    ? `<div class="text-[10px] text-green-700 mt-2">Guardrails: ${rec.guardrails_passed.map(g => `${g} ✓`).join(' · ')}</div>`
-    : '';
-
-  const whyNowLine = rec.why_now
-    ? `<div class="text-xs text-text-secondary mt-1"><strong class="text-text-primary">Why now:</strong> ${_escapeHtml(rec.why_now)}</div>`
-    : '';
-
-  // Lead with ad identity (thumb + name + audience pill) so the user can match
-  // these cards against the Dashboard's old Pause Now / Make More cards during
-  // the parity audit. Verdict metric (rec.signal) becomes a subline.
-  const adName = String(rec.entity_id || '');
-  const thumbHtml = (typeof _oracleThumbnail === 'function')
-    ? _oracleThumbnail(adName)
-    : '<div class="w-10 h-10 rounded-lg bg-surface-tertiary shrink-0"></div>';
-  const adNameDisplay = (typeof shortAdName === 'function') ? shortAdName(adName) : adName;
-  // Pull audience + format from tagger data if available — same parity hooks the
-  // Dashboard uses.
-  let audienceLabel = '';
-  let formatLabel = '';
-  if (Array.isArray(state.taggerData) && state.taggerData.length && adName) {
-    const norm = (typeof normalizeAdName === 'function') ? normalizeAdName(adName) : adName;
-    const match = state.taggerData.find(c => {
-      const n = (typeof normalizeAdName === 'function') ? normalizeAdName(c['Ad name'] || c['ad name'] || '') : (c['Ad name'] || c['ad name'] || '');
-      return n === norm;
-    });
-    if (match) {
-      const aud = match.tags?.campaign_audience;
-      if (aud && aud !== 'Unknown' && aud !== 'N/A') audienceLabel = String(aud);
-      const fmt = match.tags?.content_format || match['Creative type'];
-      if (fmt && fmt !== 'Unknown') formatLabel = String(fmt);
-    }
-  }
-  const audPill = audienceLabel
-    ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 font-semibold">${_escapeHtml(audienceLabel)}</span>`
-    : '';
-  const fmtPill = formatLabel
-    ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">${_escapeHtml(formatLabel)}</span>`
-    : '';
-
-  return `
-    <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-      <div class="flex items-start gap-3 mb-3">
-        ${thumbHtml}
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-bold text-text-primary truncate" title="${_escapeHtml(adName)}">${_escapeHtml(adNameDisplay)}</p>
-          <div class="flex items-center gap-1.5 mt-1 flex-wrap">
-            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">${_escapeHtml(rec.market || '?')}</span>
-            ${audPill}
-            ${fmtPill}
-            <code class="text-[9px] text-text-muted ml-auto">${_escapeHtml(rec.verdict_id)}</code>
-          </div>
-        </div>
-      </div>
-      <div class="flex items-center gap-2 mb-2 flex-wrap">
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${sevBgClass}">${sevDot} ${sevLabel}</span>
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${confClass}">${rec.confidence || '?'}</span>
-        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${effortClass}">${effortLabel || '?'}</span>
-      </div>
-      <div class="text-xs font-semibold text-text-primary mb-1">${_escapeHtml(rec.signal || '(no signal text)')}</div>
-      ${rec.why ? `<div class="text-xs text-text-secondary"><strong class="text-text-primary">Why:</strong> ${_escapeHtml(rec.why)}</div>` : ''}
-      ${whyNowLine}
-      ${guardrailsLine}
-      <div class="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-gray-100">
-        <button class="text-xs font-semibold px-3 py-1.5 rounded-lg ${isNoop ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'btn-primary text-white'}" ${isNoop ? 'disabled title="Smoke-test verdict — no action wired"' : ''}>${_escapeHtml(actionLabel)}</button>
-        <button onclick="actionQueueDismiss('${verdictId}','${entityId}','snooze_24h')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-secondary text-text-secondary hover:bg-surface-tertiary border border-gray-200">Snooze 24h</button>
-        <button onclick="actionQueueDismiss('${verdictId}','${entityId}','skip_7d')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-secondary text-text-secondary hover:bg-surface-tertiary border border-gray-200">Skip 7d</button>
-        <button onclick="actionQueueDismiss('${verdictId}','${entityId}','never_again')" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-surface-secondary text-text-secondary hover:bg-surface-tertiary border border-gray-200">Never again</button>
-      </div>
-    </div>`;
-}
-
 function _escapeHtml(s) {
   if (s == null) return '';
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -7588,9 +7385,6 @@ function actionQueueDismiss(verdictId, entityId, reason) {
   const ci = window.cuemathIntelligence;
   if (!ci) return;
   ci.dismiss(verdictId, entityId, reason);
-  // AQ tab re-render — guarded so this stays safe after the AQ surface is
-  // removed in a follow-up commit.
-  try { if (document.getElementById('actionQueueContainer')) renderActionQueueView(); } catch (_) {}
   // Dashboard re-render — Pause + Refresh + Make More filter against the chassis
   // dismissal localStorage at render time (see _isChassisDismissed), so a
   // re-render is enough to drop the dismissed card without rerunning chassis
@@ -7614,13 +7408,6 @@ function _isChassisDismissed(verdictId, entityId) {
     if (!isFinite(expiresMs)) return true; // never_again sentinel
     return expiresMs > Date.now();
   } catch (_) { return false; }
-}
-
-function _updateActionQueueNavBadge(count) {
-  const badge = document.getElementById('actionQueueNavBadge');
-  if (!badge) return;
-  if (count > 0) { badge.textContent = String(count); badge.style.display = ''; }
-  else { badge.style.display = 'none'; }
 }
 
 // ==================== CHASSIS VERDICTS - Meta Scale (Week 3 Day 3-4) ====================

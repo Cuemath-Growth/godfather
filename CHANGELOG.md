@@ -4,6 +4,52 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Action Queue surface deleted (2026-05-06)
+
+### Why
+The AQ tab + sidebar nav stayed alive only because `actionQueueDismiss`
+(`:7587`) was the lone UI path writing to the chassis dismissal store.
+Yesterday's commit (`73bebe6`) migrated Snooze 24h / Skip 7d / Never again
+onto Dashboard Pause + Refresh + Make More cards, so AQ is now dead UI.
+Locked decision #2: "AQ tab will be deleted once Dashboard 3-section model
+fed by chassis is stable."
+
+### What changed (`index.html`)
+- **Sidebar nav button (`:130–134`)** — removed the `data-view="actionq"`
+  button + `actionQueueNavBadge` span.
+- **AQ view container (`:497–538`)** — removed `<div id="view-actionq">`,
+  including `actionQueueContainer`, `actionQueueEmpty`, `actionQueueStats`,
+  `actionQueueChassisVer`, and the migration-roadmap empty state.
+- **`renderActionQueueView` + `_renderActionQueueCard` (`:7438–7592`)** —
+  removed both functions. The "1-CLICK" effort badge label map (locked
+  decision #3: "1-CLICK effort badge is misleading — drop or rename") went
+  with `_renderActionQueueCard`.
+- **`_updateActionQueueNavBadge` (`:7619`)** — removed (no nav badge to
+  update).
+- **Boot wiring (`:3400–3402`)** — removed the `_updateActionQueueNavBadge`
+  call inside the `ci.runDetection(...)` background callback. Detection
+  itself + `state._chassisLastRun = result` kept (Dashboard reads it).
+- **View routing** — removed `actionq` entries from `titles`/`subs` maps
+  (`:3538–3539`), the `view === 'actionq'` dispatch in `navigateTo` (`:3584`),
+  and the `activeView === 'actionq'` branch in the filter-change re-render
+  (`:6976`).
+- **`actionQueueDismiss` (`:7587`)** kept — Dashboard cards still call it.
+  Stripped the now-dead `getElementById('actionQueueContainer') &&
+  renderActionQueueView()` re-render guard since the container is gone.
+- Cleaned a stale boot comment that referred to the deleted
+  `renderActionQueueView`.
+
+### Net delta
+−213 lines. JS syntax validated with `node --check`.
+
+### Verify
+- Open Dashboard. Pause / Refresh / Make More cards still render.
+- Snooze 24h / Skip 7d / Never again on a Dashboard card still suppress the
+  card on next render (chassis localStorage read in `_isChassisDismissed`).
+- No "Action Queue" item in the sidebar. No `actionq` route resolvable.
+
+---
+
 ## Chassis dismiss buttons migrated onto Dashboard cards (2026-05-06)
 
 ### Why
