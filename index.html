@@ -17856,12 +17856,14 @@ function renderCreativeGrid() {
     const _vTW = { green: 'bg-accent-green-light text-green-700', amber: 'bg-accent-orange-light text-amber-700', red: 'bg-accent-red-light text-red-700', gray: 'bg-gray-100 text-gray-600' };
     const verdict = { text: _v.label, color: _vTW[_v.color] || _vTW.gray, why: _v.reason || '' };
 
-    // Impact contribution
+    // Impact contribution. Use 2 decimals when <0.1% so tiny-spend ads don't
+    // misleadingly read as "0.0%" when they actually spent money.
     const spendPct = _totSpend > 0 ? (spend / _totSpend * 100) : 0;
     const tdPct = _totTD > 0 ? (tdVal / _totTD * 100) : 0;
+    const fmtPct = (p) => p === 0 ? '0%' : p < 0.1 ? '<0.1%' : p < 1 ? p.toFixed(2) + '%' : p.toFixed(1) + '%';
     const impactLabel = tdPct >= 1
-      ? `${tdPct.toFixed(1)}% of portfolio TDs · ${spendPct.toFixed(1)}% of spend`
-      : `${spendPct.toFixed(1)}% of portfolio spend${tdVal === 0 && spendPct > 1 ? ' · 0 TD contribution' : ''}`;
+      ? `${fmtPct(tdPct)} of portfolio TDs · ${fmtPct(spendPct)} of spend`
+      : `${fmtPct(spendPct)} of portfolio spend${tdVal === 0 && spendPct > 1 ? ' · 0 TD contribution' : ''}`;
 
     const displayTags = ['hook','pain_benefit','emotional_tone','campaign_audience']
       .filter(cat => tags[cat] && tags[cat] !== 'Unknown')
