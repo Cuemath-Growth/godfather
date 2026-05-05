@@ -36,6 +36,29 @@ Stream 3 Path A (Dashboard becomes chassis-driven) was decided May 1. Friday-onw
 
 ---
 
+## ROOT CAUSE: supabaseGet didn't paginate (2026-05-05)
+
+### Why this is THE fix
+PostgREST returns at most 1000 rows per request by default. `supabaseGet`
+fired one request and returned whatever came back. `creative_tags` has
+2,720 rows; `creative_tags_v3` has 2,435. So 1,720+ creative_tags rows
+never reached `state._tagLookup`, and the hydration code at
+index.html:14449 (which I'd already fixed twice) was never given the
+chance to find them. Cards rendered blank not because the renderer was
+wrong, but because the lookup was empty for those rows.
+
+This explains every "thumbnail still missing" symptom from the May 5
+session, and why the renderer-sweep + hydration-sweep + dup-merge each
+fixed *some* ads but never the majority — they only helped rows that
+made it into the truncated 1000.
+
+### Fix
+`supabaseGet` now loops with `Range: <offset>-<offset+999>` headers
+until it gets back a chunk shorter than the page size. Returns all
+rows. Safety cap at 200k.
+
+---
+
 ## Phase 5: tombstone flag for unresolvable ads (2026-05-05)
 
 ### Why

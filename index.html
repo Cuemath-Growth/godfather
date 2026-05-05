@@ -1582,13 +1582,32 @@ function updateSyncBadge(status) {
 }
 
 async function supabaseGet(table, query) {
+  // Paginates 1000 rows at a time via Range header. PostgREST defaults to
+  // 1000 max; without pagination, large tables (creative_tags, creative_tags_v3,
+  // meta_ad_data) silently truncate and downstream lookups miss rows. The
+  // missing-thumbnail saga of May 5 root-caused to this exact loop being absent.
   try {
-    const url = `${SUPABASE_URL}/rest/v1/${table}?${query || 'select=*'}`;
-    const res = await fetch(url, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    if (!res.ok) throw new Error(`Supabase GET ${res.status}`);
-    return await res.json();
+    const base = `${SUPABASE_URL}/rest/v1/${table}?${query || 'select=*'}`;
+    const PAGE = 1000;
+    let offset = 0, out = [];
+    while (true) {
+      const res = await fetch(base, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Range-Unit': 'items',
+          'Range': `${offset}-${offset + PAGE - 1}`,
+        },
+      });
+      if (!res.ok) throw new Error(`Supabase GET ${res.status}`);
+      const chunk = await res.json();
+      if (!Array.isArray(chunk)) return chunk; // non-array response (e.g. single row): return as-is
+      out = out.concat(chunk);
+      if (chunk.length < PAGE) break;
+      offset += PAGE;
+      if (offset > 200000) { console.warn(`supabaseGet ${table}: stopping at 200k rows safety cap`); break; }
+    }
+    return out;
   } catch(e) {
     console.warn('supabaseGet error:', e.message);
     updateSyncBadge('offline');
