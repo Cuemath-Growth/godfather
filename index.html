@@ -3365,10 +3365,15 @@ function init() {
         setTimeout(() => {
           try {
             const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
+            state._chassisLastRun = result;
             if (typeof _updateActionQueueNavBadge === 'function') {
               _updateActionQueueNavBadge(result.stats.surfaced);
             }
             console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
+            // Re-render Dashboard once chassis result is ready, so the parity diff has data to compare against.
+            if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
+              try { renderOracleCardsV2(); } catch (e) {}
+            }
           } catch (e) {
             console.error('[chassis] background detection failed:', e);
           }
@@ -9531,6 +9536,30 @@ function renderOracleCardsV2() {
     pauseAds = capped.slice(0, 14); // soft total cap
   } else {
     pauseAds = pauseAds.slice(0, 10);
+  }
+
+  // ── Parity diff: legacy Pause+Refresh vs chassis verdicts (TEMP, delete after 24hr observation) ──
+  // Naina May 5: ship Path A swap with parity guard. If chassis is missing legacy ads → fix before swap.
+  // Runs once per session; first call when chassis result is available wins.
+  if (!state._parityRan) {
+    try {
+      const _chassis = state._chassisLastRun;
+      if (_chassis && Array.isArray(_chassis.all)) {
+        state._parityRan = true;
+        const _legacyKeys = new Set(pauseAds.map(a => normalizeAdName(a.name)));
+        const _chassisPauseRefresh = _chassis.all.filter(r => r.action && (r.action.type === 'pause' || r.action.type === 'refresh'));
+        const _chassisKeys = new Set(_chassisPauseRefresh.map(r => normalizeAdName(r.entity_id)));
+        const _legacyOnly = pauseAds.filter(a => !_chassisKeys.has(normalizeAdName(a.name)));
+        const _chassisOnly = _chassisPauseRefresh.filter(r => !_legacyKeys.has(normalizeAdName(r.entity_id)));
+        if (_legacyOnly.length || _chassisOnly.length) {
+          console.warn(`[parity] legacy=${pauseAds.length} chassis=${_chassisKeys.size} · legacy-only=${_legacyOnly.length} · chassis-only=${_chassisOnly.length}`);
+          if (_legacyOnly.length) console.table(_legacyOnly.map(a => ({ ad: a.name, type: a._type, market: a.market, spend: a.spend, ql: a.ql, td: a.td })));
+          if (_chassisOnly.length) console.table(_chassisOnly.map(r => ({ ad: r.entity_id, verdict: r.verdict_id, market: r.market, severity: r.severity_raw })));
+        } else {
+          console.log(`[parity] ✅ legacy=${pauseAds.length} chassis=${_chassisKeys.size} · perfect match`);
+        }
+      }
+    } catch (e) { console.error('[parity] diff failed:', e); }
   }
 
   const visibleAll = pauseAds.filter(a => isItemVisible('pause:' + a.name));

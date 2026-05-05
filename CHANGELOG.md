@@ -4,6 +4,38 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Parity diff: legacy Pause+Refresh vs chassis (2026-05-05)
+
+### Why
+Stream 3 Path A (Dashboard becomes chassis-driven) was decided May 1. Friday-onward chassis logs in `recommendation_log` show 5 of 9 verdicts firing stably, 3 silent (`dead_funnel`, `spam`, `refresh_fatigued_winner`), 1 fired-then-quiet (`wrong_audience`). Investigation against `tagged_creatives` v2 rollup found 55/58 lifetime dead_funnel candidates correctly skipped (paused), 3 ambiguous due to v2-vs-live data drift. Rather than chase v2 archaeology, ship the swap with a 24hr console parity guard.
+
+### What changed (`index.html`)
+
+**Edit 1, boot block (`:3367` area):**
+- Stash chassis `runDetection()` result onto `state._chassisLastRun` so the legacy Dashboard renderer can read it for the diff.
+- Re-render Dashboard once chassis completes (only if currently on Dashboard tab) so first parity log has data to compare against.
+
+**Edit 2, `renderOracleCardsV2()` (`:9536` area):**
+- New parity-diff block runs once per session (`state._parityRan` guard).
+- Compares legacy `pauseAds` (post-cap, what's actually shown) vs chassis `result.all` filtered to `pause`/`refresh` action types.
+- Logs `[parity] ✅ perfect match` when sets match; logs `console.warn` + `console.table` for `legacy-only` and `chassis-only` when they don't.
+
+### What did NOT ship
+- The actual data source swap (renderOracleCardsV2 still uses inline `adCampData` + per-signal filters)
+- AQ tab deletion
+- Make More restructure to mirror Scale verdicts
+
+### Verification
+- Inline JS parses clean (`new Function()` test on full concatenated `<script>` blocks)
+- Chassis boot block + parity diff block both visually inspected post-edit
+- Awaits browser-side check: open Dashboard, see exactly one `[parity]` line per session
+
+### Next step (after 24hr observation)
+- If `legacy-only=0` consistently → swap `renderOracleCardsV2` to consume chassis output, delete this block
+- If `legacy-only>0` → fix the gap (likely a guardrail too strict or a verdict filter missing a case), then swap
+
+---
+
 ## Phase 5: tombstone flag for unresolvable ads (2026-05-05)
 
 ### Why
