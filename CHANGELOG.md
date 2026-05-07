@@ -4,6 +4,24 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Make More: defend against orphan chassis verdicts (2026-05-07)
+
+### Why
+After Path A cleanup (`71626c6`, May 5) chassis became the sole source for Make More. Chassis runs **once** at boot with `market='all'` + a hardcoded 90d-mature window; the dashboard render reads live filters (date pills, country, BAU/PLA). When the user's filters narrow `adCampData`, the chassis emits scale verdicts whose `entity_id` doesn't resolve in the dashboard's lookup. The renderer fell through to `|| {}` and every field rendered as `undefined` — "undefined PROVEN US · 0 TDs · 0 QLs · — CPTD" cards.
+
+The sibling Pause path at `:9462–9482` already defends against the same orphan (`name: r.entity_id`, `spend: ... ?? r.spend`, `market: ... ?? r.market`). Make More skipped that pattern.
+
+### What changed (`index.html`)
+- **`_renderMakeMoreAds` (`:9778–9812`)** — when `_adByName` lookup misses, fall back to chassis-carried data: `r.entity_id` for `adName`, `r.market` for `market`, and `r.raw_metrics.{cptd,td,ql,spend,campaign_audience}` for the render fields. One safety-net `return null` when even `r.entity_id` is empty. `displayName` derives from `stripCampaignPrefix(adName)` when no full-ad row exists. Flow filter now reads `aud` from chassis fallback too.
+
+### Side-effect to watch (cleanup, not regression)
+Pre-fix, dismiss buttons on orphan cards wrote `item_id='make:ad:undefined'` / `_dismiss_meta_scale_tier1_winner_undefined` keys. Those are dead state — they don't suppress real cards (entity_ids never match `'undefined'`). One-time console cleanup if any were clicked:
+```js
+Object.keys(localStorage).filter(k => k.startsWith('_dismiss_') && k.endsWith('_undefined')).forEach(k => localStorage.removeItem(k));
+```
+
+---
+
 ## Funnel Health table — Phase 1: QL→TB→TC→TD per ad with cohort/MTD toggle (2026-05-06)
 
 ### Why

@@ -9781,19 +9781,30 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
       .map(r => {
         const fullAd = _adByName[normalizeAdName(r.entity_id)] || {};
         if (pausedAdNames.has(normalizeAdName(r.entity_id))) return null;
-        // Respect BAU/PLA flow filter — Make More on BAU view excludes PLA winners and vice versa.
-        const aud = fullAd.tags?.campaign_audience || '';
+        // Chassis runs once at boot with market='all' + a hardcoded 90d-mature window.
+        // When the user's date/market/flow filter narrows adCampData, fullAd can be {}
+        // and every render field used to come back undefined. Mirror the Pause path's
+        // defensiveness (:9469) by falling back to chassis-carried metadata.
+        const rm = r.raw_metrics || {};
+        const adName = fullAd.adName || r.entity_id;
+        if (!adName) return null;
+        const aud = fullAd.tags?.campaign_audience || rm.campaign_audience || '';
         if (flow === 'bau' && /\(PLA\)/i.test(aud)) return null;
         if (flow === 'pla' && !/\(PLA\)/i.test(aud)) return null;
         const m = fullAd.mature || {};
         const tier = r.verdict_id === 'meta_scale_tier1_winner' ? 'tier1' : 'tier2';
+        const tags = fullAd.tags || (aud ? { campaign_audience: aud } : {});
         return {
           ...fullAd,
+          adName,
+          displayName: fullAd.displayName || (typeof stripCampaignPrefix === 'function' ? stripCampaignPrefix(adName) : adName),
+          market: fullAd.market || r.market || '',
+          tags,
           _tier: tier,
-          _displayCPTD: m.cptd !== undefined ? m.cptd : fullAd.cptd,
-          _displayTD: m.td !== undefined ? m.td : fullAd.td,
-          _displayQL: m.ql !== undefined ? m.ql : fullAd.ql,
-          _displaySpend: m.spend !== undefined ? m.spend : fullAd.spend,
+          _displayCPTD: m.cptd !== undefined ? m.cptd : (fullAd.cptd != null ? fullAd.cptd : rm.cptd),
+          _displayTD: m.td !== undefined ? m.td : (fullAd.td != null ? fullAd.td : rm.td),
+          _displayQL: m.ql !== undefined ? m.ql : (fullAd.ql != null ? fullAd.ql : rm.ql),
+          _displaySpend: m.spend !== undefined ? m.spend : (fullAd.spend != null ? fullAd.spend : rm.spend),
           _verdictId: r.verdict_id,
         };
       })
