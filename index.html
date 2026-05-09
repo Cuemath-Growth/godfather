@@ -3354,12 +3354,19 @@ function init() {
     loadOracleActions().catch(e => { console.error('Boot oracle:', e); }),
     // Supabase: library_assets (creative library)
     loadLibraryFromSupabase().catch(e => { console.error('Boot library:', e); }),
-    // Google Sheets: CRM leads + cost data (only if credentials exist)
+    // Google Sheets: CRM leads + cost data (only if credentials exist).
+    // BAU fetchSheetData runs first because PLA + India CRM both dedup against
+    // leadsData. PLA + India then run in PARALLEL — they read leadsData for
+    // dedup snapshots up front, so concurrent appends from each other are safe
+    // (cross-source pid overlap is theoretical: PLA = global self-serve, India
+    // CRM = India-specific). Saves ~5-10s on boot vs the old serial chain.
     (_bootSheetUrl && _bootApiKey)
       ? fetchSheetData(_bootSheetUrl, _bootApiKey)
           .then(c => { console.log(`Boot: ${c.leads} leads, ${c.cost} cost`); return c; })
-          .then(c => fetchPLAData(_bootApiKey).then(p => { console.log(`Boot PLA: +${p.leads} leads, +${p.cost} cost`); return c; }))
-          .then(c => fetchIndiaCRM(_bootApiKey).then(i => { console.log(`Boot India CRM: +${i.leads} leads`); return c; }))
+          .then(c => Promise.all([
+              fetchPLAData(_bootApiKey).then(p => { console.log(`Boot PLA: +${p.leads} leads, +${p.cost} cost`); return p; }),
+              fetchIndiaCRM(_bootApiKey).then(i => { console.log(`Boot India CRM: +${i.leads} leads`); return i; })
+            ]).then(() => c))
           .catch(e => { console.error('Boot sheets:', e); return null; })
       : Promise.resolve(null),
     // Supabase: generation history (last 50, newest first)
@@ -5471,8 +5478,12 @@ function buildLookupMaps() {
 }
 
 let _tagMap = {}; // { normalizedAdName: { tags, type, thumb, campaign, adset } }
-let _adPerfCache = { key: '', data: [] }; // cache for getAdPerformance
-let _dailyCache = { key: '', data: [] }; // cache for getAdPerformanceDaily
+// getAdPerformance / getAdPerformanceDaily caches.
+// Multi-slot Map keyed by (market|from|to|...) — the same boot pass calls these
+// from Tagger, Sentinel, Funnel, Insights with both market='all' AND per-market
+// keys. A single-slot cache thrashed; this keeps every distinct call cached.
+const _adPerfCache = new Map(); // cacheKey → results array
+const _dailyCache = new Map();  // cacheKey → daily rows array
 
 // ── DAILY DATA LAYER: getAdPerformanceDaily() ──
 // Returns one row per ad per day. This is the foundational data model.
@@ -5484,7 +5495,8 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   const end = endDate || new Date().toISOString().slice(0, 10);
   const _flow = getFlowFilter();
   const cacheKey = `daily|${market||'all'}|${start}|${end}|${_flow}`;
-  if (_dailyCache.key === cacheKey && _dailyCache.data.length) return _dailyCache.data;
+  const _dailyHit = _dailyCache.get(cacheKey);
+  if (_dailyHit && _dailyHit.length) return _dailyHit;
 
   // Step 1: Meta API — daily spend per ad (keyed by normalizedAdName + date)
   const metaDaily = {}; // key: "normName|date" → { spend, impressions, clicks, adName, campaign, adset, account, ad_id }
@@ -5711,11 +5723,11 @@ function getAdPerformanceDaily(market, startDate, endDate) {
   const matched = results.filter(r => r._crmMatched).length;
   console.log(`getAdPerformanceDaily(${market||'all'}, ${start}, ${end}): ${results.length} daily rows | ${metaRows} meta, ${crmOnly} crm-only | ${matched} with CRM match`);
 
-  _dailyCache = { key: cacheKey, data: results };
+  _dailyCache.set(cacheKey, results);
   return results;
 }
 
-function invalidateDailyCache() { _dailyCache = { key: '', data: [] }; _adFunnelCache = { key: '', data: [] }; }
+function invalidateDailyCache() { _dailyCache.clear(); _adFunnelCache = { key: '', data: [] }; }
 
 // ── CLEAN DATA LAYER: getAdPerformance() ──
 // Single source of truth for ALL views. Joins leadsData (date-aware QLs/TDs) + metaAdData (date-aware spend).
@@ -5730,7 +5742,8 @@ function getAdPerformance(market, startDate, endDate, opts) {
 
   const _perfFlow = getFlowFilter();
   const cacheKey = `${market||'all'}|${start}|${end}|${includeNonLP?'all':'lp'}|${_perfFlow}`;
-  if (_adPerfCache.key === cacheKey && _adPerfCache.data.length) return _adPerfCache.data;
+  const _perfHit = _adPerfCache.get(cacheKey);
+  if (_perfHit && _perfHit.length) return _perfHit;
 
   // Aggregate daily rows by ad name
   const daily = getAdPerformanceDaily(market, start, end);
@@ -5833,7 +5846,7 @@ function getAdPerformance(market, startDate, endDate, opts) {
 
   results.sort((a, b) => (b['Spent'] || 0) - (a['Spent'] || 0));
 
-  _adPerfCache = { key: cacheKey, data: results };
+  _adPerfCache.set(cacheKey, results);
   return results;
 }
 
@@ -5904,7 +5917,7 @@ function getPortfolioMetrics(market, from, to) {
 }
 
 // Invalidate cache when data sources change
-function invalidateAdPerfCache() { _adPerfCache = { key: '', data: [] }; _dailyCache = { key: '', data: [] }; _adFunnelCache = { key: '', data: [] }; }
+function invalidateAdPerfCache() { _adPerfCache.clear(); _dailyCache.clear(); _adFunnelCache = { key: '', data: [] }; }
 
 // ── Funnel Health: per-ad QL→TB→TC→TD with cohort/MTD attribution toggle ──
 // Mode = 'cohort' : event date AND lead_created_date both in [start,end]
@@ -6331,6 +6344,11 @@ async function fetchSheetAsCsv(url, tq) {
 // parseCSV + parseNumber moved to shared/cuemath-data.js (Apr 28)
 
 function mergeCRMWithMeta() {
+  // Early-exit: nothing to merge into. Several call sites (post-tag, metaAdData
+  // reload paths) gate only on leadsData.length and call this before taggerData
+  // is hydrated — that fired a noisy "0 creatives" log + a wasted iteration on
+  // every boot. Cheap guard here covers all of them.
+  if (!state.taggerData || state.taggerData.length === 0) return;
   // Idempotency: skip if already merged with same data version
   const mergeKey = `${leadsData.length}|${state.taggerData.length}`;
   if (mergeCRMWithMeta._lastKey === mergeKey) { console.log('CRM merge: skipped (already merged this data version)'); return; }
@@ -7458,7 +7476,13 @@ function _deriveTier2OneAd(tagRow) {
   const three_beat_compliance = beatsHit >= 3 ? 'Compliant' : (beatsHit === 2 ? 'Partial' : 'Non-compliant');
   // Format — from existing creative_tags. Closed enum per tagging-rubric.md Field 4.
   const format = tagRow.master_frame || tagRow.format || null;
-  return { mathfit_dimension, coach_tenure_signal, three_beat_compliance, outcome_anchor, format };
+  // First-order creative_tags fields, carried through so opportunity detection can use them
+  // when tier-2 derivation comes up generic. Reliable because they're tagged directly by the
+  // v3 tagger, not derived from sparse evidence text. (PR2 Phase B fix 2026-05-10.)
+  const hook_frame = tagRow.hook_frame || tagRow['hook frame'] || null;
+  const pain_target = tagRow.pain_target || tagRow['pain target'] || null;
+  const production_cue = tagRow.production_cue || tagRow['production cue'] || null;
+  return { mathfit_dimension, coach_tenure_signal, three_beat_compliance, outcome_anchor, format, hook_frame, pain_target, production_cue };
 }
 
 function _deriveTier2Tags() {
@@ -7481,10 +7505,14 @@ function _deriveTier2Tags() {
 
 function _tier2TupleKey(tags) {
   if (!tags) return '';
+  // Tuple uses tier-2 derivations FIRST (when they signal), and falls through to first-order
+  // creative_tags fields (hook_frame, pain_target, production_cue) which are populated more
+  // reliably for Cuemath's data. Net effect: even when tier-2 derivation doesn't classify a
+  // dimension, the first-order tags differentiate winners — so the tuple is rarely all-generic.
   return [
-    tags.coach_tenure_signal || 'Anonymous',
-    tags.mathfit_dimension || 'Unclear',
-    tags.outcome_anchor || 'none',
+    tags.coach_tenure_signal && tags.coach_tenure_signal !== 'Anonymous' ? tags.coach_tenure_signal : (tags.hook_frame || 'AnonHook'),
+    tags.mathfit_dimension && tags.mathfit_dimension !== 'Unclear' ? tags.mathfit_dimension : (tags.pain_target || 'AnonPain'),
+    tags.outcome_anchor && tags.outcome_anchor !== 'none' ? tags.outcome_anchor : (tags.production_cue || 'AnonProd'),
     tags.format || 'Unknown',
     tags.three_beat_compliance || 'Non-compliant',
   ].join('::');
@@ -7630,17 +7658,25 @@ function _matchRateForAd(adName, market) {
 // MTD spend headroom. Uses tier-2 tag derivation (Phase A) + month-pace helpers from PR1.
 
 // Plain-English label for a tag tuple. Drops generic values to keep cards readable.
+// Falls back to first-order creative_tags fields (hook_frame, pain_target, production_cue) when
+// tier-2 derivations come up generic — these are populated more reliably for Cuemath's data.
 function _tier2TupleHumanLabel(tags) {
   if (!tags) return 'creative pattern';
   const parts = [];
   if (tags.coach_tenure_signal && tags.coach_tenure_signal !== 'Anonymous') {
     parts.push(tags.coach_tenure_signal.toLowerCase().replace('-', ' ') + ' coach');
+  } else if (tags.hook_frame) {
+    parts.push(tags.hook_frame + ' hook');
   }
   if (tags.mathfit_dimension && tags.mathfit_dimension !== 'Unclear' && tags.mathfit_dimension !== 'Multiple-mixed') {
     parts.push(tags.mathfit_dimension.toLowerCase() + ' dimension');
+  } else if (tags.pain_target) {
+    parts.push(tags.pain_target + ' pain');
   }
   if (tags.outcome_anchor && tags.outcome_anchor !== 'none') {
     parts.push(tags.outcome_anchor + ' outcome');
+  } else if (tags.production_cue) {
+    parts.push(tags.production_cue);
   }
   if (tags.format) {
     parts.push(tags.format);
@@ -7710,26 +7746,26 @@ function _detectCrossMarketOpportunities() {
       _diag.tuplesScanned++;
       const win = tuples[tupleKey];
       if (!win || win.count < _OPPORTUNITY_MIN_WINNERS_PER_TUPLE) { _diag.tooFewWinners++; return; }
-      const t = tupleKey.split('::');
-      const tagObj = {
-        coach_tenure_signal: t[0] || 'Anonymous',
-        mathfit_dimension: t[1] || 'Unclear',
-        outcome_anchor: t[2] || 'none',
-        format: t[3] || 'Unknown',
-        three_beat_compliance: t[4] || 'Non-compliant',
+      // Pull the original tier-2 tags from the first sample ad — the tuple key now mixes
+      // tier-2 + first-order fields so we can't reliably decode tagObj from the key.
+      const _sampleAd = (win.ads && win.ads[0]) || null;
+      const _tier2Cache = (typeof state !== 'undefined' && state && state._tier2TagsByAd) || {};
+      const _sampleTags = _sampleAd ? _tier2Cache[normalizeAdName(_sampleAd.ad_name)] : null;
+      // tagObj used by the card builder for label rendering. Prefer the full sampleTags
+      // (which includes first-order hook_frame/pain_target/production_cue fallbacks) over
+      // the tuple-key decode (which loses field provenance after first-order substitution).
+      const tagObj = _sampleTags || {
+        coach_tenure_signal: 'Anonymous',
+        mathfit_dimension: 'Unclear',
+        outcome_anchor: 'none',
+        format: 'Unknown',
+        three_beat_compliance: 'Non-compliant',
       };
-      // Skip ONLY when every dimension is generic — i.e., no creative differentiator at all.
-      // Loosened 2026-05-10 after diagnostic showed 5 of 6 winning tuples were Anonymous +
-      // Unclear despite having distinct format/outcome/three-beat signals. Cuemath has many
-      // testimonial-style winners that don't explicitly name a coach or claim a MathFit
-      // dimension, but the format + outcome + three-beat IS a defensible pattern worth
-      // recommending across markets.
-      const _allGeneric = tagObj.coach_tenure_signal === 'Anonymous'
-        && tagObj.mathfit_dimension === 'Unclear'
-        && tagObj.outcome_anchor === 'none'
-        && (!tagObj.format || tagObj.format === 'Unknown')
-        && tagObj.three_beat_compliance === 'Non-compliant';
-      if (_allGeneric) { _diag.tooGeneric++; return; }
+      // Skip when the human label can produce nothing useful — i.e., neither tier-2
+      // derivation NOR first-order tags surfaced any signal. With the first-order fallback
+      // (hook_frame, pain_target, production_cue), this is rare.
+      const _label = _tier2TupleHumanLabel(_sampleTags);
+      if (_label === 'creative pattern') { _diag.tooGeneric++; return; }
       const avgCPTD = win.cptdSum / win.count;
       targetMarkets.forEach(tgt => {
         if (tgt === srcMarket) return;
@@ -7740,7 +7776,6 @@ function _detectCrossMarketOpportunities() {
         if (tgtPresenceCount > 0) { _diag.alreadyPresent++; return; }
         const headroom = _diag.headroomByMarket[tgt] != null ? _diag.headroomByMarket[tgt] : _mtdSpendHeadroom(tgt);
         if (headroom <= _OPPORTUNITY_MIN_HEADROOM_INR) { _diag.noHeadroom++; return; }
-        const label = _tier2TupleHumanLabel(tagObj);
         out.push({
           verdict_id: 'meta_opportunity_cross_market',
           action: { type: 'opportunity' },
@@ -7753,8 +7788,8 @@ function _detectCrossMarketOpportunities() {
           winners_in_source: win.count,
           avg_cptd_source: avgCPTD,
           headroom_inr: headroom,
-          label: label,
-          signal: `${label} wins on ${srcMarket} (${win.count} winners, ${formatCurrency(avgCPTD)} avg CPTD)`,
+          label: _label,
+          signal: `${_label} wins on ${srcMarket} (${win.count} winners, ${formatCurrency(avgCPTD)} avg CPTD)`,
           why: `This combination has produced ${win.count} mature winners on ${srcMarket} at ${formatCurrency(avgCPTD)} average cost-per-trial. Has not run on ${tgt}. ${tgt} has ${formatCurrency(headroom)} of spend headroom left this month.`,
         });
         _diag.emitted++;
