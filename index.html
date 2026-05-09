@@ -7679,17 +7679,34 @@ function _nextMondayLabel() {
 }
 
 // Detect cross-market opportunities from the tuple library.
+// Threshold: ≥2 winners share a tuple to call it a pattern. v1 was 3, but Cuemath's tuple
+// density is too low for that — ~30 winners across 8 markets × 5-dim tuple means most tuples
+// are unique. Dropped to 2 on 2026-05-09 after empty-state observed in prod.
+const _OPPORTUNITY_MIN_WINNERS_PER_TUPLE = 2;
+const _OPPORTUNITY_MIN_HEADROOM_INR = 10000;
+
 function _detectCrossMarketOpportunities() {
   const lib = _getTupleLibraries();
-  if (!lib.winners) return [];
+  if (!lib.winners) {
+    console.log('[meta-ai] opportunities: 0 — tuple library not built');
+    return [];
+  }
   const out = [];
+  const _diag = { srcMarkets: 0, tuplesScanned: 0, tooFewWinners: 0, tooGeneric: 0, alreadyPresent: 0, noHeadroom: 0, emitted: 0, headroomByMarket: {} };
   const targetMarkets = (typeof MONTHLY_BUDGET_PLAN !== 'undefined') ? Object.keys(MONTHLY_BUDGET_PLAN) : [];
-  if (!targetMarkets.length) return [];
+  if (!targetMarkets.length) {
+    console.log('[meta-ai] opportunities: 0 — MONTHLY_BUDGET_PLAN empty');
+    return [];
+  }
+  // Pre-compute headroom per target market once (it's the same regardless of source).
+  targetMarkets.forEach(m => { _diag.headroomByMarket[m] = _mtdSpendHeadroom(m); });
   Object.keys(lib.winners).forEach(srcMarket => {
+    _diag.srcMarkets++;
     const tuples = lib.winners[srcMarket];
     Object.keys(tuples).forEach(tupleKey => {
+      _diag.tuplesScanned++;
       const win = tuples[tupleKey];
-      if (!win || win.count < 3) return; // need ≥3 winners to call it a pattern
+      if (!win || win.count < _OPPORTUNITY_MIN_WINNERS_PER_TUPLE) { _diag.tooFewWinners++; return; }
       const t = tupleKey.split('::');
       const tagObj = {
         coach_tenure_signal: t[0] || 'Anonymous',
@@ -7701,7 +7718,7 @@ function _detectCrossMarketOpportunities() {
       // Skip generic / un-tagged patterns — they cluster everything that lacks evidence text.
       // Tightened per code review: any tuple that is BOTH Anonymous coach AND Unclear dimension
       // is too generic to recommend across markets, regardless of outcome_anchor.
-      if (tagObj.coach_tenure_signal === 'Anonymous' && tagObj.mathfit_dimension === 'Unclear') return;
+      if (tagObj.coach_tenure_signal === 'Anonymous' && tagObj.mathfit_dimension === 'Unclear') { _diag.tooGeneric++; return; }
       const avgCPTD = win.cptdSum / win.count;
       targetMarkets.forEach(tgt => {
         if (tgt === srcMarket) return;
@@ -7709,9 +7726,9 @@ function _detectCrossMarketOpportunities() {
         // Avoids the false positive of recommending "test on tgt" when an ad with the same
         // tuple is already running but hasn't matured into a winner yet.
         const tgtPresenceCount = (lib.presence && lib.presence[tgt] && lib.presence[tgt][tupleKey]) || 0;
-        if (tgtPresenceCount > 0) return; // already running there in any state
-        const headroom = _mtdSpendHeadroom(tgt);
-        if (headroom <= 10000) return; // need at least ₹10K headroom
+        if (tgtPresenceCount > 0) { _diag.alreadyPresent++; return; }
+        const headroom = _diag.headroomByMarket[tgt] != null ? _diag.headroomByMarket[tgt] : _mtdSpendHeadroom(tgt);
+        if (headroom <= _OPPORTUNITY_MIN_HEADROOM_INR) { _diag.noHeadroom++; return; }
         const label = _tier2TupleHumanLabel(tagObj);
         out.push({
           verdict_id: 'meta_opportunity_cross_market',
@@ -7729,9 +7746,20 @@ function _detectCrossMarketOpportunities() {
           signal: `${label} wins on ${srcMarket} (${win.count} winners, ${formatCurrency(avgCPTD)} avg CPTD)`,
           why: `This combination has produced ${win.count} mature winners on ${srcMarket} at ${formatCurrency(avgCPTD)} average cost-per-trial. Has not run on ${tgt}. ${tgt} has ${formatCurrency(headroom)} of spend headroom left this month.`,
         });
+        _diag.emitted++;
       });
     });
   });
+  // Diagnostic — printed when we emit zero so the empty state is explainable.
+  if (out.length === 0) {
+    console.log('[meta-ai] opportunities: 0 emitted', _diag);
+    if (_diag.tuplesScanned === 0) console.log('[meta-ai]   → no winning tuples (chassis Scale verdicts produced 0 ads with tier-2 tags)');
+    else if (_diag.tooFewWinners === _diag.tuplesScanned) console.log('[meta-ai]   → all tuples have <' + _OPPORTUNITY_MIN_WINNERS_PER_TUPLE + ' winners (Cuemath tuple density too low — tighten tuple shape or relax threshold)');
+    else if (_diag.tooGeneric > 0 && _diag.tooFewWinners + _diag.tooGeneric === _diag.tuplesScanned) console.log('[meta-ai]   → eligible tuples are all Anonymous + Unclear (no creative pattern strong enough)');
+    else if (_diag.noHeadroom > 0 && _diag.alreadyPresent === 0) console.log('[meta-ai]   → no target markets have headroom > ₹' + _OPPORTUNITY_MIN_HEADROOM_INR + ' this month — every quadrant is over-pace');
+    else if (_diag.alreadyPresent > 0 && _diag.noHeadroom === 0) console.log('[meta-ai]   → every winning tuple is already running on every target market');
+    else console.log('[meta-ai]   → mix of presence + headroom filters; relax one threshold');
+  }
   // Sort biggest opportunities first
   return out.sort((a, b) => (b.headroom_inr || 0) - (a.headroom_inr || 0));
 }
