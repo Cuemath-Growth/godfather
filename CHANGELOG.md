@@ -4,6 +4,64 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Boot performance — sheet parallelism + multi-slot ad-perf cache + merge guard (2026-05-10)
+
+### Why
+Naina logged the boot pipeline and called out five concrete reasons it takes ~3 min: 43-page sequential Supabase pagination, three Sheets pulls in series, two tag tables fetched every boot, a CRM merge that fires twice (once with 0 creatives), and a render pipeline that re-aggregates 43K daily rows ~10× because the same `getAdPerformance` call repeats from Tagger/Sentinel/Funnel paths and the cache only held one slot. Items 1, 3, 4 from her punch list are surgical — shipping those now. Items 2 (localStorage cache for `meta_ad_data`) and 5 (lazy-load `creative_tags_v3`) deferred — see notes below.
+
+### What changed (`index.html`)
+
+**1. Sheets fetches — PLA + India CRM now parallel after BAU** (`:3358+`)
+- Old chain: `fetchSheetData → fetchPLAData → fetchIndiaCRM`, three serial `.then()` calls. PLA and India CRM both read `leadsData` to dedup against, so BAU has to land first; but PLA and India have no dependency on each other.
+- New: `fetchSheetData(...).then(c => Promise.all([fetchPLAData, fetchIndiaCRM]).then(() => c))`. Both PLA + India build their `existingPids` snapshot from `leadsData` up front (`:4670`, `:4811`) before any push, so concurrent appends are safe. The only theoretical risk is a prospectid that appears in BOTH PLA + India CRM — PLA is a global self-serve dump, India CRM is India-specific, overlap is essentially zero. `mergeCRMWithMeta` would dedup it again at `:6360` if it ever happened.
+- Saves roughly the wall time of the slower of `fetchPLAData` / `fetchIndiaCRM` (each ~5-10s for the GET + parse). Expected boot reduction: 5-10s.
+
+**2. `_adPerfCache` + `_dailyCache` — single-slot → Map** (`:5482+`, `:5498+`, `:5733+`, `:5728+`, `:5732+`, `:5739+`, `:5852+`, `:5920+`)
+- Both caches were `{ key, data }` single-slot. Boot renders alternate between `getAdPerformance(null, from, to)` (Dashboard portfolio) and per-market calls (`getAdPerformance('India', from, to)`, `getAdPerformance('US', from, to)`, etc.) from Tagger / Sentinel / Funnel / Insights paths — every per-market call evicted the portfolio cache entry, and vice versa. Net effect: same `(market, from, to)` tuple was recomputed 5+ times per boot.
+- Converted both to `new Map()`. `getAdPerformance` and `getAdPerformanceDaily` now do `cache.get(cacheKey)` / `cache.set(cacheKey, results)`. `invalidateAdPerfCache` and `invalidateDailyCache` use `.clear()`. No call sites changed — the cache is internal.
+- Expected boot reduction: 5-10s (n×aggregation collapses to 1×aggregation per distinct key).
+
+**3. `mergeCRMWithMeta` — early-exit when taggerData empty** (`:6346+`)
+- Four call sites only gate on `leadsData.length` (`:4346`, `:16040`, `:16191`, `:16199`). At boot, `metaAdData` finishes loading before `state.taggerData` hydrates, so the post-load `mergeCRMWithMeta()` runs once with `state.taggerData = []` and logs `CRM merge: N leads, 0 creatives` — pure waste. The same key gets re-merged later when taggerData arrives.
+- Added `if (!state.taggerData || state.taggerData.length === 0) return;` at the top of the function. Idempotency check at `:6354` was already there; this just prevents the leading no-op pass.
+- Expected boot reduction: marginal (the no-op pass is fast), but cleans up the log spam Naina flagged.
+
+### Deferred (not shipped this round)
+
+**Item 2 — `meta_ad_data` localStorage cache.** The diagnosis is right (43-page pagination is the single biggest chunk), but the existing fallback at `:4943` is gated on Supabase failure for a reason: `gf_v2_metaAdData` is intentionally aggregate-only because daily rows for ~43K records exceed the 5-10MB localStorage quota (see comment at `:4571`). A real fix needs IndexedDB (or a slim daily projection limited to last 90 days). That's a separate refactor — flagging for a follow-up session.
+
+**Item 5 — Lazy-load `creative_tags_v3`.** Doable but needs a consumer audit: `state._tagsV3Map` is read by `getV3Tags(adName)` and the Tagger / Insights views, and `_updateTagCoveragePill` references the row count for the header pill. Need to confirm Dashboard verdicts don't depend on it before deferring the load. Flagging for a separate pass.
+
+### Side-effects to watch
+- **Sheet parallelism:** if a prospectid ever appears in BOTH PLA and India CRM, the parallel paths could each push it (each built its dedup set before the other's push). Cross-source overlap is theoretically possible but unobserved. Watch `console.log` for `India CRM: ... raw → N added` and confirm the count matches prior boot logs.
+- **Cache Map:** unbounded — never cleared except by `invalidate*Cache()` calls. With ~6 markets × 2 includeNonLP × 2 flow values × handful of date ranges, max distinct keys per boot ≈ 50, memory cost is small. If a date-input UI starts churning new keys per keystroke, audit and add an LRU cap.
+- **Merge guard:** any caller that previously relied on `mergeCRMWithMeta` running with empty taggerData (to set `_lastKey` early or similar) would now skip. None found — function only mutates `state.taggerData[i]` rows, so a no-op when there are no rows is identity behavior.
+
+---
+
+## Match Engine: tier-2 reads from `creative_tags_v3` (root cause behind 8 days of patches) (2026-05-10)
+
+### Why
+Independent architectural review on May 10 surfaced the root cause behind eight commits of downstream Match Engine patches over May 8–10: **`_deriveTier2Tags` was reading the wrong table the entire time.**
+
+The tier-2 derivation was iterating `state._creativeTagsCache` (rows from the `creative_tags` Supabase table). The columns the regex tables read — `evidence_hook / evidence_close / evidence_pain / hook_frame / pain_target / production_cue / master_frame` — **don't exist on `creative_tags`**. They live on `creative_tags_v3` (loaded into `state._tagsV3Map`). Per `creative-variable-extraction.md:12` and `data-schemas.md:276`, v3 is the canonical source for tier-2 derivation; v2 only carries the closed-enum fields (hook, pain_benefit, emotional_tone, content_format, etc.).
+
+Effect: every regex on every ad matched against an empty string. Every tier-2 entry resolved to `{mathfit: Unclear, coach: Anonymous, three_beat: Non-compliant, outcome: none, format: null, hook_frame: null, pain_target: null, production_cue: null}`. 60 chassis Scale winners collapsed into 1–6 indistinguishable "all-generic" tuples. The all-generic skip then dropped them. Net: zero opportunities.
+
+The eight downstream patches (cache invalidation, threshold drops, generic-filter loosen, first-order tag fallback inside derivation) couldn't surface this because empty-table tier-2 looks identical to sparse-data tier-2.
+
+### What changed (`index.html`)
+- **`_deriveTier2Tags` (`:7480+`)** — now iterates `state._tagsV3Map` (deduped by row reference, since the map dual-indexes raw + lowercase keys). Boot log now reads `[meta-ai] tier-2 tags derived for N ads (from creative_tags_v3)`.
+- **`creative_tags_v3` loader hook (`:15754, :15776`)** — fires `_deriveTier2Tags()` after v3 lands (success path) AND after v3 falls back to localStorage (failure path). The earlier hook in the `creative_tags` loader (`:15146`) still fires but now produces an empty cache because v3 hasn't arrived yet — harmless redundancy; the v3 hook overwrites with the real cache.
+
+### Side-effect to watch
+- **Opportunities accordion will populate IF Cuemath's creative is signaling Tenure / MathFit / Three-beat at threshold.** If it still emits zero after this fix, that's the keystone insight per `feedback_specificity_is_not_a_brand_variable.md` ("<10 of 1,300 ads use Tenure or Memory framing"): Cuemath's creative isn't carrying the moat tags. That's a creative-direction problem, not an engineering problem.
+- **Account collision in `_tier2TagsByAd` keying** — same ad name across accounts collides under `normalizeAdName`. Currently first-match-wins; will surface if creative_tags_v3 has dup names. Fix in follow-up if it bites.
+- **Tuple shape may need to coarsen.** 5-dim tuple expects high uniqueness; if real-data hit-rates are still low, consider collapsing to 2–3 dims (e.g. `coach_tenure_signal::mathfit_dimension::three_beat_compliance`) and dropping `count >= 1`. Defer until we see real per-dim hit rates after this fix lands.
+- **Per-dim QA gate from `creative-variable-extraction.md §1`** still hasn't been run. Recommended next: manual sample on top-100 spend ads to confirm regex hit-rates per dimension before any further Match Engine threshold tuning.
+
+---
+
 ## Dashboard widget cleanup + Refresh fix (2026-05-09)
 
 ### Why

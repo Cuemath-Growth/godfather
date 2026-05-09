@@ -7486,16 +7486,26 @@ function _deriveTier2OneAd(tagRow) {
 }
 
 function _deriveTier2Tags() {
+  // Source is creative_tags_v3 (has evidence_hook/close/pain, hook_frame, master_frame,
+  // close_type, specificity, pain_target — all the fields the regex tables need). The v2
+  // creative_tags table was the WRONG source — it only carries the closed-enum v2 fields
+  // (hook, pain_benefit, emotional_tone, content_format, etc.) and lacks every column tier-2
+  // derivation reads. Architecture review on 2026-05-10 confirmed: 8 commits of downstream
+  // patches couldn't surface the table mistake because empty tier-2 looks identical to
+  // sparse-data tier-2.
   const cache = {};
-  const rows = (typeof state !== 'undefined' && state && Array.isArray(state._creativeTagsCache)) ? state._creativeTagsCache : [];
-  rows.forEach(t => {
-    if (!t || !t.ad_name) return;
+  const map = (typeof state !== 'undefined' && state && state._tagsV3Map) || {};
+  // The map dual-indexes each row under raw + lowercase ad_name; dedupe by row reference.
+  const seenRows = new Set();
+  Object.values(map).forEach(t => {
+    if (!t || !t.ad_name || seenRows.has(t)) return;
+    seenRows.add(t);
     const k = normalizeAdName(t.ad_name);
     if (!k || cache[k]) return; // first-match-wins (dup ad_name across accounts)
     cache[k] = _deriveTier2OneAd(t);
   });
   if (typeof state !== 'undefined' && state) state._tier2TagsByAd = cache;
-  console.log(`[meta-ai] tier-2 tags derived for ${Object.keys(cache).length} ads`);
+  console.log(`[meta-ai] tier-2 tags derived for ${Object.keys(cache).length} ads (from creative_tags_v3)`);
   return cache;
 }
 
@@ -15752,6 +15762,12 @@ state._tagsV3Map = {};
         if (!state._tagsV3Map[lc]) state._tagsV3Map[lc] = r;
       });
       console.log(`creative_tags_v3: ${rows.length} rows loaded`);
+      // Best-in-class Meta-AI tier-2 derivation reads from creative_tags_v3 (NOT creative_tags
+      // — see _deriveTier2Tags comment). Fire derivation after v3 lands; the v2 loader's
+      // earlier call now produces an empty cache because v3 hasn't arrived yet, but this
+      // re-firing populates it correctly. Cache-version key on _META_AI_TUPLE_LIBRARY then
+      // forces the tuple library to rebuild on next opportunity render.
+      try { if (typeof _deriveTier2Tags === 'function') _deriveTier2Tags(); } catch(e) { console.warn('[meta-ai] tier-2 derivation (v3 hook) failed:', e); }
       try {
         localStorage.setItem('gf_creative_tags_v3_backup', JSON.stringify(rows));
         localStorage.setItem('gf_creative_tags_v3_backup_ts', Date.now().toString());
@@ -15772,6 +15788,8 @@ state._tagsV3Map = {};
         });
         const age = Math.round((Date.now() - parseInt(localStorage.getItem('gf_creative_tags_v3_backup_ts') || '0')) / 3600000);
         console.log(`Using backup creative_tags_v3 (${backup.length} rows, ${age}h old)`);
+        // Same tier-2 derivation hook as the success path.
+        try { if (typeof _deriveTier2Tags === 'function') _deriveTier2Tags(); } catch(e3) { console.warn('[meta-ai] tier-2 derivation (v3 backup hook) failed:', e3); }
       }
     } catch(e2) { /* no backup */ }
   }
