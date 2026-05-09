@@ -4,6 +4,40 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Best-in-class Meta-AI PR2 Phase A — tier-2 tag derivation + tuple libraries + match-rate (2026-05-09)
+
+### Why
+PR1 made Pause/Scale/Refresh decisive. PR2 closes the loop — every concept, brief, and unrun creative gets evaluated against the winner library before spend goes out. The keystone insight from May 8: tier-2 creative tags (`mathfit_dimension`, `coach_tenure_signal`, `three_beat_compliance`, `outcome_anchor`) live only in the inline SQL CTE per `02-skills/creative-variable-extraction.md`. They're not stored as live dashboard columns. Phase A unblocks every downstream Match Engine feature (cross-market opportunity, Forge brief diagnostic, don't-ship warning) by deriving them client-side at boot.
+
+### What changed (`index.html`)
+
+**1. Tier-2 tag derivation** (`_deriveTier2OneAd / _deriveTier2Tags :7385+`)
+- Five regex tables mirror the SQL CTE in `creative-variable-extraction.md`: mathfit dimension (Clarity / Application / Confidence / Multiple-mixed / Unclear), coach tenure signal (Tenure-stated / Memory-stated / Name-only / Anonymous), outcome anchor (score-jump / contest-rank / grade-jump / parent-count / none), three-beat compliance (Compliant / Partial / Non-compliant), and format (passed through from existing `master_frame`).
+- Reads `evidence_hook + evidence_close + evidence_pain` per row. First-match-wins for de-duped ad names across accounts.
+- Cached on `state._tier2TagsByAd[normalizeAdName]`. Hooked into the `creative_tags` loader (`:15146+`) so it runs once after Supabase tags arrive.
+
+**2. Tuple libraries** (`_tier2TupleKey / _buildTupleLibraries / _getTupleLibraries :7460+`)
+- Tuple = `coach_tenure_signal::mathfit_dimension::outcome_anchor::format::three_beat_compliance`.
+- Winners come from boot-time chassis Scale verdicts (90-day-mature window correct for winner classification). Losers come from live `_runLivePauseRefresh()` output.
+- Cached for 5 minutes on `_META_AI_TUPLE_LIBRARY`. Per-market structure: `winners[market][tuple] = { ads, cptdSum, count }`.
+
+**3. Match-rate function** (`_computeMatchRate / _matchRateForAd :7510+`)
+- Weighted Jaccard: agreement between concept tags and winners on the same market, weighted by tag importance (`coach_tenure_signal` 1.5× per CD §4, `three_beat_compliance` 1.2× per CD §3, others 1.0× / 0.8×).
+- Returns `{ pct, missing[], matchedAds[], winnerCount }`. Polarity flag selects winner (default) or loser library — same function powers cross-market opportunity (Phase B) and don't-ship warning (Phase C).
+
+**4. Console-debug surface** (`window.metaAI :7565+`)
+- `metaAI.summary()` returns `{ tier2_count, winners: {market: tuple_count}, losers: {market: tuple_count} }` — fast verification that derivation + library are populated.
+- `metaAI.matchRateForAd(adName, market)` runs match-rate against any specific ad. Used for spot-checking before Phase B's verdict layer ships.
+
+### Side-effect to watch
+- **Tier-2 tags are derived from `evidence_*` text only.** Ads without strong evidence text (e.g. ad-name-only entries before tagger v3) score `Unclear / Anonymous / none / Non-compliant` across the board. They cluster into one big "thin tuple" that match-rate against will saturate. Phase B should filter these out of the cross-market opportunity emission.
+- **Match-rate uses tier-2 dimensions only.** It does NOT consider the legacy `hook_frame / pain_target` from `creative_tags`. By design — those are already in the verdict text via `_signal` / `_why`. Adding them to match-rate would double-count.
+- **Loser library refreshes per render** (rebuilds when `_runLivePauseRefresh` re-runs on date change), but the 5-min cache on `_META_AI_TUPLE_LIBRARY` means it lags by up to 5 minutes after a fresh chassis run. Acceptable for Phase A (no UI yet); Phase B should bust the cache when chassis emits new verdicts.
+- **Regex coverage is conservative.** Some real Cuemath copy may not match the patterns (e.g. "tutor for two years" vs "Year 2"). Manual sample audit on top-200 spend ads recommended — same pattern as creative-variable-extraction.md §3 QA gate.
+- **No UI surface in Phase A.** Foundation only. Phase B adds the cross-market opportunity verdict + Opportunities accordion. Phase C adds Forge brief diagnostic + don't-ship warning. Verify Phase A via `window.metaAI.summary()` in console.
+
+---
+
 ## Best-in-class Meta-AI — Tagger Funnel parity (2026-05-09)
 
 ### Why

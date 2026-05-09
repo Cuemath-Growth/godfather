@@ -7378,6 +7378,221 @@ function _adSourceTag(ad) {
   return ad && ad._hasCRM ? '[CRM]' : '[META]';
 }
 
+// ==================== Tier-2 Tag Derivation (Best-in-class Meta-AI PR2 Phase A · 2026-05-09) ====================
+// Derives the 5 tier-2 creative tags (mathfit_dimension, coach_tenure_signal, three_beat_compliance,
+// outcome_anchor, format) from the evidence_hook + evidence_close + evidence_pain text on each
+// creative_tags row. Mirrors the SQL CTE in 02-skills/creative-variable-extraction.md.
+//
+// Why client-side: the SQL CTE only runs in offline analyses (NRI report etc); these dimensions
+// aren't stored as live columns. Re-deriving in JS unblocks the Match Engine without a DDL change.
+// Cost: ~3000 rows × 5 regexes = sub-second at boot. Cached on state._tier2TagsByAd.
+
+const _TIER2_MATHFIT_PATTERNS = {
+  Clarity: /\b(explain|why|understand|concept|common core|rigour|fundamentals|depth)\b/i,
+  Application: /\b(AMC|Math Kangaroo|MATHCOUNTS|olympiad|honors|advanced|accelerat|honors track|placement|honor roll)\b/i,
+  Confidence: /\b(SAT|ACT|AP exam|competition|confidence|hesitant|fear|anxiety|doesn't volunteer|freezes)\b/i,
+};
+const _TIER2_TENURE_TENURE_RE = /\b(year\s*[0-9]+|since\s+(?:grade|year|kindergarten|[0-9])|[0-9]+\s+years\s+with|same coach|long-term coach|still her tutor|still his tutor)\b/i;
+const _TIER2_TENURE_MEMORY_RE = /\b(remembers|knew (?:she|he) was stuck|picked up where|she said last week|he said last week)\b/i;
+const _TIER2_NAMED_COACH_RE = /\b(Aditi|Meghana|Karthik|Reena|Priya|Manasi|Anjali|Sundaran|Akhil|Pooja|Nikita|Shilpa|Rohini|Kiran)\b/i;
+const _TIER2_OUTCOME_PATTERNS = {
+  'score-jump': /\+[0-9]+\s*SAT|\b[0-9]+\s+points\b|score jumped|1500\+|perfect score/i,
+  'contest-rank': /AMC Honor Roll|AMC\s*8\s*winner|Math Kangaroo top|MATHCOUNTS|olympiad qualifier/i,
+  'grade-jump': /two grade levels|[0-9]+\s+grades ahead|advanced to honors|skipped a grade/i,
+  'parent-count': /200,000\+ Students|[0-9]+K?\+\s*parents|[0-9]+K\s+families/i,
+};
+// Destination beat marker (Three-Beat §3): "Building MathFit X. One coach. Class by class." or
+// the "free class" close paired with a coach reference.
+const _TIER2_DEST_BEAT_RE = /MathFit|free class/i;
+
+function _deriveTier2OneAd(tagRow) {
+  if (!tagRow) return null;
+  const ev = ((tagRow.evidence_hook || '') + ' ' + (tagRow.evidence_close || '') + ' ' + (tagRow.evidence_pain || '')).trim();
+  // mathfit_dimension
+  const dims = [];
+  for (const dim in _TIER2_MATHFIT_PATTERNS) {
+    if (_TIER2_MATHFIT_PATTERNS[dim].test(ev)) dims.push(dim);
+  }
+  const mathfit_dimension = dims.length === 0 ? 'Unclear' : (dims.length === 1 ? dims[0] : 'Multiple-mixed');
+  // coach_tenure_signal — order matters: Tenure > Memory > Name-only > Anonymous
+  let coach_tenure_signal = 'Anonymous';
+  if (_TIER2_TENURE_TENURE_RE.test(ev)) coach_tenure_signal = 'Tenure-stated';
+  else if (_TIER2_TENURE_MEMORY_RE.test(ev)) coach_tenure_signal = 'Memory-stated';
+  else if (_TIER2_NAMED_COACH_RE.test(ev)) coach_tenure_signal = 'Name-only';
+  // outcome_anchor — first match wins
+  let outcome_anchor = 'none';
+  for (const anchor in _TIER2_OUTCOME_PATTERNS) {
+    if (_TIER2_OUTCOME_PATTERNS[anchor].test(ev)) { outcome_anchor = anchor; break; }
+  }
+  // three_beat_compliance — Goal in hook, Mechanism via mathfit dim hit, Destination in close
+  const goalBeat = !!(tagRow.evidence_hook && tagRow.evidence_hook.trim().length > 5);
+  const mechBeat = mathfit_dimension !== 'Unclear' && mathfit_dimension !== 'Multiple-mixed';
+  const closeRaw = tagRow.evidence_close || '';
+  const destBeat = _TIER2_DEST_BEAT_RE.test(closeRaw) && (_TIER2_NAMED_COACH_RE.test(closeRaw) || _TIER2_TENURE_TENURE_RE.test(closeRaw));
+  const beatsHit = (goalBeat ? 1 : 0) + (mechBeat ? 1 : 0) + (destBeat ? 1 : 0);
+  const three_beat_compliance = beatsHit >= 3 ? 'Compliant' : (beatsHit === 2 ? 'Partial' : 'Non-compliant');
+  // Format — from existing creative_tags. Closed enum per tagging-rubric.md Field 4.
+  const format = tagRow.master_frame || tagRow.format || null;
+  return { mathfit_dimension, coach_tenure_signal, three_beat_compliance, outcome_anchor, format };
+}
+
+function _deriveTier2Tags() {
+  const cache = {};
+  const rows = (typeof state !== 'undefined' && state && Array.isArray(state._creativeTagsCache)) ? state._creativeTagsCache : [];
+  rows.forEach(t => {
+    if (!t || !t.ad_name) return;
+    const k = normalizeAdName(t.ad_name);
+    if (!k || cache[k]) return; // first-match-wins (dup ad_name across accounts)
+    cache[k] = _deriveTier2OneAd(t);
+  });
+  if (typeof state !== 'undefined' && state) state._tier2TagsByAd = cache;
+  console.log(`[meta-ai] tier-2 tags derived for ${Object.keys(cache).length} ads`);
+  return cache;
+}
+
+// ==================== Tuple Libraries (PR2 Phase A) ====================
+// Winners + losers grouped by tag tuple per market. Used by match-rate, cross-market opportunity
+// (Phase B), and Forge brief diagnostic + don't-ship warning (Phase C).
+
+function _tier2TupleKey(tags) {
+  if (!tags) return '';
+  return [
+    tags.coach_tenure_signal || 'Anonymous',
+    tags.mathfit_dimension || 'Unclear',
+    tags.outcome_anchor || 'none',
+    tags.format || 'Unknown',
+    tags.three_beat_compliance || 'Non-compliant',
+  ].join('::');
+}
+
+const _META_AI_TUPLE_LIBRARY = { winners: null, losers: null, builtAt: 0, builtFromCount: 0 };
+
+function _buildTupleLibraries() {
+  const tier2 = (typeof state !== 'undefined' && state && state._tier2TagsByAd) || _deriveTier2Tags();
+  const winners = {};
+  const losers = {};
+  const _push = (bucket, market, tuple, ad) => {
+    if (!bucket[market]) bucket[market] = {};
+    if (!bucket[market][tuple]) bucket[market][tuple] = { ads: [], cptdSum: 0, count: 0 };
+    bucket[market][tuple].ads.push(ad);
+    if (typeof ad.cptd === 'number') bucket[market][tuple].cptdSum += ad.cptd;
+    bucket[market][tuple].count++;
+  };
+  // Scale winners from the boot-time chassis run (90-day-mature window correct for winners).
+  const run = (typeof state !== 'undefined' && state && state._chassisLastRun) || null;
+  if (run && Array.isArray(run.all)) {
+    run.all.forEach(r => {
+      if (!r || !r.action || r.action.type !== 'scale') return;
+      const k = normalizeAdName(r.entity_id || '');
+      const tags = tier2[k];
+      if (!tags) return;
+      _push(winners, r.market || 'unknown', _tier2TupleKey(tags), {
+        ad_name: r.entity_id,
+        cptd: (r.raw_metrics && r.raw_metrics.cptd) || null,
+      });
+    });
+  }
+  // Losers: live pause verdicts (no date arg = all-time, matches winners' window proxy).
+  const livePause = (typeof _runLivePauseRefresh === 'function') ? _runLivePauseRefresh(null, null) : [];
+  livePause.forEach(r => {
+    if (!r || !r.action || r.action.type !== 'pause') return;
+    const k = normalizeAdName(r.entity_id || '');
+    const tags = tier2[k];
+    if (!tags) return;
+    _push(losers, r.market || 'unknown', _tier2TupleKey(tags), {
+      ad_name: r.entity_id,
+      cptd: (r.raw_metrics && r.raw_metrics.cptd) || null,
+    });
+  });
+  _META_AI_TUPLE_LIBRARY.winners = winners;
+  _META_AI_TUPLE_LIBRARY.losers = losers;
+  _META_AI_TUPLE_LIBRARY.builtAt = Date.now();
+  _META_AI_TUPLE_LIBRARY.builtFromCount = Object.keys(tier2).length;
+  return _META_AI_TUPLE_LIBRARY;
+}
+
+function _getTupleLibraries() {
+  // 5-minute cache. Live-pause feeds in losers — they update on date-picker change too, so the
+  // 5-minute cache strikes a balance between freshness and not rebuilding on every render.
+  if (!_META_AI_TUPLE_LIBRARY.winners || Date.now() - _META_AI_TUPLE_LIBRARY.builtAt > 5 * 60 * 1000) {
+    _buildTupleLibraries();
+  }
+  return _META_AI_TUPLE_LIBRARY;
+}
+
+// ==================== Match-Rate (PR2 Phase A) ====================
+// Returns { pct, missing[], matchedAds[] } — pct is weighted-Jaccard agreement between
+// concept tuple and the centroid of winners/losers on the same market.
+
+const _TIER2_TAG_WEIGHTS = {
+  coach_tenure_signal: 1.5,    // strongest brand-quality signal per CD §4
+  three_beat_compliance: 1.2,  // CD §3 structural rule
+  outcome_anchor: 1.0,
+  mathfit_dimension: 1.0,
+  format: 0.8,
+};
+
+function _computeMatchRate(conceptTags, market, polarity) {
+  const lib = _getTupleLibraries();
+  const bucket = (polarity === 'loser') ? lib.losers : lib.winners;
+  if (!conceptTags || !bucket) return { pct: 0, missing: [], matchedAds: [] };
+  const marketBucket = bucket[market] || {};
+  const allAds = [].concat.apply([], Object.keys(marketBucket).map(t => marketBucket[t].ads));
+  if (!allAds.length) return { pct: 0, missing: [], matchedAds: [] };
+  const tier2 = (typeof state !== 'undefined' && state && state._tier2TagsByAd) || {};
+  const dims = ['coach_tenure_signal', 'mathfit_dimension', 'outcome_anchor', 'format', 'three_beat_compliance'];
+  let totalScore = 0, totalWeight = 0;
+  const dimMatchCounts = {};
+  dims.forEach(d => { dimMatchCounts[d] = 0; });
+  allAds.forEach(ad => {
+    const winnerTags = tier2[normalizeAdName(ad.ad_name)] || {};
+    dims.forEach(d => {
+      const w = _TIER2_TAG_WEIGHTS[d] || 1;
+      totalWeight += w;
+      if (winnerTags[d] && conceptTags[d] && winnerTags[d] === conceptTags[d]) {
+        totalScore += w;
+        dimMatchCounts[d]++;
+      }
+    });
+  });
+  const pct = totalWeight > 0 ? Math.round((totalScore / totalWeight) * 100) : 0;
+  const missing = dims.filter(d => dimMatchCounts[d] < allAds.length * 0.5).map(d => ({
+    dimension: d,
+    concept_value: conceptTags[d] || null,
+  }));
+  return { pct, missing, matchedAds: allAds.slice(0, 10), winnerCount: allAds.length };
+}
+
+// Convenience: compute match-rate for an ad already in the library. Used by Scale cards to show
+// "how typical" the winner's pattern is on its own market — high % = standard winner, low % = unusual.
+function _matchRateForAd(adName, market) {
+  const tier2 = (typeof state !== 'undefined' && state && state._tier2TagsByAd) || {};
+  const tags = tier2[normalizeAdName(adName)];
+  if (!tags) return null;
+  return _computeMatchRate(tags, market, 'winner');
+}
+
+// Console-debug surface: window.metaAI gives Naina + reviewers fast access to the match-engine
+// internals without diving into the file. Ship-only — used for verification, not by the UI.
+if (typeof window !== 'undefined') {
+  window.metaAI = {
+    deriveTier2Tags: () => _deriveTier2Tags(),
+    getTier2: () => (state && state._tier2TagsByAd) || {},
+    buildTupleLibraries: () => _buildTupleLibraries(),
+    getTupleLibraries: () => _getTupleLibraries(),
+    matchRate: _computeMatchRate,
+    matchRateForAd: _matchRateForAd,
+    summary: () => {
+      const t2 = (state && state._tier2TagsByAd) || {};
+      const lib = _getTupleLibraries();
+      const out = { tier2_count: Object.keys(t2).length, winners: {}, losers: {} };
+      Object.keys(lib.winners || {}).forEach(m => { out.winners[m] = Object.keys(lib.winners[m]).length; });
+      Object.keys(lib.losers || {}).forEach(m => { out.losers[m] = Object.keys(lib.losers[m]).length; });
+      return out;
+    },
+  };
+}
+
 // Open-in-Meta deep link. Best-in-class Meta-AI (2026-05-08): one click to navigate to
 // the ad in Ads Manager. Naina explicitly chose deep-link over auto-pause.
 function _metaDeepLink(adId, accountIdOrName) {
@@ -15141,6 +15356,9 @@ state._creativeTagsCache = []; // Will hold all creative_tags rows for tag looku
         if (!state._tagLookup[t.ad_name]) state._tagLookup[t.ad_name] = t;
       });
       console.log(`creative_tags: ${tags.length} rows loaded into tag lookup`);
+      // Best-in-class Meta-AI PR2 Phase A (2026-05-09): derive tier-2 tags now that
+      // creative_tags is loaded. Fast, idempotent, ~3000 rows × 5 regexes.
+      try { if (typeof _deriveTier2Tags === 'function') _deriveTier2Tags(); } catch(e) { console.warn('[meta-ai] tier-2 derivation failed:', e); }
       // Backfill thumbnails from creative_tags into taggerData + _tagMap.
       // stored_thumbnail (permanent Storage URL) ALWAYS wins over c.thumbnail_url
       // because the latter is typically a Meta CDN URL with a 24-48h TTL — once
