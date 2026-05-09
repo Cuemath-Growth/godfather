@@ -7832,6 +7832,21 @@ function _chassisPrepAds(from, to) {
     _campSpendByName[cn] = (_campSpendByName[cn] || 0) + (parseNumber(r['Spent']) || 0);
   });
 
+  // Build a winner-names set from the boot-time chassis Scale verdicts. _classifyWinner needs
+  // the 90-day-mature snapshot to classify, but pause prep doesn't have it — so without this
+  // override every ad's was_top_tier was always false, and the entire Refresh path silently
+  // emitted zero. Bug found 2026-05-09 when refresh count was 0 despite 60 scale winners and
+  // 280 fatigued ads in the data.
+  const _winnerNamesFromChassis = new Set();
+  const _chassisRunForWinners = (typeof state !== 'undefined' && state && state._chassisLastRun) || null;
+  if (_chassisRunForWinners && Array.isArray(_chassisRunForWinners.all)) {
+    _chassisRunForWinners.all.forEach(r => {
+      if (r && r.action && r.action.type === 'scale' && r.entity_id) {
+        _winnerNamesFromChassis.add(normalizeAdName(r.entity_id));
+      }
+    });
+  }
+
   // Best-in-class Meta-AI (2026-05-08): build ad_id + account lookups for Open-in-Meta deep
   // links. metaAdData carries ad_id and _account per (date,ad_id,account) row; first match wins.
   const _adIdByName = {};
@@ -7883,8 +7898,9 @@ function _chassisPrepAds(from, to) {
     const stat = creative ? String(creative.status || '').toUpperCase() : null;
     const is_paused = (stat && _CHASSIS_NOT_SERVING_STATUSES.has(stat)) || !livenessSet.has(key);
 
-    // was_top_tier: was this ad ever a Tier-1/2 winner per existing classifier
-    const was_top_tier = !!_classifyWinner({ market, spend, td, ql, cptd, cptql, mature: null });
+    // was_top_tier: tier-1/2 winner per existing classifier OR present in the boot-time chassis
+    // Scale run (which uses 90-day-mature data the pause prep doesn't have).
+    const was_top_tier = _winnerNamesFromChassis.has(key) || !!_classifyWinner({ market, spend, td, ql, cptd, cptql, mature: null });
 
     // ── Best-in-class Meta-AI gates (2026-05-08) ──
     const _gateAd = { market, spend, td, cptd };
