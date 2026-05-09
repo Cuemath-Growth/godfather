@@ -4,6 +4,41 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Dashboard widget cleanup + Refresh fix (2026-05-09)
+
+### Why
+Naina ran the dashboard against prod after PR2 Phase B and asked two questions: "Is Refresh supposed to be blank?" and "Do we still need other widgets like Deploy or Action Log?" Console diagnostic showed: `{refresh_count: 0, pause_count: 29, scale_count: 60, fatigued_total: 280}` — 60 winners and 280 fatigued ads coexist, but the Refresh path emits zero. And the dashboard was carrying 5 status/stub widgets next to the 4 verdict accordions, diluting the eye.
+
+### What changed (`index.html`)
+
+**1. Refresh fix — `was_top_tier` was always false in pause prep** (`:7430+`)
+- `_chassisPrepAds` was computing `was_top_tier = !!_classifyWinner({mature: null})`. `_classifyWinner` requires the 90-day-mature snapshot to classify. With `mature: null` it always returned null, so `was_top_tier` was effectively always false.
+- Result: every fatigued winner routed to `meta_pause_fatigued_loser` filter chain instead of refresh, then failed the readiness/quiet gate and silently disappeared.
+- Fix: in `_chassisPrepAds`, build a Set of winner ad-names from `state._chassisLastRun.all` (which DOES use mature data). `was_top_tier = chassis_winner_set.has(key) || _classifyWinner({mature: null})`. Chassis takes precedence when both apply.
+- Effect: the boot-time chassis registration of `meta_refresh_fatigued_winner` AND the live `_runLivePauseRefresh` both now correctly classify winners. Expected ~5-20 refresh cards once intersected with the 280 fatigued ads.
+
+**2. Killed: Deploy These** (`:412+`)
+- Pre-Match-Engine stub. Header text said "Library creatives matched to winning audiences" but the body was a permanent placeholder: `"Connect data to unlock"`. The Match Engine (PR2 Phase B Opportunities accordion) does this with real data now — Deploy These was the duplicate.
+- Element kept with `style="display:none"` so existing render code at `:9221+` doesn't null-deref. Revive by removing the style attribute.
+
+**3. Killed: Influencer Scaling** (`:418+`)
+- Placeholder example only. Body literally read `"e.g. 'Creator @mathwithmaya — 12K views, 4.2% ER, 8 enrolments → scale budget'"`. Never wired to real data.
+- Same pattern: `style="display:none"` so render code at `:9294+` doesn't break. Revive by removing the style + wiring to a chassis influencer-scoped scale verdict (Phase D candidate).
+
+**4. Demoted: Action Log** (`:380+`)
+- Wrapped the section in `<details class="oracle-accordion">` so it collapses by default. Historical, not action-owed. Useful for audit; doesn't earn the open-by-default real estate.
+
+**5. Demoted: Market Health** (`:434+`)
+- Same pattern. Wrapped in `<details>`. The "Copy Slack template" button preserved on the summary line with `event.stopPropagation()` so clicking the button doesn't accidentally toggle the accordion.
+
+### Side-effect to watch
+- **Killed widgets are hidden, not deleted.** JS still renders into them (no perf impact at this scale). Code path at `_requiredEls` (`:8829`) still expects the IDs — kept on purpose so the guard doesn't fire false negatives.
+- **Action Log counter still updates** even when collapsed (the `actionLogCounter` span lives inside the `<summary>`).
+- **Market Health Slack-copy button** lives inside the `<summary>` and uses `event.stopPropagation()` to keep the accordion from toggling on click. If clicking the button on a closed accordion accidentally toggles it open, that handler is the place to look.
+- **Dashboard goes from 9 visible sections → 4 verdict accordions + 1 chat + 2 collapsed details.** The eye lands on what owes a decision.
+
+---
+
 ## Best-in-class Meta-AI PR2 Phase B — cross-market opportunity verdict + Opportunities accordion (2026-05-09)
 
 ### Why

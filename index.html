@@ -377,16 +377,17 @@
             <div id="oracleRefreshList" class="mt-2"></div>
           </details>
 
-          <!-- Action Log -->
-          <div class="mb-6">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-surface-tertiary flex items-center justify-center"><svg class="w-3.5 h-3.5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
+          <!-- Action Log — demoted to collapsed <details> 2026-05-09: historical, not action-owed. -->
+          <details class="mb-6 oracle-accordion">
+            <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+              <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <div class="w-6 h-6 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
               <h3 class="text-sm font-bold">Action Log</h3>
               <span id="actionLogCounter" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple"></span>
               <span class="text-[10px] text-text-muted">— track what you've acted on</span>
-            </div>
-            <div id="oracleActionLog" class="space-y-1.5"></div>
-          </div>
+            </summary>
+            <div id="oracleActionLog" class="space-y-1.5 mt-2"></div>
+          </details>
 
           <!-- Section 2: MAKE MORE (accordion) -->
           <details class="mb-6 oracle-accordion" id="oracleMakeMore">
@@ -409,40 +410,35 @@
             <div id="oracleMakeMoreList" class="mt-2"></div>
           </details>
 
-          <!-- Section 3: DEPLOY THESE -->
-          <div class="mb-6" id="oracleDeploy">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-accent-purple flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg></div>
-              <h3 class="text-sm font-bold">Deploy These</h3>
-              <span class="text-[9px] text-accent-purple font-bold px-1.5 py-0.5 rounded bg-accent-purple-light">READY</span>
-              <span class="text-[10px] text-text-muted">— Library creatives matched to winning audiences</span>
-            </div>
-            <div id="oracleDeployList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary flex items-center gap-2"><svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>Connect data to unlock</p></div>
+          <!-- Deploy These — KILLED 2026-05-09. Pre-Match-Engine stub ("Connect data to unlock"),
+               duplicates what Opportunities now does with real data. Element kept (display:none)
+               so existing render code doesn't error; revive by removing the style attribute. -->
+          <div class="mb-6 hidden" id="oracleDeploy" style="display:none">
+            <div id="oracleDeployList"></div>
           </div>
 
-          <!-- Section 4: INFLUENCER SCALING -->
-          <div class="mb-6" id="oracleInfluencer">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-accent-pink flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
-              <h3 class="text-sm font-bold">Influencer Scaling</h3>
-              <span class="text-[10px] text-text-muted">— who to scale, who to pause</span>
-            </div>
-            <div id="oracleInfluencerList"><p class="text-xs text-text-muted italic p-3 rounded-lg bg-surface-secondary">e.g. "Creator @mathwithmaya — 12K views, 4.2% ER, 8 enrolments → scale budget"</p></div>
+          <!-- Influencer Scaling — KILLED 2026-05-09. Placeholder example only, never wired.
+               Element kept hidden so existing render code doesn't error. Revive by removing
+               the style attribute and wiring to chassis influencer-scoped scale verdicts. -->
+          <div class="mb-6 hidden" id="oracleInfluencer" style="display:none">
+            <div id="oracleInfluencerList"></div>
           </div>
 
-          <!-- Section 5: MARKET HEALTH -->
-          <div class="mb-6" id="oracleMarketHealth">
-            <div class="flex items-center gap-2 mb-3">
-              <div class="w-6 h-6 rounded-lg bg-accent-blue flex items-center justify-center"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
+          <!-- Market Health — DEMOTED to collapsed <details> 2026-05-09. Status not action-owed.
+               Useful for the Monday Slack template; doesn't earn the open-by-default real estate. -->
+          <details class="mb-6 oracle-accordion" id="oracleMarketHealth">
+            <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+              <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <div class="w-6 h-6 rounded-lg bg-accent-blue flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></div>
               <h3 class="text-sm font-bold">Market Health</h3>
               <span class="text-[10px] text-text-muted">— per-geo CPTD, conversion, status</span>
-              <button onclick="copyMarketHealthClipboard(this)" class="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold btn-secondary rounded-lg border border-gray-200" title="Copy Monday Slack template">
+              <button onclick="event.preventDefault();event.stopPropagation();copyMarketHealthClipboard(this)" class="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold btn-secondary rounded-lg border border-gray-200" title="Copy Monday Slack template">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 Copy Slack template
               </button>
-            </div>
-            <div id="oracleMarketHealthList"></div>
-          </div>
+            </summary>
+            <div id="oracleMarketHealthList" class="mt-2"></div>
+          </details>
 
           <!-- Hidden compat containers (legacy, kept for JS references) -->
           <div class="hidden"><div id="oracleModule1"></div><div id="oracleModule3"></div><div id="oracleModule4"></div><div id="oracleModule5"></div><div id="oracleModule6"></div><div id="oracleModule7"></div><div id="oracleCMOList"></div><div id="pipelineActive"></div><div id="pipelineForge"></div><div id="pipelineGaps"></div><div id="pipelineGapsList"></div><div id="pipelineUpcomingWindows"></div><div id="briefsGrid"></div></div>
