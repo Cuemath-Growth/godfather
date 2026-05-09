@@ -7903,8 +7903,12 @@ function _metaDeepLink(adId, accountIdOrName) {
       if (match) act = match.id;
     }
   }
+  // Meta's web UI uses just the numeric ID in the `act=` query param. The `act_` prefix is
+  // a Marketing API convention only — passing it in the URL breaks the redirect and Meta
+  // falls back to the user's default account. Strip it.
+  const actNumeric = act.replace(/^act_/, '');
   const parts = ['selected_ad_ids=' + encodeURIComponent(String(adId))];
-  if (act) parts.unshift('act=' + encodeURIComponent(act));
+  if (actNumeric) parts.unshift('act=' + encodeURIComponent(actNumeric));
   return 'https://business.facebook.com/adsmanager/manage/ads?' + parts.join('&');
 }
 
