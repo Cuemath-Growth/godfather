@@ -7546,6 +7546,30 @@ function _buildTupleLibraries() {
     if (typeof ad.cptd === 'number') bucket[market][tuple].cptdSum += ad.cptd;
     bucket[market][tuple].count++;
   };
+  // Single _chassisPrepAds() pass that builds BOTH the ad-info lookup (for winner deep-links)
+  // AND the presence map (for opportunity false-positive prevention). Was two separate passes;
+  // consolidating here halves the prep work.
+  const _adInfoByName = {};
+  if (typeof _chassisPrepAds === 'function') {
+    try {
+      _chassisPrepAds().forEach(a => {
+        if (!a || !a.adName) return;
+        const k = normalizeAdName(a.adName);
+        if (!_adInfoByName[k]) {
+          _adInfoByName[k] = { ad_id: a.ad_id || '', _account: a._account || '' };
+        }
+        if (a.market) {
+          const tags = tier2[k];
+          if (tags) {
+            const tupleKey = _tier2TupleKey(tags);
+            if (!presence[a.market]) presence[a.market] = {};
+            if (!presence[a.market][tupleKey]) presence[a.market][tupleKey] = 0;
+            presence[a.market][tupleKey]++;
+          }
+        }
+      });
+    } catch (e) { console.warn('[meta-ai] prep iteration failed:', e); }
+  }
   // Scale winners from the boot-time chassis run (90-day-mature window correct for winners).
   const run = (typeof state !== 'undefined' && state && state._chassisLastRun) || null;
   if (run && Array.isArray(run.all)) {
@@ -7554,9 +7578,12 @@ function _buildTupleLibraries() {
       const k = normalizeAdName(r.entity_id || '');
       const tags = tier2[k];
       if (!tags) return;
+      const info = _adInfoByName[k] || {};
       _push(winners, r.market || 'unknown', _tier2TupleKey(tags), {
         ad_name: r.entity_id,
         cptd: (r.raw_metrics && r.raw_metrics.cptd) || null,
+        ad_id: info.ad_id || '',
+        _account: info._account || '',
       });
     });
   }
@@ -7572,21 +7599,7 @@ function _buildTupleLibraries() {
       cptd: (r.raw_metrics && r.raw_metrics.cptd) || null,
     });
   });
-  // Presence map: every ad in _chassisPrepAds() with a tier-2 tuple, by (market, tuple).
-  if (typeof _chassisPrepAds === 'function') {
-    try {
-      _chassisPrepAds().forEach(a => {
-        if (!a || !a.adName || !a.market) return;
-        const k = normalizeAdName(a.adName);
-        const tags = tier2[k];
-        if (!tags) return;
-        const tupleKey = _tier2TupleKey(tags);
-        if (!presence[a.market]) presence[a.market] = {};
-        if (!presence[a.market][tupleKey]) presence[a.market][tupleKey] = 0;
-        presence[a.market][tupleKey]++;
-      });
-    } catch (e) { console.warn('[meta-ai] presence map build failed:', e); }
-  }
+  // (Presence map now populated inline above during the same prep iteration.)
   _META_AI_TUPLE_LIBRARY.winners = winners;
   _META_AI_TUPLE_LIBRARY.losers = losers;
   _META_AI_TUPLE_LIBRARY.presence = presence;
@@ -7798,6 +7811,13 @@ function _detectCrossMarketOpportunities() {
           winners_in_source: win.count,
           avg_cptd_source: avgCPTD,
           headroom_inr: headroom,
+          // Top 3 winner ads for the card to render with thumbnails + deep links. Sorted by
+          // CPTD ascending (best winners first) when available.
+          winner_ads: ((win.ads || []).slice().sort((a, b) => {
+            const ac = (a && a.cptd != null) ? a.cptd : Infinity;
+            const bc = (b && b.cptd != null) ? b.cptd : Infinity;
+            return ac - bc;
+          })).slice(0, 3),
           label: _label,
           signal: `${_label} wins on ${srcMarket} (${win.count} winners, ${formatCurrency(avgCPTD)} avg CPTD)`,
           why: `This combination has produced ${win.count} mature winners on ${srcMarket} at ${formatCurrency(avgCPTD)} average cost-per-trial. Has not run on ${tgt}. ${tgt} has ${formatCurrency(headroom)} of spend headroom left this month.`,
@@ -10201,8 +10221,37 @@ function _buildOpportunityCardHtml(o, idx) {
   const driver = `${o.label} wins on ${o.source_market} (${o.winners_in_source} winners, ${formatCurrency(o.avg_cptd_source)} avg CPTD)`;
   const actionByDate = `Test on ${o.market} by ${_nextMondayLabel()} · ${formatCurrency(o.headroom_inr)} headroom.`;
   const whyHtml = o.why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${o.why}</p>` : '';
+
+  // Top winner ads — show the actual creatives that produced this winning pattern. Each row:
+  // [thumb] [ad name truncated] · [CPTD] · Open in Meta ↗. Clicking name copies it; clicking
+  // link opens the ad in Ads Manager. Source: o.winner_ads (top 3 by CPTD asc).
+  const winnerRowsHtml = (Array.isArray(o.winner_ads) ? o.winner_ads : []).map(w => {
+    if (!w || !w.ad_name) return '';
+    const _adName = String(w.ad_name);
+    const _short = _adName.length > 60 ? _adName.slice(0, 60) + '…' : _adName;
+    const _cptd = (typeof w.cptd === 'number' && isFinite(w.cptd)) ? formatCurrency(w.cptd) : '—';
+    const _thumb = (typeof getCreativeThumbnail === 'function') ? getCreativeThumbnail(_adName) : null;
+    const _thumbHtml = _thumb
+      ? `<img src="${_thumb}" class="w-8 h-8 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />`
+      : '<div class="w-8 h-8 rounded bg-surface-tertiary shrink-0"></div>';
+    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account || o.source_market) : '';
+    const _linkHtml = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" class="text-[10px] text-accent-purple hover:underline whitespace-nowrap shrink-0">Open in Meta ↗</a>` : '';
+    return `<div class="flex items-center gap-2 py-1">
+      ${_thumbHtml}
+      <span class="text-[11px] text-text-secondary truncate flex-1 cursor-pointer hover:text-text-primary" title="${_escapeHtml(_adName)}" onclick="navigator.clipboard.writeText('${_adName.replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${_escapeHtml(_short)}</span>
+      <span class="text-[10px] text-text-muted shrink-0">${_cptd} CPTD</span>
+      ${_linkHtml}
+    </div>`;
+  }).join('');
+  const winnersBlock = winnerRowsHtml
+    ? `<div class="mt-2 pt-2 border-t border-purple-100">
+         <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">Top winners on ${_escapeHtml(o.source_market)}</p>
+         ${winnerRowsHtml}
+       </div>`
+    : '';
+
   const detailsHtml = whyHtml
-    ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why · winners</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}</div></details>`
+    ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}</div></details>`
     : '';
   const escId = String(itemId).replace(/'/g, "\\'");
   const escLabel = String(o.label || '').replace(/'/g, "\\'");
@@ -10213,6 +10262,7 @@ function _buildOpportunityCardHtml(o, idx) {
         <p class="text-[11px] text-text-muted">${_escapeHtml(o.source_market)} → ${_escapeHtml(o.market)}</p>
         <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">SHIP</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${_escapeHtml(driver)}</span>. <em>${_escapeHtml(actionByDate)}</em> <span class="text-[10px] text-text-muted ml-1">[CRM]</span></span></p>
         ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action && action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : detailsHtml}
+        ${!isDone ? winnersBlock : ''}
       </div>
     </div>
     ${!isDone ? `<div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1.5">
