@@ -323,6 +323,18 @@
           <!-- Untagged Ads Alert -->
           <div class="mb-4 hidden" id="untaggedAlert"></div>
 
+          <!-- Best-in-class Meta-AI PR2 Phase B: Opportunities (cross-market SHIP recommendations) -->
+          <details class="mb-6 oracle-accordion" id="oracleOpportunities">
+            <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
+              <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+              <div class="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+              <h3 class="text-sm font-bold">Opportunities</h3>
+              <span class="text-[10px] text-purple-500 font-medium hidden sm:inline">Winning patterns untested on markets with budget headroom</span>
+              <span id="opportunitiesBadge" class="text-[10px] text-purple-700 font-bold px-1.5 py-0.5 rounded bg-purple-50"></span>
+            </summary>
+            <div id="oracleOpportunitiesList" class="mt-2"></div>
+          </details>
+
           <!-- Section 1: PAUSE NOW (accordion) -->
           <details class="mb-6 oracle-accordion" id="oraclePause">
             <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
@@ -7392,15 +7404,24 @@ const _TIER2_MATHFIT_PATTERNS = {
   Application: /\b(AMC|Math Kangaroo|MATHCOUNTS|olympiad|honors|advanced|accelerat|honors track|placement|honor roll)\b/i,
   Confidence: /\b(SAT|ACT|AP exam|competition|confidence|hesitant|fear|anxiety|doesn't volunteer|freezes)\b/i,
 };
-const _TIER2_TENURE_TENURE_RE = /\b(year\s*[0-9]+|since\s+(?:grade|year|kindergarten|[0-9])|[0-9]+\s+years\s+with|same coach|long-term coach|still her tutor|still his tutor)\b/i;
+const _TIER2_TENURE_TENURE_RE = /\b(year\s*[0-9]+|since\s+(?:grade|year|kindergarten|[0-9])|[0-9]+\s+years\s+with|(?:her|his)\s+coach\s+for\s+[0-9]+\s+years|same coach|long-term coach|still her tutor|still his tutor)\b/i;
 const _TIER2_TENURE_MEMORY_RE = /\b(remembers|knew (?:she|he) was stuck|picked up where|she said last week|he said last week)\b/i;
-const _TIER2_NAMED_COACH_RE = /\b(Aditi|Meghana|Karthik|Reena|Priya|Manasi|Anjali|Sundaran|Akhil|Pooja|Nikita|Shilpa|Rohini|Kiran)\b/i;
+// Named-coach detection. v1: explicit roster of known coaches (excl. Kiran + Rohini per
+// feedback_exclude_kiran_rohini.md) PLUS a context regex that catches any capitalized
+// first-name preceded by "coach"/"tutor"/"teacher"/"ma'am" — generalises beyond the roster.
+// PR2-Phase-B-followup: derive the roster from CRM/Trial Mastery data instead of hardcoding.
+const _TIER2_NAMED_COACH_RE = /\b(Aditi|Meghana|Karthik|Reena|Priya|Manasi|Anjali|Sundaran|Akhil|Pooja|Nikita|Shilpa)\b|\b(?:coach|tutor|teacher|mentor|ma'am)\s+[A-Z][a-z]+/i;
 const _TIER2_OUTCOME_PATTERNS = {
-  'score-jump': /\+[0-9]+\s*SAT|\b[0-9]+\s+points\b|score jumped|1500\+|perfect score/i,
+  // Tightened: bare "[N] points" was over-firing on within-test deltas. Anchor to "+N points",
+  // "jumped/scored N points", or score-jump phrasing.
+  'score-jump': /\+[0-9]+\s*SAT|\+\s*[0-9]+\s+points|(?:jumped|scored|gained)\s+[0-9]+\s+points|score jumped|1500\+|perfect score/i,
   'contest-rank': /AMC Honor Roll|AMC\s*8\s*winner|Math Kangaroo top|MATHCOUNTS|olympiad qualifier/i,
   'grade-jump': /two grade levels|[0-9]+\s+grades ahead|advanced to honors|skipped a grade/i,
   'parent-count': /200,000\+ Students|[0-9]+K?\+\s*parents|[0-9]+K\s+families/i,
 };
+// Goal-beat keywords for three-beat compliance. Per CD §3, the Goal beat names what the parent
+// wants — grades, competition, foundation. Was: "hook length > 5". Now: explicit keyword check.
+const _TIER2_GOAL_KEYWORDS_RE = /\b(grade|grades|competition|olympiad|AMC|exam|foundation|fundamentals|fall behind|falling behind|catch up|catching up|honors|SAT|ACT|placement|honor roll|behind in|struggling)\b/i;
 // Destination beat marker (Three-Beat §3): "Building MathFit X. One coach. Class by class." or
 // the "free class" close paired with a coach reference.
 const _TIER2_DEST_BEAT_RE = /MathFit|free class/i;
@@ -7424,9 +7445,17 @@ function _deriveTier2OneAd(tagRow) {
   for (const anchor in _TIER2_OUTCOME_PATTERNS) {
     if (_TIER2_OUTCOME_PATTERNS[anchor].test(ev)) { outcome_anchor = anchor; break; }
   }
-  // three_beat_compliance — Goal in hook, Mechanism via mathfit dim hit, Destination in close
-  const goalBeat = !!(tagRow.evidence_hook && tagRow.evidence_hook.trim().length > 5);
-  const mechBeat = mathfit_dimension !== 'Unclear' && mathfit_dimension !== 'Multiple-mixed';
+  // three_beat_compliance — Goal in hook, Mechanism in hook+pain (NOT close — close is for the
+  // Destination beat), Destination in close. Order is enforced by the field-segmentation:
+  // evidence_hook = Goal, evidence_pain = Mechanism's setup, evidence_close = Destination.
+  const goalBeat = _TIER2_GOAL_KEYWORDS_RE.test(tagRow.evidence_hook || '');
+  // Mechanism: re-test the mathfit patterns on hook+pain only, so a destination-only mechanism
+  // doesn't grant the mechanism beat (was a real bug per code review).
+  const mechText = (tagRow.evidence_hook || '') + ' ' + (tagRow.evidence_pain || '');
+  let mechBeat = false;
+  for (const dim in _TIER2_MATHFIT_PATTERNS) {
+    if (_TIER2_MATHFIT_PATTERNS[dim].test(mechText)) { mechBeat = true; break; }
+  }
   const closeRaw = tagRow.evidence_close || '';
   const destBeat = _TIER2_DEST_BEAT_RE.test(closeRaw) && (_TIER2_NAMED_COACH_RE.test(closeRaw) || _TIER2_TENURE_TENURE_RE.test(closeRaw));
   const beatsHit = (goalBeat ? 1 : 0) + (mechBeat ? 1 : 0) + (destBeat ? 1 : 0);
@@ -7465,12 +7494,17 @@ function _tier2TupleKey(tags) {
   ].join('::');
 }
 
-const _META_AI_TUPLE_LIBRARY = { winners: null, losers: null, builtAt: 0, builtFromCount: 0 };
+const _META_AI_TUPLE_LIBRARY = { winners: null, losers: null, presence: null, builtAt: 0, builtFromCount: 0 };
 
 function _buildTupleLibraries() {
   const tier2 = (typeof state !== 'undefined' && state && state._tier2TagsByAd) || _deriveTier2Tags();
   const winners = {};
   const losers = {};
+  // Presence: ANY ad with a tier-2 tuple in a market, regardless of verdict. Used by the
+  // cross-market opportunity detector to avoid recommending "test on market X" when X already
+  // has an ad with that tuple running but not yet classified as a winner. Fixes a real false-
+  // positive caught by code review (PR2 Phase B independent review, May 9 2026).
+  const presence = {};
   const _push = (bucket, market, tuple, ad) => {
     if (!bucket[market]) bucket[market] = {};
     if (!bucket[market][tuple]) bucket[market][tuple] = { ads: [], cptdSum: 0, count: 0 };
@@ -7504,8 +7538,24 @@ function _buildTupleLibraries() {
       cptd: (r.raw_metrics && r.raw_metrics.cptd) || null,
     });
   });
+  // Presence map: every ad in _chassisPrepAds() with a tier-2 tuple, by (market, tuple).
+  if (typeof _chassisPrepAds === 'function') {
+    try {
+      _chassisPrepAds().forEach(a => {
+        if (!a || !a.adName || !a.market) return;
+        const k = normalizeAdName(a.adName);
+        const tags = tier2[k];
+        if (!tags) return;
+        const tupleKey = _tier2TupleKey(tags);
+        if (!presence[a.market]) presence[a.market] = {};
+        if (!presence[a.market][tupleKey]) presence[a.market][tupleKey] = 0;
+        presence[a.market][tupleKey]++;
+      });
+    } catch (e) { console.warn('[meta-ai] presence map build failed:', e); }
+  }
   _META_AI_TUPLE_LIBRARY.winners = winners;
   _META_AI_TUPLE_LIBRARY.losers = losers;
+  _META_AI_TUPLE_LIBRARY.presence = presence;
   _META_AI_TUPLE_LIBRARY.builtAt = Date.now();
   _META_AI_TUPLE_LIBRARY.builtFromCount = Object.keys(tier2).length;
   return _META_AI_TUPLE_LIBRARY;
@@ -7572,6 +7622,120 @@ function _matchRateForAd(adName, market) {
   return _computeMatchRate(tags, market, 'winner');
 }
 
+// ==================== Cross-Market Opportunities (PR2 Phase B · 2026-05-09) ====================
+// SHIP verdicts: winning tag-tuples on one market that have never run on another market with
+// MTD spend headroom. Uses tier-2 tag derivation (Phase A) + month-pace helpers from PR1.
+
+// Plain-English label for a tag tuple. Drops generic values to keep cards readable.
+function _tier2TupleHumanLabel(tags) {
+  if (!tags) return 'creative pattern';
+  const parts = [];
+  if (tags.coach_tenure_signal && tags.coach_tenure_signal !== 'Anonymous') {
+    parts.push(tags.coach_tenure_signal.toLowerCase().replace('-', ' ') + ' coach');
+  }
+  if (tags.mathfit_dimension && tags.mathfit_dimension !== 'Unclear' && tags.mathfit_dimension !== 'Multiple-mixed') {
+    parts.push(tags.mathfit_dimension.toLowerCase() + ' dimension');
+  }
+  if (tags.outcome_anchor && tags.outcome_anchor !== 'none') {
+    parts.push(tags.outcome_anchor + ' outcome');
+  }
+  if (tags.format) {
+    parts.push(tags.format);
+  }
+  if (tags.three_beat_compliance === 'Compliant') {
+    parts.push('three-beat compliant');
+  }
+  return parts.length ? parts.join(' · ') : 'creative pattern';
+}
+
+// MTD spend headroom for a market (₹). Positive = under-pace, room to deploy.
+function _mtdSpendHeadroom(market) {
+  if (!market || market === 'all') return 0;
+  const now = new Date();
+  const ym = now.toISOString().slice(0, 7);
+  const planSpend = (typeof MONTHLY_BUDGET_PLAN !== 'undefined' && MONTHLY_BUDGET_PLAN[market] && MONTHLY_BUDGET_PLAN[market][ym]) || 0;
+  if (!planSpend) return 0;
+  const monthStart = ym + '-01';
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthEnd = ym + '-' + String(daysInMonth).padStart(2, '0');
+  let mtdSpend = 0;
+  if (typeof costData !== 'undefined' && Array.isArray(costData) && typeof filterCostByMarket === 'function') {
+    const rows = filterCostByMarket(costData, market).filter(r => {
+      const d = r.day || ''; return d >= monthStart && d <= monthEnd;
+    });
+    mtdSpend = rows.reduce((s, r) => s + (parseFloat(r.amount_spent) || 0), 0);
+  }
+  const monthFrac = now.getDate() / daysInMonth;
+  const expectedSpend = planSpend * monthFrac;
+  return expectedSpend - mtdSpend; // positive = under-pace, room to deploy this month
+}
+
+// Next-Monday label for action-by-date in opportunity cards.
+function _nextMondayLabel() {
+  const d = new Date();
+  const daysUntilMonday = ((1 - d.getDay() + 7) % 7) || 7; // 0=Sun..6=Sat; Mon=1; if today is Mon, jump 7d
+  d.setDate(d.getDate() + daysUntilMonday);
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// Detect cross-market opportunities from the tuple library.
+function _detectCrossMarketOpportunities() {
+  const lib = _getTupleLibraries();
+  if (!lib.winners) return [];
+  const out = [];
+  const targetMarkets = (typeof MONTHLY_BUDGET_PLAN !== 'undefined') ? Object.keys(MONTHLY_BUDGET_PLAN) : [];
+  if (!targetMarkets.length) return [];
+  Object.keys(lib.winners).forEach(srcMarket => {
+    const tuples = lib.winners[srcMarket];
+    Object.keys(tuples).forEach(tupleKey => {
+      const win = tuples[tupleKey];
+      if (!win || win.count < 3) return; // need ≥3 winners to call it a pattern
+      const t = tupleKey.split('::');
+      const tagObj = {
+        coach_tenure_signal: t[0] || 'Anonymous',
+        mathfit_dimension: t[1] || 'Unclear',
+        outcome_anchor: t[2] || 'none',
+        format: t[3] || 'Unknown',
+        three_beat_compliance: t[4] || 'Non-compliant',
+      };
+      // Skip generic / un-tagged patterns — they cluster everything that lacks evidence text.
+      // Tightened per code review: any tuple that is BOTH Anonymous coach AND Unclear dimension
+      // is too generic to recommend across markets, regardless of outcome_anchor.
+      if (tagObj.coach_tenure_signal === 'Anonymous' && tagObj.mathfit_dimension === 'Unclear') return;
+      const avgCPTD = win.cptdSum / win.count;
+      targetMarkets.forEach(tgt => {
+        if (tgt === srcMarket) return;
+        // Presence check spans ALL ads with this tuple in tgt market (not just winners).
+        // Avoids the false positive of recommending "test on tgt" when an ad with the same
+        // tuple is already running but hasn't matured into a winner yet.
+        const tgtPresenceCount = (lib.presence && lib.presence[tgt] && lib.presence[tgt][tupleKey]) || 0;
+        if (tgtPresenceCount > 0) return; // already running there in any state
+        const headroom = _mtdSpendHeadroom(tgt);
+        if (headroom <= 10000) return; // need at least ₹10K headroom
+        const label = _tier2TupleHumanLabel(tagObj);
+        out.push({
+          verdict_id: 'meta_opportunity_cross_market',
+          action: { type: 'opportunity' },
+          entity_type: 'tuple',
+          entity_id: tupleKey + '@' + tgt,
+          market: tgt,
+          source_market: srcMarket,
+          tuple: tupleKey,
+          tags: tagObj,
+          winners_in_source: win.count,
+          avg_cptd_source: avgCPTD,
+          headroom_inr: headroom,
+          label: label,
+          signal: `${label} wins on ${srcMarket} (${win.count} winners, ${formatCurrency(avgCPTD)} avg CPTD)`,
+          why: `This combination has produced ${win.count} mature winners on ${srcMarket} at ${formatCurrency(avgCPTD)} average cost-per-trial. Has not run on ${tgt}. ${tgt} has ${formatCurrency(headroom)} of spend headroom left this month.`,
+        });
+      });
+    });
+  });
+  // Sort biggest opportunities first
+  return out.sort((a, b) => (b.headroom_inr || 0) - (a.headroom_inr || 0));
+}
+
 // Console-debug surface: window.metaAI gives Naina + reviewers fast access to the match-engine
 // internals without diving into the file. Ship-only — used for verification, not by the UI.
 if (typeof window !== 'undefined') {
@@ -7590,6 +7754,7 @@ if (typeof window !== 'undefined') {
       Object.keys(lib.losers || {}).forEach(m => { out.losers[m] = Object.keys(lib.losers[m]).length; });
       return out;
     },
+    opportunities: () => _detectCrossMarketOpportunities(),
   };
 }
 
@@ -9923,6 +10088,41 @@ function renderUntaggedAlert() {
   </div>`;
 }
 
+// Best-in-class Meta-AI PR2 Phase B (2026-05-09): Opportunity card builder.
+// SHIP cards live in the new "Opportunities" accordion above PAUSE NOW. Each card represents
+// a winning tag-tuple from market_A that hasn't run on market_B (which has spend headroom).
+function _buildOpportunityCardHtml(o, idx) {
+  const itemId = 'opp:' + o.entity_id;
+  const action = (typeof getOracleAction === 'function') ? getOracleAction(itemId) : null;
+  const isDone = action && action.status === 'done';
+  const opacity = isDone ? 'opacity-50' : '';
+  const verdictColor = 'text-purple-700';
+  const cardBg = 'bg-purple-50 border-purple-200';
+  const driver = `${o.label} wins on ${o.source_market} (${o.winners_in_source} winners, ${formatCurrency(o.avg_cptd_source)} avg CPTD)`;
+  const actionByDate = `Test on ${o.market} by ${_nextMondayLabel()} · ${formatCurrency(o.headroom_inr)} headroom.`;
+  const whyHtml = o.why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${o.why}</p>` : '';
+  const detailsHtml = whyHtml
+    ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why · winners</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}</div></details>`
+    : '';
+  const escId = String(itemId).replace(/'/g, "\\'");
+  const escLabel = String(o.label || '').replace(/'/g, "\\'");
+  const dismissActions = (typeof _chassisDismissActions === 'function') ? _chassisDismissActions(o.verdict_id, o.entity_id) : '';
+  return `<div class="p-4 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${_escapeHtml(o.label || '')}">
+    <div class="flex items-start gap-3">
+      <div class="flex-1 min-w-0">
+        <p class="text-[11px] text-text-muted">${_escapeHtml(o.source_market)} → ${_escapeHtml(o.market)}</p>
+        <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">SHIP</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${_escapeHtml(driver)}</span>. <em>${_escapeHtml(actionByDate)}</em> <span class="text-[10px] text-text-muted ml-1">[CRM]</span></span></p>
+        ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action && action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : detailsHtml}
+      </div>
+    </div>
+    ${!isDone ? `<div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-1.5">
+      <button onclick="oracleAction('${escId}','opportunity','done','${escLabel}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
+      <button onclick="oracleAction('${escId}','opportunity','dismissed','${escLabel}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
+      <button onclick="oracleAction('${escId}','opportunity','snoozed','${escLabel}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
+    </div>${dismissActions}` : ''}
+  </div>`;
+}
+
 function renderOracleCardsV2() {
   if (!leadsData.length) {
     const hasCredentials = (localStorage.getItem('gf_sheetUrl') || state.sheetConfig.crmLeadsUrl) && GOOGLE_API_KEY;
@@ -9960,6 +10160,29 @@ function renderOracleCardsV2() {
     const trend = lwQL > 0 && twQL === 0 ? 'declining' : twQL > lwQL * 1.3 ? 'improving' : twQL < lwQL * 0.7 ? 'declining' : 'stable';
     return { twSpend, lwSpend, twQL, lwQL, trend, label: trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : '→' };
   }
+
+  // ── OPPORTUNITIES: cross-market SHIP recommendations (Best-in-class Meta-AI PR2 Phase B) ──
+  try {
+    const oppList = document.getElementById('oracleOpportunitiesList');
+    const oppBadge = document.getElementById('opportunitiesBadge');
+    if (oppList) {
+      const allOpps = (typeof _detectCrossMarketOpportunities === 'function') ? _detectCrossMarketOpportunities() : [];
+      const visible = allOpps
+        .filter(o => !market || market === 'all' || o.market === market)
+        .filter(o => isItemVisible('opp:' + o.entity_id) && !_isChassisDismissed(o.verdict_id, o.entity_id))
+        .slice(0, 10);
+      if (visible.length) {
+        let html = '<div class="space-y-2">';
+        visible.forEach((o, idx) => { html += _buildOpportunityCardHtml(o, idx); });
+        html += '</div>';
+        oppList.innerHTML = html;
+        if (oppBadge) oppBadge.textContent = `${visible.length} opportunit${visible.length === 1 ? 'y' : 'ies'}`;
+      } else {
+        oppList.innerHTML = '<p class="text-xs text-text-muted py-3">No cross-market opportunities right now — all winning patterns already running on every viable market, or no spend headroom available this month.</p>';
+        if (oppBadge) oppBadge.textContent = '';
+      }
+    }
+  } catch (e) { console.warn('[meta-ai] opportunities render failed:', e); }
 
   // ── PAUSE NOW: CPTQL > 2x market avg — flag inefficient ads ──
   // Respect user's date selection — no artificial widening

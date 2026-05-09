@@ -4,6 +4,43 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Best-in-class Meta-AI PR2 Phase B — cross-market opportunity verdict + Opportunities accordion (2026-05-09)
+
+### Why
+Phase A built the tuple library + match-rate; Phase B turns it into the first user-visible Match Engine output. SHIP cards surface winning tag-tuples on one market that haven't been tested on another market with positive MTD spend headroom. This is the "ship X on Y" verdict from the May 8 Match Engine memory — the keystone insight that makes Godfather feel like Meta's AI assistant rather than an ops dashboard.
+
+### What changed (`index.html`)
+
+**1. Helpers** (`:7610–7700`)
+- `_tier2TupleHumanLabel(tags)` — plain-English label for a tuple, dropping generic values (`Anonymous`, `Unclear`, `none`, `Non-compliant`).
+- `_mtdSpendHeadroom(market)` — returns ₹ headroom = `planSpend × (days elapsed ÷ days in month) − mtdSpend`. Mirrors `_renderBudgetPace` (`:10985`).
+- `_nextMondayLabel()` — `"Mon May 12"` style string for action-by-date.
+- `_detectCrossMarketOpportunities()` — iterates winner tuples per market, for each `(srcMarket, tuple)` with `count ≥ 3` checks every market in `MONTHLY_BUDGET_PLAN` for zero-presence + headroom > ₹10K. Skips tuples that are both `Anonymous` coach AND `Unclear` dimension (too generic). Returns chassis-shaped objects with `verdict_id: 'meta_opportunity_cross_market'`, `action.type: 'opportunity'`. Sorted by headroom (largest opportunities first).
+
+**2. Presence map in `_buildTupleLibraries`** (`:7530+`)
+- Phase A built `winners` + `losers`. Phase B adds `presence` — every ad with a tier-2 tuple by `(market, tuple)`, regardless of verdict. Used by `_detectCrossMarketOpportunities` so we don't recommend "test on market X" when an ad with the same tuple is already running there but hasn't matured into a Scale winner. (Caught by independent code review before ship.)
+
+**3. Opportunities accordion** (`HTML :326+`, `card builder :10068+`, `render block :10122+`)
+- New `<details id="oracleOpportunities">` accordion ABOVE Pause Now. Purple icon + badge.
+- `_buildOpportunityCardHtml(o, idx)` — top-level function. Card text: `SHIP — {label} wins on {srcMarket} ({N} winners, {avgCPTD} avg CPTD). Test on {tgtMarket} by {Mon Date} · ₹{X} headroom. [CRM]`. Standard Done/Dismiss/Snooze buttons + chassis dismissal store.
+- Render block in `renderOracleCardsV2` runs at the start of the Pause section (before the existing pause render). Wrapped in try/catch so a failure can never break Pause/Refresh/MakeMore.
+- Cap: 10 visible cards (matches the existing Pause cap pattern). Market filter respected.
+
+**4. Code-review fixes (4 ship blockers caught and fixed before push)**
+- `outcome_anchor.score-jump` regex was over-firing on within-test deltas like "from 30 points to 50 points". Tightened to `\+\s*[0-9]+\s+points|jumped\s+[0-9]+\s+points|scored\s+[0-9]+\s+points`. (Line 7414.)
+- Hardcoded coach-name list included `Kiran` + `Rohini` — directly violates `feedback_exclude_kiran_rohini.md`. Removed both. Also added a context-regex `\b(?:coach|tutor|teacher|mentor|ma'am)\s+[A-Z][a-z]+` so any name in coaching context counts as `Name-only`, not just the explicit roster.
+- `coach_tenure_signal.Tenure-stated` regex missed `"her coach for [N] years"` / `"his coach for [N] years"` phrasing. Added.
+- Three-beat compliance: goal-beat was `evidence_hook.length > 5` (any non-empty hook passed). Now requires goal keywords (`grade / competition / olympiad / AMC / exam / foundation / SAT / ACT / placement / honor roll / etc`). Mechanism-beat was computed on the joined hook+pain+close text — meaning a destination-only mechanism scored Mechanism. Now mechanism is computed on hook+pain only, enforcing the §3 ordering proxy.
+
+### Side-effect to watch
+- **Opportunity cards depend on tier-2 derivation having run.** `_deriveTier2Tags` runs once at boot inside the `creative_tags` loader. If `creative_tags` is empty (Supabase down + no localStorage backup), `_chassisPrepAds` still works but Opportunities will render the empty-state message. That's the right fallback.
+- **Presence map iterates every prep ad on every library rebuild** (5-min cache). For ~3000 ads this is sub-second. If perf becomes an issue, key the cache on `metaAdData.length + state._creativeTagsCache.length` so it busts cleanly on data refresh.
+- **Coach-name detection still has a hand-curated roster** of 12 names. PR2-Phase-B-followup should pull the real coach roster from CRM / Trial Mastery (tracked, not blocking). Name-only attribution will under-fire for unlisted coaches without the context-regex fallback.
+- **Cross-market opportunities filter the date picker** the same way Pause/Refresh do (market filter respected, no date filter on the verdict itself — opportunities are inherently month-pace driven via `_mtdSpendHeadroom`).
+- **Defers carried into Phase C**: (1) Loser library still uses `_runLivePauseRefresh(null, null)` = all-time, plan called for 30-day window — fix when match-rate ships against losers. (2) Tuple library 5-min cache vs live-pause re-runs — losers can lag visible Pause cards by up to 5 min. Acceptable; Phase C should bust the cache when chassis emits new verdicts.
+
+---
+
 ## Best-in-class Meta-AI PR2 Phase A — tier-2 tag derivation + tuple libraries + match-rate (2026-05-09)
 
 ### Why
