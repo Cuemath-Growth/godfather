@@ -7239,12 +7239,14 @@ function formatCurrency(val) {
 //   meta_pause_spam             — >25% invalid lead rate (Pause Now Signal 5)
 //   meta_pause_fatigued_loser   — Stage-2/3 fatigue, non-winner (Pause Now Signal 6 / loser)
 //   meta_refresh_fatigued_winner — Stage-2/3 fatigue, was Tier-1/2 winner → refresh, not kill
-// All Pause verdicts register: cohort_matured, volume_floor, historical_winner_check,
-// not_recently_dismissed. The Refresh-winner verdict OMITS historical_winner_check (would
-// self-block past winners). See feedback_cohort_maturity, feedback_business_context.
+// All Pause verdicts register: historical_winner_check + not_recently_dismissed. The
+// Refresh-winner verdict OMITS historical_winner_check (would self-block past winners).
+// As of 2026-05-08 the cohort_matured and volume_floor guardrails are replaced by an
+// `is_ready_to_judge` filter at the front of every detect() — see _isReadyToJudge.
 
-// Volume floors mirror VERDICT_SPEND_FLOOR + the chassis volume_floor guardrail.
-// Used here for the scoreConfidence threshold (CONFIDENT iff spend ≥ 2× floor AND cohort ≥ 21d).
+// Legacy volume floors — kept for reference. Active confidence scoring now rides on
+// 2× target_cptd (see _chassisPauseConfidence). _CHASSIS_VOLUME_FLOORS_INR may still be
+// referenced by older code paths; do not delete without grep first.
 const _CHASSIS_VOLUME_FLOORS_INR = { US: 15000, India: 3000, AUS: 8000, APAC: 8000, MEA: 5000, UK: 10000, EU: 10000, ROW: 5000 };
 const _CHASSIS_NOT_SERVING_STATUSES = new Set([
   'PAUSED', 'CAMPAIGN_PAUSED', 'ADSET_PAUSED',
@@ -7253,10 +7255,155 @@ const _CHASSIS_NOT_SERVING_STATUSES = new Set([
   'IN_PROCESS'
 ]);
 
+// ==================== Best-in-class Meta-AI gates (2026-05-08) ====================
+// Plan: ~/.claude/plans/e-g-tenure-stated-demo-enumerated-hare.md
+// Replaces calendar maturity (cohort_matured ≥14d) and chassis volume_floor with a single
+// spend-readiness rule: an ad is ready to judge when its spend ≥ 3× target cost-per-trial,
+// or whenever it has ≥1 actual trial. Adds quiet-ad filter (the boring middle 60%) and
+// month-pace conditioning (over_under / under_under / under_over / over_over) so verdict
+// thresholds shift with where the month is sitting against MONTHLY_BUDGET_PLAN.
+
+const _META_AI_SPEND_READINESS_MULTIPLIER = 3;     // spend ≥ 3× target_cptd → ready to judge
+const _META_AI_QUIET_SPEND_PCT = 0.01;             // < 1% of campaign spend
+const _META_AI_QUIET_CPTD_TOL = 0.15;              // CPTD within ±15% of target
+const _META_AI_MONTH_PACE_TOL = 0.10;              // ±10% of pace = "on track"
+
+// Per-quadrant pause-threshold multiplier. <1 = tighter pause (cut losers harder); >1 = looser.
+const _META_AI_PAUSE_MULT = {
+  over_under: 0.66,    // overspending + underdelivering → cut losers harder
+  under_under: 1.33,   // underspending + underdelivering → keep volume
+  under_over: 1.0,     // efficient, behind on spend → standard
+  over_over: 1.0,      // cruise → standard
+};
+// Per-quadrant scale-step recommendation surfaced in card text.
+const _META_AI_SCALE_STEP = {
+  over_under: '+10%',
+  under_under: '+20%',
+  under_over: '+30%',  // efficient + behind on spend → push more
+  over_over: '+20%',
+};
+
+function _getTargetCPTD(market) {
+  const th = SENTINEL_THRESHOLDS[market] || SENTINEL_THRESHOLDS['US'];
+  return (th && th.cptd && th.cptd.green) || 35000;
+}
+
+// Spend-readiness: ad is decidable if it has any trial OR has spent 3× target CPTD.
+// "td > 0" handles winners on small spend; "spend ≥ 3× target" handles losers on big spend.
+function _isReadyToJudge(ad) {
+  if (!ad) return false;
+  if ((ad.td || 0) > 0) return true;
+  const target = _getTargetCPTD(ad.market);
+  return (ad.spend || 0) >= _META_AI_SPEND_READINESS_MULTIPLIER * target;
+}
+
+// Quiet-ad: thin slice of campaign + near-target CPTD = doesn't deserve a verdict slot.
+function _isQuiet(ad, campaignSpend) {
+  if (!ad || !campaignSpend || campaignSpend <= 0) return false;
+  const pct = (ad.spend || 0) / campaignSpend;
+  if (pct >= _META_AI_QUIET_SPEND_PCT) return false;
+  if (ad.cptd == null) return false;
+  const target = _getTargetCPTD(ad.market);
+  const tol = Math.abs(ad.cptd - target) / target;
+  return tol <= _META_AI_QUIET_CPTD_TOL;
+}
+
+// Month-pace quadrant: combines spend-pace + trial-pace against MONTHLY_BUDGET_PLAN.
+// Trial target is derived as planSpend ÷ target_cptd. Cached per market per day.
+const _META_AI_PACE_CACHE = {};
+function _computeMonthPaceQuadrant(market) {
+  if (!market || market === 'all') return 'over_over';
+  const now = new Date();
+  const ym = now.toISOString().slice(0, 7);
+  const dayStr = now.toISOString().slice(0, 10);
+  // Cache key includes data-version proxies (leadsData.length + costData.length) so
+  // the cache busts when CRM/cost data refreshes mid-session.
+  const _leadsLen = (typeof leadsData !== 'undefined' && Array.isArray(leadsData)) ? leadsData.length : 0;
+  const _costLen = (typeof costData !== 'undefined' && Array.isArray(costData)) ? costData.length : 0;
+  const cacheKey = market + ':' + dayStr + ':' + _leadsLen + ':' + _costLen;
+  if (_META_AI_PACE_CACHE[cacheKey]) return _META_AI_PACE_CACHE[cacheKey];
+  const planSpend = (typeof MONTHLY_BUDGET_PLAN !== 'undefined' && MONTHLY_BUDGET_PLAN[market] && MONTHLY_BUDGET_PLAN[market][ym]) || 0;
+  if (!planSpend) { _META_AI_PACE_CACHE[cacheKey] = 'over_over'; return 'over_over'; }
+  const targetCPTD = _getTargetCPTD(market);
+  const planTDs = planSpend / targetCPTD;
+  const monthStart = ym + '-01';
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthEnd = ym + '-' + String(daysInMonth).padStart(2, '0');
+  let mtdSpend = 0;
+  if (typeof costData !== 'undefined' && Array.isArray(costData) && typeof filterCostByMarket === 'function') {
+    const rows = filterCostByMarket(costData, market).filter(r => {
+      const d = r.day || ''; return d >= monthStart && d <= monthEnd;
+    });
+    mtdSpend = rows.reduce((s, r) => s + (parseFloat(r.amount_spent) || 0), 0);
+  }
+  // MTD trials: filter CRM leads to this market, then keep rows with a real trial-done
+  // event in the current month. Mirrors the pattern used by getTD_snapshot at :5306.
+  // BUG FIX 2026-05-08: previously checked l._market (which CRM rows don't have) — that
+  // silently let every market's quadrant read the global trial count. Now uses the
+  // canonical filterLeadsByMarket helper + the trials_done='1' flag.
+  let mtdTds = 0;
+  if (typeof leadsData !== 'undefined' && Array.isArray(leadsData) && typeof filterLeadsByMarket === 'function') {
+    mtdTds = filterLeadsByMarket(leadsData, market).filter(l => {
+      if (String(l.trials_done) !== '1') return false;
+      const td = l.trial_done_date || '';
+      if (!td || String(td).length < 10) return false;
+      const d = String(td).slice(0, 10);
+      return d >= monthStart && d <= monthEnd;
+    }).length;
+  }
+  const monthPct = now.getDate() / daysInMonth;
+  const spendPct = planSpend > 0 ? mtdSpend / planSpend : 0;
+  const tdPct = planTDs > 0 ? mtdTds / planTDs : 0;
+  const tol = _META_AI_MONTH_PACE_TOL;
+  const spendAhead = spendPct > monthPct + tol;
+  const spendBehind = spendPct < monthPct - tol;
+  const tdAhead = tdPct > monthPct + tol;
+  const tdBehind = tdPct < monthPct - tol;
+  let q;
+  if (spendAhead && tdBehind) q = 'over_under';
+  else if (spendBehind && tdBehind) q = 'under_under';
+  else if (spendBehind && tdAhead) q = 'under_over';
+  else q = 'over_over';
+  _META_AI_PACE_CACHE[cacheKey] = q;
+  return q;
+}
+
+function _pauseMultiplier(market) {
+  return _META_AI_PAUSE_MULT[_computeMonthPaceQuadrant(market)] || 1.0;
+}
+function _scaleStepLabel(market) {
+  return _META_AI_SCALE_STEP[_computeMonthPaceQuadrant(market)] || '+20%';
+}
+function _adSourceTag(ad) {
+  return ad && ad._hasCRM ? '[CRM]' : '[META]';
+}
+
+// Open-in-Meta deep link. Best-in-class Meta-AI (2026-05-08): one click to navigate to
+// the ad in Ads Manager. Naina explicitly chose deep-link over auto-pause.
+function _metaDeepLink(adId, accountIdOrName) {
+  if (!adId) return '';
+  let act = '';
+  if (accountIdOrName) {
+    if (/^act_/.test(accountIdOrName)) act = accountIdOrName;
+    else if (typeof META_AD_ACCOUNTS !== 'undefined' && Array.isArray(META_AD_ACCOUNTS)) {
+      const match = META_AD_ACCOUNTS.find(a => a.name === accountIdOrName || a.market === accountIdOrName);
+      if (match) act = match.id;
+    }
+  }
+  const parts = ['selected_ad_ids=' + encodeURIComponent(String(adId))];
+  if (act) parts.unshift('act=' + encodeURIComponent(act));
+  return 'https://business.facebook.com/adsmanager/manage/ads?' + parts.join('&');
+}
+
 // Builds the prepared-ad list once per detect() call. Returns ads enriched with
-// cohort_age_days, was_top_tier, is_paused so verdicts can filter cleanly.
-function _chassisPrepAds() {
-  const rawPerf = (typeof getAdPerformance === 'function') ? getAdPerformance(null, null, null) : [];
+// cohort_age_days, was_top_tier, is_paused, plus the new Meta-AI gates: is_ready_to_judge,
+// is_quiet, month_pace_quadrant, target_cptd, campaign_total_spend, _hasCRM.
+//
+// Date range (from, to) is optional. When omitted (chassis boot detection) it pulls
+// all-time. When provided (live render path 2026-05-08), it scopes rawPerf to the user's
+// current date filter so Pause/Refresh verdicts respect the date picker.
+function _chassisPrepAds(from, to) {
+  const rawPerf = (typeof getAdPerformance === 'function') ? getAdPerformance(null, from || null, to || null) : [];
   const todayMs = Date.now();
   const sevenAgoStr = new Date(todayMs - 7 * 86400000).toISOString().slice(0, 10);
   const todayStr = new Date(todayMs).toISOString().slice(0, 10);
@@ -7270,9 +7417,30 @@ function _chassisPrepAds() {
   const creativeByName = new Map();
   (Array.isArray(metaCreatives) ? metaCreatives : []).forEach(c => creativeByName.set(normalizeAdName(c.name), c));
 
+  // Campaign-total-spend map for quiet-ad detection (Change 1B).
+  const _campSpendByName = {};
+  rawPerf.forEach(r => {
+    const cn = r['Campaign name'] || '';
+    _campSpendByName[cn] = (_campSpendByName[cn] || 0) + (parseNumber(r['Spent']) || 0);
+  });
+
+  // Best-in-class Meta-AI (2026-05-08): build ad_id + account lookups for Open-in-Meta deep
+  // links. metaAdData carries ad_id and _account per (date,ad_id,account) row; first match wins.
+  const _adIdByName = {};
+  const _accountByAdName = {};
+  if (typeof metaAdData !== 'undefined' && Array.isArray(metaAdData)) {
+    metaAdData.forEach(r => {
+      if (!r || !r.ad_id || !r.ad_name) return;
+      const k = normalizeAdName(r.ad_name);
+      if (k && !_adIdByName[k]) _adIdByName[k] = String(r.ad_id);
+      if (k && r._account && !_accountByAdName[k]) _accountByAdName[k] = r._account;
+    });
+  }
+
   return rawPerf.map(r => {
     const adName = r['Ad name'] || '';
     const campaignName = r['Campaign name'] || '';
+    const adSetName = r['Ad set name'] || r['ad set name'] || '';
     const key = normalizeAdName(adName);
     const market = r._market || 'US';
     const spend = parseNumber(r['Spent']) || 0;
@@ -7283,6 +7451,9 @@ function _chassisPrepAds() {
     const nri = parseNumber(r['NRI']) || 0;
     const cptql = parseNumber(r['CPTQL']) || null;
     const cptd = parseNumber(r['CPTD']) || null;
+    const _hasCRM = r._hasCRM === true || r._hasCRM === 'true';
+    const ad_id = _adIdByName[key] || '';
+    const _account = _accountByAdName[key] || '';
 
     // Audience + invalid-rate fields — mirror legacy Pause Now mapping at index.html:9098-9102
     const nriPct = (parseNumber(r['NRI%']) || 0) / 100;
@@ -7290,7 +7461,7 @@ function _chassisPrepAds() {
     const invalid = invalidPct * (ql + td);
     const totalLeads = ql + (invalidPct > 0 ? Math.round(ql / (1 - invalidPct)) - ql : 0);
 
-    // cohort_age_days — read _date or DDMMYY suffix in ad name
+    // cohort_age_days — read _date or DDMMYY suffix in ad name (kept for severity scoring + display)
     let dateStr = r['_date'] || null;
     if (!dateStr) {
       const m = adName.match(/(\d{6})$/);
@@ -7307,12 +7478,24 @@ function _chassisPrepAds() {
     // was_top_tier: was this ad ever a Tier-1/2 winner per existing classifier
     const was_top_tier = !!_classifyWinner({ market, spend, td, ql, cptd, cptql, mature: null });
 
+    // ── Best-in-class Meta-AI gates (2026-05-08) ──
+    const _gateAd = { market, spend, td, cptd };
+    const campaign_total_spend = _campSpendByName[campaignName] || 0;
+    const is_ready_to_judge = _isReadyToJudge(_gateAd);
+    const is_quiet = _isQuiet(_gateAd, campaign_total_spend);
+    const month_pace_quadrant = _computeMonthPaceQuadrant(market);
+    const target_cptd = _getTargetCPTD(market);
+
     return {
-      adName, campaignName, market,
+      adName, campaignName, adSetName, market,
       spend, ql, tql, td, ts, nri,
       nriPct, invalid, invalidPct, totalLeads,
       cptql, cptd,
-      cohort_age_days, was_top_tier, is_paused
+      cohort_age_days, was_top_tier, is_paused,
+      _hasCRM,
+      // Best-in-class Meta-AI fields:
+      ad_id, _account,
+      campaign_total_spend, is_ready_to_judge, is_quiet, month_pace_quadrant, target_cptd,
     };
   });
 }
@@ -7324,9 +7507,12 @@ function _chassisPauseSeverity(signal) {
 }
 
 function _chassisPauseConfidence(signal, ci) {
-  // CONFIDENT iff cohort ≥ 21d AND spend ≥ 2× per-market volume floor.
-  const floor = _CHASSIS_VOLUME_FLOORS_INR[signal.market] || 15000;
-  return (signal.cohort_age_days >= 21 && signal.spend >= floor * 2)
+  // Best-in-class Meta-AI (2026-05-08): confidence rides on spend-readiness, not days.
+  // CONFIDENT iff spend ≥ 2× target_cptd (well past the 1× readiness gate, with room for noise).
+  // LIKELY when spend is at the readiness floor (1× to 2× target).
+  const target = _getTargetCPTD(signal.market);
+  const spend = signal.spend || 0;
+  return spend >= 2 * _META_AI_SPEND_READINESS_MULTIPLIER * target
     ? ci.CONFIDENCE.CONFIDENT
     : ci.CONFIDENCE.LIKELY;
 }
@@ -7339,9 +7525,10 @@ function registerMetaPauseVerdicts(ci) {
     channel: 'meta',
     detect: () => {
       return _chassisPrepAds()
+        .filter(a => a.is_ready_to_judge && !a.is_quiet)
         .filter(a => !a.is_paused && a.tql >= 5 && a.cptql)
         .filter(a => {
-          const amber = (SENTINEL_THRESHOLDS[a.market] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000;
+          const amber = ((SENTINEL_THRESHOLDS[a.market] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000) * _pauseMultiplier(a.market);
           return a.cptql > amber;
         })
         .map(a => {
@@ -7363,7 +7550,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreSeverity: _chassisPauseSeverity,
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
-    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    guardrails: ['historical_winner_check', 'not_recently_dismissed'],
     action: { label: 'Pause Ad', type: 'pause' },
   });
 
@@ -7374,6 +7561,7 @@ function registerMetaPauseVerdicts(ci) {
     channel: 'meta',
     detect: () => {
       return _chassisPrepAds()
+        .filter(a => a.is_ready_to_judge && !a.is_quiet)
         .filter(a => !a.is_paused && a.spend >= 20000 && a.ql >= 15 && a.td === 0)
         .map(a => {
           const why = a.ts === 0
@@ -7395,7 +7583,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreSeverity: _chassisPauseSeverity,
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
-    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    guardrails: ['historical_winner_check', 'not_recently_dismissed'],
     action: { label: 'Pause Ad', type: 'pause' },
   });
 
@@ -7407,6 +7595,7 @@ function registerMetaPauseVerdicts(ci) {
     channel: 'meta',
     detect: () => {
       return _chassisPrepAds()
+        .filter(a => a.is_ready_to_judge && !a.is_quiet)
         .filter(a => !a.is_paused && a.spend >= 15000 && a.ql === 0)
         .map(a => {
           return {
@@ -7425,7 +7614,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreSeverity: _chassisPauseSeverity,
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
-    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    guardrails: ['historical_winner_check', 'not_recently_dismissed'],
     action: { label: 'Pause Ad', type: 'pause' },
   });
 
@@ -7438,6 +7627,7 @@ function registerMetaPauseVerdicts(ci) {
     channel: 'meta',
     detect: () => {
       return _chassisPrepAds()
+        .filter(a => a.is_ready_to_judge && !a.is_quiet)
         .filter(a => !a.is_paused
           && a.market === 'US'
           && !_isPLACampaignName(a.campaignName)
@@ -7462,7 +7652,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreSeverity: _chassisPauseSeverity,
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
-    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    guardrails: ['historical_winner_check', 'not_recently_dismissed'],
     action: { label: 'Pause Ad', type: 'pause' },
   });
 
@@ -7474,10 +7664,11 @@ function registerMetaPauseVerdicts(ci) {
     channel: 'meta',
     detect: () => {
       return _chassisPrepAds()
+        .filter(a => a.is_ready_to_judge && !a.is_quiet)
         .filter(a => !a.is_paused
           && a.spend >= 10000
           && a.totalLeads >= 20
-          && a.invalidPct > 0.25)
+          && a.invalidPct > 0.25 * _pauseMultiplier(a.market))
         .map(a => {
           const invalidPctLabel = Math.round(a.invalidPct * 100);
           return {
@@ -7496,7 +7687,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreSeverity: _chassisPauseSeverity,
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
-    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    guardrails: ['historical_winner_check', 'not_recently_dismissed'],
     action: { label: 'Pause Ad', type: 'pause' },
   });
 
@@ -7519,13 +7710,20 @@ function registerMetaPauseVerdicts(ci) {
         .map(f => {
           const a = adByName[normalizeAdName(f.ad_name)];
           if (!a || a.is_paused) return null;
-          const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
+          if (!a.is_ready_to_judge || a.is_quiet) return null;
+          // Best-in-class Meta-AI plain English (2026-05-08): drop "Stage-N fatigue"
+          // jargon AND the contradictory "No freq data" filler. State only the real
+          // signals — frequency if known, then the perf-decay diagnostics.
+          const _perfBits = (f.signals || []).filter(s => !/^Freq\s/i.test(s) && !/no freq data/i.test(s));
+          const _freqBit = (f.frequency >= 2.0) ? `seen ${f.frequency.toFixed(1)}× by audience this week` : '';
+          const _signalPlain = [_freqBit].concat(_perfBits).filter(Boolean).join(' · ') || 'creative spent';
+          const _urgentTag = f.stage === 3 ? ' · URGENT' : '';
           return {
             entity_type: 'ad',
             entity_id: a.adName,
             market: a.market,
-            signal: `${stageText} · ${f.signals.join(' · ')}${f.stage === 3 ? ' · URGENT' : ''}`,
-            why: `${stageText} — ${f.signals.join('; ')}. Audience has seen this creative too many times; pause before it drags down the account's learning phase.`,
+            signal: `${_signalPlain}${_urgentTag}`,
+            why: `${_signalPlain}. Audience has seen this creative too many times — pause before it drags down the account's learning phase.`,
             spend: a.spend || (f.daily_spend * 7) || 0,
             cohort_age_days: a.cohort_age_days,
             was_top_tier: a.was_top_tier,
@@ -7538,7 +7736,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
     // historical_winner_check IN — blocks ads that were Tier-1/2 winners; those route to 6b.
-    guardrails: ['cohort_matured', 'volume_floor', 'historical_winner_check', 'not_recently_dismissed'],
+    guardrails: ['historical_winner_check', 'not_recently_dismissed'],
     action: { label: 'Pause Ad', type: 'pause' },
   });
 
@@ -7560,15 +7758,21 @@ function registerMetaPauseVerdicts(ci) {
         .map(f => {
           const a = adByName[normalizeAdName(f.ad_name)];
           if (!a || a.is_paused) return null;
+          if (!a.is_ready_to_judge) return null;
           if (!a.was_top_tier) return null; // only winners route here
-          const stageText = f.stage === 3 ? 'Stage-3 fatigue (severe)' : 'Stage-2 fatigue (moderate)';
+          // Best-in-class Meta-AI plain English (2026-05-08): same cleanup as 6a, plus
+          // the "winner fatiguing" framing for the refresh path.
+          const _perfBits2 = (f.signals || []).filter(s => !/^Freq\s/i.test(s) && !/no freq data/i.test(s));
+          const _freqBit2 = (f.frequency >= 2.0) ? `seen ${f.frequency.toFixed(1)}× by audience this week` : '';
+          const _signalPlain2 = [_freqBit2].concat(_perfBits2).filter(Boolean).join(' · ') || 'creative spent';
+          const _urgentTag2 = f.stage === 3 ? ' · URGENT' : '';
           const cptdStr = a.cptd ? formatCurrency(a.cptd) : '—';
           return {
             entity_type: 'ad',
             entity_id: a.adName,
             market: a.market,
-            signal: `Proven winner fatiguing · ${f.signals.join(' · ')}${f.stage === 3 ? ' · URGENT' : ''}`,
-            why: `${stageText} — but this ad was a winner (CPTD ${cptdStr}, ${a.td || 0} TDs). ${f.signals.join('; ')}. The CREATIVE PATTERN works — refresh visual/hook, keep same audience + format, DON'T kill.`,
+            signal: `Winner fatiguing · ${_signalPlain2}${_urgentTag2}`,
+            why: `Winner fatiguing — was a winner (CPTD ${cptdStr}, ${a.td || 0} TDs). ${_signalPlain2}. The creative pattern works — refresh visual/hook, keep same audience + format, don't kill.`,
             spend: a.spend || (f.daily_spend * 7) || 0,
             cohort_age_days: a.cohort_age_days,
             was_top_tier: a.was_top_tier,
@@ -7581,7 +7785,7 @@ function registerMetaPauseVerdicts(ci) {
     scoreConfidence: signal => _chassisPauseConfidence(signal, ci),
     scoreEffort: () => ci.EFFORT.ONE_CLICK,
     // historical_winner_check OMITTED — this verdict ONLY fires on past winners (would self-block).
-    guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+    guardrails: ['not_recently_dismissed'],
     action: { label: 'Refresh creative', type: 'refresh' },
   });
 }
@@ -7618,6 +7822,140 @@ function _isChassisDismissed(verdictId, entityId) {
     if (!isFinite(expiresMs)) return true; // never_again sentinel
     return expiresMs > Date.now();
   } catch (_) { return false; }
+}
+
+// ==================== LIVE PAUSE/REFRESH DETECT (Best-in-class Meta-AI 2026-05-08) ====================
+// Decouples Pause + Refresh verdicts from the boot-time chassis run so the user's date-picker
+// drives them in real time. The chassis still runs at boot for Scale verdicts (90-day-mature
+// window is correct for winner classification — it shouldn't ride live filters). Pause and
+// Refresh, by contrast, should always reflect the current filter window.
+//
+// Mirrors the same filter chains that registerMetaPauseVerdicts builds inside chassis
+// `detect()` calls; outputs chassis-shaped objects so the render path consumes them
+// identically to `state._chassisLastRun.all` filtered to action.type === 'pause'/'refresh'.
+function _runLivePauseRefresh(from, to) {
+  const prep = _chassisPrepAds(from, to);
+  const out = [];
+  const _push = (verdict_id, actionType, sig) => {
+    out.push(Object.assign({ verdict_id: verdict_id, action: { type: actionType } }, sig));
+  };
+  // 1. cptql_leak — CPTQL above market amber, pace-multiplier-tightened
+  prep
+    .filter(a => a.is_ready_to_judge && !a.is_quiet)
+    .filter(a => !a.is_paused && a.tql >= 5 && a.cptql)
+    .forEach(a => {
+      const amberRaw = (SENTINEL_THRESHOLDS[a.market] || SENTINEL_THRESHOLDS['US']).cpql?.amber || 15000;
+      const amber = amberRaw * _pauseMultiplier(a.market);
+      if (a.cptql <= amber) return;
+      _push('meta_pause_cptql_leak', 'pause', {
+        entity_type: 'ad', entity_id: a.adName, market: a.market,
+        signal: `CPTQL ${formatCurrency(a.cptql)} above ${a.market} amber ${formatCurrency(amber)} · ${a.tql} TQLs · ${formatCurrency(a.spend)}`,
+        why: `Costs too much per qualified lead (CPTQL ${formatCurrency(a.cptql)} vs market amber ${formatCurrency(amber)}). Any downstream enrollment margin is already gone — pause and reallocate.`,
+        spend: a.spend,
+        raw_metrics: { spend: a.spend, cptql: a.cptql, tql: a.tql, market_amber: amber, market: a.market },
+      });
+    });
+  // 2. dead_funnel — ≥15 QLs, 0 TDs
+  prep
+    .filter(a => a.is_ready_to_judge && !a.is_quiet)
+    .filter(a => !a.is_paused && a.spend >= 20000 && a.ql >= 15 && a.td === 0)
+    .forEach(a => {
+      const why = a.ts === 0
+        ? `${a.ql} QLs but 0 trial-bookings — leads aren't intent-qualified (LP click without form completion, or wrong audience).`
+        : `${a.ts} trials scheduled but 0 completed — no-show or sales-handoff issue, not a creative problem.`;
+      _push('meta_pause_dead_funnel', 'pause', {
+        entity_type: 'ad', entity_id: a.adName, market: a.market,
+        signal: `${a.ql} QLs → 0 TDs · ${formatCurrency(a.spend)}`,
+        why: why,
+        spend: a.spend,
+        raw_metrics: { spend: a.spend, ql: a.ql, td: a.td, ts: a.ts, market: a.market },
+      });
+    });
+  // 3. budget_burn — ≥₹15K spend, 0 QLs
+  prep
+    .filter(a => a.is_ready_to_judge && !a.is_quiet)
+    .filter(a => !a.is_paused && a.spend >= 15000 && a.ql === 0)
+    .forEach(a => {
+      _push('meta_pause_budget_burn', 'pause', {
+        entity_type: 'ad', entity_id: a.adName, market: a.market,
+        signal: `${formatCurrency(a.spend)} spent · 0 QLs — pure waste`,
+        why: `${formatCurrency(a.spend)} delivered 0 QLs — hook isn't landing or the audience isn't seeing enough value to sign up. Pause and reallocate.`,
+        spend: a.spend,
+        raw_metrics: { spend: a.spend, ql: a.ql, market: a.market },
+      });
+    });
+  // 4. wrong_audience — US BAU only, <30% NRI rate at scale
+  prep
+    .filter(a => a.is_ready_to_judge && !a.is_quiet)
+    .filter(a => !a.is_paused
+      && a.market === 'US'
+      && (typeof _isPLACampaignName === 'function' ? !_isPLACampaignName(a.campaignName) : true)
+      && a.spend >= 20000
+      && a.ql >= 15
+      && a.nriPct < 0.30)
+    .forEach(a => {
+      const nriPctLabel = Math.round(a.nriPct * 100);
+      _push('meta_pause_wrong_audience', 'pause', {
+        entity_type: 'ad', entity_id: a.adName, market: a.market,
+        signal: `Only ${nriPctLabel}% NRI (${a.nri}/${a.ql}) · ${formatCurrency(a.spend)} — attracting wrong audience`,
+        why: `NRI is the highest-converting US segment (benchmark 40%+). Only ${nriPctLabel}% of this ad's QLs are NRI — the creative or targeting is pulling in non-converting audiences. Pause and either tighten the interest stack or refresh the hook to speak to expat parents.`,
+        spend: a.spend,
+        raw_metrics: { spend: a.spend, ql: a.ql, nri: a.nri, nri_pct: a.nriPct, market: a.market },
+      });
+    });
+  // 5. spam — ≥₹10K spend, ≥20 leads, >25% (× pace mult) invalid rate
+  prep
+    .filter(a => a.is_ready_to_judge && !a.is_quiet)
+    .filter(a => !a.is_paused && a.spend >= 10000 && a.totalLeads >= 20 && a.invalidPct > 0.25 * _pauseMultiplier(a.market))
+    .forEach(a => {
+      const invalidPctLabel = Math.round(a.invalidPct * 100);
+      _push('meta_pause_spam', 'pause', {
+        entity_type: 'ad', entity_id: a.adName, market: a.market,
+        signal: `${invalidPctLabel}% invalid leads (${Math.round(a.invalid)}/${Math.round(a.totalLeads)}) · ${formatCurrency(a.spend)}`,
+        why: `${invalidPctLabel}% of this ad's leads are marked invalid (bots, junk forms, disposable emails). The creative is attracting pattern-matchers who auto-submit forms — usually a hook or offer that implies "easy money" / low-commitment signup. Pause and rebrief.`,
+        spend: a.spend,
+        raw_metrics: { spend: a.spend, total_leads: a.totalLeads, invalid: a.invalid, invalid_pct: a.invalidPct, market: a.market },
+      });
+    });
+  // 6. fatigue — Stage-2/3, plain English. Loser → pause; winner → refresh.
+  // Note: detectFatigue() is global and not date-windowed today — it always reads the
+  // last 6 days of metaAdData. For PR1 we accept that limitation (fatigue is a near-term
+  // signal anyway). PR2 can date-window it if needed.
+  const fatigued = (typeof detectFatigue === 'function') ? detectFatigue() : [];
+  if (fatigued.length) {
+    const adByName = {};
+    prep.forEach(a => { adByName[normalizeAdName(a.adName)] = a; });
+    fatigued.filter(f => f.stage >= 2).forEach(f => {
+      const a = adByName[normalizeAdName(f.ad_name)];
+      if (!a || a.is_paused) return;
+      if (!a.is_ready_to_judge) return;
+      const _perfBits = (f.signals || []).filter(s => !/^Freq\s/i.test(s) && !/no freq data/i.test(s));
+      const _freqBit = (f.frequency >= 2.0) ? `seen ${f.frequency.toFixed(1)}× by audience this week` : '';
+      const _signalPlain = [_freqBit].concat(_perfBits).filter(Boolean).join(' · ') || 'creative spent';
+      const _urgentTag = f.stage === 3 ? ' · URGENT' : '';
+      if (a.was_top_tier) {
+        // Refresh winner
+        const cptdStr = a.cptd ? formatCurrency(a.cptd) : '—';
+        _push('meta_refresh_fatigued_winner', 'refresh', {
+          entity_type: 'ad', entity_id: a.adName, market: a.market,
+          signal: `Winner fatiguing · ${_signalPlain}${_urgentTag}`,
+          why: `Winner fatiguing — was a winner (CPTD ${cptdStr}, ${a.td || 0} TDs). ${_signalPlain}. The creative pattern works — refresh visual/hook, keep same audience + format, don't kill.`,
+          spend: a.spend || (f.daily_spend * 7) || 0,
+          raw_metrics: { spend: a.spend, fatigue_stage: f.stage, fatigue_signals: f.signals, frequency: f.frequency, td: a.td, cptd: a.cptd, market: a.market },
+        });
+      } else if (!a.is_quiet) {
+        // Pause loser
+        _push('meta_pause_fatigued_loser', 'pause', {
+          entity_type: 'ad', entity_id: a.adName, market: a.market,
+          signal: `${_signalPlain}${_urgentTag}`,
+          why: `${_signalPlain}. Audience has seen this creative too many times — pause before it drags down the account's learning phase.`,
+          spend: a.spend || (f.daily_spend * 7) || 0,
+          raw_metrics: { spend: a.spend, fatigue_stage: f.stage, fatigue_signals: f.signals, frequency: f.frequency, market: a.market },
+        });
+      }
+    });
+  }
+  return out;
 }
 
 // ==================== CHASSIS VERDICTS - Meta Scale (Week 3 Day 3-4) ====================
@@ -7805,7 +8143,7 @@ function _isChassisDismissed(verdictId, entityId) {
       scoreConfidence: function() { return C.CONFIDENT; },
       scoreEffort: function() { return E.FIVE_MIN; },
       // NOTE: historical_winner_check OMITTED - this verdict IS recommending winners.
-      guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+      guardrails: ['not_recently_dismissed'],
       action: { label: 'Scale to adjacent audience', type: 'scale' },
       whyNow: function(signal) {
         const adj = signal.raw_metrics && signal.raw_metrics.suggested_audience;
@@ -7858,7 +8196,7 @@ function _isChassisDismissed(verdictId, entityId) {
       scoreConfidence: function() { return C.LIKELY; },
       scoreEffort: function() { return E.FIVE_MIN; },
       // historical_winner_check OMITTED - this is recommending an emerging winner.
-      guardrails: ['cohort_matured', 'volume_floor', 'not_recently_dismissed'],
+      guardrails: ['not_recently_dismissed'],
       action: { label: 'Scale to adjacent audience', type: 'scale' },
       whyNow: function(signal) {
         return 'Early winner - confirm with a parallel adset on a neighbor audience before committing more budget.';
@@ -9415,35 +9753,52 @@ function renderOracleCardsV2() {
   const rawPerf = getAdPerformance(market, from, to);
   // Map to the field names the signal logic expects
   // Include all ads — CRM-matched and Meta-only. Mark unmatched so UI can flag them.
-  const adCampData = rawPerf.map(r => ({
-    adName: r['Ad name'], campaignName: r['Campaign name'],
-    adSetName: r['Ad set name'] || r['ad set name'] || '',
-    displayName: stripCampaignPrefix(r['Ad name']),
-    campaignContext: stripCampaignPrefix(r['Campaign name']),
-    market: r._market || '',
-    spend: r['Spent'], ql: r['QL'], tql: r['TQL'], td: r['TD'], ts: parseNumber(r['TS']||0), enrolled: r['Paid'],
-    nri: r['NRI'], invalid: parseNumber(r['Invalid%']) * (r['QL'] + (r['TD']||0)) / 100,
-    totalLeads: r['QL'] + (parseNumber(r['Invalid%']) > 0 ? Math.round(r['QL'] / (1 - parseNumber(r['Invalid%'])/100)) - r['QL'] : 0),
-    nriPct: (r['NRI%'] || 0) / 100,
-    qlToTdPct: (r['QL-TD%'] || 0) / 100,
-    invalidPct: (r['Invalid%'] || 0) / 100,
-    cptql: r['CPTQL'], cptd: r['CPTD'],
-    thumbnail_url: r.thumbnail_url || '',
-    image_url: r.image_url || '',
-    tags: r.tags || {},
-    _spendSource: r._spendSource,
-    _hasCRM: r._hasCRM,
-  }));
+  // Build ad_id + account lookup once for Open-in-Meta deep links (Best-in-class Meta-AI 2026-05-08).
+  const _adIdByNameRender = {};
+  const _accountByAdNameRender = {};
+  if (typeof metaAdData !== 'undefined' && Array.isArray(metaAdData)) {
+    metaAdData.forEach(r => {
+      if (!r || !r.ad_id || !r.ad_name) return;
+      const k = normalizeAdName(r.ad_name);
+      if (k && !_adIdByNameRender[k]) _adIdByNameRender[k] = String(r.ad_id);
+      if (k && r._account && !_accountByAdNameRender[k]) _accountByAdNameRender[k] = r._account;
+    });
+  }
+  const adCampData = rawPerf.map(r => {
+    const _k = normalizeAdName(r['Ad name'] || '');
+    return {
+      adName: r['Ad name'], campaignName: r['Campaign name'],
+      adSetName: r['Ad set name'] || r['ad set name'] || '',
+      displayName: stripCampaignPrefix(r['Ad name']),
+      campaignContext: stripCampaignPrefix(r['Campaign name']),
+      market: r._market || '',
+      spend: r['Spent'], ql: r['QL'], tql: r['TQL'], td: r['TD'], ts: parseNumber(r['TS']||0), enrolled: r['Paid'],
+      nri: r['NRI'], invalid: parseNumber(r['Invalid%']) * (r['QL'] + (r['TD']||0)) / 100,
+      totalLeads: r['QL'] + (parseNumber(r['Invalid%']) > 0 ? Math.round(r['QL'] / (1 - parseNumber(r['Invalid%'])/100)) - r['QL'] : 0),
+      nriPct: (r['NRI%'] || 0) / 100,
+      qlToTdPct: (r['QL-TD%'] || 0) / 100,
+      invalidPct: (r['Invalid%'] || 0) / 100,
+      cptql: r['CPTQL'], cptd: r['CPTD'],
+      thumbnail_url: r.thumbnail_url || '',
+      image_url: r.image_url || '',
+      tags: r.tags || {},
+      _spendSource: r._spendSource,
+      _hasCRM: r._hasCRM,
+      ad_id: _adIdByNameRender[_k] || '',
+      _account: _accountByAdNameRender[_k] || '',
+    };
+  });
   // Build ad-name → full-ad lookup; the chassis override below uses it to enrich each
   // verdict signal with the per-ad fields (campaignName, tags, spend, etc.) the card
   // renderer expects.
   const _adByName = {};
   adCampData.forEach(a => { _adByName[normalizeAdName(a.adName)] = a; });
 
-  // Chassis is the source of truth for Pause + Refresh. While chassis detection is in flight
-  // (~10s after boot), pauseAds stays empty — the Dashboard re-renders when chassis completes
-  // (boot tick at :3406). No legacy fallback: legacy and chassis already reached parity, and
-  // legacy was noisier (no winner-aware suppression, no dismissal-aware suppression).
+  // Best-in-class Meta-AI (2026-05-08): Pause + Refresh now run LIVE on every render
+  // against the user's date-picker filter. Scale verdicts continue to read the boot-time
+  // chassis run via `state._chassisLastRun` (90-day-mature window is correct for winner
+  // classification). _runLivePauseRefresh emits chassis-shaped objects so the rest of the
+  // render pipeline (dismissal suppression, market cap, sort) is unchanged.
   let pauseAds = [];
   const _verdictTypeMap = {
     'meta_pause_budget_burn': 'burn',
@@ -9454,11 +9809,11 @@ function renderOracleCardsV2() {
     'meta_pause_fatigued_loser': 'fatigue',
     'meta_refresh_fatigued_winner': 'refresh',
   };
-  const _chassisRun = state._chassisLastRun;
-  if (_chassisRun && Array.isArray(_chassisRun.all)) {
-    pauseAds = _chassisRun.all
+  const _liveVerdicts = (typeof _runLivePauseRefresh === 'function') ? _runLivePauseRefresh(from, to) : [];
+  if (_liveVerdicts.length) {
+    pauseAds = _liveVerdicts
       .filter(r => r.action && (r.action.type === 'pause' || r.action.type === 'refresh'))
-      .filter(r => !market || r.market === market)
+      .filter(r => !market || market === 'all' || r.market === market)
       .map(r => {
         const fullAd = _adByName[normalizeAdName(r.entity_id)] || {};
         const _type = _verdictTypeMap[r.verdict_id] || 'pause';
@@ -9516,6 +9871,9 @@ function renderOracleCardsV2() {
 
   // Card builder shared by Pause + Refresh sections.
   const _buildPauseCardHtml = (a, idx) => {
+    // Best-in-class Meta-AI card surgery (2026-05-08): one sentence per card.
+    // Format: [VERDICT] — [driver number]. [action by date]. [CRM|META]
+    // Secondary fields (why, weekly trend, campaign context) live inside a <details> hover.
     const itemId = 'pause:' + a.name;
     const action = getOracleAction(itemId);
     const isDone = action?.status === 'done';
@@ -9527,22 +9885,44 @@ function renderOracleCardsV2() {
     const isUrgent = (isFatigue && a._priority === 0) || isBurn;
     const isWarn = a._type === 'audience' || a._type === 'funnel' || a._type === 'spam' || isRefresh;
     const cardBg = isRefresh ? 'bg-blue-50 border-blue-200' : (isTopOffender || isUrgent ? 'bg-red-50 border-red-200' : isWarn ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200');
-    const metricColor = isRefresh ? 'text-blue-700' : (isTopOffender || isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-text-muted');
-    const typeLabel = { burn: 'BURN', cptql: 'COSTLY', audience: 'WRONG AUDIENCE', funnel: 'DEAD FUNNEL', spam: 'SPAM', fatigue: 'FATIGUED', refresh: 'REFRESH · was a winner' }[a._type] || '';
+    const verdictWord = isRefresh ? 'REFRESH' : 'PAUSE';
+    const verdictColor = isRefresh ? 'text-blue-700' : (isTopOffender || isUrgent ? 'text-red-700' : 'text-amber-700');
+
+    // Driver: existing _signal carries the number that drives the verdict. Strip "URGENT" tag.
+    const driver = (a._signal || ((a.spend != null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs'))
+      .replace(/\s*·\s*URGENT\s*$/i, '');
+    // Action by date — pause = today; refresh = today.
+    const actionByDate = isRefresh ? 'Refresh today.' : 'Turn off today.';
+    // Source tag drives [CRM] vs [META] — see _adSourceTag.
+    const sourceTag = _adSourceTag(a);
+
     let displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
     if (/^\d{10,}/.test(displayName)) displayName = a.campaignContext || a.adName?.slice(0, 40) || displayName;
-    const campCtx = a.campaignContext || '';
+    const campCtx = a.campaignContext || a.campaignName || '';
+    const adSet = a.adSetName || '';
     const geoTag = a.market ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary text-text-muted font-bold">${a.market}</span>` : '';
     const thumbHtml = _oracleThumbnail(a.name);
+
+    // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
+    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(a.ad_id, a._account || a.market) : '';
+    const metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta ↗</a>` : '';
+
+    // Secondary fields collapse into a <details> block. Campaign + ad set now surface
+    // on the primary line, so Why · this-week is the only thing left in details.
+    const whyHtml = a._why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : '';
+    const trendHtml = a._trend ? `<p class="text-[11px] text-text-muted mt-1">This week: ${a._trend.label} ${formatCurrency(a._trend.twSpend)}</p>` : '';
+    const detailsHtml = (whyHtml || trendHtml)
+      ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why · this week</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}${trendHtml}</div></details>`
+      : '';
+
     return `<div class="p-4 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
-      <div class="flex items-center gap-3">
+      <div class="flex items-start gap-3">
         ${thumbHtml}
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold truncate" title="${a.name}">${displayName} ${geoTag}${typeLabel ? ` <span class="text-[10px] px-2 py-0.5 rounded ${isRefresh ? 'bg-blue-100 text-blue-700' : isUrgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'} font-bold">${typeLabel}</span>` : ''}</p>
-          ${campCtx ? `<p class="text-[11px] text-text-muted truncate" title="${a.campaignName || ''}">${campCtx}</p>` : ''}
-          <p class="text-xs ${metricColor} mt-0.5">${a._signal || ((a.spend !== null ? formatCurrency(a.spend) : '—') + ' spent · ' + a.ql + ' QLs')}</p>
-          ${a._why ? `<p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : ''}
-          ${isDone ? `<p class="text-[11px] text-green-700 mt-0.5">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : ''}
+          <p class="text-[11px] text-text-muted truncate" title="${a.name}">${displayName} ${geoTag}</p>
+          ${campCtx || adSet ? `<p class="text-[10px] text-text-muted truncate" title="${(a.campaignName || '') + ' / ' + adSet}">${campCtx ? `<span class="font-semibold">${campCtx}</span>` : ''}${campCtx && adSet ? ' · ' : ''}${adSet ? `<span>${adSet}</span>` : ''}</p>` : ''}
+          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">${verdictWord}</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${driver}</span>. <em>${actionByDate}</em> <span class="text-[10px] text-text-muted ml-1">${sourceTag}</span>${metaLinkInline}</span></p>
+          ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : detailsHtml}
         </div>
       </div>
       ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
@@ -9565,6 +9945,29 @@ function renderOracleCardsV2() {
   } else {
     pauseList.innerHTML = '<p class="text-xs text-accent-green font-medium py-3">No budget leaks detected (last 90 days).</p>';
   }
+
+  // Best-in-class Meta-AI (2026-05-08): quiet ads expander.
+  // Quiet = small slice of campaign spend AND CPTD within ±15% of target. They don't deserve
+  // a verdict slot (no decision owed), but the operator can expand to scan them on demand.
+  try {
+    const _allPrep = (typeof _chassisPrepAds === 'function') ? _chassisPrepAds() : [];
+    const _quietAds = _allPrep.filter(a => a && a.is_quiet && (!market || market === 'all' || a.market === market));
+    if (_quietAds.length && pauseList) {
+      const quietRows = _quietAds.slice(0, 50).map(a => {
+        const _nm = (a.adName || '').length > 60 ? (a.adName || '').slice(0, 60) + '…' : (a.adName || '');
+        const _cptdStr = a.cptd != null ? formatCurrency(a.cptd) : '—';
+        return `<div class="flex items-center justify-between text-[11px] py-1 border-b border-gray-100 last:border-0">
+          <span class="text-text-muted truncate flex-1" title="${_escapeHtml(a.adName || '')}">${_escapeHtml(_nm)}</span>
+          <span class="text-text-muted shrink-0 ml-2">${_escapeHtml(a.market || '')} · ${formatCurrency(a.spend || 0)} · ${_cptdStr} CPTD</span>
+        </div>`;
+      }).join('');
+      const _moreNote = _quietAds.length > 50 ? `<p class="text-[10px] text-text-muted mt-1">…and ${_quietAds.length - 50} more</p>` : '';
+      pauseList.insertAdjacentHTML('beforeend',
+        `<details class="mt-3 pt-2 border-t border-gray-200"><summary class="text-[11px] text-text-muted cursor-pointer hover:text-text-primary select-none">Show ${_quietAds.length} quiet ad${_quietAds.length > 1 ? 's' : ''} (small spend, near target — no verdict needed)</summary>
+          <div class="mt-2 max-h-64 overflow-y-auto">${quietRows}${_moreNote}</div>
+        </details>`);
+    }
+  } catch (e) { console.warn('[meta-ai] quiet-ads expander render failed:', e); }
 
   // Refresh section (was-a-winner now fatiguing — refresh, don't kill)
   const refreshList = document.getElementById('oracleRefreshList');
@@ -9878,21 +10281,38 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
       adjCfg.geo?.length ? adjCfg.geo.join('/') : ''
     ].filter(Boolean).join(' \u00B7 ') : '';
 
+    // Best-in-class Meta-AI card surgery (2026-05-08): one-sentence SCALE primary,
+    // secondary fields collapse into <details>. Step varies per month-pace quadrant.
+    const _targetCPTD = mktTh.cptd?.green || 35000;
+    const _cptdStr = w._displayCPTD ? formatCurrency(w._displayCPTD) : '\u2014';
+    const _targetStr = formatCurrency(_targetCPTD);
+    const _tdCount = w._displayTD || 0;
+    const _driver = `${_cptdStr} cost-per-trial vs ${_targetStr} target \u00B7 ${_tdCount} TD${_tdCount === 1 ? '' : 's'}`;
+    const _scaleStep = (typeof _scaleStepLabel === 'function') ? _scaleStepLabel(mkt) : '+20%';
+    const _sourceTag = w._hasCRM ? '[CRM]' : '[META]';
+    const _campCtx = w.campaignContext || w.campaignName || '';
+    const _adSet = w.adSetName || '';
+    // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
+    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account || mkt) : '';
+    const _metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta \u2197</a>` : '';
+    const _whyHtml = why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>` : '';
+    const _audHtml = currentAud ? `<p class="text-[11px] text-text-muted mt-1" title="${esc(audFmt.tooltip)}">Running on <strong>${currentAud}</strong>${audFmt.subtitleLines[0] ? ' \u00B7 ' + audFmt.subtitleLines[0] : ''}</p>` : '';
+    const _detailsHtml = (_whyHtml || _audHtml)
+      ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why \u00B7 audience</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${_whyHtml}${_audHtml}</div></details>`
+      : '';
+
     html += `<div class="p-4 bg-white border border-gray-200 rounded-xl ${opacity}" data-item-id="${itemId}" data-item-name="${esc(w.displayName || w.adName)}">
       <div class="flex items-start gap-3">
         ${thumb ? `<img src="${thumb}" class="w-14 h-14 rounded-lg object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-14 h-14 rounded-lg bg-surface-tertiary shrink-0"></div>'}
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
-            <p class="text-sm font-semibold truncate" title="${esc(w.adName)}">${w.displayName || w.adName}</p>
+            <p class="text-[11px] text-text-muted truncate" title="${esc(w.adName)}">${w.displayName || w.adName}</p>
             ${tierBadge}
             <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
           </div>
-          ${currentAud ? `<p class="text-[11px] text-text-muted mt-0.5" title="${esc(audFmt.tooltip)}">Running on <strong>${currentAud}</strong>${audFmt.subtitleLines[0] ? ' \u00B7 ' + audFmt.subtitleLines[0] : ''}</p>` : ''}
-          <p class="text-[11px] text-text-secondary mt-1 leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>
-        </div>
-        <div class="text-right shrink-0">
-          <p class="text-base font-bold text-accent-${cptdColor}">${w._displayCPTD ? formatCurrency(w._displayCPTD) : '\u2014'}</p>
-          <p class="text-[9px] text-text-muted" title="Mature cohort \u2014 leads created \u226514 days ago. Excludes fresh leads that haven't had time to convert.">CPTD<br>${w._displayTD || 0} TDs \u00B7 ${w._displayQL || 0} QLs</p>
+          ${_campCtx || _adSet ? `<p class="text-[10px] text-text-muted truncate" title="${esc((w.campaignName || '') + ' / ' + _adSet)}">${_campCtx ? `<span class="font-semibold">${esc(_campCtx)}</span>` : ''}${_campCtx && _adSet ? ' \u00B7 ' : ''}${_adSet ? `<span>${esc(_adSet)}</span>` : ''}</p>` : ''}
+          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase text-green-700 align-middle mr-1">SCALE</span><span class="text-text-secondary">\u2014 <span class="font-semibold text-text-primary">${_driver}</span>. <em>Raise budget ${_scaleStep} Monday.</em> <span class="text-[10px] text-text-muted ml-1">${_sourceTag}</span>${_metaLinkInline}</span></p>
+          ${_detailsHtml}
         </div>
       </div>
       ${adj ? `<div class="mt-3 pt-3 border-t border-gray-100 bg-accent-purple-light/20 -mx-4 -mb-4 px-4 pb-3 pt-2 rounded-b-xl">
@@ -16034,23 +16454,31 @@ function goFunnelTablePage(p) { state._funnelTablePage = p; renderFunnelHealthTa
 
 // Build a quick lookup of chassis verdicts by adName+market → { action, signal, why, verdictId }
 // Keying on market too prevents cross-market verdict bleed when two markets share a name.
-function _funnelChassisByAd(activeMarket) {
+//
+// Best-in-class Meta-AI (2026-05-09): Pause/Refresh now run LIVE on the user's date filter
+// via _runLivePauseRefresh; Scale verdicts continue from the boot-time chassis run (90-day-
+// mature window correct for winner classification). The Tagger Funnel table merges both.
+function _funnelChassisByAd(activeMarket, from, to) {
   const out = {};
-  const run = state._chassisLastRun;
-  if (!run || !Array.isArray(run.all)) return out;
-  run.all.forEach(r => {
-    if (!r.entity_id || !r.action) return;
-    // Mirror existing pause-card filter at :9446 — skip out-of-market verdicts
+  const rank = { pause: 0, refresh: 1, scale: 2 };
+  const _accept = (r) => {
+    if (!r || !r.entity_id || !r.action) return;
     if (activeMarket && activeMarket !== 'all' && r.market && r.market !== activeMarket) return;
     const k = normalizeAdName(r.entity_id) + '||' + (r.market || '');
     if (!k) return;
-    // Keep highest-priority verdict (pause > refresh > scale)
-    const rank = { pause: 0, refresh: 1, scale: 2 };
     const cur = out[k];
     if (!cur || (rank[r.action.type] ?? 9) < (rank[cur.action.type] ?? 9)) {
       out[k] = { action: r.action, signal: r.signal || '', why: r.why || '', verdictId: r.verdict_id || '' };
     }
-  });
+  };
+  // 1. Live Pause + Refresh against the user's current date filter.
+  const live = (typeof _runLivePauseRefresh === 'function') ? _runLivePauseRefresh(from, to) : [];
+  live.forEach(_accept);
+  // 2. Scale verdicts from the boot-time chassis run.
+  const run = state._chassisLastRun;
+  if (run && Array.isArray(run.all)) {
+    run.all.forEach(r => { if (r.action && r.action.type === 'scale') _accept(r); });
+  }
   return out;
 }
 
@@ -16063,15 +16491,24 @@ function _funnelEsc(s) {
 
 function _funnelRecCell(row, chassisByAd) {
   // Pre-chassis loading state: state._chassisLastRun is null until ~10s after boot
+  // Live Pause/Refresh runs synchronously now (2026-05-09), so we only show the loading
+  // state until the boot-time Scale chassis arrives.
   if (!state._chassisLastRun) {
     return `<span class="text-[10px] text-text-muted italic">Loading verdicts…</span>`;
   }
   const k = normalizeAdName(row.ad_name) + '||' + (row.market || '');
   const v = chassisByAd[k];
+  // Open-in-Meta deep link — appended to either the Monitor states or the verdict rows.
+  // Best-in-class Meta-AI (2026-05-09): one click to navigate from Tagger Funnel to Ads Manager.
+  const _adId = row.ad_id || '';
+  const _acct = row.account || row._account || row.market || '';
+  const _metaUrl = (_adId && typeof _metaDeepLink === 'function') ? _metaDeepLink(_adId, _acct) : '';
+  const _metaLink = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" class="text-[10px] text-accent-purple hover:underline ml-1 whitespace-nowrap">Open in Meta ↗</a>` : '';
+  const _adSet = row.adset_name ? `<span class="text-[10px] text-text-muted truncate max-w-[200px]" title="${_funnelEsc(row.adset_name)}">${_funnelEsc(row.adset_name)}</span>` : '';
   if (!v) {
-    if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>`;
-    if (row.spend < 5000) return `<span class="text-[10px] text-text-muted italic">Monitor — under volume floor</span>`;
-    return `<span class="text-[10px] text-text-muted italic">Monitor — within thresholds</span>`;
+    if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>${_metaLink}`;
+    if (row.spend < 5000) return `<span class="text-[10px] text-text-muted italic">Monitor — under volume floor</span>${_metaLink}`;
+    return `<span class="text-[10px] text-text-muted italic">Monitor — within thresholds</span>${_metaLink}`;
   }
   const t = v.action.type;
   const palette = t === 'pause' ? 'bg-red-50 text-red-800 border-red-200'
@@ -16081,7 +16518,11 @@ function _funnelRecCell(row, chassisByAd) {
   const whyRaw = v.why || v.signal || '';
   const whyTrunc = whyRaw.length > 140 ? whyRaw.slice(0,140)+'…' : whyRaw;
   return `<div class="flex flex-col gap-0.5">
-    <span class="inline-block self-start px-1.5 py-0.5 rounded text-[9px] font-bold border ${palette}">${label}</span>
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <span class="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border ${palette}">${label}</span>
+      ${_adSet}
+      ${_metaLink}
+    </div>
     <span class="text-[10px] text-text-secondary leading-snug" title="${_funnelEsc(whyRaw)}">${_funnelEsc(whyTrunc)}</span>
   </div>`;
 }
@@ -16160,7 +16601,7 @@ function renderFunnelHealthTable() {
   const page = state._funnelTablePage || 1;
   const paged = rows.slice((page - 1) * FUNNEL_PAGE_SIZE, page * FUNNEL_PAGE_SIZE);
 
-  const chassisByAd = _funnelChassisByAd(market);
+  const chassisByAd = _funnelChassisByAd(market, from || null, to || null);
 
   if (totalRows === 0) {
     tbody.innerHTML = `<tr><td colspan="17" class="px-4 py-8 text-center text-text-muted text-[11px]">

@@ -4,6 +4,127 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Best-in-class Meta-AI — Tagger Funnel parity (2026-05-09)
+
+### Why
+Naina noticed that all the personality-shift work landed only on Dashboard surfaces. Tagger Tree's Funnel sub-view (added 2026-05-06) reads chassis verdicts in its recommendation column via `_funnelRecCell` at `:16484` — but it was still pointed at the boot-time chassis run with the hardcoded 90-day-mature window. So:
+- Date picker on Tagger view did NOT update the recommendation column.
+- No Open-in-Meta deep link from Funnel rows.
+- Ad set name was buried in a hover tooltip even though we now have it on the row.
+
+Chassis-level changes (spend-readiness, quiet filter, month-pace, plain-English fatigue) flowed through automatically because the chassis emits richer signals, but the surface-level UX wins were Dashboard-only until now.
+
+### What changed (`index.html`)
+
+**1. Live Pause/Refresh in Tagger Funnel** (`_funnelChassisByAd :16457+`, caller `:16590+`)
+- Signature `_funnelChassisByAd(activeMarket)` → `_funnelChassisByAd(activeMarket, from, to)`.
+- Pause + Refresh now read from `_runLivePauseRefresh(from, to)` — same helper Dashboard uses. Scale verdicts continue from `state._chassisLastRun.all` (90-day-mature window correct for winner classification). The two streams merge into one `out` map.
+- Caller in `renderFunnelHealthTable` (`:16590`) passes the destructured `from / to` from `getGlobalDateRange()`. Tagger date picker now drives the recommendation column live.
+
+**2. Open in Meta link in Funnel rows** (`_funnelRecCell :16486+`)
+- Reads `row.ad_id` + `row.account || row._account || row.market` (mirrors `_metaDeepLink` resolution in Dashboard cards).
+- Inline `Open in Meta ↗` link appended both to verdict rows AND to the "Monitor" / "No CRM match" fallback states. Hidden gracefully when `row.ad_id` is empty.
+
+**3. Ad set name on the verdict row** (`_funnelRecCell :16486+`)
+- New compact pill rendering `row.adset_name` next to the verdict label. Truncates at 200px with full hover via `title=`.
+
+### Side-effect to watch
+- **`_runLivePauseRefresh` runs on every Funnel render.** Same cost profile as Dashboard's pause render (sub-second on warm `_chassisPrepAds`). If Tagger feels laggy after this, the fix is the same — memoize `_chassisPrepAds(from, to)` on a `(from, to)` key.
+- **Funnel "Loading verdicts…" placeholder still gates on `state._chassisLastRun`** even though Pause/Refresh now run live — kept that gate so Scale verdicts have time to arrive before the row resolves to a final cell. If we want Pause to render before Scale finishes booting, drop the gate and let Scale arrive in a re-render.
+- **`account` vs `_account` field naming**: `_funnelRecCell` falls back through `row.account || row._account || row.market` because `getAdFunnelMetrics` emits `account` (`:6035`) while `_chassisPrepAds` emits `_account`. The fallback covers both shapes — clean up if/when one canonical name is settled.
+
+---
+
+## Best-in-class Meta-AI follow-ups — live Pause + deep-link + plain-English fatigue (2026-05-08, same day)
+
+### Why
+First user test surfaced four problems with the morning's PR:
+1. Fatigue cards read "Stage-2 fatigue (moderate) · No freq data · CTR -100%" — internal jargon plus a self-contradiction (fatigue stage from frequency, then "no freq data").
+2. Campaign and ad set name were buried inside the `<details>` collapse — the operator can't act without them.
+3. The card said PAUSE but the only buttons were Done / Dismiss / Snooze (tracking, not execution). To pause an ad you had to switch to Meta Ads Manager and find it manually.
+4. The date picker at the top of Dashboard didn't drive the verdicts — chassis ran once at boot with a hardcoded 90-day-mature window. Changing the date filter had no effect on which ads got Pause/Refresh cards.
+
+Naina's call: **(a) deep-link to Meta Ads Manager (no auto-pause), (b) decouple Pause from Scale so Pause respects the live date filter while Scale keeps the 90-day-mature window**.
+
+### What changed (`index.html`)
+
+**1. Plain-English fatigue signal** (verdict 6a `:7660+`, verdict 6b `:7704+`)
+Drop the "Stage-2/3 fatigue (moderate/severe)" prefix entirely. Drop "No freq data" filler. Build the signal from the actual diagnostics: frequency only when it's high, then the perf-decay bits (CTR drop, CPM rise, click drop). Examples now read `PAUSE — seen 4.1× by audience this week, CTR -23%. Turn off today.` or `PAUSE — CTR -100% this week. Turn off today.` — same data, no contradictions.
+
+**2. Campaign + ad set on the primary card line** (`_buildPauseCardHtml :9698+`, scale card `:10131+`)
+- `_chassisPrepAds` (`:7434+`) now extracts `Ad set name` from `rawPerf` and attaches `adSetName` to every prepped ad. The render-side `adCampData` mapper (`:9618+`) also extracts it.
+- Both pause and scale cards render `[campaign] · [ad set]` directly under the ad name. Truncated with `title="..."` for full hover. The `<details>` block dropped its "Campaign" line (now redundant) — only "Why · this week" remains inside.
+
+**3. Open in Meta deep link** (helper `_metaDeepLink :7385+`, wired into both card builders)
+- `_chassisPrepAds` builds `_adIdByName` and `_accountByAdName` maps from `metaAdData`, attaches `ad_id` + `_account` to each prepped ad. Render-side `adCampData` does the same.
+- New helper `_metaDeepLink(adId, accountIdOrName)` resolves the account by `act_*` ID, account name, or market via `META_AD_ACCOUNTS`, returns `https://business.facebook.com/adsmanager/manage/ads?act={accountId}&selected_ad_ids={adId}`.
+- Card builders inline a small `Open in Meta ↗` link next to the source tag on the verdict line. One click opens the ad in Ads Manager. Per Naina: no auto-pause via API.
+
+**4. Live Pause/Refresh detection** (`_runLivePauseRefresh :7833+`, render hook `:9646+`)
+- `_chassisPrepAds(from, to)` signature now takes optional date range that flows through to `getAdPerformance(null, from, to)`. Existing callers (no args) still get all-time, matching prior behavior.
+- New `_runLivePauseRefresh(from, to)` mirrors all 7 verdict filter chains (cptql_leak / dead_funnel / budget_burn / wrong_audience / spam / fatigued_loser / refresh_fatigued_winner) and emits chassis-shaped output `{verdict_id, action.type, entity_id, market, signal, why, spend, raw_metrics}`. Same shape the chassis produces, so the dismissal store + market cap + sort logic in render is unchanged.
+- `renderOracleCardsV2` (`:9646+`) replaces its `state._chassisLastRun.all.filter(... action.type==='pause'/'refresh')` reader with `_runLivePauseRefresh(from, to)`. **Pause + Refresh now re-detect on every render** — the date picker drives them in real time. Scale (`_renderMakeMoreAds`) continues reading `state._chassisLastRun` (90-day-mature window correct for winner classification).
+
+### Side-effect to watch
+- **Pause re-detect on every render** — calls `_chassisPrepAds(from, to)` per render, which calls `getAdPerformance` (cached by `invalidateAdPerfCache`). Should be sub-second; if the dashboard feels laggy after this, profile `_chassisPrepAds` and consider memoizing on `(from, to)`.
+- **`detectFatigue()` is NOT date-windowed.** It reads the last 6 days of `metaAdData` regardless of the user's date picker. PR2 can window it; for now fatigue cards remain near-term-only and stable across date-picker changes.
+- **Dismissals still scoped to `(verdictId, entityId)`.** A dismissal from yesterday on a CPTQL-leak verdict still suppresses the same ad today even if the live re-detect emits the same verdict_id.
+- **Stale chassis Scale data** — Scale verdicts run once at boot and don't refresh until next page load. If you ship a new ad and want it considered for SCALE, hard-refresh.
+- **Open-in-Meta link requires `metaAdData` to have loaded `ad_id`** — old ads not in the recent Meta API pull won't have a deep link (button hidden gracefully).
+
+---
+
+## Best-in-class Meta-AI personality shift — verdict layer + card surgery (2026-05-08)
+
+### Why
+Godfather's verdict chassis was rule-based and calendar-gated: an ad became "mature" at 14 days, a chassis `volume_floor` set per-market spend bars, and every ad regardless of size or month-state read the same thresholds. Three resulting failure modes:
+1. **Verdicts firing on thin evidence.** A 21-day-old ad with ₹50K spend and zero trials fired pause cards under `cohort_matured + volume_floor`, but ₹50K is below the 3× target-CPTD bar — that ad has not produced statistically meaningful evidence either way.
+2. **Verdicts NOT firing on real evidence.** A 3-day-old ad with ₹3L spend and zero trials was a clear pause but the calendar gate suppressed it.
+3. **No portfolio context.** May 5 and May 25 read identically — no awareness of whether the month is running ahead or behind on spend, or on trials, against `MONTHLY_BUDGET_PLAN`.
+
+Plan: `~/.claude/plans/e-g-tenure-stated-demo-enumerated-hare.md`. Delivers four changes that reuse data already in the chassis + Supabase + cost tracker, no new tables/sheets/agents. Match-engine pieces (cross-market opportunity, Forge brief check, don't-ship warning) defer to PR2 because tag-tuple fields (coach_tenure_signal, mathfit_dimension, outcome_anchor, three_beat_compliance) live in the SQL CTE per `creative-variable-extraction.md` — they are not stored as live columns in the deprecated `tagged_creatives` rollup.
+
+### What changed (`index.html`)
+
+**Change 1A — Spend-readiness gate replaces calendar maturity.**
+- New helper `_isReadyToJudge(ad)` (`:7263+`). An ad is judgeable when `td > 0` OR `spend ≥ 3× target_cptd`. Replaces `cohort_matured` (≥14d) and `volume_floor` chassis guardrails.
+- Constants: `_META_AI_SPEND_READINESS_MULTIPLIER = 3`. Target CPTD pulled from `SENTINEL_THRESHOLDS[market].cptd.green`.
+- All 6 pause verdicts (`meta_pause_cptql_leak / dead_funnel / budget_burn / wrong_audience / spam / fatigued_loser`) and the refresh verdict (`meta_refresh_fatigued_winner`) get `.filter(a => a.is_ready_to_judge && !a.is_quiet)` at the front of their detect chains. Fatigue detect-loops apply the same gate inline after the existing `is_paused` short-circuit.
+- All chassis verdict guardrails arrays drop `'cohort_matured'` and `'volume_floor'`. Pause verdicts now run `['historical_winner_check', 'not_recently_dismissed']`; refresh + scale run `['not_recently_dismissed']` only.
+- `_chassisPauseConfidence` (`:7359+`) rewired: CONFIDENT iff spend ≥ 2× the readiness floor (= 6× target_cptd). LIKELY at the readiness floor.
+
+**Change 1B — Quiet-ad filter (the boring 60%).**
+- New helper `_isQuiet(ad, campaignSpend)` (`:7273+`). Quiet = ad spend < 1% of campaign spend AND `|cptd - target| / target ≤ 15%`.
+- `_chassisPrepAds` (`:7372+`) builds a `_campSpendByName` map in one extra pass over `rawPerf` and attaches `is_quiet`, `campaign_total_spend` to every prepped ad.
+- All pause-verdict detect chains carry `!a.is_quiet`. Scale verdicts intentionally do NOT — even thin-spend winners are worth scaling.
+- New "Show N quiet ads" `<details>` block appended to the Pause section in `renderOracleCardsV2` (`:9737+`). Lists ad name + market + spend + CPTD; capped at 50 rows with "…and X more" footnote.
+
+**Change 2 — Month-pace conditioning.**
+- New helper `_computeMonthPaceQuadrant(market)` (`:7298+`). Pulls MTD spend from `costData` (same path as `_renderBudgetPace` at `:10800`) and MTD trials from `filterLeadsByMarket(leadsData, market)` filtered to `trials_done === '1'` rows whose `trial_done_date` falls in the current month. Compares each to `MONTHLY_BUDGET_PLAN[market][YYYY-MM]` × elapsed-day fraction. Trial target derives from `planSpend / target_cptd`. Cache key includes `leadsData.length + costData.length` so it busts on data refresh.
+- Returns one of `over_under` (spend ahead, trials behind) / `under_under` / `under_over` / `over_over`. Per-day-per-market cache in `_META_AI_PACE_CACHE` so the chassis can call many times per render.
+- `_pauseMultiplier(market)` and `_scaleStepLabel(market)` consume the quadrant. Pause-multiplier table: 0.66 / 1.33 / 1.0 / 1.0. Scale-step label: +10% / +20% / +30% / +20%.
+- Multiplier wired into `meta_pause_cptql_leak` (cpql amber × multiplier) and `meta_pause_spam` (invalid-pct threshold × multiplier). Other pause verdicts use absolute spend gates that are below the readiness bar and don't benefit from quadrant conditioning. `wrong_audience` deliberately untouched (its threshold direction inverts; wiring would need separate logic).
+- Tolerance: `_META_AI_MONTH_PACE_TOL = 0.10` (±10% of pace).
+
+**Change 3 — One-sentence card surgery.**
+- `_buildPauseCardHtml` (`:9662+`) rebuilt: primary text is `[VERDICT] — [driver]. [action by date]. [CRM|META]`. Verdict word is `text-2xl font-bold uppercase` in red/blue. Driver pulls from existing `a._signal`. Action by date is "Turn off today." (pause) or "Refresh today." (refresh). Source tag from `_adSourceTag(ad)` reads `ad._hasCRM`.
+- All previous secondary fields (why, weekly trend, campaign context) collapsed into a `<details>` block with summary "Why · this week · campaign". Hover or click to expand.
+- `_renderMakeMoreAds` (`:9944+`) scale card body rewritten on the same pattern: SCALE word in green, driver `[CPTD] cost-per-trial vs [target] target · N TDs`, action "Raise budget [step] Monday." where step is `_scaleStepLabel(market)`. Right-side metrics box removed (redundant with one-sentence). Adjacency suggestion ("Also try on…") preserved unchanged.
+
+**Out of scope (deferred to PR2):**
+- Cross-market opportunity verdict (`meta_opportunity_cross_market`). Needs a stable winner-tuple library joining `creative_tags` derivations per `02-skills/creative-variable-extraction.md`. The fields `coach_tenure_signal / mathfit_dimension / outcome_anchor / three_beat_compliance` live in inline SQL CTE today, not in live dashboard rows. Forcing it into PR1 would have rushed the data plumbing.
+- Brief diagnostic before `/write` (Forge) generates.
+- Don't-ship warning when a concept matches a recent loser.
+
+### Side-effect to watch
+- **Card volume drops sharply.** Expected ~60% drop on Indian and US markets. The drop is split: roughly 40% from quiet-ad suppression, 20% from spend-readiness raising the bar above existing per-verdict gates. If volume drops more than ~70% something is misbehaving — check `_META_AI_PACE_CACHE` and `is_ready_to_judge` distribution by spending `_chassisPrepAds()` in console.
+- **Pause cards on small-but-old ads disappear.** Ads in the ₹15K–₹105K spend range (US) with zero trials no longer surface a pause card unless they have 1+ trial. This is intentional per the plan ("a 21-day-old ad with ₹50K spend gets a verdict that has no real evidence behind it").
+- **`tagged_creatives` is deprecated** (`:1998+`). Comments still reference it for historical context but no live code path queries it.
+- **MTD trial-target depends on `MONTHLY_BUDGET_PLAN[market]`**. Markets without a current-month entry (currently EU is placeholder, ROW absent) default to `over_over` quadrant — standard rules. Add a market-month entry to `MONTHLY_BUDGET_PLAN` before relying on quadrant conditioning there.
+- **Stale comments at `:7919, 7921`** still say "Required for cohort_matured guardrail" / "Required for volume_floor guardrail" even though those guardrails are dead. Cleanup punted to a follow-up.
+
+---
+
 ## Make More: defend against orphan chassis verdicts (2026-05-07)
 
 ### Why
