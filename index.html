@@ -7558,10 +7558,17 @@ function _buildTupleLibraries() {
 }
 
 function _getTupleLibraries() {
-  // 5-minute cache. Live-pause feeds in losers — they update on date-picker change too, so the
-  // 5-minute cache strikes a balance between freshness and not rebuilding on every render.
-  if (!_META_AI_TUPLE_LIBRARY.winners || Date.now() - _META_AI_TUPLE_LIBRARY.builtAt > 5 * 60 * 1000) {
+  // Cache key = tier2_count + chassis_count + ':' + 5-min-bucket. Rebuilds when either data
+  // version changes OR every 5 minutes. The data-version key fixes a stale-cache bug found
+  // 2026-05-10: library was built once before tier-2 derivation completed (race at boot),
+  // cached empty, and the time-only check kept it stale until a 5-min expiry.
+  const _t2c = (typeof state !== 'undefined' && state && state._tier2TagsByAd) ? Object.keys(state._tier2TagsByAd).length : 0;
+  const _chc = (typeof state !== 'undefined' && state && state._chassisLastRun && state._chassisLastRun.all) ? state._chassisLastRun.all.length : 0;
+  const _bucket5min = Math.floor(Date.now() / (5 * 60 * 1000));
+  const cacheKey = _t2c + '|' + _chc + '|' + _bucket5min;
+  if (!_META_AI_TUPLE_LIBRARY.winners || _META_AI_TUPLE_LIBRARY.builtCacheKey !== cacheKey) {
     _buildTupleLibraries();
+    _META_AI_TUPLE_LIBRARY.builtCacheKey = cacheKey;
   }
   return _META_AI_TUPLE_LIBRARY;
 }
