@@ -7718,10 +7718,18 @@ function _detectCrossMarketOpportunities() {
         format: t[3] || 'Unknown',
         three_beat_compliance: t[4] || 'Non-compliant',
       };
-      // Skip generic / un-tagged patterns — they cluster everything that lacks evidence text.
-      // Tightened per code review: any tuple that is BOTH Anonymous coach AND Unclear dimension
-      // is too generic to recommend across markets, regardless of outcome_anchor.
-      if (tagObj.coach_tenure_signal === 'Anonymous' && tagObj.mathfit_dimension === 'Unclear') { _diag.tooGeneric++; return; }
+      // Skip ONLY when every dimension is generic — i.e., no creative differentiator at all.
+      // Loosened 2026-05-10 after diagnostic showed 5 of 6 winning tuples were Anonymous +
+      // Unclear despite having distinct format/outcome/three-beat signals. Cuemath has many
+      // testimonial-style winners that don't explicitly name a coach or claim a MathFit
+      // dimension, but the format + outcome + three-beat IS a defensible pattern worth
+      // recommending across markets.
+      const _allGeneric = tagObj.coach_tenure_signal === 'Anonymous'
+        && tagObj.mathfit_dimension === 'Unclear'
+        && tagObj.outcome_anchor === 'none'
+        && (!tagObj.format || tagObj.format === 'Unknown')
+        && tagObj.three_beat_compliance === 'Non-compliant';
+      if (_allGeneric) { _diag.tooGeneric++; return; }
       const avgCPTD = win.cptdSum / win.count;
       targetMarkets.forEach(tgt => {
         if (tgt === srcMarket) return;
