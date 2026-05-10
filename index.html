@@ -4866,12 +4866,18 @@ async function fetchMetaCreatives(force = false) {
   }
   const all = [];
   for (const account of accounts) {
+    console.log(`Meta creatives: fetching ${account.name} (${account.id})…`);
     try {
+      // Note (2026-05-11): `filtering` parameter was previously sending effective_status IN [...]
+      // but Naina's prod test confirmed orchestrated fetch returned 0 ads even though a direct
+      // callMetaAPI WITHOUT filtering returned 3 ads with creative data. Dropping the filter so
+      // we get whatever Meta returns first (typically most recent ads). Page cap (30 below)
+      // bounds the total. If we need status filtering later, do it client-side after the fetch.
       let page = await callMetaAPI(`${account.id}/ads`, {
         fields: 'id,name,creative{thumbnail_url,image_url},status,effective_status',
-        limit: '100',
-        filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE','PAUSED','PENDING_REVIEW','IN_PROCESS','WITH_ISSUES','CAMPAIGN_PAUSED','ADSET_PAUSED'] }])
+        limit: '100'
       });
+      console.log(`Meta creatives: ${account.name} first page returned ${page?.data?.length || 0} ads, next=${!!page?.paging?.next}`);
       let pageNum = 1;
       while (page && pageNum <= 30) {
         if (page.data) {
