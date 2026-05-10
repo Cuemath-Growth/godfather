@@ -8770,10 +8770,13 @@ function _runLivePauseRefresh(from, to) {
       return Object.assign({}, a, { mature: m });
     });
 
-    // Winners: tier1 + tier2 (ads with no mature cohort skipped - feedback_cohort_maturity.md).
+    // Winners: tier1 + tier2 (cohort-mature) + evidence (current-data, may have no mature cohort).
+    // Previously skipped `_matureMissing` ads outright per feedback_cohort_maturity. C1b (May 11):
+    // evidence-path classifies on raw data, so ads without a mature cohort still get a chance.
+    // _classifyWinner returns 'evidence' / 'tier1' / 'tier2' / null and applies brand-awareness
+    // exclusion internally.
     const winners = [];
     annotated.forEach(a => {
-      if (a._matureMissing) return;
       const tier = _classifyWinner(a);
       if (!tier) return;
       const m = a.mature || {};
@@ -8783,7 +8786,7 @@ function _runLivePauseRefresh(from, to) {
         _displayTD: m.td !== undefined ? m.td : a.td,
         _displayQL: m.ql !== undefined ? m.ql : a.ql,
         _displaySpend: m.spend !== undefined ? m.spend : a.spend,
-        _matureCohortDays: COHORT_MATURITY_DAYS,
+        _matureCohortDays: a._matureMissing ? 0 : COHORT_MATURITY_DAYS,
       }));
     });
 
@@ -8944,7 +8947,65 @@ function _runLivePauseRefresh(from, to) {
       },
     });
 
-    // Verdict 3 (meta_refresh_fatigued_winner) intentionally lives in chassis-pause-remaining
+    // -- Verdict 3: Evidence (early winner — current data, may not yet be cohort-mature) -------
+    // C1b (Naina May 11): TDs ≥ 3 with green CPTD + green CPTQL on raw data is concrete proof
+    // before the 14-day cohort window matures. Surfaces winners that tier1/tier2 miss because
+    // they require mature-cohort data. Feeds Match Engine SHIP cards alongside tier1/tier2.
+    ci.registerVerdict({
+      id: 'meta_scale_evidence_winner',
+      tool: 'godfather',
+      channel: 'meta',
+      detect: function(data, context) {
+        const market = (context && context.market) || 'all';
+        const prep = _chassisScalePrepAds(market);
+        const winners = prep.winners;
+        const out = [];
+        for (let i = 0; i < winners.length; i++) {
+          const w = winners[i];
+          if (w._tier !== 'evidence') continue;
+          const adj = (typeof _findAdjacentAudience === 'function')
+            ? _findAdjacentAudience(w, winners) : null;
+          const why = (typeof _winnerWhy === 'function')
+            ? _winnerWhy(w)
+            : 'Early evidence: ' + (w.td || 0) + ' TDs at INR ' + Math.round(w.cptd || 0).toLocaleString('en-IN') + ' CPTD + green CPTQL — concrete outcome before the cohort window matured.';
+          const adjLine = adj ? ' Adjacent audience to test: ' + adj.audience + ' (' + adj.source + ').' : '';
+          out.push({
+            entity_type: 'ad',
+            entity_id: w.adName,
+            market: w.market || 'unknown',
+            // Evidence path may have no mature cohort yet — pass 0 so the cohort_matured
+            // guardrail doesn't block it. The path itself replaces the cohort gate with the
+            // TD-≥-3 + green-both gate.
+            cohort_age_days: w._matureCohortDays || 0,
+            spend: w.spend || 0,
+            window_days: 90,
+            signal: 'Early evidence — ' + (w.td || 0) + ' TDs, ' + (w.ql || 0) + ' QLs at INR ' + Math.round(w.cptd || 0).toLocaleString('en-IN') + ' CPTD',
+            why: why + adjLine,
+            raw_metrics: {
+              tier: 'evidence', td: w.td, ql: w.ql,
+              cptd: w.cptd, cptql: w.cptql, spend: w.spend,
+              campaign_audience: (w.tags && w.tags.campaign_audience) || null,
+              suggested_audience: adj ? adj.audience : null,
+              suggested_audience_source: adj ? adj.source : null,
+            },
+          });
+        }
+        return out;
+      },
+      scoreSeverity: function(signal) { return _chassisScaleSeverity(signal, 1.5); },
+      scoreConfidence: function() { return C.LIKELY; },
+      scoreEffort: function() { return E.FIVE_MIN; },
+      guardrails: ['not_recently_dismissed'],
+      action: { label: 'Scale early evidence', type: 'scale' },
+      whyNow: function(signal) {
+        const adj = signal.raw_metrics && signal.raw_metrics.suggested_audience;
+        return adj
+          ? 'Concrete TDs ≥3 with green metrics — promising signal before cohort matures. Test on ' + adj + ' while creative is still fresh.'
+          : 'Concrete TDs ≥3 with green metrics — worth scaling now while the creative is hot, rather than waiting for the 14-day cohort to mature.';
+      },
+    });
+
+    // Verdict 4 (meta_refresh_fatigued_winner) intentionally lives in chassis-pause-remaining
     // co-located with the fatigued-loser sibling under registerMetaPauseVerdicts (both share
     // the detectFatigue() detector). Removed from this branch on 2026-04-29 to avoid
     // double-registration when both branches merge to main. See CHANGELOG note below.
@@ -10934,20 +10995,38 @@ const AUDIENCE_FAMILIES = {
 // The QL > TD clause rejects the 100%-conversion clamp / cohort-artifact case the user flagged
 // (3 QLs / 3 TDs @ ₹7.3K looks magical but is either data drift or a sample too small to trust).
 function _classifyWinner(ad) {
-  // Phase 7: evaluate against mature cohort if annotated (Make More path). Fall back to
-  // raw ad metrics (e.g. Pause Now's Refresh detection still classifies against current snapshot).
-  const src = ad.mature || ad;
   const mkt = ad.market || 'US';
   const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
   const cptdGreen = th.cptd?.green || 35000;
   const cptdAmber = th.cptd?.amber || 50000;
   const cpqlGreen = th.cpql?.green || 10000;
+  const MIN_SPEND = 25000;
+
+  // Brand-awareness exclusion (C1b — Naina May 11) — these ads don't optimize for QL/TD.
+  if (typeof _isBrandAwarenessAd === 'function' && _isBrandAwarenessAd(ad.adName, ad.campaignName)) return null;
+
+  // EVIDENCE path FIRST (current data, regardless of mature cohort). Per
+  // feedback_winner_gate_evidence_first.md (May 11): concrete TDs ≥ 3 at green CPTD + green
+  // CPTQL is proof; cohort age doesn't matter. Surfaces early winners the cohort path misses.
+  const evSpend = ad.spend || 0;
+  const evTd = ad.td || 0;
+  const evQl = ad.ql || 0;
+  const evCptd = ad.cptd;
+  const evCptql = ad.cptql;
+  const evHasCptd = evCptd !== null && evCptd !== undefined && evCptd > 0;
+  const evHasCptql = evCptql !== null && evCptql !== undefined && evCptql > 0;
+  if (evSpend >= MIN_SPEND && evTd >= 3 && evHasCptd && evCptd <= cptdGreen && evHasCptql && evCptql <= cpqlGreen
+      && evQl > evTd && evQl >= evTd * 2.5) {
+    return 'evidence';
+  }
+
+  // COHORT-MATURE path — original tier1/tier2 (uses mature snapshot if available).
+  const src = ad.mature || ad;
   const td = src.td || 0;
   const ql = src.ql || 0;
   const spend = src.spend || 0;
   const cptd = src.cptd;
   const cptql = src.cptql;
-  const MIN_SPEND = 25000;
   const hasCPTD = cptd !== null && cptd !== undefined && cptd > 0;
   const hasCPTQL = cptql !== null && cptql !== undefined && cptql > 0;
 
@@ -17729,8 +17808,11 @@ function _winningCreativesTable(data) {
     const cptdGreen = th.cptd?.green || 35000;
     const ageDays = _adAgeDays(c);
 
-    // EVIDENCE path: ≥3 TDs with both metrics in green (no age gate — proof overrides cohort)
-    const evidencePath = td >= 3 && cptd <= cptdGreen && cptql <= cptqlGreen;
+    // EVIDENCE path: ≥3 TDs with both metrics in green (no age gate — proof overrides cohort).
+    // Also requires spend ≥ VERDICT_SPEND_FLOOR per-market so micro-volume coincidences don't
+    // qualify (C1b alignment with getCreativeVerdict — closes a 33-ad gap caught May 11).
+    const _evFloor = (typeof VERDICT_SPEND_FLOOR !== 'undefined' && VERDICT_SPEND_FLOOR[mkt]) || 5000;
+    const evidencePath = td >= 3 && cptd <= cptdGreen && cptql <= cptqlGreen && spend >= _evFloor;
     // COHORT-MATURE path: ≥14d + volume floor + ≥2 TDs + both metrics in amber
     const cohortPath = ageDays >= COHORT_DAYS && tql >= (VOLUME_FLOORS[mkt] || 3) && td >= 2 && cptql <= cptqlAmber && cptd <= cptdAmber;
     if (!evidencePath && !cohortPath) return;
