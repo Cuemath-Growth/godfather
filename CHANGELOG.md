@@ -4,6 +4,22 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Hot-fix #4 — Revert "Preview ↗" (Meta Ad Library is empty for Cuemath ads) (2026-05-11)
+
+### Why
+Naina confirmed May 11 on prod: clicking `Preview ↗` opens Meta Ad Library with `No ads match your search criteria. The ad you searched doesn't exist.` Cuemath's commercial India/US/AUS ads don't fall under Meta's transparency rules (EU + political only), so the Library by-ID lookup is a dead end for our inventory. The Preview button was adding clutter for zero value. Reverting.
+
+### What changed (`index.html`)
+
+- Removed the `_metaAdLibraryUrl(adId)` helper (was `:7416`).
+- All 4 card sites (SHIP winner row, Pause, Make More, Funnel rec cell) now render a single "Open in Meta ↗" link again (with the clipboard workaround intact from Hot-fix #2). Same purple `text-accent-purple` styling.
+
+### What's still pending the real fix
+- Visual verification "which ad is this?" — current answer is to populate `metaCreatives` so thumbnails render on cards (debugging in progress; live `callMetaAPI` test on prod May 11 returned 3 ads with creative data, but `fetchMetaCreatives` orchestration produces 0 — investigating root cause).
+- "Open in Meta ↗" still lands operator in haystack with name in clipboard. The 2-click flow stays.
+
+---
+
 ## Hot-fix #3 — Add Meta Ad Library "Preview ↗" alongside "Manage ↗" (2026-05-11)
 
 ### Why
