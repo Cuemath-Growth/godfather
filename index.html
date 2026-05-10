@@ -203,9 +203,9 @@
           <button onclick="setFlowFilter('pla')" data-flow="pla" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">PLA</button>
         </div>
         <div class="h-3 w-px bg-gray-200 shrink-0"></div>
-        <div id="attributionModeGroup" class="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 shrink-0" title="Attribution mode. Cohort = TDs grouped by the date the LEAD came in (apples-to-apples per ad). MTD = TDs grouped by the date the TRIAL happened (current operations view). Default Cohort.">
+        <div id="attributionModeGroup" class="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 shrink-0" title="Attribution mode. Cohort = TDs grouped by the date the LEAD came in (apples-to-apples per ad). MTD = TDs grouped by the date the TRIAL happened — wiring in progress, MTD currently affects only Tagger Funnel.">
           <button onclick="setAttributionMode('cohort')" data-attr-mode="cohort" class="attr-mode-btn px-2 py-1 rounded-md text-[11px] font-bold text-accent-purple bg-white shadow-sm transition">Cohort</button>
-          <button onclick="setAttributionMode('mtd')" data-attr-mode="mtd" class="attr-mode-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">MTD</button>
+          <button onclick="setAttributionMode('mtd')" data-attr-mode="mtd" disabled class="attr-mode-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted opacity-50 cursor-not-allowed transition" title="MTD attribution wired only on Tagger Funnel right now. Other surfaces (Pause Now, Match Engine, Tagger Tree, Winning Creatives, Hero KPIs) still aggregate against cohort. Full wiring is the next slice — disabled here until it lands so the toggle doesn't promise a behavior it can't deliver.">MTD</button>
         </div>
         <span class="text-[9px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 cursor-help" title="Godfather scope: Meta only. Google/Influencer/WhatsApp/BTL leads are excluded from KPIs. For all-channel BAU MTD, see the perf tracker leads tab.">Meta only</span>
         <span id="dataDateRange" class="text-[9px] text-text-muted shrink-0" style="display:none"></span>
