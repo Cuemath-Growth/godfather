@@ -10564,8 +10564,11 @@ function _buildOpportunityCardHtml(o, idx) {
       : '<div class="w-8 h-8 rounded bg-surface-tertiary shrink-0"></div>';
     // Prefer act_* directly over market-label lookup. With _account_id captured upstream the
     // deep link now lands on the right account instead of the user's default.
-    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account_id || w._account || o.source_market, w.ad_name) : '';
-    const _linkHtml = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${_adName.replace(/'/g, "\\'")}');" title="Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter — Meta's URL filter API doesn't work, this is the reliable workaround." class="text-[10px] text-accent-purple hover:underline whitespace-nowrap shrink-0">Open in Meta ↗</a>` : '';
+    // Meta deep-link removed May 11 v3 — Meta's URL filter API has no working schema for
+    // single-ad deep-link in their current Ads Manager (tried selected_ad_ids alone,
+    // filter_set ad.id IN, ad.name CONTAIN, ad.name CONTAINS — all dropped server-side).
+    // Identification is via thumbnail + ad name (click-to-copy) + campaign › adset hierarchy
+    // on this row. If you need to act in Meta, copy the name and search Meta's UI manually.
     // Campaign · ad set as a small subtitle line so the operator can see hierarchy without
     // clicking through. Hover shows the full string.
     const _campAdset = [w.campaign_name, w.adset_name].filter(Boolean).join(' › ');
@@ -10583,7 +10586,6 @@ function _buildOpportunityCardHtml(o, idx) {
       </div>
       ${_pathBadge}
       <span class="text-[10px] text-text-muted shrink-0">${_cptd} CPTD</span>
-      ${_linkHtml}
     </div>`;
   }).join('');
   const winnersBlock = winnerRowsHtml
@@ -10844,8 +10846,9 @@ function renderOracleCardsV2() {
     const thumbHtml = _oracleThumbnail(a.name);
 
     // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
-    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(a.ad_id, a._account || a.market, a.name) : '';
-    const metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(a.name||'').replace(/'/g, "\\'")}');" title="Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter." class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta ↗</a>` : '';
+    // Meta deep-link removed May 11 v3 — see comment in SHIP card section. Identification
+    // is via the displayName + campaign + adset already rendered above (click-to-copy on name).
+    const metaLinkInline = '';
 
     // Secondary fields collapse into a <details> block. Campaign + ad set now surface
     // on the primary line, so Why · this-week is the only thing left in details.
@@ -11253,8 +11256,8 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     const _campCtx = w.campaignContext || w.campaignName || '';
     const _adSet = w.adSetName || '';
     // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
-    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account || mkt, w.adName) : '';
-    const _metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(w.adName||'').replace(/'/g, "\\'")}');" title="Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter." class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta \u2197</a>` : '';
+    // Meta deep-link removed May 11 v3 \u2014 see comment in SHIP card section.
+    const _metaLinkInline = '';
     const _whyHtml = why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>` : '';
     const _audHtml = currentAud ? `<p class="text-[11px] text-text-muted mt-1" title="${esc(audFmt.tooltip)}">Running on <strong>${currentAud}</strong>${audFmt.subtitleLines[0] ? ' \u00B7 ' + audFmt.subtitleLines[0] : ''}</p>` : '';
     const _detailsHtml = (_whyHtml || _audHtml)
@@ -17431,8 +17434,9 @@ function _funnelRecCell(row, chassisByAd) {
   // Best-in-class Meta-AI (2026-05-09): one click to navigate from Tagger Funnel to Ads Manager.
   const _adId = row.ad_id || '';
   const _acct = row.account || row._account || row.market || '';
-  const _metaUrl = (_adId && typeof _metaDeepLink === 'function') ? _metaDeepLink(_adId, _acct, row.ad_name) : '';
-  const _metaLink = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(row.ad_name||'').replace(/'/g, "\\'")}');" title="Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter." class="text-[10px] text-accent-purple hover:underline ml-1 whitespace-nowrap">Open in Meta ↗</a>` : '';
+  // Meta deep-link removed May 11 v3 — see comment in SHIP card section. The ad name + adset
+  // are already in the row label cell; click-to-copy lives there.
+  const _metaLink = '';
   const _adSet = row.adset_name ? `<span class="text-[10px] text-text-muted truncate max-w-[200px]" title="${_funnelEsc(row.adset_name)}">${_funnelEsc(row.adset_name)}</span>` : '';
   if (!v) {
     if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>${_metaLink}`;
