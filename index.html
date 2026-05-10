@@ -4855,7 +4855,14 @@ function loadCachedCreatives() {
   return false;
 }
 
+// Deduplication: if a fetch is already in-flight, callers get the same promise
+// instead of triggering a parallel call that compounds rate-limit pressure.
+let _fetchMetaCreativesPromise = null;
 async function fetchMetaCreatives(force = false) {
+  if (_fetchMetaCreativesPromise) {
+    console.log('Meta creatives: dedup — returning in-flight promise');
+    return _fetchMetaCreativesPromise;
+  }
   const accounts = state.metaApi?.accounts || META_AD_ACCOUNTS;
   if (!accounts?.length) return;
   // Skip if data is fresh (< 24 hours) unless forced
@@ -4864,22 +4871,22 @@ async function fetchMetaCreatives(force = false) {
     console.log('Meta creatives: skipping — data is < 24h old. Use Settings > Refresh to force.');
     return;
   }
+  _fetchMetaCreativesPromise = (async () => {
   const all = [];
   for (const account of accounts) {
     console.log(`Meta creatives: fetching ${account.name} (${account.id})…`);
     try {
-      // Note (2026-05-11): `filtering` parameter was previously sending effective_status IN [...]
-      // but Naina's prod test confirmed orchestrated fetch returned 0 ads even though a direct
-      // callMetaAPI WITHOUT filtering returned 3 ads with creative data. Dropping the filter so
-      // we get whatever Meta returns first (typically most recent ads). Page cap (30 below)
-      // bounds the total. If we need status filtering later, do it client-side after the fetch.
+      // Note (2026-05-11): `filtering` parameter was dropped because it returned 0 ads
+      // even though direct callMetaAPI without filtering returned 3 with creative data.
+      // Page cap reduced 30 → 8 (2026-05-11 v2) after Naina hit "too many calls to this
+      // ad-account" rate-limit on ROW. 8 pages × 100 ads × 3 accounts = 2400 ads cap.
       let page = await callMetaAPI(`${account.id}/ads`, {
         fields: 'id,name,creative{thumbnail_url,image_url},status,effective_status',
         limit: '100'
       });
       console.log(`Meta creatives: ${account.name} first page returned ${page?.data?.length || 0} ads, next=${!!page?.paging?.next}`);
       let pageNum = 1;
-      while (page && pageNum <= 30) {
+      while (page && pageNum <= 8) {
         if (page.data) {
           page.data.forEach(ad => {
             all.push({
@@ -4903,9 +4910,23 @@ async function fetchMetaCreatives(force = false) {
         const u = new URL(next);
         const ep = u.pathname.replace(/\/v\d+\.\d+\//, '');
         const p = {}; u.searchParams.forEach((v, k) => { if (k !== 'access_token') p[k] = v; });
-        page = await callMetaAPI(ep, p);
+        try {
+          page = await callMetaAPI(ep, p);
+        } catch (e) {
+          if (/too many calls/i.test(e.message)) {
+            console.warn(`Meta creatives: ${account.name} rate-limited on page ${pageNum}, backing off 30s then retrying once`);
+            await sleep(30000);
+            try { page = await callMetaAPI(ep, p); } catch (e2) {
+              console.warn(`Meta creatives: ${account.name} retry failed, moving to next account (got ${pageNum - 1} pages)`);
+              break;
+            }
+          } else { throw e; }
+        }
       }
     } catch(e) { console.error(`Creatives ${account.name}:`, e.message); }
+    // Inter-account breather — gives Meta's per-account rate window time to refill before
+    // we hammer the next one. ROW especially needs this since it has the most ads.
+    await sleep(5000);
   }
   metaCreatives = all;
   console.log(`Meta creatives: ${all.length} ads from ${accounts.length} accounts`);
@@ -4916,6 +4937,12 @@ async function fetchMetaCreatives(force = false) {
   _safeCacheSet('gf_v2_creativesTs', Date.now().toString());
   // Re-render oracle cards with thumbnails
   if (state.currentView === 'dashboard') try { renderOracleCardsV2(); } catch(e) {}
+  })();
+  try {
+    return await _fetchMetaCreativesPromise;
+  } finally {
+    _fetchMetaCreativesPromise = null;
+  }
 }
 
 // ── Section 4: Daily Ad Insights + Fatigue Detection ──
