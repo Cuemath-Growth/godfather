@@ -17745,9 +17745,12 @@ function _winningCreativesTable(data) {
       const vBadge = v.key === 'scale' ? 'bg-green-100 text-green-800' : 'bg-emerald-100 text-emerald-700';
       const action = v.key === 'scale' ? 'Scale +30% budget' : 'Hold spend; brief V2';
       const reasonAttr = (v.reason||'').replace(/"/g,'&quot;');
+      const _pathBadge = q.path === 'evidence'
+        ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-purple-light text-accent-purple font-bold uppercase tracking-wider" title="Evidence path: ≥3 TDs with green CPTD + green CPTQL. Cohort age ${q.ageDays != null ? q.ageDays + 'd' : 'unknown'} — not gated.">Early ev.</span>`
+        : `<span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-green-light text-accent-green font-bold uppercase tracking-wider" title="Cohort-mature path: ${q.ageDays != null ? q.ageDays + 'd' : '14d+'} live, amber CPTD + amber CPTQL, volume floor met.">Mature</span>`;
       body += `<tr class="border-b border-gray-100 hover:bg-gray-50">
         <td class="px-2 py-2">${thumb ? `<img src="${thumb}" class="w-9 h-9 rounded object-cover" onerror="this.style.display='none'"/>` : '<div class="w-9 h-9 rounded bg-gray-100"></div>'}</td>
-        <td class="px-2 py-2 font-medium truncate" style="max-width:220px" title="${name.replace(/"/g,'&quot;')}">${shortAdName(name)}</td>
+        <td class="px-2 py-2 font-medium" style="max-width:220px"><div class="flex items-center gap-1.5"><span class="truncate" title="${name.replace(/"/g,'&quot;')}">${shortAdName(name)}</span>${_pathBadge}</div></td>
         <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-muted">${q.mkt}</span></td>
         <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700">${tagLabel(aud)}</span></td>
         <td class="px-2 py-2 text-right">${formatCurrency(q.spend)}</td>
@@ -17764,7 +17767,7 @@ function _winningCreativesTable(data) {
   const _coverageNote = _coverageSkipped > 0 ? ` · <span class="text-amber-700">${_coverageSkipped} hidden — incomplete spend in window (run "Backfill Full History" in Settings)</span>` : '';
   return `<div class="mb-6">
     <h3 class="text-base font-bold mb-1">\u{1F3C6} Winning Creatives</h3>
-    <p class="text-xs text-text-muted mb-3">${qualified.length} creative${qualified.length>1?'s':''} passing all 4 gates in their own market: TQL volume floor, CPTQL ≤ target, CPTD ≤ target, ≥14 days live. Sorted by CPTD within each market — never cross-ranked.${_coverageNote}</p>
+    <p class="text-xs text-text-muted mb-3">${qualified.length} creative${qualified.length>1?'s':''} passing in their own market. <span class="text-accent-purple font-semibold">Early evidence</span> = ≥3 TDs + green CPTD + green CPTQL (any age). <span class="text-accent-green font-semibold">Mature</span> = ≥14d + volume floor + amber both + ≥2 TDs. Brand-awareness ads excluded. Evidence rows first, then CPTD asc — never cross-ranked across markets.${_coverageNote}</p>
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
       <table class="w-full text-[11px]">
         <thead><tr class="bg-surface-secondary border-b border-gray-200 text-text-muted text-[10px] uppercase tracking-wider">
