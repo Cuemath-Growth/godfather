@@ -17877,9 +17877,16 @@ function _winningCreativesTable(data) {
       const _pathBadge = q.path === 'evidence'
         ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-purple-light text-accent-purple font-bold uppercase tracking-wider" title="Evidence path: ≥3 TDs with green CPTD + green CPTQL. Cohort age ${q.ageDays != null ? q.ageDays + 'd' : 'unknown'} — not gated.">Early ev.</span>`
         : `<span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-green-light text-accent-green font-bold uppercase tracking-wider" title="Cohort-mature path: ${q.ageDays != null ? q.ageDays + 'd' : '14d+'} live, amber CPTD + amber CPTQL, volume floor met.">Mature</span>`;
+      // Surface campaign › adset under the ad name so duplicate-looking rows are visually
+      // distinguishable — same creative deployed across multiple campaigns/audiences shows up
+      // as separate ads, this line tells them apart at a glance. (Naina May 11 v3.)
+      const _campRaw = c['Campaign name'] || c.campaign || c['campaign_name'] || '';
+      const _adsetRaw = c['Ad set name'] || c['ad set name'] || c.adset_name || '';
+      const _hier = [_campRaw, _adsetRaw].filter(Boolean).join(' › ');
+      const _hierHtml = _hier ? `<p class="text-[9px] text-text-muted truncate mt-0.5" title="${_hier.replace(/"/g,'&quot;')}">${_hier}</p>` : '';
       body += `<tr class="border-b border-gray-100 hover:bg-gray-50">
         <td class="px-2 py-2">${thumb ? `<img src="${thumb}" class="w-9 h-9 rounded object-cover" onerror="this.style.display='none'"/>` : '<div class="w-9 h-9 rounded bg-gray-100"></div>'}</td>
-        <td class="px-2 py-2 font-medium" style="max-width:220px"><div class="flex items-center gap-1.5"><span class="truncate" title="${name.replace(/"/g,'&quot;')}">${shortAdName(name)}</span>${_pathBadge}</div></td>
+        <td class="px-2 py-2 font-medium" style="max-width:220px"><div class="flex items-center gap-1.5"><span class="truncate" title="${name.replace(/"/g,'&quot;')}">${shortAdName(name)}</span>${_pathBadge}</div>${_hierHtml}</td>
         <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-surface-tertiary text-text-muted">${q.mkt}</span></td>
         <td class="px-2 py-2"><span class="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-700">${tagLabel(aud)}</span></td>
         <td class="px-2 py-2 text-right">${formatCurrency(q.spend)}</td>
