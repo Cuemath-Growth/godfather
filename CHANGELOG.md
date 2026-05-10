@@ -4,6 +4,68 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## C1a — Verdict-layer hardening: evidence-first gate + brand-awareness exclusion + Pause same-message (2026-05-11)
+
+### Why
+Three intertwined verdict-layer issues caught during Naina's May 10–11 walkthrough:
+
+1. **"Only 1 winner in 30 days"** when several ads clearly were winning by evidence — they just hadn't matured 14 days yet. The 14-day cohort gate was throwing away early winners. Naina's framing: "If TDs > 3, cohort age doesn't matter — TDs are the outcome." Decision saved in `feedback_winner_gate_evidence_first.md`.
+2. **Brand-awareness Video on Pause Now** — category-wrong verdict. Reach-objective ads optimize for impressions, not QL/TD; judging them on CPTQL is meaningless.
+3. **Same message across multiple Pause cards** — operator couldn't distinguish similar driver lines on a quick scan. `_why` already carries the specific reason but is hidden inside a collapsed `<details>`.
+
+### What changed (`index.html`)
+
+**New helper `_isBrandAwarenessAd(adName, campaignName)`** (`:7416+`)
+- Regex on `_Brand_Awareness_` / `_Awareness_Traffic_` / `_Reach_lift` / `_Recall_lift` / `_Traffic_Maximise_Reach` / `_Brand_Lift_` / `_Awareness_Reach_`. Matches Cuemath naming convention. Conversion ads (`_Leads_Conv_`) pass through untouched.
+
+**`getCreativeVerdict` restructured** (`:18162`)
+- New rule 0 — brand-awareness early return → `Brand-Awareness` verdict, gray, excluded from Pause/Refresh/Scale signals.
+- New rule 2 — **EVIDENCE WINNER** path moved BEFORE the age gates. If TDs ≥ 3 AND CPTD ≤ green AND CPTQL ≤ green → Scale verdict, regardless of cohort age. The reason text appends `· early evidence at Nd` when age < 14d so operator knows the ad is young.
+- Old rule 6 (Scale check after age gates) deleted — its logic moved to rule 2.
+- Old rules 1–5 (Too early, Testing, Funnel break, Pause, Fatigued-trend) preserved, now firing only when evidence path doesn't qualify.
+- Net effect: ads with concrete TDs ≥ 3 + green metrics surface as Scale even at age < 14d. Previously they were dropped into Testing.
+
+**`_winningCreativesTable` dual-path** (`:17613`)
+- Brand-awareness ads skipped (counted as `_baExcluded`, available for future surfacing).
+- Two qualification paths:
+  - **EVIDENCE**: TDs ≥ 3 AND CPTD ≤ green AND CPTQL ≤ green. No age gate.
+  - **COHORT-MATURE**: age ≥ 14d AND TQL ≥ volume floor AND TDs ≥ 2 AND CPTQL ≤ amber AND CPTD ≤ amber.
+- Each `qualified` row tags itself with `path: 'evidence' | 'cohort'` and `ageDays`.
+- Per-market section heading splits the count: `US · 4 early evidence · 12 mature` (purple/green color separation). Sort within market puts evidence rows first.
+- Empty-state copy explains the two paths so operator knows what to loosen.
+- Expected effect: more rows in the table once ads with TDs ≥ 3 but age < 14d join. The "only 1 winner" mystery resolves into "1 mature + N early evidence".
+
+**Pause card same-message fix** (`:10734`)
+- `<details>` for Why · this week auto-opens on the first 3 cards (`idx < 3`). Operator sees the specific `_why` reason without clicking. Cards 4+ stay collapsed to keep the list scannable.
+- Matches the SHIP card auto-expand pattern from Sweep #4.
+
+### Not changed (intentionally — separate scope)
+- Chassis Scale verdicts (`meta_scale_tier1_winner` / `meta_scale_tier2_winner` in `_runLivePauseRefresh`) still use their own gates. Brand-awareness exclusion + evidence-path gate for those is a follow-up in C1b — they feed Match Engine and need careful baseline diff before changing.
+- Cohort/MTD global toggle — designed in plan, slated for C1b.
+- Same-message bug at the chassis level (where `_signal` text comes from) — `getCreativeVerdict` reasons are already per-rule specific; chassis `_signal` strings already include market thresholds and absolute numbers per `:8222`+. If two ads still produce truly-identical signals, that's a chassis text-templating fix, deferred.
+
+### How to verify (after deploy)
+
+1. Run baseline snapshot BEFORE deploy lands, then again after:
+   ```js
+   console.log({
+     winningCreatives: state.taggerData?.filter(c => { const v = getCreativeVerdict(c); return v?.key === 'scale' || v?.key === 'working'; }).length,
+     scaleVerdicts: state.taggerData?.filter(c => getCreativeVerdict(c).key === 'scale').length,
+     pauseVerdicts: state.taggerData?.filter(c => getCreativeVerdict(c).key === 'pause').length,
+     brandAwareness: state.taggerData?.filter(c => getCreativeVerdict(c).label === 'Brand-Awareness').length,
+   });
+   ```
+2. Tagger › Patterns → Winning Creatives. Section header should now read `MARKET · N early evidence · M mature` instead of bare count. Early-evidence rows appear above mature rows within each market.
+3. Find an ad named `…_Brand_Awareness_…` in Tagger Tree → verdict should read `Brand-Awareness` (gray), not `Pause`.
+4. Pause Now: top 3 cards' Why details are open by default. Cards 4+ collapsed.
+
+### Side-effects to watch
+- More Scale verdicts → more ads on Match Engine SHIP cards (early evidence ads join the winner pool). Check `metaAI.opportunities().length` before/after.
+- Brand-awareness ads disappear from Pause Now / Winning Creatives. If you were expecting them there, that's the bug — they now route to their own verdict.
+- The `path` field on each Winning Creatives row is internal; if downstream code reads the row shape, no breakage (added field, not changed).
+
+---
+
 ## Hot-fix #4 — Revert "Preview ↗" (Meta Ad Library is empty for Cuemath ads) (2026-05-11)
 
 ### Why

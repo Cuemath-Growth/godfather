@@ -7440,6 +7440,18 @@ function _adSourceTag(ad) {
   return ad && ad._hasCRM ? '[CRM]' : '[META]';
 }
 
+// Brand-awareness / Reach / Awareness-Traffic objectives don't optimize for QL or TD —
+// they optimize for impressions, frequency, recall. Judging them on CPTQL/CPTD is category-
+// wrong (per `feedback_verdict_layer_must_be_model_not_rules` and Naina's May 11 catch:
+// brand-awareness Video on Pause Now was a category error). Detected via ad-name token per
+// Cuemath naming convention. Conversion ads (the standard performance flow) carry `_Conv_`
+// and pass through — only the explicit brand-awareness tokens hit this exclusion.
+const _BRAND_AWARENESS_RE = /(_Brand_Awareness_|_Awareness_Traffic_|_Reach_lift|_Recall_lift|_Traffic_Maximise_Reach|_Brand_Lift_|_Awareness_Reach_)/i;
+function _isBrandAwarenessAd(adName, campaignName) {
+  const haystack = `${adName || ''} ${campaignName || ''}`;
+  return _BRAND_AWARENESS_RE.test(haystack);
+}
+
 // Click-from-format-chip: filter Tagger by Video/Static and navigate.
 function _filterTaggerByFormat(fmt) {
   const cap = String(fmt || '').charAt(0).toUpperCase() + String(fmt || '').slice(1).toLowerCase();
@@ -10717,8 +10729,11 @@ function renderOracleCardsV2() {
     // on the primary line, so Why · this-week is the only thing left in details.
     const whyHtml = a._why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${a._why}</p>` : '';
     const trendHtml = a._trend ? `<p class="text-[11px] text-text-muted mt-1">This week: ${a._trend.label} ${formatCurrency(a._trend.twSpend)}</p>` : '';
+    // Same-message fix (Naina May 11): auto-open Why on first 3 Pause/Refresh cards so the
+    // specific reason is visible without clicking. Cards with similar driver text (CPTQL above
+    // amber etc.) read alike on a scan; Why differentiates them.
     const detailsHtml = (whyHtml || trendHtml)
-      ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why · this week</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}${trendHtml}</div></details>`
+      ? `<details class="mt-1"${idx < 3 ? ' open' : ''}><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why · this week</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}${trendHtml}</div></details>`
       : '';
 
     return `<div class="p-4 border rounded-xl ${cardBg} ${opacity}" data-item-id="${itemId}" data-item-name="${displayName}">
@@ -17606,9 +17621,11 @@ function _taggerItemId(adName, verdict) {
   return 'tagger:' + verdict + ':' + normalizeAdName(adName);
 }
 
-// Winning Creatives — cross-market table of ads passing all 4 gates in their own market.
-// Gates: TQL volume floor · CPTQL ≤ cpnri.amber · CPTD ≤ cptd.amber · age ≥ 14d.
-// TQL = NRI for US, QL for everywhere else (per data-schemas.md).
+// Winning Creatives — cross-market table of ads passing the winner gate in their own market.
+// Two paths (Naina May 11 decision per `feedback_winner_gate_evidence_first`):
+//   EVIDENCE path:   TDs ≥ 3 AND CPTD ≤ green AND CPTQL ≤ green (cohort age irrelevant)
+//   COHORT-MATURE:   age ≥ 14d AND TQL ≥ volume floor AND CPTQL ≤ amber AND CPTD ≤ amber AND TDs ≥ 2
+// TQL = NRI for US, QL elsewhere. Brand-awareness ads excluded (don't optimize for QL/TD).
 // Per markets-are-silos rule: grouped by market, never cross-ranked.
 function _winningCreativesTable(data) {
   const VOLUME_FLOORS = { US: 5, India: 10, AUS: 3, APAC: 3, MEA: 3, UK: 3, EU: 3, ROW: 3 };
@@ -17639,24 +17656,33 @@ function _winningCreativesTable(data) {
 
   const qualified = [];
   let _coverageSkipped = 0;
+  let _baExcluded = 0;
   data.forEach(c => {
     const mkt = extractMarket(c) || 'US';
     const th = SENTINEL_THRESHOLDS[mkt] || SENTINEL_THRESHOLDS['US'];
+    const adName = c['Ad name'] || c['ad name'] || '';
+    const campaignName = c['Campaign name'] || c['campaign'] || c['campaign_name'] || '';
+    // Brand-awareness exclusion — non-conversion objectives don't belong in QL/TD winner table.
+    if (_isBrandAwarenessAd(adName, campaignName)) { _baExcluded++; return; }
     const spend = parseNumber(c['Spent']||c['spent']||0);
     const ql = parseNumber(c['QL']||c['ql']||0);
     const nri = parseNumber(c['NRI']||c['nri']||0);
     const td = parseNumber(c['TD']||c['td']||0);
     const tql = mkt === 'US' ? nri : ql;
-    if (tql < (VOLUME_FLOORS[mkt] || 3)) return;
-    if (td < 2) return;
+    if (spend <= 0 || td <= 0) return;
     const cptql = tql > 0 ? spend / tql : Infinity;
-    const cptd = td > 0 ? spend / td : Infinity;
-    const cptqlGate = th.cpnri?.amber || th.cpql?.amber || 15000;
-    const cptdGate = th.cptd?.amber || 50000;
-    if (cptql > cptqlGate) return;
-    if (cptd > cptdGate) return;
+    const cptd = spend / td;
+    const cptqlAmber = th.cpnri?.amber || th.cpql?.amber || 15000;
+    const cptdAmber = th.cptd?.amber || 50000;
+    const cptqlGreen = th.cpnri?.green || th.cpql?.green || 10000;
+    const cptdGreen = th.cptd?.green || 35000;
     const ageDays = _adAgeDays(c);
-    if (ageDays < COHORT_DAYS) return;
+
+    // EVIDENCE path: ≥3 TDs with both metrics in green (no age gate — proof overrides cohort)
+    const evidencePath = td >= 3 && cptd <= cptdGreen && cptql <= cptqlGreen;
+    // COHORT-MATURE path: ≥14d + volume floor + ≥2 TDs + both metrics in amber
+    const cohortPath = ageDays >= COHORT_DAYS && tql >= (VOLUME_FLOORS[mkt] || 3) && td >= 2 && cptql <= cptqlAmber && cptd <= cptdAmber;
+    if (!evidencePath && !cohortPath) return;
 
     // Coverage sanity: if ad launched on/after the filter window's `from` date,
     // its date-filtered spend should equal its all-time spend. If it's less than
@@ -17679,24 +17705,33 @@ function _winningCreativesTable(data) {
       }
     }
 
-    qualified.push({ c, mkt, spend, tql, td, cptql, cptd, tqlToTd: tql > 0 ? (td/tql*100) : 0 });
+    qualified.push({ c, mkt, spend, tql, td, cptql, cptd, tqlToTd: tql > 0 ? (td/tql*100) : 0, ageDays, path: evidencePath ? 'evidence' : 'cohort' });
   });
 
   if (!qualified.length) {
     return `<div class="mb-6">
       <h3 class="text-base font-bold mb-1">\u{1F3C6} Winning Creatives</h3>
-      <p class="text-xs text-text-muted mb-3">Creatives passing all 4 gates in their own market: TQL volume floor, CPTQL ≤ target, CPTD ≤ target, ≥14 days live.</p>
-      <div class="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center text-xs text-text-muted">No creatives currently pass all gates for the active filters. Loosen the date range or change market filter.</div>
+      <p class="text-xs text-text-muted mb-3">Two paths to qualify: <strong>evidence</strong> (≥3 TDs + green CPTD + green CPTQL — any age) OR <strong>cohort-mature</strong> (≥14 days live + volume floor + amber both). Brand-awareness ads excluded.</p>
+      <div class="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center text-xs text-text-muted">No creatives currently pass either path for the active filters. Loosen the date range or change market filter.</div>
     </div>`;
   }
 
   const byMarket = {};
   qualified.forEach(q => { (byMarket[q.mkt] = byMarket[q.mkt] || []).push(q); });
-  Object.values(byMarket).forEach(arr => arr.sort((a,b) => a.cptd - b.cptd));
+  // Sort within each market: evidence-path first (early winners on top), then cohort-mature; CPTD asc within each.
+  Object.values(byMarket).forEach(arr => arr.sort((a,b) => {
+    if (a.path !== b.path) return a.path === 'evidence' ? -1 : 1;
+    return a.cptd - b.cptd;
+  }));
 
   let body = '';
   Object.keys(byMarket).sort().forEach(mkt => {
-    body += `<tr class="bg-surface-tertiary"><td colspan="11" class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">${mkt} · ${byMarket[mkt].length} winner${byMarket[mkt].length>1?'s':''}</td></tr>`;
+    const evidenceCount = byMarket[mkt].filter(q => q.path === 'evidence').length;
+    const matureCount = byMarket[mkt].filter(q => q.path === 'cohort').length;
+    const summary = [];
+    if (evidenceCount) summary.push(`<span class="text-accent-purple">${evidenceCount} early evidence</span>`);
+    if (matureCount) summary.push(`<span class="text-accent-green">${matureCount} mature</span>`);
+    body += `<tr class="bg-surface-tertiary"><td colspan="11" class="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">${mkt} · ${summary.join(' · ')}</td></tr>`;
     byMarket[mkt].forEach(q => {
       const c = q.c;
       const name = c['Ad name']||c['ad name']||'Unknown';
@@ -18181,6 +18216,7 @@ function getCreativeVerdict(c) {
 
   // Cohort age — _date or DDMMYY in ad name
   const adName = c['Ad name'] || c['ad name'] || '';
+  const campaignName = c['Campaign name'] || c['campaign'] || c['campaign_name'] || '';
   let date = c['_date'] || null;
   if (!date) {
     const m = adName.match(/(\d{6})$/);
@@ -18192,23 +18228,38 @@ function getCreativeVerdict(c) {
   const wrongScale = _oracleActions.find(a => a.item_id === _taggerItemId(adName, 'scale') && a.status === 'wrong');
   const wrongPause = _oracleActions.find(a => a.item_id === _taggerItemId(adName, 'pause') && a.status === 'wrong');
 
-  // 1. Too early — not enough spend OR fresh cohort
-  if (spend < floor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent (floor ${formatCurrency(floor)}) — not enough data yet` };
-  if (ageDays != null && ageDays < 7) return { label: 'Too early', key: 'new', color: 'gray', reason: `${ageDays}d live — wait for cohort to mature` };
+  // 0. Brand-awareness exclusion (Naina decision May 11) — these don't optimize for QL/TD,
+  // judging them on CPTQL/CPTD is category-wrong. Routed to a separate verdict family.
+  if (_isBrandAwarenessAd(adName, campaignName)) {
+    return { label: 'Brand-Awareness', key: 'new', color: 'gray', reason: `Brand-awareness / reach objective — optimizes for impressions + frequency, not QL/TD. Excluded from QL-driven verdicts.` };
+  }
 
-  // 2. Testing — 7–13 days, signal not trusted
+  // 1. Too early — not enough spend
+  if (spend < floor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent (floor ${formatCurrency(floor)}) — not enough data yet` };
+
+  // 2. EVIDENCE WINNER — TDs ≥ 3 with both metrics in green, regardless of cohort age.
+  // Per `feedback_winner_gate_evidence_first` (May 11): concrete TDs override the 14-day
+  // cohort gate. The age check below only fires if evidence isn't present.
+  if (td >= 3 && cptd <= cptdGreen && cptql > 0 && cptql <= cptqlGreen) {
+    if (wrongScale) return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)} — previously overrated, watch closely` };
+    const earlyTag = (ageDays != null && ageDays < 14) ? ` · early evidence at ${ageDays}d` : '';
+    return { label: 'Scale', key: 'scale', color: 'green', reason: `${td} TDs · CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)}${earlyTag} — both below green target. Proven performer.` };
+  }
+
+  // 3. Age gates — only apply when NOT evidence-confirmed above
+  if (ageDays != null && ageDays < 7) return { label: 'Too early', key: 'new', color: 'gray', reason: `${ageDays}d live — wait for cohort to mature` };
   if (ageDays != null && ageDays < 14) return { label: 'Testing', key: 'new', color: 'gray', reason: `${ageDays}d live — testing window, signals not trusted yet` };
 
-  // 3. Funnel break — TQLs but no trials
+  // 4. Funnel break — TQLs but no trials
   if (tql >= 5 && td === 0) return { label: 'Funnel break', key: 'watch', color: 'amber', reason: `${tql} TQL but 0 TDs after ${formatCurrency(spend)} — LP/scheduler issue, fix funnel` };
 
-  // 4. Pause — burned 2× floor with zero trials
+  // 5. Pause — burned 2× floor with zero trials
   if (spend >= floor * 2 && td === 0) {
     if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive` };
     return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent, 0 TDs — kill` };
   }
 
-  // 5. Fatigued (trend-based) — WoW degradation, even if today's metric still in range
+  // 6. Fatigued (trend-based) — WoW degradation, even if today's metric still in range
   const trends = _computeVerdictTrends();
   const trend = trends[(typeof normalizeAdName === 'function') ? normalizeAdName(adName) : adName];
   if (td >= 1 && trend && (trend.cptdRising || trend.cpqlRising || trend.ctrFalling)) {
@@ -18217,12 +18268,6 @@ function getCreativeVerdict(c) {
     if (trend.cpqlRising) reasons.push('CPTQL up ≥30% WoW');
     if (trend.ctrFalling) reasons.push('CTR down ≥40% WoW');
     return { label: 'Fatigued', key: 'fatigued', color: 'amber', reason: `${reasons.join(' · ')} — refresh creative` };
-  }
-
-  // 6. Scale — both CPTD AND CPTQL in green, ≥3 TDs
-  if (td >= 3 && cptd <= cptdGreen && cptql > 0 && cptql <= cptqlGreen) {
-    if (wrongScale) return { label: 'Working', key: 'working', color: 'green', reason: `CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)} — previously overrated, watch closely` };
-    return { label: 'Scale', key: 'scale', color: 'green', reason: `${td} TDs · CPTD ${formatCurrency(cptd)} · CPTQL ${formatCurrency(cptql)} — both below green target. Proven performer.` };
   }
 
   // 7. Working — both CPTD AND CPTQL in amber, ≥2 TDs
