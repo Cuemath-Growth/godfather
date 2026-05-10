@@ -4,6 +4,40 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Hot-fix #3 — Add Meta Ad Library "Preview ↗" alongside "Manage ↗" (2026-05-11)
+
+### Why
+Meta's URL filter doesn't work and `selected_ad_ids` lands the operator in the haystack. Even with the clipboard workaround, the operator can't *see* the ad without doing two clicks + paste. Meta Ad Library has a by-ID lookup (`?id=AD_ID`) that reliably shows a single ad in isolation IF the ad falls under Meta's transparency rules (EU ads always; commercial elsewhere is empirical per ad). Worth offering as a second path so the operator picks the right surface for the task.
+
+### What changed (`index.html`)
+
+**New helper `_metaAdLibraryUrl(adId)`** (`:7416+`)
+- Returns `https://www.facebook.com/ads/library/?id=AD_ID&country=ALL&active_status=all&ad_type=all`.
+- `country=ALL` widens the geographic scope; `active_status=all` includes inactive ads; `ad_type=all` covers political + commercial.
+- No auth or account routing required — by-ID lookup works for any Library-visible ad.
+
+**Renamed "Open in Meta ↗" → "Manage ↗" + added "Preview ↗" alongside on all 4 sites:**
+- Match Engine SHIP card winner row (`:10405`) — Library link rendered first (blue, `text-accent-blue`), Manage second (purple, `text-accent-purple`).
+- Pause Now / Refresh card (`:10681`).
+- Make More winner card (`:11069`).
+- Tagger Funnel rec cell (`:17224`).
+- Color separation (blue for Preview, purple for Manage) makes the two surfaces visually distinct.
+
+**Tooltips clarify the trade-off:**
+- Preview: "Preview the ad in Meta Ad Library — works if the ad is publicly viewable."
+- Manage: "Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter."
+
+### How to verify
+- Hard reload after deploy. Find any card with a Meta link.
+- Click "Preview ↗" → opens Ad Library. If the ad is in the Library, you see the creative + targeting + delivery info in one card. If not, Library shows "No results" and you fall back to Manage.
+- Click "Manage ↗" → ad name copied to clipboard, Ads Manager opens. `Cmd+V` into their search box → table filters.
+
+### Side-effects to watch
+- Two links per card adds horizontal real estate. Most cards have room; on narrow SHIP card rows the links may wrap to a second line. Acceptable.
+- Ad Library coverage is unpredictable for non-EU commercial ads. Some Cuemath India/US ads will show, some won't. Use Manage as the always-works fallback.
+
+---
+
 ## Hot-fix #2 — Open-in-Meta: click copies name + opens Meta (workaround for broken filter API) (2026-05-11)
 
 ### Why

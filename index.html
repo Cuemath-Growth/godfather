@@ -7407,6 +7407,15 @@ function _adSourceTag(ad) {
   return ad && ad._hasCRM ? '[CRM]' : '[META]';
 }
 
+// Meta Ad Library URL — preview-only surface that reliably shows one ad if the ad
+// falls under Meta's transparency rules (EU-targeted always, commercial non-EU empirical).
+// No auth or account routing required — by-ID lookup works for any Meta-Library-visible ad.
+// Pair with the Ads-Manager link: Library for verification, Ads Manager for action.
+function _metaAdLibraryUrl(adId) {
+  if (!adId) return '';
+  return `https://www.facebook.com/ads/library/?id=${encodeURIComponent(String(adId))}&country=ALL&active_status=all&ad_type=all`;
+}
+
 // Click-from-format-chip: filter Tagger by Video/Static and navigate.
 function _filterTaggerByFormat(fmt) {
   const cap = String(fmt || '').charAt(0).toUpperCase() + String(fmt || '').slice(1).toLowerCase();
@@ -10402,7 +10411,9 @@ function _buildOpportunityCardHtml(o, idx) {
     // Prefer act_* directly over market-label lookup. With _account_id captured upstream the
     // deep link now lands on the right account instead of the user's default.
     const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account_id || w._account || o.source_market, w.ad_name) : '';
-    const _linkHtml = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${_adName.replace(/'/g, "\\'")}');" title="Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter — Meta's URL filter API doesn't work, this is the reliable workaround." class="text-[10px] text-accent-purple hover:underline whitespace-nowrap shrink-0">Open in Meta ↗</a>` : '';
+    const _libUrl = _metaAdLibraryUrl(w.ad_id);
+    const _libLinkHtml = _libUrl ? `<a href="${_libUrl}" target="_blank" rel="noopener" title="Preview the ad in Meta Ad Library — works if the ad is publicly viewable (EU-targeted always, commercial elsewhere is empirical)." class="text-[10px] text-accent-blue hover:underline whitespace-nowrap shrink-0">Preview ↗</a>` : '';
+    const _linkHtml = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${_adName.replace(/'/g, "\\'")}');" title="Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter — Meta's URL filter API doesn't work, this is the reliable workaround." class="text-[10px] text-accent-purple hover:underline whitespace-nowrap shrink-0">Manage ↗</a>` : '';
     // Campaign · ad set as a small subtitle line so the operator can see hierarchy without
     // clicking through. Hover shows the full string.
     const _campAdset = [w.campaign_name, w.adset_name].filter(Boolean).join(' › ');
@@ -10416,6 +10427,7 @@ function _buildOpportunityCardHtml(o, idx) {
         ${_hierarchyHtml}
       </div>
       <span class="text-[10px] text-text-muted shrink-0">${_cptd} CPTD</span>
+      ${_libLinkHtml}
       ${_linkHtml}
     </div>`;
   }).join('');
@@ -10678,7 +10690,9 @@ function renderOracleCardsV2() {
 
     // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
     const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(a.ad_id, a._account || a.market, a.name) : '';
-    const metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(a.name||'').replace(/'/g, "\\'")}');" title="Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter." class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta ↗</a>` : '';
+    const _libUrl = _metaAdLibraryUrl(a.ad_id);
+    const _libLinkInline = _libUrl ? ` <a href="${_libUrl}" target="_blank" rel="noopener" title="Preview the ad in Meta Ad Library." class="ml-2 text-[10px] text-accent-blue hover:underline inline-flex items-center gap-0.5">Preview ↗</a>` : '';
+    const metaLinkInline = (_libLinkInline + (_metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(a.name||'').replace(/'/g, "\\'")}');" title="Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter." class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Manage ↗</a>` : ''));
 
     // Secondary fields collapse into a <details> block. Campaign + ad set now surface
     // on the primary line, so Why · this-week is the only thing left in details.
@@ -11066,7 +11080,9 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     const _adSet = w.adSetName || '';
     // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
     const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account || mkt, w.adName) : '';
-    const _metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(w.adName||'').replace(/'/g, "\\'")}');" title="Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter." class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta \u2197</a>` : '';
+    const _libUrl = _metaAdLibraryUrl(w.ad_id);
+    const _libLinkInline = _libUrl ? ` <a href="${_libUrl}" target="_blank" rel="noopener" title="Preview the ad in Meta Ad Library." class="ml-2 text-[10px] text-accent-blue hover:underline inline-flex items-center gap-0.5">Preview \u2197</a>` : '';
+    const _metaLinkInline = _libLinkInline + (_metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(w.adName||'').replace(/'/g, "\\'")}');" title="Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter." class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Manage \u2197</a>` : '');
     const _whyHtml = why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>` : '';
     const _audHtml = currentAud ? `<p class="text-[11px] text-text-muted mt-1" title="${esc(audFmt.tooltip)}">Running on <strong>${currentAud}</strong>${audFmt.subtitleLines[0] ? ' \u00B7 ' + audFmt.subtitleLines[0] : ''}</p>` : '';
     const _detailsHtml = (_whyHtml || _audHtml)
@@ -17221,7 +17237,9 @@ function _funnelRecCell(row, chassisByAd) {
   const _adId = row.ad_id || '';
   const _acct = row.account || row._account || row.market || '';
   const _metaUrl = (_adId && typeof _metaDeepLink === 'function') ? _metaDeepLink(_adId, _acct, row.ad_name) : '';
-  const _metaLink = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(row.ad_name||'').replace(/'/g, "\\'")}');" title="Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter." class="text-[10px] text-accent-purple hover:underline ml-1 whitespace-nowrap">Open in Meta ↗</a>` : '';
+  const _libUrl = _metaAdLibraryUrl(_adId);
+  const _libLink = _libUrl ? `<a href="${_libUrl}" target="_blank" rel="noopener" title="Preview the ad in Meta Ad Library." class="text-[10px] text-accent-blue hover:underline ml-1 whitespace-nowrap">Preview ↗</a>` : '';
+  const _metaLink = _libLink + (_metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" onclick="navigator.clipboard.writeText('${(row.ad_name||'').replace(/'/g, "\\'")}');" title="Click: copies ad name + opens Meta Ads Manager. Cmd+V into Meta's search to filter." class="text-[10px] text-accent-purple hover:underline ml-1 whitespace-nowrap">Manage ↗</a>` : '');
   const _adSet = row.adset_name ? `<span class="text-[10px] text-text-muted truncate max-w-[200px]" title="${_funnelEsc(row.adset_name)}">${_funnelEsc(row.adset_name)}</span>` : '';
   if (!v) {
     if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>${_metaLink}`;
