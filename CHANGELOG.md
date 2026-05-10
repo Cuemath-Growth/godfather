@@ -4,6 +4,35 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Hot-fix #2 — Open-in-Meta: click copies name + opens Meta (workaround for broken filter API) (2026-05-11)
+
+### Why
+Both `CONTAIN` and `CONTAINS` are also silently dropped by Meta's backend (confirmed May 11 on prod after `bb56691..8000c4b` deploy). Four schemas tried, all four ignored — `selected_ad_ids` alone, `filter_set` with `ad.id IN`, `ad.name CONTAIN`, `ad.name CONTAINS`. Meta has no working URL-based deep link to a single ad in their current Ads Manager. Operator lands in the right account but the table is unfiltered, ad's checkbox is somewhere in 32K rows.
+
+The reliable workaround: get the ad name into the operator's clipboard at click-time so they can paste into Meta's search box once landed. One click on our side, one Cmd+V on theirs.
+
+### What changed (`index.html`)
+
+**`onclick="navigator.clipboard.writeText(<adName>)"` added to all 4 Open-in-Meta link sites**
+- Match Engine SHIP card winner row (`:10405`) — `_adName`
+- Pause Now / Refresh card (`:10681`) — `a.name`
+- Make More winner card (`:11069`) — `w.adName`
+- Tagger Funnel rec cell (`:17224`) — `row.ad_name`
+- Each link's `title=` tooltip explains the flow: "Click: copies ad name to clipboard + opens Meta Ads Manager. Paste (Cmd+V) into Meta's search box to filter."
+
+### How to verify
+Click any "Open in Meta ↗". New tab opens, ad name lands in clipboard simultaneously. In the new Meta tab, focus the search input (top-left of Ads Manager) and `Cmd+V` — table filters to that ad. 2 clicks total.
+
+### Side-effects to watch
+- `navigator.clipboard.writeText` is a Promise; if it rejects (rare — e.g. clipboard permissions denied), no toast/error surfaced. Failure is silent. Operator would notice when paste produces nothing. Acceptable for v1; can add a toast in a follow-up.
+- For ads with single quotes in their name, the inline escape handles it (`.replace(/'/g, "\\'")`). Other special chars (backticks, etc.) pass through unchanged — they're fine in clipboard.
+- Account-routing for cross-market ads (e.g. India testimonials surfaced from ROW account) is unchanged here — separate investigation queued. `_metaDeepLink` still resolves account via `META_AD_ACCOUNTS` lookup, which has entries only for ROW / US / India. AUS / MEA / UK / APAC fall through to no `act=` param → user's default.
+
+### What was tried and discarded
+Four Meta filter schemas, all silently dropped by Meta's backend regardless of URL syntax. Documented in `reference_meta_url_filter_quirk.md`. If Meta ever fixes their URL filter API, drop the onclick and use the filter URL directly.
+
+---
+
 ## Hot-fix #1 — CPTD format math + Meta filter `CONTAINS` retry (2026-05-11)
 
 ### Why
