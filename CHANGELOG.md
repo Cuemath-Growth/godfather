@@ -4,6 +4,356 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Hot-fix #1 — CPTD format math + Meta filter `CONTAINS` retry (2026-05-11)
+
+### Why
+Naina May 11 browser walkthrough caught two real bugs on top of Sweep #5:
+
+1. **Hero CPTD format split didn't reconcile against portfolio CPTD.** US view showed portfolio ₹70.1K with Static ₹87.7K + Video ₹93.4K. Mathematically impossible if every ad is Static or Video — weighted average would sit between them, not below both. Root cause: format split (a) silently excluded `Creative type === 'Unknown'` ads, (b) capped at top 3 formats, and (c) used ad-level Meta-attributed TDs while portfolio uses CRM-attributed TDs. Three layers of hidden discrepancy.
+
+2. **Meta deep link `ad.name CONTAIN` also dropped.** May 11 URL had `field=ad.name operator=CONTAIN value=…`, Ads Manager still showed all 32K rows. Both `ad.id IN` and `ad.name CONTAIN` are silently ignored by Meta's backend. Trying `CONTAINS` (plural) — both forms exist across Meta's product versions and we've seen `CONTAINS` work where `CONTAIN` doesn't.
+
+### What changed (`index.html`)
+
+**Hero CPTD format split — bucket untagged + show every format** (`:12159+`)
+- `if (fmt === 'Unknown') return;` → bucket as `'Other'`. Untagged ads now visible in the format aggregation; spend totals reconcile.
+- Removed `.slice(0, 3)` — every format with TD > 0 shows. Operator sees Static + Video + Carousel + Influencer + Other if all are present, not just top 3.
+- Tooltip on each chip explicitly names the denominator: "Meta-attributed; portfolio CPTD above uses CRM" — surfaces the source mismatch so operator knows why portfolio average can sit outside the per-format range.
+- Underlying denominator difference (Meta per-ad TD vs CRM total TD) is not fixed here — it's a CRM-to-creative attribution gap (India has no ad-level UTM). Documented in `feedback_india_adset_rollup`. Real fix requires UTM coverage uplift.
+
+**Meta filter operator: `CONTAIN` → `CONTAINS`** (`:7966`)
+- One-line schema swap. If `CONTAINS` (plural) is also dropped, next fallback is changing surface entirely — navigate to the ad's edit-drawer URL pattern instead of the filtered table.
+
+### How to verify
+- Hard reload Godfather. Open Hero CPTD card on US view. Format line should now show all formats including "Other" (untagged) if any, with spend bucketed cleanly. Hover any chip → tooltip explains the denominator caveat.
+- Click any "Open in Meta ↗". URL now contains `operator=CONTAINS`. Confirm whether Ads Manager filters to one row.
+
+### Side-effects to watch
+- Format line could get long if many `Creative type` values exist; the parent container already wraps. No layout change required.
+- "Other" bucket label is generic — if useful in future, split into "Carousel"/"Influencer"/"Untagged" explicitly.
+
+---
+
+## Detective-tax Sweep #5 — WoW arrow direction + format chip floor + Pause card name (2026-05-11)
+
+### Why
+Naina's browser walkthrough on May 10–11 surfaced three issues my code-side audit missed: (1) CPTD WoW line read `↓ 102%` in red — arrow said cost dropped, color said something's wrong; they were contradicting each other because the arrow was being inverted along with the color. (2) Hero CPTD format chips hid Static under the US filter because the `td >= 5` floor suppressed thin-volume formats; she lost visibility into a real format. (3) Pause Now ad-name lines were rendered at `text-[11px] text-text-muted` — operator couldn't identify the ad at a glance, defeating the whole card.
+
+### What changed (`index.html`)
+
+**`fmtWoW` arrow direction** (`:10056+`)
+- Was: `arrow(invert ? -p : p)` — when invert=true the arrow was flipped, so a CPTD that doubled in cost displayed `↓ 100%`.
+- Now: `arrow(p)` — arrow always reflects the actual direction. CPTD up → ↑; CPTD down → ↓. The `color` function still uses `invert` correctly — going-up CPTD is red, going-down CPTD is green. Color and arrow now agree.
+
+**Format chip floor relaxed + sample-size annotation** (`:12168+`)
+- Was: `.filter(([,s]) => s.td >= 5)` — formats with <5 TDs were dropped silently. US Static (few TDs) disappeared, operator had no visibility.
+- Now: `.filter(([,s]) => s.td > 0)` — every format with at least 1 TD renders. When TD count is thin (<5), an inline `(n=2)` muted annotation appears next to the chip so the operator knows the average is on small volume.
+
+**Pause card primary ad-name line gets typographic weight + click-to-copy** (`:10692`)
+- Was: `text-[11px] text-text-muted truncate` — 11px muted, easy to skip.
+- Now: `text-sm font-semibold text-text-primary` + `cursor-pointer hover:text-accent-purple` + the standard sweep click-to-copy onclick. Same affordance pattern as Top 5 / Tagger Creative Review winner cards from Sweep #2.
+
+### Not changed
+- Thumbnail-absence on Pause / Match Engine winner rows (Naina flagged): root cause is `metaCreatives` not being populated for those ad names in her environment. `_oracleThumbnail` and `getCreativeThumbnail` both depend on `metaCreatives` being loaded; if it's empty or coverage is low, lookups return null. Needs a data-side investigation (Supabase `meta_creatives` coverage) before code can change. Flagged in plan; not a sweep fix.
+
+### How to verify
+- Hero CPTD card with country=US and last 30 days: CPTD goes up vs prior → arrow ↑ in red. Goes down → ↓ in green. No more contradictions.
+- Hero CPTD card format chips: see both `Static` and `Video` even when one has low TDs, with `(n=2)` annotation when sample is thin.
+- Pause Now card: ad name is visible at 14px semibold instead of 11px muted. Click the name → copies to clipboard, same as other sweep sites.
+
+---
+
+## Meta deep link — switch filter from `ad.id IN` to `ad.name CONTAIN` (2026-05-11)
+
+### Why
+The May 10 fix (`filter_set=SEARCH=[{"field":"ad.id","operator":"IN","value":["…"]}]`) didn't actually filter Ads Manager — Naina confirmed May 11 that the URL contained the filter but the table still showed all 32K ads with "1 selected". Meta's backend silently drops `ad.id IN` filters from `filter_set`; their search box honors `ad.name CONTAIN`, so that's the path their UI actually wires through.
+
+### What changed (`index.html`)
+
+**`_metaDeepLink(adId, accountIdOrName, adName)`** (`:7947+`)
+- New third parameter: `adName`. When present, builds the filter with `ad.name CONTAIN` as the primary filter and keeps `ad.id IN` as a no-op trailer (in case Meta ever starts honoring it). When absent, falls back to id-only and `selected_ad_ids` for row pre-selection. Operator still lands on the right account either way.
+- Cuemath's ad naming convention (BAU/PLA/Influencer prefixes + dated suffixes) means collisions on a full ad name across 30K rows are essentially zero, so a name CONTAIN match typically resolves to one row.
+
+**Caller updates — all 4 sites now pass the ad name:**
+- Match Engine SHIP card winner rows (`:10395`) → `_metaDeepLink(w.ad_id, w._account_id || w._account || o.source_market, w.ad_name)`
+- Pause Now / Refresh cards (`:10671`) → `_metaDeepLink(a.ad_id, a._account || a.market, a.name)`
+- Make More winner cards (`:11059`) → `_metaDeepLink(w.ad_id, w._account || mkt, w.adName)`
+- Funnel rec cell (`:17212`) → `_metaDeepLink(_adId, _acct, row.ad_name)`
+
+### How to verify
+Hard-reload Godfather (`Cmd+Shift+R` — `file://` HTML is cached aggressively). Click any "Open in Meta ↗" link. Ads Manager should open with the table narrowed via name filter, not 32K rows.
+
+### Side-effects to watch
+- If multiple ads share an *identical* full name (rare for Cuemath given the dated suffix convention), the table will show all matching rows. Still better than 32K. The id filter trailing in the JSON is a hedge for the day Meta starts honoring it.
+- `CONTAIN` not `CONTAINS` — I've seen both forms in Meta URLs across product versions; if `CONTAIN` is also being dropped, switch to `CONTAINS` (one-line change).
+
+---
+
+## B2 — Budget Pace dedup (kill duplicate renderer, single source of truth) (2026-05-10)
+
+### Why
+P0 finding from the May 10 audit. Two divergent renderers were both wired up to the dashboard, drawing from two different plan tables with different verdict thresholds — operator looking at Budget Pace had no way to tell which numbers were authoritative.
+
+- `_renderBudgetPace(market)` (was `:11985`) — parameterized, scoped, sourced from `MONTHLY_BUDGET_PLAN` (₹), 10% pace threshold ('Ahead' / 'Behind' / 'On pace'). Called inline from `renderMetricTicker` (`:12239`).
+- `renderBudgetPace()` (was `:15054`) — US-only, sourced from `BUDGET_PLAN_INR_CR` (₹ Cr), tighter ±10% threshold with extra `Day X/Y · X% through month` framing. Mounted to a separate `#budgetPaceCard` DOM element (`:310`), called from `onDashboardFilterChange` at `:7175`.
+
+Same name shape, different math, different mount point — classic data-truth conflict. Removed before any new verdict surface ships on top.
+
+### What changed (`index.html`)
+
+**Removed** (per plan B2):
+- `renderBudgetPace()` function and its `BUDGET_PLAN_INR_CR` const block (was `:15049–15115`, ~67 lines).
+- The `<div id="budgetPaceCard" class="mt-4"></div>` mount point at `:310`.
+- The `try { renderBudgetPace(); } catch(e) { ... }` call inside `onDashboardFilterChange` (was `:7175`).
+
+**Kept** (the survivor):
+- `_renderBudgetPace(market)` at `:11985` — already parameterized, already wired to `renderMetricTicker` which reads `dashboardCountryFilter`. No signature change. The metric ticker section now carries the only Budget Pace card on the dashboard.
+
+### How to verify
+1. Reload dashboard with country filter = US (or All Markets). Budget Pace card renders inside the metric ticker area (Hero CPTD region) with the `MONTHLY_BUDGET_PLAN` numbers and the 10%/-5% verdict thresholds.
+2. Switch country filter to India / AUS / MEA — Budget Pace card hides if no monthly plan is wired (the `if (!plan) return ''` guard at the top of `_renderBudgetPace`).
+3. Confirm there's no longer a separate Budget Pace card mounted to `#budgetPaceCard` — that DOM element no longer exists.
+4. `console.log(typeof renderBudgetPace)` → `undefined`. `console.log(typeof _renderBudgetPace)` → `function`.
+
+### Side-effects to watch
+- Any external page or bookmarklet relying on `window.renderBudgetPace` would break — none known. The only call site was inside this file.
+- `BUDGET_PLAN_INR_CR` was a different (₹ Cr) representation of the US plan; if any future surface needs ₹ Cr formatting, derive from `MONTHLY_BUDGET_PLAN[market]['YYYY-MM'] / 1e7` instead of duplicating the table.
+- The deletion was done via `sed -i '' '15049,15115d'` because the source file mixes literal `—` and `₹` Unicode escape sequences inside string literals that the Edit tool's old_string match couldn't resolve cleanly (em-dash and rupee glyph are NOT bytewise the same as `—` / `₹` literal char sequences — and the file uses literals in this block).
+
+---
+
+## B1 — Library shows the global filter bar (2026-05-10)
+
+### Why
+P0 finding from the May 10 audit. The Library tab was the one user-facing surface the global filter bar was hidden on (`:3560` hide list included `'library'`). Match Engine's keystone bet is that Library is the inventory layer feeding cross-market opportunities; if operators can't *see* which market/date scope they're looking at, every recommendation that links to Library is suspect. `syncGeoFilter` already mirrors the dashboard filter into `libraryFilter`, but without the bar visible the operator was filtering blind.
+
+### What changed (`index.html`)
+
+**`navigateTo` filter-bar hide list** (`:3560`)
+- Drop `view === 'library'` from the hide condition. Filter bar now shows on Library, Dashboard, Tagger, Insights, and Influencer. Hidden only on Settings + Create (Generate) where date/market scope is irrelevant.
+- Comment expanded to spell out the rationale so a future hand doesn't re-add it.
+
+### Not changed
+- `libraryFilter` (the in-Library market dropdown at `:1181`) stays — the global filter bar's market dropdown syncs to it via `syncGeoFilter`. Two visual surfaces for the same value is fine; if anything, redundancy is the point — operator confirms the scope is right.
+- `onGlobalFilterChange` already calls `renderLibrary()` when the active view is library (`:7160`), so changing the global filter while on Library re-renders correctly.
+
+### How to verify
+1. Open Dashboard, set Country = India + Last 30 days.
+2. Click Library in the sidebar. The header filter bar should now be visible with India + Last 30d.
+3. Change the country to AUS in the global bar → Library cards re-render to AUS scope.
+
+### Side-effects to watch
+- The global filter bar takes vertical space; Library's grid layout already accommodates it (the bar lives above the view container).
+
+---
+
+## Detective-tax Sweep #4 — Dashboard + Match Engine + Insights affordances (2026-05-10)
+
+### Why
+Audit Round-up across the surfaces an operator hits most often: WoW digest gives no indication of which arrow direction is good, headroom on a SHIP card has no provenance, the empty-state for "No cross-market opportunities" is a flat sentence with no breakdown, the untagged-ads banner names a count without naming which markets are bleeding spend, format-mix chips on the hero CPTD card are unclickable proof, and the seasonal context line offers no path back to the calendar source.
+
+### What changed (`index.html`)
+
+**WoW digest direction hints + window framing** (`:10064`, `:10068–10082`)
+- Header span now reads `Last 7 days (May 3 – May 10) vs prior 7` and carries a tooltip; the bare date range was ambiguous.
+- KPI labels carry tiny inline hints: `Spend (↑ = more, watch trend)` / `QLs (↑ better)` / `TDs (↑ better)` / `CPTD (↑ worse)`. Direction is visible at a glance instead of relying on color alone.
+
+**SHIP card headroom tooltip + Why auto-expand on first card** (`:10356`, `:10398`)
+- `actionByDate` text is wrapped in `<em title="…" class="cursor-help">`; tooltip explains "Headroom = monthly plan − MTD spend, refreshes daily; test by next Monday so the ad has 14d to mature".
+- `<details>` for Why auto-opens on the first SHIP card per accordion render (`idx === 0 ? ' open' : ''`). Subsequent cards stay collapsed — operator sees one example of the reasoning without clicking through every card.
+
+**Match Engine empty-state breakdown** (`_detectCrossMarketOpportunities` at `:7896`, empty branch at `:10484`)
+- `_diag` (the internal funnel of why-no-opp counts) is now stashed on `state._lastOppDiag` at every run. The empty-state branch reads it and renders a per-reason breakdown: `2 content-locked · 1 brand-blocked · 0 no headroom · 5 already running everywhere · 0 ready to ship`. Operator can tell at a glance whether the empty state means "data missing" vs "all blocked by guardrails" vs "headroom exhausted".
+
+**Untagged alert per-market breakdown** (`renderUntaggedAlert`)
+- The 12-untagged banner used to read "New creatives need tagging — Go to Tagger". Now reads `India 7 · ₹85K · US 4 · ₹40K · AUS 1 · ₹2K`, sorted by spend descending so the highest-priority market is named first. `extractMarket` resolves market per row; `parseNumber('Spent')` is summed.
+
+**Country-breakdown click-to-copy** (Insights Module 2 country cards at `:11403–11404`)
+- `Top: AMC8 Static — ₹22K CPTD` and `Drain: …` strings are now wrapped in clickable spans that copy the creative name to clipboard on click. Same `navigator.clipboard.writeText` + textContent-mutation pattern used elsewhere in the sweep.
+
+**Hero CPTD format-mix chips are clickable** (`formatCptdLine` at `:12159`)
+- Each `Static ₹28K` / `Video ₹35K` chip now wraps in `<span onclick="_filterTaggerByFormat('Static')">` and routes to Tagger pre-filtered to that format. New helper `_filterTaggerByFormat(fmt)` capitalizes the chip value, sets the `taggerFormatFilter` dropdown, dispatches `change`, then `navigateTo('tagger')`. Operator can drill from "what format is winning" → "show me the ads in that format" in one click.
+
+**Seasonal context tooltip references the calendar source** (`:11406`)
+- The 📅 line on each country breakdown card now carries a `title=` pointing to `seasonal-calendar.md` and reminding the operator to verify dates before writing time-bound copy. Anchors the existing `feedback_verify_event_dates_before_writing` rule on screen.
+
+### Deferred (intentionally out of this sweep, queued for follow-up)
+- **Per-market suppression disclosure line under Pause/Make-More** — the `byMkt` cap loop runs at the bottom of `renderOracleCardsV2`; surfacing "By market: US 2 / India 2 / AUS 0 / MEA 1 / UK 0 (capped)" needs renderer-state plumbing into the section title, more than a bare display tweak. Folded into a follow-up sweep.
+- **Sentinel anomaly card enrichment** (spend / CPTD / Meta link on each anomaly card) — needs the anomaly upstream to carry those fields. Bigger than a one-line fix.
+- **Funnel_alerts deep links to Tagger Funnel** — same shape; defer.
+- **Snooze/Dismiss roster + Undo** — new component. Worth its own commit; not bundled here.
+- **Top 5 / Bottom 5 thumbnails + Meta link column** — Sweep #2 already added click-to-copy on the name cell; the thumbnail column + Meta link change requires layout shift and two more grep callers.
+- **Tagger Tree row Open-in-Meta column** — folded into C2 (Tagger absorbs Funnel) per plan.
+
+### How to verify
+- This Week vs Last Week → labels read with direction hints, header date range labels both windows.
+- Match Engine SHIP card → hover the action-by-date text; tooltip explains headroom math. First card's Why is open by default.
+- Force the empty state (e.g. set `_OPPORTUNITY_MIN_HEADROOM_INR` to a giant number temporarily) → Match Engine accordion shows a per-reason breakdown rather than the flat sentence.
+- Add an untagged ad → banner names the market and spend instead of the bare count.
+- Insights Module 2 country card → click "Top:" creative name → copies to clipboard.
+- Hero CPTD card → click `Video ₹35K` → Tagger opens with the format filter set to Video.
+- Insights Module 2 country card → hover the 📅 line → tooltip references the calendar source.
+
+### Side-effects to watch
+- `_filterTaggerByFormat('Static')` capitalizes via `charAt(0).toUpperCase() + slice(1).toLowerCase()`. If the chip value is `STATIC` or `static_video`, capitalization will produce 'Static' / 'Static_video' — still likely to match the dropdown options ('Video' | 'Static') for the dominant cases. Edge formats fall through to no filter change but still navigate.
+- `state._lastOppDiag` is now read on the empty-state branch; if the chassis hasn't run once yet (very early boot), reads `{}` and the breakdown line is suppressed — the bare empty-state text still shows.
+- WoW direction hints add ~2 chars to each KPI title; layout already accommodates.
+
+---
+
+## Detective-tax Sweep #3 — Tagger surface affordances (2026-05-10)
+
+### Why
+Audit P1 findings on Tagger Funnel + Creative Review surfaces. The same operator who knew the rules in her head was repeatedly forced to re-derive them on screen: "Monitor — within thresholds" gave no number to compare; "Phase 2" / "Phase 3" placeholder columns looked broken; the India ad-set grain badge was opaque without context; TQL is defined differently per market and the definition lived only in a hover; "Scale These — Proven Winners" gave no count so operator never knew if she was seeing 6 of 6 or 6 of 22.
+
+### What changed (`index.html`)
+
+**`_funnelRecCell` Monitor states show numbers** (`:17250-17251`)
+- `Monitor — under volume floor` → `Monitor — spend ${formatCurrency(row.spend)} (floor ₹5K)`
+- `Monitor — within thresholds` → `Monitor — CPTD ${formatCurrency(row.cptd)}, within thresholds`
+- Operator now sees the actual figure being checked against the threshold without leaving the row.
+
+**India ad-set grain badge tooltip** (`:17359`)
+- Bare `<span>India · ad-set grain (UTM gap)</span>` → adds `cursor-help` + `title="India CRM has no ad-level UTM — TD/QL on this row reflects the entire ad set, not this single ad."` Surfaces the explanation that's documented in `feedback_india_adset_rollup` but invisible on screen.
+
+**Funnel Health Table Phase 2 / Phase 3 placeholder columns demoted to em-dash + tooltip** (`:17383-17386`)
+- `<td>Phase 2</td>` and `<td>Phase 3</td>` italic placeholders looked like the table was broken. Replaced with `<td>—</td>` + per-cell `title="Audience targeting — pending data hookup"` / `Destination (Instant Form vs LP)` / `Meta Ads Manager link — see Recommendation column for the live ↗ link` / `Notion ad doc — pending data hookup`. Column count unchanged (header still aligns).
+
+**TQL header gets visible info glyph** (`:17726` Creative Review winners table)
+- Added `cursor-help` + an inline `<span class="text-[8px] text-text-muted">ⓘ</span>` next to the TQL label, plus expanded the title to spell out per-market definitions: "True Qualified Leads — NRI for US, IB/IGCSE for India/MEA, all QLs elsewhere". The single `?` glyph is the affordance — operator sees it before having to hover blindly.
+
+**"Scale These" / "Pause or Refresh" headers carry counts** (`:17953`, `:17965`)
+- `✓ Scale These — Proven Winners` → `✓ Scale These — ${winners.length} of ${scale.length + working.length} Proven Winners`. Same shape on the loser side: `✗ Pause or Refresh — ${losers.length} of ${pause.length + fatigued.length} Underperforming`. Both lists are sliced to top 6; operator now knows whether 6 represents the full pool or a sample.
+
+### Deferred
+- **Tagger group rows market badge** — needs `extractMarket` threaded through `renderTaggerGroupRow` (signature change). Folded into C2 (Tagger absorbs Funnel) where the function is already being touched.
+- **Verdict color legend on `taggerVerdictSummary`** — P2; deferred to C2 alongside the new header verdict pill.
+
+### How to verify
+- Open Tagger › Funnel. Find an ad with low spend → row's Recommendation cell reads "Monitor — spend ₹2K (floor ₹5K)" instead of generic "under volume floor". Find an India ad with the amber UTM badge → hover shows the explanation.
+- Tagger › Funnel rightmost columns now render `—` instead of "Phase 2/3" italic placeholders; hovering each shows the planned content.
+- Tagger › Creative Review (Winners) → TQL column header carries an `ⓘ` glyph; hover spells out the per-market definition.
+- Tagger › Creative Review → "Scale These" / "Pause or Refresh" headers show counts (e.g. "Scale These — 6 of 22 Proven Winners").
+
+### Side-effects to watch
+- The Phase 2/3 → `—` swap leaves the column structure intact. If anything downstream parsed the literal string "Phase 2" / "Phase 3" out of the rendered HTML (no usages found), that would break.
+- `formatCurrency(row.spend || 0)` falls back to ₹0 if spend is undefined; the surrounding logic already gated on `row.spend < 5000`, so a live row reaching that branch always has a numeric spend.
+
+---
+
+## Detective-tax Sweep #2 — apply `_sourceTagPill` + `_relativeTime` + click-to-copy (2026-05-10)
+
+### Why
+Sweep #1 landed the helpers; Sweep #2 wires them into the surfaces the May 10 audit flagged. Three classes of fix: (1) bare `[CRM]` / `[META]` strings on Match Engine SHIP / Pause Now / Make More cards now render with tooltips so an operator can hover and learn what the tag means; (2) "Done {date}" lines now show "2d ago" / "3w ago" instead of `5/8/2026` so recency is visible at a glance; (3) truncated ad-name cells on four high-traffic surfaces now copy on click, matching the Match Engine pattern from May 8.
+
+### What changed (`index.html`)
+
+**Source-tag pills replace inline `[CRM]` / `[META]` strings (3 sites)**
+- Match Engine SHIP card driver line (`_buildOpportunityCardHtml`) — was a hardcoded `[CRM]` span with no tooltip.
+- Pause Now / Refresh card driver line (`renderOracleCardsV2`) — was `${sourceTag}` from `_adSourceTag(a)`. The intermediate `sourceTag` const + comment removed (now dead).
+- Make More SCALE card driver line — was `${_sourceTag}` from a local `w._hasCRM ? '[CRM]' : '[META]'`. The intermediate const removed.
+- All three now produce `<span class="text-[10px] text-text-muted ml-1" title="…explanation…">[CRM]</span>`.
+
+**Done timestamps swap `toLocaleDateString()` → `_relativeTime(action.actioned_at)` (4 sites, single replace_all)**
+- The exact string `new Date(action.actioned_at).toLocaleDateString()` is unique to the 4 Oracle-action Done lines (SHIP card / Pause card / Make More card / chassis card around `:11214`). Other `toLocaleDateString()` callers in the file use different vars (`a.actioned_at`, `w.deployed_at`, `tags.tagged_at`) and were left alone. Verified by grep before editing.
+
+**Click-to-copy on truncated ad-name cells (4 sites)**
+- Top 5 Performers table — `<div class="truncate" title="${name}">…</div>` → adds `cursor-pointer hover:text-text-primary` + an `onclick="navigator.clipboard.writeText(...)"` that mutates `this.textContent` to confirm the copy. Pattern copied verbatim from the Match Engine SHIP-card winner-row (Apr 8 implementation at `:10334`).
+- Top 5 Budget Drains table — same pattern.
+- Tagger Creative Review winner card — same pattern.
+- Tagger Pattern grid card — same pattern.
+- The `title=` is augmented with " — click to copy" so the affordance is discoverable on hover.
+- Sites with an explicit "Copy & Pause" / "Copy Name" button (Sentinel anomaly cards at `:9300`, `:9316`) intentionally NOT changed — adding click-on-name there would duplicate the affordance with different semantics (the button also logs the action). Same logic kept Tagger Tree ad rows for Sweep #3 since those need a deeper structural touch (Open-in-Meta column + market badge) and bundling the changes makes regression review cleaner.
+
+### How to verify
+- Hover any `[CRM]` / `[META]` pill on Pause Now, Make More, or Match Engine SHIP cards → tooltip explains the source.
+- Open Oracle action history (or mark a Pause as Done): the Done line reads "Done just now" / "Done 2m ago" / "Done 3d ago" instead of a raw locale date.
+- On Top 5 Performers, Top 5 Drains, Tagger Creative Review winners, or Tagger Pattern grid: click an ad-name cell. The text should briefly flash to "Copied — {short name}" and the full ad name lands in the clipboard.
+
+### Side-effects to watch
+- `_sourceTagPill` returns HTML, not a bare string. All three call sites are template-literal interpolations that emit HTML, so this is consistent. If a fourth caller emerges that uses `_adSourceTag(ad)` for plain-text logging or aria-labels, it still works — `_adSourceTag` is unchanged.
+- The click-to-copy mutates `textContent` permanently (does not revert). This matches the May 8 Match Engine pattern Naina has been using; if she wants a 1-second auto-revert later, easy follow-up.
+- `_relativeTime` falls back to a short locale date past 4 weeks, so old Done items stay readable.
+
+---
+
+## Detective-tax Sweep #1 — `_sourceTagPill` + `_relativeTime` helpers (2026-05-10)
+
+### Why
+Independent UX audit on May 10 found two cross-cutting gaps that produced detective work across the dashboard: (1) bare numbers everywhere with no source attribution — `[CRM]` / `[META]` strings rendered inline at three Match Engine / Make More sites with no tooltip explaining what they mean, no time-window context, so when Godfather numbers don't reconcile against Pulse the operator can't trace the discrepancy; (2) "Done {date}" timestamps on Oracle action cards (`:10367`, `:10616`, `:11022`, `:11172`) using `toLocaleDateString()` — operator can't tell at a glance whether an item was actioned today or six months ago. Naina's framing: "I'm spending more time figuring it out." Sweep #1 lands the helpers; Sweep #2 applies them at the call sites.
+
+### What changed (`index.html`)
+
+**`_sourceTagPill(kind, period)` + `_relativeTime(iso)`** (`:7408+`)
+- Inserted right after `_adSourceTag` so the small formatting/labeling helpers stay grouped.
+- `_sourceTagPill('CRM' | 'META' | 'Sheet' | 'Computed', period?)` returns a `<span class="text-[10px] text-text-muted ml-1">` with a `title=` tooltip explaining the source. Period is optional — passing `'L30d'` / `'MTD'` / `'cohort 14d'` renders `[CRM · L30d]`. Establishes a single convention so Sweep #2 + C6 (Source attribution pass) have one place to extend.
+- `_relativeTime(iso)` returns `just now` / `Xm ago` / `Xh ago` / `Xd ago` / `Xw ago`, falling back to a short locale date past 4 weeks. Pure function, no DOM coupling — call from any card render.
+- Both rely on `_escapeHtml` (defined at `:8385`); function-declaration hoisting means the forward reference is fine at runtime.
+
+### Not changed
+- The three existing inline `[CRM]` / `[META]` HTML strings at `:10366`, `:10983`, and the Make More section remain unchanged — Sweep #2 swaps them to `_sourceTagPill` calls.
+- `_adSourceTag(ad)` kept as-is (returns the bare token; surfaces using it can keep doing so).
+
+### How to verify
+Console: `_sourceTagPill('CRM', 'L30d')` → returns the pill HTML with the right tooltip. `_relativeTime(new Date(Date.now() - 86400000).toISOString())` → returns `1d ago`. No surface visibly changes yet — Sweep #2 wires them in.
+
+### Side-effects to watch
+None — pure additions, zero existing call-site touched.
+
+---
+
+## Match Engine: Open-in-Meta link now FILTERS Ads Manager to the one ad (2026-05-10)
+
+### Why
+Naina clicked an "Open in Meta ↗" link from a SHIP card and landed in Ads Manager with all 32,303 ads in the account, the target ad sitting somewhere outside the visible 200-row window. `selected_ad_ids` in the URL only ticks a row's checkbox — it doesn't narrow the table. So the link "worked" (right account, right ad selected) but the operator was blind: no way to see which ad / adset / campaign the SHIP card was talking about without scrolling 32K rows. Naina: "I still don't know which ad, ad set or campaign you are talking about. I am spending more time figuring it out."
+
+### What changed (`index.html`)
+
+**`_metaDeepLink(adId, accountIdOrName)`** (`:7896+`)
+- Added a `filter_set` query parameter alongside the existing `selected_ad_ids` — narrows the Ads table to exactly the one ad.id, then pre-selects its row. Operator now lands on a one-row table where the ad name, adset, and campaign are immediately visible in Ads Manager's hierarchy breadcrumb.
+- Filter format: `filter_set=SEARCH=[{"field":"ad.id","operator":"IN","value":["AD_ID"]}]` (URL-encoded once via `encodeURIComponent`).
+- Kept `selected_ad_ids` as belt-and-braces — if Meta ever changes the `filter_set` schema, the row is still pre-checked.
+- All five callers benefit transparently — Match Engine SHIP cards (3 surfaces) + Sentinel verdict cards + chassis card. No call-site changes.
+
+### How to verify
+1. Reload the dashboard. Match Engine → Opportunities accordion → click any "Open in Meta ↗" on a top-winner row.
+2. Ads Manager should open showing exactly ONE ad row (the table self-narrows via the filter), with the row's checkbox pre-selected and the correct account in the breadcrumb. Adset + campaign visible by hovering the ad name or clicking up the breadcrumb.
+3. If the table still shows 32K rows, the `filter_set` schema has shifted — file a follow-up; `selected_ad_ids` is the fallback.
+
+### Side-effects to watch
+- Filter URL is generated once at card-render time, so a stale ad.id (deleted/archived ad) would filter to zero rows. Acceptable — matches reality. Operator can clear the filter manually.
+
+---
+
+## Library Phase 1a Step 1 — matching algorithm (2026-05-10)
+
+### Why
+Per `project_library_phase1_plan.md` (May 1), the Library tab's keystone deliverable is killing the manual `Live Status/<market>` upkeep on the source sheet (`1PCIBvtS5xoNUECaaU7ZQJhf6ST96jzlfSvXPX3pOk0o`). The fix is matching each sheet row to its Meta ad deployments by token. Without that match, "live" status is whatever a human last typed into the sheet — exactly the labor problem Naina flagged. POC was validated May 1 (10/10 hand-picked rows). This commit lands the algorithm itself, behind a console function, so we can verify hit rate against current data before changing any UI.
+
+### What changed (`index.html`)
+
+**`matchLibraryRowToAds(card, ads)` + helpers** (`:20411+`)
+- 2-tier matching per the May 1 spec:
+  - **Tier 1:** all tokens from the sheet row's `Particular` AND-match the ad name (case-insensitive substring), AND format matches if the row's tab/keyword declares one (`_Static_` / `_Video_` / `_Influencer_` / `_Carousel_` patterns), AND market matches if the row's `Shared for /<market>` columns narrow to exactly one market.
+  - **Tier 2:** drop generic tokens (`creative` / `static` / `video` / `ad` / `set` / articles / connectors) and retry with the proper-noun remainder. Catches "Testimonial Suzy" → `Video_Suzy_*`.
+  - **Tier 3:** no match → row is "shared on the sheet but never deployed."
+- Format scope: `card.format` from multi-tab pull wins; falls back to keyword detection in the row name.
+- Market scope: only narrows when exactly ONE `Shared for /<market>` is TRUE — multi-market rows stay open. Per-ad market check uses `_account` first, ad-name regex second (USA / IND / AUS / MEA / APAC / ROW tokens).
+- Unique-by-ad_name de-dupe inside the matcher so a daily-rows array of ~43K doesn't inflate counts.
+
+**`runLibraryMatchPOC()`** (`:20542+`, `window.runLibraryMatchPOC`)
+- Iterates every sheet row, runs the matcher, prints a one-line summary and a 20-row sample table to console. Output: `{ total, t1, t2, t3, sample }`.
+- No DOM changes. Pure data layer.
+
+### Not changed
+- Library UI still reads manual `Live Status/<market>` columns. Wiring computed live-state into the cards comes in Phase 1a Step 2 (the actual labor-killer), gated on the POC hit rate matching the May 1 baseline.
+- 3-column Kanban (Queued / Live / Dropped) and the "X% never went live" headline come in Step 3.
+
+### How to verify
+With the dashboard loaded and Library data fetched (Library tab → wait for sheet sync), open console and run `runLibraryMatchPOC()`. Expected: ≥80% combined Tier 1 + Tier 2 across the full sheet (May 1 was 10/10 on hand-picked rows; broader sheet will have more Tier 3s from rows that genuinely never deployed). If hit rate ≥80%, Step 2 is greenlit.
+
+---
+
 ## Boot performance — sheet parallelism + multi-slot ad-perf cache + merge guard (2026-05-10)
 
 ### Why

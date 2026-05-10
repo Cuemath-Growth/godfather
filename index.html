@@ -307,7 +307,6 @@
           <div class="mb-6" id="tickerSection">
             <div id="metricTicker"></div>
             <div id="funnelTable" class="mt-4"></div>
-            <div id="budgetPaceCard" class="mt-4"></div>
           </div>
 
           <!-- BAU vs PLA Comparison -->
@@ -3555,9 +3554,11 @@ function navigateTo(view) {
   document.getElementById(`view-${view}`).classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
-  // Show/hide global filter bar (hidden on Settings and Forge)
+  // Show/hide global filter bar. Hidden on Settings + Create only. Library shows it (B1, 2026-05-10)
+  // so operators can confirm market/date scope — `syncGeoFilter` already mirrors the dashboard
+  // filter into `libraryFilter`, but visibility is what makes the trust loop complete.
   const filterBar = document.getElementById('globalFilterBar');
-  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate' || view === 'library') ? 'none' : '';
+  if (filterBar) filterBar.style.display = (view === 'settings' || view === 'generate') ? 'none' : '';
   const titles = { dashboard:'Dashboard', generate:'Create', tagger:'Tagger', library:'Library', influencer:'Creators', settings:'Settings' };
   const subs = { dashboard:'What to do right now', generate:'Generate copy & visuals', tagger:'Tag & analyze creatives', library:'Your creative assets', influencer:'Creator performance analysis', settings:'Data sources & preferences' };
   document.getElementById('headerTitle').textContent = titles[view] || '';
@@ -7170,7 +7171,6 @@ function onDashboardFilterChange() {
   state.analysis = null;
   try { renderPipeline(); } catch(e) { console.error('renderPipeline:', e); }
   try { renderMetricTicker(); } catch(e) { console.error('renderMetricTicker:', e); }
-  try { renderBudgetPace(); } catch(e) { console.error('renderBudgetPace:', e); }
   try { renderBauPlaComparison(); } catch(e) { console.error('renderBauPlaComparison:', e); }
   try { renderOracleModules(); } catch(e) { console.error('renderOracleModules:', e); }
   try { renderOracleActions(); } catch(e) { console.error('renderOracleActions:', e); }
@@ -7405,6 +7405,56 @@ function _scaleStepLabel(market) {
 }
 function _adSourceTag(ad) {
   return ad && ad._hasCRM ? '[CRM]' : '[META]';
+}
+
+// Click-from-format-chip: filter Tagger by Video/Static and navigate.
+function _filterTaggerByFormat(fmt) {
+  const cap = String(fmt || '').charAt(0).toUpperCase() + String(fmt || '').slice(1).toLowerCase();
+  const el = document.getElementById('taggerFormatFilter');
+  if (el) { el.value = cap; el.dispatchEvent(new Event('change')); }
+  if (typeof navigateTo === 'function') navigateTo('tagger');
+}
+
+// ==================== Sweep helpers (May 10 detective-tax sweep) ====================
+// Detective-tax audit found two cross-cutting gaps: (1) numbers shown without naming their
+// data source / time window, so operators couldn't reconcile against Pulse. (2) "Done X"
+// timestamps shown as raw locale dates, hiding recency. Two helpers below establish the
+// convention; Sweep #2 applies them at the call sites.
+
+// Inline pill that names a number's data source + time window. Convention:
+//   kind: 'CRM' | 'META' | 'Sheet' | 'Computed'
+//   period: optional short label, e.g. 'L30d', 'MTD', 'cohort 14d', 'live'
+function _sourceTagPill(kind, period) {
+  const k = String(kind || '').toUpperCase();
+  const tooltips = {
+    'CRM': 'TD/QL count from CRM Leads sheet',
+    'META': 'Meta API attribution — no CRM match for this row',
+    'SHEET': 'Source: Google Sheet (Library / Perf Tracker / Plan)',
+    'COMPUTED': 'Derived in-browser from underlying data'
+  };
+  const tip = tooltips[k] || '';
+  const label = period ? `${k} · ${period}` : k;
+  return `<span class="text-[10px] text-text-muted ml-1" title="${_escapeHtml(tip)}">[${_escapeHtml(label)}]</span>`;
+}
+
+// Relative time formatter for "Done X" lines on Oracle action cards. Falls back to a short
+// locale date past 4 weeks. Operator now knows whether a Done was today vs last quarter.
+function _relativeTime(iso) {
+  if (!iso) return '';
+  const ts = (iso instanceof Date) ? iso.getTime() : new Date(iso).getTime();
+  if (!isFinite(ts)) return '';
+  const diff = Date.now() - ts;
+  if (diff < 0) return new Date(ts).toLocaleDateString();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  const d = Math.floor(h / 24);
+  if (d < 7) return d + 'd ago';
+  const w = Math.floor(d / 7);
+  if (w < 5) return w + 'w ago';
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // ==================== Tier-2 Tag Derivation (Best-in-class Meta-AI PR2 Phase A · 2026-05-09) ====================
@@ -7862,6 +7912,7 @@ function _detectCrossMarketOpportunities() {
     else if (_diag.alreadyPresent > 0 && _diag.noHeadroom === 0) console.log('[meta-ai]   → every winning tuple is already running on every target market');
     else console.log('[meta-ai]   → mix of filters; check the breakdown above to see which is dominating');
   }
+  state._lastOppDiag = _diag;
   // Sort biggest opportunities first
   return out.sort((a, b) => (b.headroom_inr || 0) - (a.headroom_inr || 0));
 }
@@ -7893,7 +7944,7 @@ if (typeof window !== 'undefined') {
 // (b) act_* lookup via _account_id field on the ad, (c) market label → META_AD_ACCOUNTS lookup.
 // Lands on the ads manager filtered to the ad — Meta shows the campaign › ad set › ad
 // breadcrumb at the top. Without the right act_* the user lands on their default account.
-function _metaDeepLink(adId, accountIdOrName) {
+function _metaDeepLink(adId, accountIdOrName, adName) {
   if (!adId) return '';
   let act = '';
   if (accountIdOrName) {
@@ -7907,7 +7958,21 @@ function _metaDeepLink(adId, accountIdOrName) {
   // a Marketing API convention only — passing it in the URL breaks the redirect and Meta
   // falls back to the user's default account. Strip it.
   const actNumeric = act.replace(/^act_/, '');
-  const parts = ['selected_ad_ids=' + encodeURIComponent(String(adId))];
+  // `filter_set` with `ad.id IN` is silently dropped by Meta's backend (confirmed
+  // 2026-05-11: URL contained the filter, table still showed all 32K ads with 1 selected).
+  // `ad.name CONTAIN` IS honored by their search backend. Use the ad name as the primary
+  // filter when we have it; fall back to id-only when we don't (selected_ad_ids still
+  // pre-selects the row so an operator can scroll to it). `CONTAIN` operator + the full
+  // ad name typically narrows the table to one row — name collisions across 30K+ ads are
+  // rare given the BAU/PLA/Influencer slug prefixes Cuemath uses.
+  const filters = [];
+  if (adName) filters.push({ field: 'ad.name', operator: 'CONTAINS', value: String(adName) });
+  filters.push({ field: 'ad.id', operator: 'IN', value: [String(adId)] });
+  const filterJson = JSON.stringify(filters);
+  const parts = [
+    'filter_set=' + encodeURIComponent('SEARCH=' + filterJson),
+    'selected_ad_ids=' + encodeURIComponent(String(adId))
+  ];
   if (actNumeric) parts.unshift('act=' + encodeURIComponent(actNumeric));
   return 'https://business.facebook.com/adsmanager/manage/ads?' + parts.join('&');
 }
@@ -9994,7 +10059,10 @@ function renderWoWDigest() {
     if (Math.abs(lw) < Math.abs(tw) * 0.1) return 'new';
     if (Math.abs(p) < 5) return '';
     const label = Math.abs(p) > 200 ? (Math.abs(p)/100).toFixed(1)+'x' : Math.abs(p).toFixed(0)+'%';
-    return `${arrow(invert ? -p : p)} ${label}`;
+    // Arrow always reflects ACTUAL direction (↑ if went up). Only `color` flips for
+    // lower-is-better metrics (CPTD/CPTQL — invert=true). Caught May 11 — CPTD ↓102% in red
+    // was reading contradictory: arrow said cost dropped, color said something is wrong.
+    return `${arrow(p)} ${label}`;
   };
 
   const spendPct = pct(twSpend, lwSpend);
@@ -10010,26 +10078,26 @@ function renderWoWDigest() {
         <svg class="w-4 h-4 text-accent-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
         This Week vs Last Week
       </h3>
-      <span class="text-[9px] text-text-muted">${geo === 'all' ? 'All Markets' : geo} · ${twStr} → ${todayStr}</span>
+      <span class="text-[9px] text-text-muted" title="Last 7 days vs the prior 7 days">${geo === 'all' ? 'All Markets' : geo} · Last 7 days (${twStr} – ${todayStr}) vs prior 7</span>
     </div>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div>
-        <p class="text-[9px] text-text-muted uppercase font-bold">Spend</p>
+        <p class="text-[9px] text-text-muted uppercase font-bold">Spend <span class="text-[8px] normal-case font-normal">(↑ = more, watch trend)</span></p>
         <p class="text-lg font-black">${formatCurrency(twSpend)}</p>
         <p class="text-[10px] font-semibold ${color(spendPct, false)}">${fmtWoW(twSpend, lwSpend, spendPct, false)}${lwSpend > 0 ? ' vs ' + formatCurrency(lwSpend) : ''}</p>
       </div>
       <div>
-        <p class="text-[9px] text-text-muted uppercase font-bold">QLs</p>
+        <p class="text-[9px] text-text-muted uppercase font-bold">QLs <span class="text-[8px] normal-case font-normal">(↑ better)</span></p>
         <p class="text-lg font-black">${twQL}</p>
         <p class="text-[10px] font-semibold ${color(qlPct, false)}">${fmtWoW(twQL, lwQL, qlPct, false)}${lwQL > 0 ? ' vs ' + lwQL : ''}</p>
       </div>
       <div>
-        <p class="text-[9px] text-text-muted uppercase font-bold">TDs</p>
+        <p class="text-[9px] text-text-muted uppercase font-bold">TDs <span class="text-[8px] normal-case font-normal">(↑ better)</span></p>
         <p class="text-lg font-black">${twTD}</p>
         <p class="text-[10px] font-semibold ${color(tdPct, false)}">${fmtWoW(twTD, lwTD, tdPct, false)}${lwTD > 0 ? ' vs ' + lwTD : ''}</p>
       </div>
       <div>
-        <p class="text-[9px] text-text-muted uppercase font-bold">CPTD</p>
+        <p class="text-[9px] text-text-muted uppercase font-bold">CPTD <span class="text-[8px] normal-case font-normal">(↑ worse)</span></p>
         <p class="text-lg font-black">${twCPTD > 0 ? formatCurrency(twCPTD) : '\u2014'}</p>
         <p class="text-[10px] font-semibold ${color(cptdPct, true)}">${twCPTD > 0 && lwCPTD > 0 ? fmtWoW(twCPTD, lwCPTD, cptdPct, true) + ' vs ' + formatCurrency(lwCPTD) : '\u2014'}</p>
       </div>
@@ -10282,11 +10350,23 @@ function renderUntaggedAlert() {
   const untagged = state.taggerData.filter(c => !c.tags || !c.tags.hook || c.tags.hook === 'Unknown');
   if (untagged.length === 0) { el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
+  // Per-market breakdown sorted by spend so highest-priority market is named first.
+  const byMkt = {};
+  untagged.forEach(c => {
+    const m = (typeof extractMarket === 'function' ? extractMarket(c) : '') || 'Unknown';
+    byMkt[m] = byMkt[m] || { count: 0, spend: 0 };
+    byMkt[m].count++;
+    byMkt[m].spend += parseNumber(c['Spent'] || c['spent'] || 0);
+  });
+  const sorted = Object.entries(byMkt).sort((a, b) => b[1].spend - a[1].spend);
+  const breakdownHtml = sorted.slice(0, 4).map(([m, v]) =>
+    `<span class="inline-block mr-2">${m} ${v.count}${v.spend > 0 ? ' · ' + formatCurrency(v.spend) : ''}</span>`
+  ).join('');
   el.innerHTML = `<div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
     <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
     <div class="flex-1">
       <p class="text-sm font-bold text-amber-800">${untagged.length} untagged ad${untagged.length > 1 ? 's' : ''}</p>
-      <p class="text-[10px] text-amber-600">New creatives need tagging for Lens intelligence to work. Go to Tagger → Tag New.</p>
+      <p class="text-[10px] text-amber-600">${breakdownHtml || 'New creatives need tagging for Lens intelligence to work.'}</p>
     </div>
     <button onclick="navigateTo('tagger')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-200 text-amber-800 hover:bg-amber-300 shrink-0">Tag Now</button>
   </div>`;
@@ -10304,6 +10384,7 @@ function _buildOpportunityCardHtml(o, idx) {
   const cardBg = 'bg-purple-50 border-purple-200';
   const driver = `${o.label} wins on ${o.source_market} (${o.winners_in_source} winners, ${formatCurrency(o.avg_cptd_source)} avg CPTD)`;
   const actionByDate = `Test on ${o.market} by ${_nextMondayLabel()} · ${formatCurrency(o.headroom_inr)} headroom.`;
+  const _headroomTip = `Headroom = ${o.market} monthly plan − MTD spend (chassis-computed, refreshes daily). Test by ${_nextMondayLabel()} so the ad has a 14-day cohort window before EOM verdict.`;
   const whyHtml = o.why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why:</span> ${o.why}</p>` : '';
 
   // Top winner ads — show the actual creatives that produced this winning pattern. Each row:
@@ -10320,7 +10401,7 @@ function _buildOpportunityCardHtml(o, idx) {
       : '<div class="w-8 h-8 rounded bg-surface-tertiary shrink-0"></div>';
     // Prefer act_* directly over market-label lookup. With _account_id captured upstream the
     // deep link now lands on the right account instead of the user's default.
-    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account_id || w._account || o.source_market) : '';
+    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account_id || w._account || o.source_market, w.ad_name) : '';
     const _linkHtml = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" class="text-[10px] text-accent-purple hover:underline whitespace-nowrap shrink-0">Open in Meta ↗</a>` : '';
     // Campaign · ad set as a small subtitle line so the operator can see hierarchy without
     // clicking through. Hover shows the full string.
@@ -10346,7 +10427,7 @@ function _buildOpportunityCardHtml(o, idx) {
     : '';
 
   const detailsHtml = whyHtml
-    ? `<details class="mt-1"><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}</div></details>`
+    ? `<details class="mt-1"${idx === 0 ? ' open' : ''}><summary class="text-[10px] text-text-muted cursor-pointer hover:text-text-primary select-none">Why</summary><div class="mt-1 pl-2 border-l-2 border-gray-200">${whyHtml}</div></details>`
     : '';
   const escId = String(itemId).replace(/'/g, "\\'");
   const escLabel = String(o.label || '').replace(/'/g, "\\'");
@@ -10355,8 +10436,8 @@ function _buildOpportunityCardHtml(o, idx) {
     <div class="flex items-start gap-3">
       <div class="flex-1 min-w-0">
         <p class="text-[11px] text-text-muted">${_escapeHtml(o.source_market)} → ${_escapeHtml(o.market)}</p>
-        <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">SHIP</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${_escapeHtml(driver)}</span>. <em>${_escapeHtml(actionByDate)}</em> <span class="text-[10px] text-text-muted ml-1">[CRM]</span></span></p>
-        ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action && action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : detailsHtml}
+        <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">SHIP</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${_escapeHtml(driver)}</span>. <em title="${_escapeHtml(_headroomTip)}" class="cursor-help">${_escapeHtml(actionByDate)}</em> ${_sourceTagPill('CRM')}</span></p>
+        ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action && action.actioned_at ? _relativeTime(action.actioned_at) : ''}</p>` : detailsHtml}
         ${!isDone ? winnersBlock : ''}
       </div>
     </div>
@@ -10423,7 +10504,19 @@ function renderOracleCardsV2() {
         oppList.innerHTML = html;
         if (oppBadge) oppBadge.textContent = `${visible.length} opportunit${visible.length === 1 ? 'y' : 'ies'}`;
       } else {
-        oppList.innerHTML = '<p class="text-xs text-text-muted py-3">No cross-market opportunities right now — all winning patterns already running on every viable market, or no spend headroom available this month.</p>';
+        const _diag = state._lastOppDiag || {};
+        const _parts = [];
+        if (_diag.contentLocked > 0) _parts.push(`${_diag.contentLocked} content-locked (NAPLAN/AMC/CBSE keep to home market)`);
+        if (_diag.brandIncompatible > 0) _parts.push(`${_diag.brandIncompatible} brand-blocked (India→MEA etc.)`);
+        if (_diag.noHeadroom > 0) _parts.push(`${_diag.noHeadroom} no headroom this month`);
+        if (_diag.alreadyPresent > 0) _parts.push(`${_diag.alreadyPresent} already running everywhere`);
+        if (_diag.tooFewWinners > 0) _parts.push(`${_diag.tooFewWinners} had <${_OPPORTUNITY_MIN_WINNERS_PER_TUPLE} winners per tuple`);
+        if (_diag.tooGeneric > 0) _parts.push(`${_diag.tooGeneric} all-generic tuples`);
+        const _emptyLead = _diag.tuplesScanned === 0
+          ? 'No winning tuples yet — chassis Scale verdicts have produced zero ads with tier-2 tags.'
+          : `Detected ${_diag.tuplesScanned} candidate tuple${_diag.tuplesScanned === 1 ? '' : 's'}; ${_diag.emitted || 0} ready to ship.`;
+        const _breakdown = _parts.length ? `<p class="text-[10px] text-text-muted mt-1">${_parts.join(' · ')}</p>` : '';
+        oppList.innerHTML = `<div class="py-3"><p class="text-xs text-text-muted">${_emptyLead}</p>${_breakdown}</div>`;
         if (oppBadge) oppBadge.textContent = '';
       }
     }
@@ -10576,9 +10669,6 @@ function renderOracleCardsV2() {
       .replace(/\s*·\s*URGENT\s*$/i, '');
     // Action by date — pause = today; refresh = today.
     const actionByDate = isRefresh ? 'Refresh today.' : 'Turn off today.';
-    // Source tag drives [CRM] vs [META] — see _adSourceTag.
-    const sourceTag = _adSourceTag(a);
-
     let displayName = a.displayName || (a.name.length > 40 ? a.name.slice(0, 40) + '...' : a.name);
     if (/^\d{10,}/.test(displayName)) displayName = a.campaignContext || a.adName?.slice(0, 40) || displayName;
     const campCtx = a.campaignContext || a.campaignName || '';
@@ -10587,7 +10677,7 @@ function renderOracleCardsV2() {
     const thumbHtml = _oracleThumbnail(a.name);
 
     // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
-    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(a.ad_id, a._account || a.market) : '';
+    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(a.ad_id, a._account || a.market, a.name) : '';
     const metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta ↗</a>` : '';
 
     // Secondary fields collapse into a <details> block. Campaign + ad set now surface
@@ -10602,10 +10692,10 @@ function renderOracleCardsV2() {
       <div class="flex items-start gap-3">
         ${thumbHtml}
         <div class="flex-1 min-w-0">
-          <p class="text-[11px] text-text-muted truncate" title="${a.name}">${displayName} ${geoTag}</p>
+          <p class="text-sm font-semibold text-text-primary truncate cursor-pointer hover:text-accent-purple" title="${a.name} — click to copy" onclick="navigator.clipboard.writeText('${(a.name||'').replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${displayName} ${geoTag}</p>
           ${campCtx || adSet ? `<p class="text-[10px] text-text-muted truncate" title="${(a.campaignName || '') + ' / ' + adSet}">${campCtx ? `<span class="font-semibold">${campCtx}</span>` : ''}${campCtx && adSet ? ' · ' : ''}${adSet ? `<span>${adSet}</span>` : ''}</p>` : ''}
-          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">${verdictWord}</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${driver}</span>. <em>${actionByDate}</em> <span class="text-[10px] text-text-muted ml-1">${sourceTag}</span>${metaLinkInline}</span></p>
-          ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>` : detailsHtml}
+          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase ${verdictColor} align-middle mr-1">${verdictWord}</span><span class="text-text-secondary">— <span class="font-semibold text-text-primary">${driver}</span>. <em>${actionByDate}</em> ${_sourceTagPill(a._hasCRM ? 'CRM' : 'META')}${metaLinkInline}</span></p>
+          ${isDone ? `<p class="text-[11px] text-green-700 mt-1">Done ${action.actioned_at ? _relativeTime(action.actioned_at) : ''}</p>` : detailsHtml}
         </div>
       </div>
       ${!isDone ? _pauseCardActions(itemId, displayName) : ''}
@@ -10972,11 +11062,10 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
     const _tdCount = w._displayTD || 0;
     const _driver = `${_cptdStr} cost-per-trial vs ${_targetStr} target \u00B7 ${_tdCount} TD${_tdCount === 1 ? '' : 's'}`;
     const _scaleStep = (typeof _scaleStepLabel === 'function') ? _scaleStepLabel(mkt) : '+20%';
-    const _sourceTag = w._hasCRM ? '[CRM]' : '[META]';
     const _campCtx = w.campaignContext || w.campaignName || '';
     const _adSet = w.adSetName || '';
     // Open-in-Meta deep link (Best-in-class Meta-AI 2026-05-08).
-    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account || mkt) : '';
+    const _metaUrl = (typeof _metaDeepLink === 'function') ? _metaDeepLink(w.ad_id, w._account || mkt, w.adName) : '';
     const _metaLinkInline = _metaUrl ? ` <a href="${_metaUrl}" target="_blank" rel="noopener" class="ml-2 text-[10px] text-accent-purple hover:underline inline-flex items-center gap-0.5">Open in Meta \u2197</a>` : '';
     const _whyHtml = why ? `<p class="text-[11px] text-text-secondary leading-snug"><span class="font-bold text-text-primary">Why it worked:</span> ${why}</p>` : '';
     const _audHtml = currentAud ? `<p class="text-[11px] text-text-muted mt-1" title="${esc(audFmt.tooltip)}">Running on <strong>${currentAud}</strong>${audFmt.subtitleLines[0] ? ' \u00B7 ' + audFmt.subtitleLines[0] : ''}</p>` : '';
@@ -10994,7 +11083,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
             <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
           </div>
           ${_campCtx || _adSet ? `<p class="text-[10px] text-text-muted truncate" title="${esc((w.campaignName || '') + ' / ' + _adSet)}">${_campCtx ? `<span class="font-semibold">${esc(_campCtx)}</span>` : ''}${_campCtx && _adSet ? ' \u00B7 ' : ''}${_adSet ? `<span>${esc(_adSet)}</span>` : ''}</p>` : ''}
-          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase text-green-700 align-middle mr-1">SCALE</span><span class="text-text-secondary">\u2014 <span class="font-semibold text-text-primary">${_driver}</span>. <em>Raise budget ${_scaleStep} Monday.</em> <span class="text-[10px] text-text-muted ml-1">${_sourceTag}</span>${_metaLinkInline}</span></p>
+          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase text-green-700 align-middle mr-1">SCALE</span><span class="text-text-secondary">\u2014 <span class="font-semibold text-text-primary">${_driver}</span>. <em>Raise budget ${_scaleStep} Monday.</em> ${_sourceTagPill(w._hasCRM ? 'CRM' : 'META')}${_metaLinkInline}</span></p>
           ${_detailsHtml}
         </div>
       </div>
@@ -11011,7 +11100,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
         <button onclick="oracleAction('${esc(itemId)}','make_more','done','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-green-light text-green-700 font-bold hover:bg-green-200">Done</button>
         <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
         <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(w.displayName || w.adName)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
-      </div>${w._verdictId ? _chassisDismissActions(w._verdictId, w.adName) : ''}` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>`}
+      </div>${w._verdictId ? _chassisDismissActions(w._verdictId, w.adName) : ''}` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? _relativeTime(action.actioned_at) : ''}</p>`}
     </div>`;
   });
   html += '</div>';
@@ -11161,7 +11250,7 @@ function _renderMakeMoreClusters(container, market, portfolioCPTD, portfolioSpen
           <button onclick="oracleAction('${esc(itemId)}','make_more','dismissed','${esc(c.audience)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-surface-tertiary text-text-muted font-bold hover:bg-gray-200">Dismiss</button>
           <button onclick="oracleAction('${esc(itemId)}','make_more','snoozed','${esc(c.audience)}')" class="text-[11px] px-3 py-1.5 rounded-full bg-accent-orange-light text-amber-700 font-bold hover:bg-amber-200">Snooze 7d</button>
         </div>
-      </div>` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? new Date(action.actioned_at).toLocaleDateString() : ''}</p>`}
+      </div>` : `<p class="text-[11px] text-green-700 mt-2">Done ${action?.actioned_at ? _relativeTime(action.actioned_at) : ''}</p>`}
     </div>`;
   });
   html += '</div>';
@@ -11240,7 +11329,7 @@ function renderOracleModules() {
         const _t5id = 'perf_top:' + normalizeAdName(name);
         const _t5a = getOracleAction(_t5id);
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
-          <td class="py-1.5 px-2 font-medium" style="max-width:200px"><div class="truncate" title="${name}">${shortAdName(name)}</div></td>
+          <td class="py-1.5 px-2 font-medium" style="max-width:200px"><div class="truncate cursor-pointer hover:text-text-primary" title="${name} — click to copy" onclick="navigator.clipboard.writeText('${name.replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${shortAdName(name)}</div></td>
           <td class="py-1.5 px-2">${market}</td>
           <td class="py-1.5 px-2">${format}</td>
           <td class="py-1.5 px-2 text-right font-bold text-accent-green">${cptdHtml}</td>
@@ -11273,7 +11362,7 @@ function renderOracleModules() {
         const _b5id = 'perf_drain:' + normalizeAdName(name);
         const _b5a = getOracleAction(_b5id);
         html += `<tr class="border-b border-gray-50 hover:bg-surface-secondary/50">
-          <td class="py-1.5 px-2 font-medium" style="max-width:200px"><div class="truncate" title="${name}">${shortAdName(name)}</div></td>
+          <td class="py-1.5 px-2 font-medium" style="max-width:200px"><div class="truncate cursor-pointer hover:text-text-primary" title="${name} — click to copy" onclick="navigator.clipboard.writeText('${name.replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${shortAdName(name)}</div></td>
           <td class="py-1.5 px-2">${market}</td>
           <td class="py-1.5 px-2">${format}</td>
           <td class="py-1.5 px-2 text-right font-bold text-red-600">${cptdHtml}</td>
@@ -11321,8 +11410,8 @@ function renderOracleModules() {
             <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full ${gc.dot}"></div><span class="font-bold text-sm">${geo}</span></div>
             <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold border ${sc}">${status}</span>
           </div>
-          ${topCreative ? `<p class="text-xs mb-1"><span class="font-semibold text-green-700">Top:</span> ${topCreative}</p>` : ''}
-          ${topDrain ? `<p class="text-xs mb-1"><span class="font-semibold text-red-600">Drain:</span> ${topDrain}</p>` : ''}
+          ${topCreative ? `<p class="text-xs mb-1"><span class="font-semibold text-green-700">Top:</span> <span class="cursor-pointer hover:underline" title="Click to copy" onclick="navigator.clipboard.writeText('${String(topCreative).replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${topCreative}</span></p>` : ''}
+          ${topDrain ? `<p class="text-xs mb-1"><span class="font-semibold text-red-600">Drain:</span> <span class="cursor-pointer hover:underline" title="Click to copy" onclick="navigator.clipboard.writeText('${String(topDrain).replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${topDrain}</span></p>` : ''}
           ${bd.headline ? `<p class="text-xs font-medium mb-1">${bd.headline}</p>` : ''}
           ${bd.detail ? `<p class="text-[11px] text-text-muted mb-2">${bd.detail}</p>` : ''}
           <div class="flex flex-wrap gap-1.5 mb-2">
@@ -11331,7 +11420,7 @@ function renderOracleModules() {
             ${qlTdPct ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-surface-tertiary font-medium">QL\u2192TD ${qlTdPct}</span>` : ''}
             ${bd.key_metric ? `<span class="text-[10px] px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple font-medium">${bd.key_metric}</span>` : ''}
           </div>
-          <p class="text-[10px] text-text-muted mb-1">📅 ${seasonalCtx}</p>
+          <p class="text-[10px] text-text-muted mb-1" title="Seasonal context for this market — sourced from seasonal-calendar.md (verify dates before writing time-bound copy).">📅 ${seasonalCtx}</p>
           ${gaps.length ? `<div class="mt-1">${gaps.map(g => `<p class="text-[10px] text-amber-700">\u26A0 ${g}</p>`).join('')}</div>` : ''}
         </div>`;
       }).join('')}</div>`;
@@ -12067,24 +12156,26 @@ function renderMetricTicker() {
     // 2. Hero: CPTD + TD (large, side by side)
     const cptdTrend = trend(cptd, priorCptd, true);
     const tdTrend = trend(crm.td, priorCrm.td, false);
-    // Format CPTD from tagger data
+    // Format CPTD from tagger data. Bucket untagged ads as "Other" so spend totals add up
+    // and the operator can see why the format averages don't reconcile against portfolio CPTD
+    // (different denominators — portfolio uses CRM-attributed TDs, format split uses ad-level
+    // Meta-attributed TDs from tagger; surface every format with TD > 0 so nothing is hidden).
     let formatCptdLine = '';
     if (state.taggerData?.length) {
       const fmtStats = {};
       const dashData = getDashboardFilteredData();
       dashData.forEach(c => {
-        const fmt = c['Creative type'] || 'Unknown';
-        if (fmt === 'Unknown') return;
+        const fmtRaw = c['Creative type'] || '';
+        const fmt = fmtRaw && fmtRaw !== 'Unknown' ? fmtRaw : 'Other';
         if (!fmtStats[fmt]) fmtStats[fmt] = { spend: 0, td: 0 };
         fmtStats[fmt].spend += parseNumber(c['Spent']||c['spent']||0);
         fmtStats[fmt].td += parseNumber(c['TD']||c['td']||0);
       });
       const fmtCptd = Object.entries(fmtStats)
-        .filter(([,s]) => s.td >= 5)
-        .map(([fmt, s]) => ({ fmt, cptd: s.spend / s.td }))
-        .sort((a, b) => a.cptd - b.cptd)
-        .slice(0, 3);
-      if (fmtCptd.length) formatCptdLine = fmtCptd.map(f => `${f.fmt} ${formatCurrency(f.cptd)}`).join(' · ');
+        .filter(([,s]) => s.td > 0)
+        .map(([fmt, s]) => ({ fmt, cptd: s.spend / s.td, td: s.td }))
+        .sort((a, b) => a.cptd - b.cptd);
+      if (fmtCptd.length) formatCptdLine = fmtCptd.map(f => `<span class="cursor-pointer hover:underline" title="Click to filter Tagger to ${f.fmt} ads · n=${Math.round(f.td)} TDs (Meta-attributed; portfolio CPTD above uses CRM)" onclick="_filterTaggerByFormat('${f.fmt}')">${f.fmt} ${formatCurrency(f.cptd)}${f.td < 5 ? ` <span class="text-text-muted">(n=${Math.round(f.td)})</span>` : ''}</span>`).join(' · ');
     }
     const _sparkGeo = market === 'all' ? 'all' : market;
     const _heroSparkOpts = { width: 110, height: 22, days: 30, fillGradient: false };
@@ -14966,73 +15057,6 @@ function renderSparkline(metric, geo, opts = {}) {
   return generateSparklineSVG(data, { ...opts, lowerBetter, id: `sp_${metric}_${geo || 'all'}_${Math.random().toString(36).slice(2,6)}` });
 }
 
-// US monthly spend plan (₹ Cr) — FY26-27 from summary doc §9.4. US-only; other markets via AOP not yet wired.
-const BUDGET_PLAN_INR_CR = {
-  US: { Apr: 2.25, May: 1.72, Jun: 3.50, Jul: 5.10, Aug: 6.85, Sep: 8.10, Oct: 6.95, Nov: 5.45, Dec: 2.58, Jan: 7.35, Feb: 6.40, Mar: 4.45 }
-};
-
-function renderBudgetPace() {
-  const el = document.getElementById('budgetPaceCard');
-  if (!el) return;
-  const dashCountry = document.getElementById('dashboardCountryFilter')?.value || 'all';
-  // Only render for US or All Markets (other markets have no monthly plan wired)
-  const market = dashCountry === 'all' || dashCountry === 'US' ? 'US' : null;
-  if (!market || !costData?.length) { el.innerHTML = ''; return; }
-
-  const today = new Date();
-  const monthName = today.toLocaleString('en', { month: 'short' });
-  const planCr = BUDGET_PLAN_INR_CR[market]?.[monthName];
-  if (!planCr) { el.innerHTML = ''; return; }
-
-  const planInr = planCr * 1e7;
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0,10);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0,10);
-  const todayStr = today.toISOString().slice(0,10);
-
-  const monthCost = filterCostByMarket(_filterCostByFlow(costData), market)
-    .filter(r => r.day >= monthStart && r.day <= todayStr);
-  const spentMTD = monthCost.reduce((s, r) => s + (parseFloat(r.amount_spent) || parseFloat(r.spend) || 0), 0);
-
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  const dayOfMonth = today.getDate();
-  const monthPct = dayOfMonth / daysInMonth * 100;
-  const budgetPct = spentMTD / planInr * 100;
-  const expectedSpend = planInr * (dayOfMonth / daysInMonth);
-  const paceDelta = budgetPct - monthPct;
-
-  let status, statusColor, statusBg;
-  if (paceDelta > 10) { status = 'Ahead'; statusColor = 'text-amber-700'; statusBg = 'bg-accent-orange-light'; }
-  else if (paceDelta < -10) { status = 'Behind'; statusColor = 'text-red-700'; statusBg = 'bg-accent-red-light'; }
-  else { status = 'On pace'; statusColor = 'text-green-700'; statusBg = 'bg-accent-green-light'; }
-
-  const barColor = paceDelta > 10 ? 'bg-accent-orange' : paceDelta < -10 ? 'bg-accent-red' : 'bg-accent-green';
-  const barTrack = 'bg-surface-tertiary';
-  const remainingDays = daysInMonth - dayOfMonth;
-  const remainingBudget = Math.max(0, planInr - spentMTD);
-  const dailyPace = remainingDays > 0 ? remainingBudget / remainingDays : 0;
-
-  el.innerHTML = `<div class="bg-white rounded-xl border border-gray-200/80 shadow-sm p-4">
-    <div class="flex items-center justify-between mb-2">
-      <div class="flex items-center gap-2">
-        <h4 class="text-xs font-bold text-text-secondary uppercase tracking-wider">${market} Budget Pace \u2014 ${monthName} ${today.getFullYear()}</h4>
-        <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${statusBg} ${statusColor}">${status}</span>
-      </div>
-      <span class="text-[10px] text-text-muted">Day ${dayOfMonth}/${daysInMonth} \u2014 ${monthPct.toFixed(0)}% through month</span>
-    </div>
-    <div class="flex items-center gap-2 mb-2">
-      <div class="flex-1 h-3 ${barTrack} rounded-full overflow-hidden relative">
-        <div class="h-full ${barColor} transition-all" style="width:${Math.min(budgetPct, 100).toFixed(1)}%"></div>
-        <div class="absolute top-0 bottom-0 w-px bg-text-primary" style="left:${monthPct.toFixed(1)}%" title="Linear pace marker"></div>
-      </div>
-      <span class="text-xs font-bold text-text-primary shrink-0">${budgetPct.toFixed(0)}%</span>
-    </div>
-    <div class="flex items-center justify-between text-[11px]">
-      <p><span class="font-bold">${formatCurrency(spentMTD)}</span> spent of <span class="font-bold">\u20B9${planCr} Cr</span> planned</p>
-      <p class="text-text-muted">Linear pace: ${formatCurrency(expectedSpend)} \u2014 ${paceDelta >= 0 ? '+' : ''}${formatCurrency(spentMTD - expectedSpend)} ${paceDelta >= 0 ? 'over' : 'under'}</p>
-    </div>
-    ${remainingDays > 0 ? `<p class="text-[10px] text-text-muted mt-1">To hit plan: ${formatCurrency(dailyPace)}/day for the remaining ${remainingDays} days.</p>` : ''}
-  </div>`;
-}
 
 // Funnel waterfall — visual bars with leak % per stage
 // crm: { ql, tql, ts, td, paid, nri, asian, invalid }
@@ -17196,13 +17220,13 @@ function _funnelRecCell(row, chassisByAd) {
   // Best-in-class Meta-AI (2026-05-09): one click to navigate from Tagger Funnel to Ads Manager.
   const _adId = row.ad_id || '';
   const _acct = row.account || row._account || row.market || '';
-  const _metaUrl = (_adId && typeof _metaDeepLink === 'function') ? _metaDeepLink(_adId, _acct) : '';
+  const _metaUrl = (_adId && typeof _metaDeepLink === 'function') ? _metaDeepLink(_adId, _acct, row.ad_name) : '';
   const _metaLink = _metaUrl ? `<a href="${_metaUrl}" target="_blank" rel="noopener" class="text-[10px] text-accent-purple hover:underline ml-1 whitespace-nowrap">Open in Meta ↗</a>` : '';
   const _adSet = row.adset_name ? `<span class="text-[10px] text-text-muted truncate max-w-[200px]" title="${_funnelEsc(row.adset_name)}">${_funnelEsc(row.adset_name)}</span>` : '';
   if (!v) {
     if (!row._hasCRM) return `<span class="text-[10px] text-text-muted italic">No CRM match — verify UTM</span>${_metaLink}`;
-    if (row.spend < 5000) return `<span class="text-[10px] text-text-muted italic">Monitor — under volume floor</span>${_metaLink}`;
-    return `<span class="text-[10px] text-text-muted italic">Monitor — within thresholds</span>${_metaLink}`;
+    if (row.spend < 5000) return `<span class="text-[10px] text-text-muted italic">Monitor — spend ${formatCurrency(row.spend || 0)} (floor ₹5K)</span>${_metaLink}`;
+    return `<span class="text-[10px] text-text-muted italic">Monitor — CPTD ${row.cptd != null ? formatCurrency(row.cptd) : '—'}, within thresholds</span>${_metaLink}`;
   }
   const t = v.action.type;
   const palette = t === 'pause' ? 'bg-red-50 text-red-800 border-red-200'
@@ -17310,7 +17334,7 @@ function renderFunnelHealthTable() {
       ? `<div class="flex flex-col gap-0.5">
            <span class="font-semibold text-text-primary">${_funnelEsc((r.ad_name||'').slice(0,80))}</span>
            <span class="text-[9px] text-text-muted">${_funnelEsc(r.campaign_name||'')} › ${_funnelEsc(r.adset_name||'')}</span>
-           ${r._isAdsetGrain ? '<span class="text-[9px] text-amber-600 font-semibold">India · ad-set grain (UTM gap)</span>' : ''}
+           ${r._isAdsetGrain ? '<span class="text-[9px] text-amber-600 font-semibold cursor-help" title="India CRM has no ad-level UTM — TD/QL on this row reflects the entire ad set, not this single ad.">India · ad-set grain (UTM gap)</span>' : ''}
            ${r.market ? `<span class="inline-block self-start px-1.5 py-0.5 rounded bg-surface-tertiary text-[9px] font-bold text-text-muted">${_funnelEsc(r.market)}</span>` : ''}
          </div>`
       : `<div class="flex flex-col gap-0.5">
@@ -17334,10 +17358,10 @@ function renderFunnelHealthTable() {
       ${_funnelPctCell(r.qlTdPct, 25, 15)}
       <td class="px-2 py-2 text-right">${r.cptql != null ? formatCurrency(r.cptql) : '—'}</td>
       <td class="px-2 py-2 text-right font-semibold">${r.cptd != null ? formatCurrency(r.cptd) : '—'}</td>
-      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 2</td>
-      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 2</td>
-      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 3</td>
-      <td class="px-2 py-2 text-text-muted text-[10px] italic">Phase 3</td>
+      <td class="px-2 py-2 text-text-muted text-[10px]" title="Audience targeting — pending data hookup">—</td>
+      <td class="px-2 py-2 text-text-muted text-[10px]" title="Destination (Instant Form vs Landing Page) — pending data hookup">—</td>
+      <td class="px-2 py-2 text-text-muted text-[10px]" title="Meta Ads Manager link — see Recommendation column for the live ↗ link">—</td>
+      <td class="px-2 py-2 text-text-muted text-[10px]" title="Notion ad doc — pending data hookup">—</td>
       <td class="px-2 py-2" style="min-width:200px">${recCell}</td>
     </tr>`;
   }).join('');
@@ -17677,7 +17701,7 @@ function _winningCreativesTable(data) {
           <th class="text-left px-2 py-2 font-semibold">Market</th>
           <th class="text-left px-2 py-2 font-semibold">Audience</th>
           <th class="text-right px-2 py-2 font-semibold">Spend</th>
-          <th class="text-right px-2 py-2 font-semibold" title="True Qualified Leads — NRI for US, QL for others">TQL</th>
+          <th class="text-right px-2 py-2 font-semibold cursor-help" title="True Qualified Leads — NRI for US, IB/IGCSE for India/MEA, all QLs elsewhere">TQL <span class="text-[8px] text-text-muted">ⓘ</span></th>
           <th class="text-right px-2 py-2 font-semibold">TD</th>
           <th class="text-right px-2 py-2 font-semibold">CPTQL</th>
           <th class="text-right px-2 py-2 font-semibold">CPTD</th>
@@ -17828,7 +17852,7 @@ function renderCreativeReview() {
             <span class="text-[10px] px-1.5 py-0.5 rounded-full font-medium ${type==='Video' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}">${type}</span>
             <span class="text-[10px] text-text-muted">${mkt}</span>
           </div>
-          <p class="text-[11px] font-semibold leading-tight mb-1 truncate" title="${name}">${shortAdName(name)}</p>
+          <p class="text-[11px] font-semibold leading-tight mb-1 truncate cursor-pointer hover:text-text-primary" title="${name} — click to copy" onclick="navigator.clipboard.writeText('${name.replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${shortAdName(name)}</p>
           <p class="text-[10px] text-text-secondary leading-snug mb-2">${v.reason}</p>
           ${hasAnyTag ? `<div class="flex flex-wrap items-center gap-1 mb-2">${_visiblePills}${_morePills}${_confBadge}</div>` : '<div class="mb-2"><span class="text-[9px] text-gray-400 italic">Needs tagging</span></div>'}
           <div class="grid grid-cols-4 gap-2 text-[10px]">
@@ -17904,7 +17928,7 @@ function renderCreativeReview() {
   if (scale.length + working.length > 0) {
     const winners = [...scale, ...working].slice(0, 6);
     html += `<div class="mb-6">
-      <h3 class="text-base font-bold mb-1 text-green-800">✓ Scale These — Proven Winners</h3>
+      <h3 class="text-base font-bold mb-1 text-green-800">✓ Scale These — ${winners.length} of ${scale.length + working.length} Proven Winners</h3>
       <p class="text-xs text-text-muted mb-3">These creatives are converting well. Make more like them or increase their budget. <span class="italic">Metric arrows compare against portfolio average.</span></p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         ${winners.map(x => creativeCard(x.c, x.v, true)).join('')}
@@ -17916,7 +17940,7 @@ function renderCreativeReview() {
   if (pause.length + fatigued.length > 0) {
     const losers = [...pause, ...fatigued].slice(0, 6);
     html += `<div class="mb-6">
-      <h3 class="text-base font-bold mb-1 text-red-800">✗ Pause or Refresh — Underperforming</h3>
+      <h3 class="text-base font-bold mb-1 text-red-800">✗ Pause or Refresh — ${losers.length} of ${pause.length + fatigued.length} Underperforming</h3>
       <p class="text-xs text-text-muted mb-3">These creatives are burning budget without converting. Pause or create new variants. <span class="italic">Metric arrows compare against portfolio average.</span></p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         ${losers.map(x => creativeCard(x.c, x.v, true)).join('')}
@@ -19244,7 +19268,7 @@ function renderCreativeGrid() {
           return `<span class="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-surface-tertiary border-gray-200 text-text-muted shrink-0">${_hasCRM ? '\u2014' : 'No CRM'}</span>`;
         })()}
       </div>
-      <p class="text-xs font-semibold mb-0.5 truncate" title="${name}">${shortAdName(name)}</p>
+      <p class="text-xs font-semibold mb-0.5 truncate cursor-pointer hover:text-text-primary" title="${name} — click to copy" onclick="navigator.clipboard.writeText('${name.replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${shortAdName(name)}</p>
       <p class="text-[10px] text-text-muted mb-2 truncate" title="${campaign}">${campaign}</p>
       <p class="text-[10px] text-text-muted mb-2">${impactLabel}</p>
       <div class="grid grid-cols-3 gap-2 mb-2 text-center">
@@ -20406,6 +20430,287 @@ function normalizeLibraryRow(row) {
     _raw: row
   };
 }
+
+// ---- Library Phase 1a: sheet row → Meta ad matching algorithm ----
+// Goal (per May 1 plan): kill the manual "Live Status/<market>" upkeep on the
+// library sheet. Match each sheet row to its Meta ad deployments by token, with
+// a 2-tier fallback that drops generic words when the strict pass misses.
+//
+// Inputs: a normalized library card (from `normalizeLibraryRow`) and the global
+// `metaAdData` array of daily ad rows. Output: { tier, matches[], markets[] }.
+//
+// Tier 1 = all search tokens AND-match in ad_name (case-insensitive substring),
+//          format scope matches if the card declares one,
+//          market scope matches if the sheet's "Shared for /<market>" columns
+//          narrow to a single market.
+// Tier 2 = drop generic tokens (testimonial/video/static/etc), retry with the
+//          remaining proper-noun tokens. Catches "Testimonial Suzy" → "Video_Suzy_*".
+// Tier 3 = no match. Card is "shared on the sheet but never deployed".
+
+const _LIBRARY_GENERIC_TOKENS = new Set([
+  'creative','creatives','static','statics','video','videos','ad','ads',
+  'asset','assets','set','sets','batch','the','a','an','for','of','and',
+  'with','to','on','in','&'
+]);
+// Domain synonyms — Cuemath abbreviations / spelling variants the sheet uses
+// interchangeably with full forms in ad names. Each token expands to a group;
+// AND-match across groups, OR-match within a group. CONSERVATIVE: only true
+// abbreviations or spelling variants of the SAME concept go here. Related-but-
+// different concepts (MOEMS ≠ Olympiad, NAPLAN ≠ Australian) DO NOT belong —
+// conflating them creates false-positive matches across distinct campaigns.
+// May 10: Naina caught `moems → olympiad` as wrong (different ads, different
+// markets); also stripped `amc → amc8`, `pongal ↔ sakrant`, `nri → desi`,
+// `naplan → australian` for the same reason.
+const _LIBRARY_SYNONYMS = {
+  'mk': ['mathkangaroo','kangaroo'],
+  'mathkangaroo': ['mk','kangaroo'],
+  'kangaroo': ['mk','mathkangaroo'],
+  'hs': ['highschool'],
+  'sakrant': ['sankranti','sankrant'],
+  'sankranti': ['sakrant','sankrant'],
+  'sankrant': ['sakrant','sankranti'],
+  'aus': ['australia','au'],
+  'australia': ['aus','au'],
+  'au': ['aus','australia'],
+  'anz': ['anz'],
+  'k-2': ['k2'],
+  'k2': ['k-2']
+};
+// Sheet status → market filter tokens for the "Shared for /<market>" columns.
+const _LIBRARY_MARKET_KEYS = {
+  US: 'usStatus', India: 'inStatus', AUS: 'auStatus',
+  MEA: 'meaStatus', APAC: 'apacStatus'
+};
+function _libraryStatusIsTrue(v) {
+  const s = (v || '').toLowerCase().trim();
+  return s === 'true' || s === 'yes' || s === 'live' || s === 'deployed' || s === '1';
+}
+function _libraryExtractTokens(name) {
+  return (name || '')
+    .toLowerCase()
+    .replace(/[_/]/g, ' ')
+    .split(/[\s\-]+/)
+    .filter(Boolean);
+}
+function _libraryDetectFormatScope(card) {
+  // Card.format wins if the multi-tab pull tagged it; otherwise infer from name.
+  const f = (card.format || '').toLowerCase();
+  if (f.includes('static')) return 'Static';
+  if (f.includes('video')) return 'Video';
+  if (f.includes('influencer')) return 'Influencer';
+  if (f.includes('carousel')) return 'Carousel';
+  const n = (card.name || '').toLowerCase();
+  if (/\bstatics?\b/.test(n)) return 'Static';
+  if (/\bvideos?\b/.test(n)) return 'Video';
+  if (/\binfluencers?\b/.test(n)) return 'Influencer';
+  if (/\bcarousels?\b/.test(n)) return 'Carousel';
+  return null; // no scope — match any format
+}
+function _libraryMarketScope(card) {
+  // If exactly one "Shared for /<market>" is TRUE, scope to that market.
+  // If multiple or none, leave open.
+  const live = [];
+  Object.entries(_LIBRARY_MARKET_KEYS).forEach(([market, key]) => {
+    if (_libraryStatusIsTrue(card[key])) live.push(market);
+  });
+  return live.length === 1 ? live[0] : null;
+}
+function _libraryAdMatchesMarket(ad, market) {
+  if (!market) return true;
+  const acct = String(ad._account || '').toLowerCase();
+  const name = String(ad.ad_name || '').toLowerCase();
+  if (market === 'US') return acct.includes('us') || /\b(usa|us)\b/.test(name);
+  if (market === 'India') return acct.includes('india') || /\b(ind|india)\b/.test(name);
+  if (market === 'AUS') return acct.includes('aus') || acct.includes('anz') || /\b(aus|anz|au)\b/.test(name);
+  if (market === 'MEA') return acct.includes('mea') || acct.includes('row') || /\b(mea|uae|sa)\b/.test(name);
+  if (market === 'APAC') return acct.includes('apac') || acct.includes('row') || /\b(apac|sg|hk)\b/.test(name);
+  return true;
+}
+function _libraryAdMatchesFormat(ad, formatScope) {
+  if (!formatScope) return true;
+  const name = String(ad.ad_name || '').toLowerCase();
+  // Use boundary-anchored regex so format keyword at start/end of name still
+  // matches (e.g., `Video_Suzy_010125`). Old `/_video_/` missed those.
+  if (formatScope === 'Static') return /(^|_)static(_|$)/.test(name);
+  if (formatScope === 'Video') return /(^|_)video(_|$)/.test(name);
+  if (formatScope === 'Influencer') return /(^|_)(influencer|postboost)(_|$)/.test(name);
+  if (formatScope === 'Carousel') return /(^|_)carousel(_|$)/.test(name);
+  return true;
+}
+// Sub-row detector: variation rows like "1 (english script)" or bare "2" or
+// "Creative-1" / "Ad-3" are extracted as separate cards by the sheet pull but
+// are NOT real concepts — they're variations of the parent above them. The
+// hyphen-digit + space-digit-suffix patterns added May 10 after the POC saw
+// `Creative-1`, `Creative-2`, `Ad-3`, `Ad-4`, `High school 1` matching ~7K ads
+// each as substring false positives.
+function _libraryIsSubRow(name) {
+  const n = (name || '').trim();
+  if (!n) return true;
+  if (n.length < 3) return true;
+  if (/^\d+(\s|\(|\.|$)/.test(n)) return true;
+  if (/^(creative|ad|variation|version|set|cut|copy|v)-?\s*\d+$/i.test(n)) return true;
+  if (/\s\d{1,2}$/.test(n) && n.length < 25) return true;
+  return false;
+}
+function matchLibraryRowToAds(card, ads) {
+  const adsArr = ads || (typeof metaAdData !== 'undefined' ? metaAdData : []);
+  if (!card?.name || !adsArr.length) return { tier: 3, matches: [], markets: [], reason: 'no-data' };
+  if (_libraryIsSubRow(card.name)) return { tier: 3, matches: [], markets: [], reason: 'sub-row' };
+  const properTokens = _libraryExtractTokens(card.name).filter(t => !_LIBRARY_GENERIC_TOKENS.has(t));
+  if (!properTokens.length) return { tier: 3, matches: [], markets: [], reason: 'no-proper-tokens' };
+  const formatScope = _libraryDetectFormatScope(card);
+  const marketScope = _libraryMarketScope(card);
+  // Build a unique-by-ad_name index so we don't double-count daily rows.
+  const byName = new Map();
+  for (const r of adsArr) {
+    const n = r.ad_name || '';
+    if (!n) continue;
+    if (!byName.has(n)) byName.set(n, r);
+  }
+  const candidates = Array.from(byName.values());
+  // Each token becomes a synonym group [token, ...synonyms]. AND across groups,
+  // OR within a group. Lets `MK` match `mathkangaroo` while still requiring all
+  // other proper tokens to match.
+  const tokenGroups = properTokens.map(t => {
+    const syns = _LIBRARY_SYNONYMS[t] || [];
+    return [t, ...syns];
+  });
+  const tryMatch = (opts) => {
+    return candidates.filter(ad => {
+      const lname = String(ad.ad_name || '').toLowerCase();
+      if (opts.format && !_libraryAdMatchesFormat(ad, formatScope)) return false;
+      if (opts.market && !_libraryAdMatchesMarket(ad, marketScope)) return false;
+      return tokenGroups.every(group => group.some(t => lname.includes(t)));
+    });
+  };
+  // Tier 1: properTokens AND-match + format + market scope
+  // Tier 2: drop market scope (multi-market rows or scope misclassified)
+  // Tier 3: drop format scope too (sheet tab and ad-name format disagree)
+  // No-match: row never deployed.
+  const tier1 = tryMatch({ format: true, market: true });
+  if (tier1.length) {
+    const markets = Array.from(new Set(tier1.map(a => a._account || '').filter(Boolean)));
+    return { tier: 1, matches: tier1, markets, tokens: properTokens };
+  }
+  const tier2 = tryMatch({ format: true, market: false });
+  if (tier2.length) {
+    const markets = Array.from(new Set(tier2.map(a => a._account || '').filter(Boolean)));
+    return { tier: 2, matches: tier2, markets, tokens: properTokens };
+  }
+  const tier3 = tryMatch({ format: false, market: false });
+  if (tier3.length) {
+    const markets = Array.from(new Set(tier3.map(a => a._account || '').filter(Boolean)));
+    return { tier: 3, matches: tier3, markets, tokens: properTokens, reason: 'format-relaxed' };
+  }
+  return { tier: 4, matches: [], markets: [], tokens: properTokens, reason: 'no-match' };
+}
+// POC: run matching across all sheet rows, log hit rate + per-row sample.
+// Call from console: `runLibraryMatchPOC()`. May 1 baseline = 10/10 hit on
+// hand-picked rows; this runs the full sheet so we get a real-data hit rate.
+function runLibraryMatchPOC() {
+  const sheet = state._librarySheet || [];
+  if (!sheet.length) { console.warn('runLibraryMatchPOC: state._librarySheet is empty — call fetchLibrarySheet() first'); return; }
+  if (!metaAdData || !metaAdData.length) { console.warn('runLibraryMatchPOC: metaAdData is empty — boot has not finished'); return; }
+  const cards = sheet.map(normalizeLibraryRow).filter(c => c.name);
+  const buckets = { t1: [], t2: [], t3: [], unmatched: [], subrow: [], untokenizable: [] };
+  // Helper: did a human mark "Shared for" or "Live Status" TRUE on the sheet?
+  // The live sheet has bare `Shared for` + `Live Status` columns (TRUE/FALSE),
+  // not the per-market columns the May 1 plan assumed — so we read them off
+  // the raw row directly. Lets us split unmatched rows into "human-claimed-
+  // shared but algo missed" vs "human-also-shows-not-shared (genuine never-
+  // deployed)." Updated May 10 after `inspectLibraryColumns` revealed the
+  // actual schema.
+  const claimedShared = (c) => {
+    const r = c._raw || {};
+    return (r['Shared for'] || '').trim().toUpperCase() === 'TRUE'
+        || (r['Live Status'] || '').trim().toUpperCase() === 'TRUE';
+  };
+  cards.forEach(c => {
+    const r = matchLibraryRowToAds(c, metaAdData);
+    const row = {
+      name: c.name.slice(0, 40),
+      format: c.format || _libraryDetectFormatScope(c) || '—',
+      marketScope: _libraryMarketScope(c) || 'open',
+      claimedShared: claimedShared(c) ? 'yes' : 'no',
+      tier: r.tier,
+      reason: r.reason || '',
+      matches: r.matches.length,
+      accounts: r.markets.slice(0, 4).join(',') || '—'
+    };
+    if (r.reason === 'sub-row') buckets.subrow.push(row);
+    else if (r.reason === 'no-proper-tokens') buckets.untokenizable.push(row);
+    else if (r.tier === 1) buckets.t1.push(row);
+    else if (r.tier === 2) buckets.t2.push(row);
+    else if (r.tier === 3) buckets.t3.push(row);
+    else buckets.unmatched.push(row);
+  });
+  // Split unmatched: "disputed" (human said shared, algo found nothing) vs
+  // "agreed-not-deployed" (human said not shared, algo agrees). Disputed rows
+  // are the algorithm-quality signal — ideally a small number we can debug.
+  const disputed = buckets.unmatched.filter(r => r.claimedShared === 'yes');
+  const agreed = buckets.unmatched.filter(r => r.claimedShared === 'no');
+  const total = cards.length;
+  const real = total - buckets.subrow.length - buckets.untokenizable.length;
+  const hit = buckets.t1.length + buckets.t2.length + buckets.t3.length;
+  const pct = real > 0 ? Math.round(hit / real * 100) : 0;
+  console.log(`Library match POC: ${hit}/${real} real rows matched (${pct}%) | Tier 1: ${buckets.t1.length} · Tier 2 (drop market): ${buckets.t2.length} · Tier 3 (drop format): ${buckets.t3.length} · No-match: ${buckets.unmatched.length}`);
+  console.log(`Unmatched split: ${disputed.length} disputed (human claims shared, algo missed) · ${agreed.length} agreed-not-deployed (sheet labor would be killed)`);
+  console.log(`Filtered out: ${buckets.subrow.length} sub-rows, ${buckets.untokenizable.length} untokenizable (all generic words)`);
+  if (disputed.length) {
+    console.log(`Disputed sample (algorithm-quality signal — investigate):`);
+    console.table(disputed.slice(0, 15));
+  }
+  // Stratified sample of matched + edge cases.
+  const stratified = [
+    ...buckets.t1.slice(0, 5),
+    ...buckets.t2.slice(0, 5),
+    ...buckets.t3.slice(0, 5),
+    ...agreed.slice(0, 5)
+  ];
+  console.table(stratified);
+  return {
+    total, real,
+    ...Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, v.length])),
+    disputed: disputed.length,
+    agreed: agreed.length,
+    buckets,
+    disputedRows: disputed
+  };
+}
+window.runLibraryMatchPOC = runLibraryMatchPOC;
+
+// Diagnostic: surface the actual sheet columns and a sample of how the
+// Shared/Live columns are populated so the matcher's "claimedShared" check
+// can read the correct fields. The May 1 plan assumed per-market columns
+// (Shared for /US, Live Status/US, etc.) but the live sheet has bare
+// `Shared for` + `Live Status` columns — values may encode markets, dates,
+// or TRUE/FALSE. Run once to inspect, then fold the result into normalizeLibraryRow.
+function inspectLibraryColumns() {
+  const sheet = state._librarySheet || [];
+  if (!sheet.length) { console.warn('inspectLibraryColumns: no sheet — call fetchLibrarySheet() first'); return; }
+  // Group by tab type so each tab's column set is visible separately.
+  const byTab = {};
+  sheet.forEach(r => { const t = r._contentType || 'unknown'; (byTab[t] = byTab[t] || []).push(r); });
+  Object.entries(byTab).forEach(([tab, rows]) => {
+    const keys = Object.keys(rows[0] || {});
+    const sharedKeys = keys.filter(k => /shared|live|status/i.test(k));
+    console.log(`Tab "${tab}" (${rows.length} rows) — shared/live columns:`, sharedKeys);
+    // 5 populated samples per tab
+    const populated = rows.filter(r => sharedKeys.some(k => (r[k] || '').trim() && (r[k] || '').trim().toLowerCase() !== 'false'));
+    const sample = populated.slice(0, 5).map(r => {
+      const out = { name: (r.Particular || r['Particular  '] || '').slice(0, 40) };
+      sharedKeys.forEach(k => { out[k] = r[k]; });
+      return out;
+    });
+    console.table(sample);
+    // Distinct values per shared/live column
+    sharedKeys.forEach(k => {
+      const distinct = Array.from(new Set(rows.map(r => (r[k] || '').trim()).filter(Boolean))).slice(0, 20);
+      console.log(`  "${k}" distinct values (up to 20):`, distinct);
+    });
+  });
+}
+window.inspectLibraryColumns = inspectLibraryColumns;
 
 // ---- Render Library (Redesigned: operational creative tracker) ----
 function renderLibrary() {
