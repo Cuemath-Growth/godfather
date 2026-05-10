@@ -7446,7 +7446,11 @@ function _adSourceTag(ad) {
 // brand-awareness Video on Pause Now was a category error). Detected via ad-name token per
 // Cuemath naming convention. Conversion ads (the standard performance flow) carry `_Conv_`
 // and pass through — only the explicit brand-awareness tokens hit this exclusion.
-const _BRAND_AWARENESS_RE = /(_Brand_Awareness_|_Awareness_Traffic_|_Reach_lift|_Recall_lift|_Traffic_Maximise_Reach|_Brand_Lift_|_Awareness_Reach_)/i;
+// Match brand-awareness tokens with word-boundary semantics so they hit at start-of-string,
+// after a separator (`_`, `-`, space), or as standalone tokens. Naina May 11 v2: caught that
+// campaigns named `Brand_Awareness_Traffic-LP` were slipping through because the previous
+// regex required a leading underscore.
+const _BRAND_AWARENESS_RE = /(?:^|[\s_-])(Brand[_ ]Awareness|Awareness[_ ]Traffic|Reach[_ ]lift|Recall[_ ]lift|Traffic[_ ]Maximise[_ ]Reach|Brand[_ ]Lift|Awareness[_ ]Reach)/i;
 function _isBrandAwarenessAd(adName, campaignName) {
   const haystack = `${adName || ''} ${campaignName || ''}`;
   return _BRAND_AWARENESS_RE.test(haystack);
@@ -18588,6 +18592,12 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount, parentG
 
   // Group-level insight
   const _gIns = (() => {
+    // Brand-awareness exclusion — campaigns optimizing for reach / impressions / recall don't
+    // belong in a QL/TD verdict family. Naina May 11 v2: `Brand_Awareness_Traffic-LP` was
+    // reading "Kill — 0 TDs" which is category-wrong (the campaign was never trying for TDs).
+    if (typeof _isBrandAwarenessAd === 'function' && _isBrandAwarenessAd(label, '')) {
+      return { text: 'Brand-Awareness — judged on reach, not TDs', color: 'text-gray-500', icon: '○' };
+    }
     const _cptdG = _tgrTh.cptd?.green || 35000;
     const _s = (base) => Math.round(base * _cptdG / 50000);
     if (totals.spend < _s(3000)) return { text: 'Too early', color: 'text-gray-400', icon: '○' };
