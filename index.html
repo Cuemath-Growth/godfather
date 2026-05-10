@@ -7456,6 +7456,49 @@ function _isBrandAwarenessAd(adName, campaignName) {
   return _BRAND_AWARENESS_RE.test(haystack);
 }
 
+// Compute which winner path a creative is on — same dual-path rule as _winningCreativesTable.
+// Returns { path: 'evidence' | 'cohort', ageDays } or null if it doesn't qualify as a winner.
+// Used to render the Early/Mature badge wherever Scale/Working verdicts appear.
+function _computeWinnerPath(c) {
+  if (!c) return null;
+  const mkt = (typeof extractMarket === 'function' ? extractMarket(c) : '') || 'US';
+  const th = (typeof SENTINEL_THRESHOLDS !== 'undefined' && SENTINEL_THRESHOLDS[mkt]) || (typeof SENTINEL_THRESHOLDS !== 'undefined' && SENTINEL_THRESHOLDS['US']) || {};
+  const adName = c['Ad name'] || c['ad name'] || c.ad_name || '';
+  const campaignName = c['Campaign name'] || c['campaign'] || c['campaign_name'] || c.campaign_name || '';
+  if (_isBrandAwarenessAd(adName, campaignName)) return null;
+  const spend = parseNumber(c['Spent'] || c['spent'] || c.spend || 0);
+  const ql = parseNumber(c['QL'] || c['ql'] || c.ql || 0);
+  const nri = parseNumber(c['NRI'] || c['nri'] || c.nri || 0);
+  const td = parseNumber(c['TD'] || c['td'] || c.td || 0);
+  const tql = mkt === 'US' ? nri : ql;
+  if (spend <= 0 || td <= 0) return null;
+  const cptql = tql > 0 ? spend / tql : Infinity;
+  const cptd = spend / td;
+  const cptqlGreen = th.cpnri?.green || th.cpql?.green || 10000;
+  const cptdGreen = th.cptd?.green || 35000;
+  const cptqlAmber = th.cpnri?.amber || th.cpql?.amber || 15000;
+  const cptdAmber = th.cptd?.amber || 50000;
+  let date = c['_date'] || null;
+  if (!date) { const m = adName.match(/(\d{6})$/); if (m) date = `20${m[1].slice(4,6)}-${m[1].slice(2,4)}-${m[1].slice(0,2)}`; }
+  const ageDays = date ? Math.floor((Date.now() - new Date(date).getTime()) / 86400000) : 0;
+  const VF = { US: 5, India: 10, AUS: 3, APAC: 3, MEA: 3, UK: 3, EU: 3, ROW: 3 };
+  const evidence = td >= 3 && cptd <= cptdGreen && cptql <= cptqlGreen;
+  const cohort = ageDays >= 14 && tql >= (VF[mkt] || 3) && td >= 2 && cptql <= cptqlAmber && cptd <= cptdAmber;
+  if (evidence) return { path: 'evidence', ageDays };
+  if (cohort) return { path: 'cohort', ageDays };
+  return null;
+}
+
+// Small inline pill — purple for evidence-path winners, green for cohort-mature.
+// Empty string if not a winner (caller can interpolate without conditional wrapping).
+function _winnerPathBadge(c) {
+  const r = _computeWinnerPath(c);
+  if (!r) return '';
+  return r.path === 'evidence'
+    ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-purple-light text-accent-purple font-bold uppercase tracking-wider whitespace-nowrap" title="Evidence path: ≥3 TDs + green CPTD + green CPTQL. Age ${r.ageDays}d, no cohort gate.">Early ev.</span>`
+    : `<span class="text-[9px] px-1.5 py-0.5 rounded bg-accent-green-light text-accent-green font-bold uppercase tracking-wider whitespace-nowrap" title="Cohort-mature: ${r.ageDays}d live + volume floor + amber both + ≥2 TDs.">Mature</span>`;
+}
+
 // Click-from-format-chip: filter Tagger by Video/Static and navigate.
 function _filterTaggerByFormat(fmt) {
   const cap = String(fmt || '').charAt(0).toUpperCase() + String(fmt || '').slice(1).toLowerCase();
@@ -10458,12 +10501,16 @@ function _buildOpportunityCardHtml(o, idx) {
     const _hierarchyHtml = _campAdset
       ? `<p class="text-[9px] text-text-muted truncate" title="${_escapeHtml(_campAdset)}">${_escapeHtml(_campAdset)}</p>`
       : '';
+    // Winner ads on SHIP cards inherit the same Early/Mature semantics — surface the path
+    // so operator knows whether the source-market winner has matured or is still early-evidence.
+    const _pathBadge = (typeof _winnerPathBadge === 'function') ? _winnerPathBadge(w) : '';
     return `<div class="flex items-start gap-2 py-1">
       ${_thumbHtml}
       <div class="flex-1 min-w-0">
         <p class="text-[11px] text-text-secondary truncate cursor-pointer hover:text-text-primary" title="${_escapeHtml(_adName)}" onclick="navigator.clipboard.writeText('${_adName.replace(/'/g, "\\'")}');this.textContent='Copied — ' + this.textContent;">${_escapeHtml(_short)}</p>
         ${_hierarchyHtml}
       </div>
+      ${_pathBadge}
       <span class="text-[10px] text-text-muted shrink-0">${_cptd} CPTD</span>
       ${_linkHtml}
     </div>`;
@@ -11135,7 +11182,7 @@ function _renderMakeMoreAds(container, adCampData, pausedAdNames, market) {
             <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
           </div>
           ${_campCtx || _adSet ? `<p class="text-[10px] text-text-muted truncate" title="${esc((w.campaignName || '') + ' / ' + _adSet)}">${_campCtx ? `<span class="font-semibold">${esc(_campCtx)}</span>` : ''}${_campCtx && _adSet ? ' \u00B7 ' : ''}${_adSet ? `<span>${esc(_adSet)}</span>` : ''}</p>` : ''}
-          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase text-green-700 align-middle mr-1">SCALE</span><span class="text-text-secondary">\u2014 <span class="font-semibold text-text-primary">${_driver}</span>. <em>Raise budget ${_scaleStep} Monday.</em> ${_sourceTagPill(w._hasCRM ? 'CRM' : 'META')}${_metaLinkInline}</span></p>
+          <p class="text-sm mt-1 leading-snug"><span class="text-2xl font-bold uppercase text-green-700 align-middle mr-1">SCALE</span><span class="text-text-secondary">\u2014 <span class="font-semibold text-text-primary">${_driver}</span>. <em>Raise budget ${_scaleStep} Monday.</em> ${typeof _winnerPathBadge === 'function' ? _winnerPathBadge({ 'Ad name': w.adName, 'Spent': w.spend, 'QL': w.ql, 'NRI': w.nri, 'TD': w.td, _date: w._date, 'Campaign name': w.campaignName }) : ''} ${_sourceTagPill(w._hasCRM ? 'CRM' : 'META')}${_metaLinkInline}</span></p>
           ${_detailsHtml}
         </div>
       </div>
@@ -18561,7 +18608,7 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks) {
       </div>
     </td>
     <td class="px-1.5 py-2">
-      <div class="flex items-start gap-1"><span class="text-[9px] font-bold ${_ins.color} whitespace-nowrap" title="${v.reason}">${_ins.icon} ${_ins.text}</span>${_actBtn}</div>
+      <div class="flex items-start gap-1 flex-wrap"><span class="text-[9px] font-bold ${_ins.color} whitespace-nowrap" title="${v.reason}">${_ins.icon} ${_ins.text}</span>${_winnerPathBadge(c)}${_actBtn}</div>
       ${_ins.why ? `<p class="text-[9px] text-text-muted mt-0.5 leading-snug">${_ins.why}</p>` : ''}
     </td>
     <td class="px-2 py-2 text-right font-semibold text-[11px]">${formatCurrency(spend)}</td>
