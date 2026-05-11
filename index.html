@@ -222,6 +222,7 @@
           <div class="w-10 h-10 border-3 border-accent-purple/20 border-t-accent-purple rounded-full animate-spin mx-auto mb-4"></div>
           <p class="text-sm font-semibold text-text-primary">Loading Godfather</p>
           <p class="text-xs text-text-muted mt-1">Pulling CRM + Meta data...</p>
+          <p id="bootProgress" class="text-[10px] text-text-muted mt-2 font-mono whitespace-pre-line leading-snug min-h-[60px]"></p>
         </div>
       </div>
 
@@ -3325,15 +3326,34 @@ function init() {
     new Promise((_, rej) => setTimeout(() => rej(new Error(`${label} boot timeout after ${ms}ms`)), ms))
   ]);
 
+  // Live boot progress (May 12 — operator couldn't tell if boot was stuck or just slow).
+  // Each source ticks itself off as it resolves. Renders into the overlay's #bootProgress.
+  const _bootSources = ['Meta ads', 'Oracle actions', 'Library', 'CRM sheets', 'Gen history'];
+  const _bootDone = new Set();
+  const _bootProgress = (label, ok) => {
+    _bootDone.add(label);
+    const el = document.getElementById('bootProgress');
+    if (!el) return;
+    el.textContent = _bootSources.map(s => {
+      if (_bootDone.has(s)) return `✓ ${s}`;
+      if (_bootDone.has(s + ':fail')) return `⚠ ${s}`;
+      return `· ${s}`;
+    }).join('\n');
+  };
+
   const bootPromises = [
     // Supabase: metaAdData (primary spend source, 32K rows) — 30s ceiling
     _withTimeout(loadCachedAdData(), 30000, 'metaAdData')
-      .then(ok => { if (ok) console.log(`Boot: ${metaAdData.length} metaAdData rows`); return ok; })
-      .catch(e => { console.error('Boot metaAdData:', e.message || e); return false; }),
+      .then(ok => { if (ok) console.log(`Boot: ${metaAdData.length} metaAdData rows`); _bootProgress('Meta ads'); return ok; })
+      .catch(e => { console.error('Boot metaAdData:', e.message || e); _bootDone.add('Meta ads:fail'); _bootProgress('Meta ads'); return false; }),
     // Supabase: oracle actions (Pause Now/Make More card states) — 15s
-    _withTimeout(loadOracleActions(), 15000, 'oracle_actions').catch(e => { console.error('Boot oracle:', e.message || e); }),
+    _withTimeout(loadOracleActions(), 15000, 'oracle_actions')
+      .then(v => { _bootProgress('Oracle actions'); return v; })
+      .catch(e => { console.error('Boot oracle:', e.message || e); _bootDone.add('Oracle actions:fail'); _bootProgress('Oracle actions'); }),
     // Supabase: library_assets (creative library) — 15s
-    _withTimeout(loadLibraryFromSupabase(), 15000, 'library_assets').catch(e => { console.error('Boot library:', e.message || e); }),
+    _withTimeout(loadLibraryFromSupabase(), 15000, 'library_assets')
+      .then(v => { _bootProgress('Library'); return v; })
+      .catch(e => { console.error('Boot library:', e.message || e); _bootDone.add('Library:fail'); _bootProgress('Library'); }),
     // Google Sheets: CRM leads + cost data (only if credentials exist). BAU fetchSheetData
     // runs first because PLA + India CRM both dedup against leadsData. PLA + India then run
     // in PARALLEL — they read leadsData for dedup snapshots up front, so concurrent appends
@@ -3349,8 +3369,9 @@ function init() {
               ]).then(() => c)),
           45000, 'sheets_bundle'
         )
-        .catch(e => { console.error('Boot sheets:', e.message || e); return null; })
-      : Promise.resolve(null),
+        .then(v => { _bootProgress('CRM sheets'); return v; })
+        .catch(e => { console.error('Boot sheets:', e.message || e); _bootDone.add('CRM sheets:fail'); _bootProgress('CRM sheets'); return null; })
+      : (() => { _bootProgress('CRM sheets'); return Promise.resolve(null); })(),
     // Supabase: generation history (last 50, newest first) — 15s
     _withTimeout(supabaseGet('generation_history', 'select=*&order=created_at.desc&limit=50'), 15000, 'generation_history')
       .then(rows => {
@@ -3371,13 +3392,19 @@ function init() {
           state.lastGeneratedContent = state.generationHistory[0]?.content || '';
           console.log(`Boot: generation_history fallback to localStorage (${state.generationHistory.length} rows)`);
         }
+        _bootProgress('Gen history');
       })
       .catch(e => {
         console.error('Boot generation_history:', e);
         try { state.generationHistory = JSON.parse(localStorage.getItem('gf_generationHistory') || '[]'); } catch(_){ state.generationHistory = []; }
         state.lastGeneratedContent = state.generationHistory[0]?.content || '';
+        _bootDone.add('Gen history:fail');
+        _bootProgress('Gen history');
       }),
   ];
+
+  // Prime the progress display so user sees all 5 sources listed immediately
+  _bootProgress(null);
 
   Promise.all(bootPromises).then(([metaOk, , sheetsResult]) => {
     // ALL data loaded — now render exactly once

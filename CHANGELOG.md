@@ -4,6 +4,20 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Boot — progress hint in overlay (2026-05-12)
+
+### Why
+Operator couldn't tell if boot was stuck or just slow. The overlay showed only "Pulling CRM + Meta data…" for 30–60s while five sources loaded in parallel. May 12: prod felt unresponsive but was actually mid-fetch.
+
+### What changed (`index.html`)
+- Boot overlay gains a `#bootProgress` line below the existing text.
+- Each of the 5 boot promises calls `_bootProgress('<name>')` in its `.then` and a `:fail` variant in its `.catch`.
+- Display renders all 5 sources up front with `·` markers, swaps to `✓` on success or `⚠` on failure:
+  - Meta ads · Oracle actions · Library · CRM sheets · Gen history
+- Now the overlay visibly ticks: `✓ Meta ads | · Oracle actions | ✓ Library | · CRM sheets | · Gen history` — operator can see progress instead of guessing.
+
+---
+
 ## Boot — per-fetch timeouts so a slow source can't hang the whole load (2026-05-12)
 
 ### Why
