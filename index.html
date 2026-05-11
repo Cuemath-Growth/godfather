@@ -7461,6 +7461,43 @@ function _isBrandAwarenessAd(adName, campaignName) {
   return _BRAND_AWARENESS_RE.test(haystack);
 }
 
+// Estimate live status (Active / Paused) for an ad — Meta API ground truth from metaCreatives
+// when available, else a spend-recency heuristic from metaAdData. Returns { label, color }.
+// Naina May 11 v4: Grid view didn't show pause/active state — operator couldn't tell whether
+// a "Too early" verdict was because of low spend or because the ad was paused.
+function _getAdStatus(adName) {
+  const _norm = (typeof normalizeAdName === 'function') ? normalizeAdName(adName) : String(adName || '').toLowerCase();
+  if (!_norm) return { label: 'Unknown', color: 'gray', source: 'none' };
+  // API truth first
+  if (Array.isArray(metaCreatives) && metaCreatives.length > 0) {
+    const m = metaCreatives.find(x => normalizeAdName(x.name) === _norm);
+    if (m && m.status) {
+      const s = String(m.status).toUpperCase();
+      if (s === 'ACTIVE') return { label: 'Active', color: 'green', source: 'api' };
+      if (s === 'PAUSED') return { label: 'Paused', color: 'amber', source: 'api' };
+      if (s === 'CAMPAIGN_PAUSED') return { label: 'Campaign paused', color: 'amber', source: 'api' };
+      if (s === 'ADSET_PAUSED') return { label: 'Adset paused', color: 'amber', source: 'api' };
+      if (s === 'DISAPPROVED' || s === 'WITH_ISSUES') return { label: 'Issues', color: 'red', source: 'api' };
+      if (s === 'PENDING_REVIEW' || s === 'IN_PROCESS') return { label: 'In review', color: 'gray', source: 'api' };
+      return { label: m.status, color: 'gray', source: 'api' };
+    }
+  }
+  // Fallback: latest spend date heuristic
+  if (Array.isArray(metaAdData) && metaAdData.length > 0) {
+    let latestDate = '';
+    for (const r of metaAdData) {
+      if ((r.spend || 0) > 0 && normalizeAdName(r.ad_name) === _norm && r.date > latestDate) latestDate = r.date;
+    }
+    if (latestDate) {
+      const days = Math.floor((Date.now() - new Date(latestDate).getTime()) / 86400000);
+      if (days <= 3) return { label: `Active (~${days}d)`, color: 'green', source: 'spend' };
+      if (days <= 14) return { label: `Paused ${days}d ago`, color: 'amber', source: 'spend' };
+      return { label: `Paused ${days}d ago`, color: 'gray', source: 'spend' };
+    }
+  }
+  return { label: 'Unknown', color: 'gray', source: 'none' };
+}
+
 // Compute which winner path a creative is on — same dual-path rule as _winningCreativesTable.
 // Returns { path: 'evidence' | 'cohort', ageDays } or null if it doesn't qualify as a winner.
 // Used to render the Early/Mature badge wherever Scale/Working verdicts appear.
@@ -18414,8 +18451,10 @@ function getCreativeVerdict(c) {
     return { label: 'Brand-Awareness', key: 'new', color: 'gray', reason: `Brand-awareness / reach objective — optimizes for impressions + frequency, not QL/TD. Excluded from QL-driven verdicts.` };
   }
 
-  // 1. Too early — not enough spend
-  if (spend < floor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent (floor ${formatCurrency(floor)}) — not enough data yet` };
+  // 1. Too early — not enough spend in the active date window. Floor is calibrated for ≥30-day
+  // windows; with a tight filter (e.g. 1–3 days) most ads sit below floor regardless of quality.
+  // Reason text spells this out so operator knows whether to widen the date range or wait.
+  if (spend < floor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent in this date window — below ${mkt} verdict floor of ${formatCurrency(floor)}. Widen the date range or wait for spend to accumulate.` };
 
   // 2. EVIDENCE WINNER — TDs ≥ 3 with both metrics in green, regardless of cohort age.
   // Per `feedback_winner_gate_evidence_first` (May 11): concrete TDs override the 14-day
@@ -19520,7 +19559,16 @@ function renderCreativeGrid() {
       <div class="flex items-center justify-between mb-2 gap-1">
         <div class="flex items-center gap-1 flex-wrap">
           <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${type==='Video'?'bg-accent-purple-light text-accent-purple':'bg-accent-blue-light text-accent-blue'}">${type}</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${verdict.color}">${verdict.text}</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${verdict.color}" title="${(_v.reason || '').replace(/"/g,'&quot;')}">${verdict.text}</span>
+          ${(() => {
+            const _st = (typeof _getAdStatus === 'function') ? _getAdStatus(name) : { label: 'Unknown', color: 'gray', source: 'none' };
+            const _stClass = _st.color === 'green' ? 'bg-accent-green-light text-green-700 border-green-200'
+                            : _st.color === 'amber' ? 'bg-accent-orange-light text-amber-700 border-orange-200'
+                            : _st.color === 'red' ? 'bg-accent-red-light text-red-700 border-red-200'
+                            : 'bg-gray-100 text-gray-600 border-gray-200';
+            const _stTip = _st.source === 'api' ? 'Live from Meta API' : _st.source === 'spend' ? 'Estimated from latest spend date (Meta API not connected)' : 'No status data — Meta API not connected, no spend signal';
+            return `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold border ${_stClass}" title="${_stTip}">${_st.label}</span>`;
+          })()}
           <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-tertiary text-text-muted">${mkt}</span>
         </div>
         ${(() => {
