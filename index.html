@@ -899,6 +899,11 @@
                owes a decision. Click any segment to filter the Explore Tree/Grid by that verdict. -->
           <div id="taggerHeaderVerdictPill" class="mb-3 hidden"></div>
 
+          <!-- C2 tag scorecards (Naina May 11): per-tag pattern verdict cards.
+               "Outcome-First · 12 ads · 4 winners · ₹3.2K CPTD · Pattern is hot."
+               Top 6 by net winners. Each card clickable to filter Tree by tag value. -->
+          <div id="taggerTagScorecards" class="hidden"></div>
+
           <!-- Section Tabs — 3-group consolidation (Signals / Explore / Patterns) -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1 flex-wrap">
@@ -17088,6 +17093,7 @@ function showTaggerResults() {
       if (_spend > 0 && _spend < (_floor / 2)) _vc.quiet++;
     });
     if (typeof renderTaggerHeaderVerdictPill === 'function') renderTaggerHeaderVerdictPill(_vc, _fData.length);
+    if (typeof renderTaggerTagScorecards === 'function') renderTaggerTagScorecards(_fData);
   } catch (_) {}
   renderActiveTaggerTab();
   // Auto-run Sentinel on new data — use clean data layer when available
@@ -17472,6 +17478,66 @@ function renderTaggerHeaderVerdictPill(counts, totalAds) {
       ${brand > 0 ? _seg(brand, 'brand-awareness (excluded)', 'bg-blue-50 border-blue-200', 'text-blue-700', 'all', 'Brand-awareness ads — excluded from QL/TD verdict family. Click to show all.') : ''}
       <span class="text-[10px] text-text-muted ml-auto">${totalAds} ads total</span>
     </div>`;
+}
+
+// C2 Tag scorecards (Naina May 11): per-tag pattern-level verdicts. Groups ads by Hook,
+// Pain/Benefit, Format, Theme, Close, and Audience; for each tag value with ≥3 ads emits
+// a card with ad count + winners + avg CPTD + "Pattern is hot/broken/mixed" pill. Top 6 by
+// net winners (winners - losers). Click → Tree filtered by that tag value.
+function renderTaggerTagScorecards(data) {
+  const el = document.getElementById('taggerTagScorecards');
+  if (!el) return;
+  if (!data || !data.length) { el.classList.add('hidden'); return; }
+  const DIMS_TO_SCORE = ['hook', 'pain_benefit', 'content_format', 'theme', 'close_type', 'campaign_audience'];
+  const scores = [];
+  DIMS_TO_SCORE.forEach(dim => {
+    const groups = {};
+    data.forEach(c => {
+      const tag = c.tags && c.tags[dim];
+      if (!tag || tag === 'Unknown' || tag === 'N/A') return;
+      if (!groups[tag]) groups[tag] = { ads: 0, winners: 0, losers: 0, totalSpend: 0, totalTD: 0 };
+      const g = groups[tag];
+      g.ads++;
+      const v = getCreativeVerdict(c);
+      if (v.key === 'scale' || v.key === 'working') g.winners++;
+      else if (v.key === 'pause' || v.key === 'fatigued') g.losers++;
+      g.totalSpend += parseNumber(c['Spent'] || c['spent'] || 0);
+      g.totalTD += parseNumber(c['TD'] || c['td'] || 0);
+    });
+    Object.entries(groups).forEach(([tag, g]) => {
+      if (g.ads < 3) return;
+      const winRate = g.winners / g.ads;
+      const lossRate = g.losers / g.ads;
+      const avgCPTD = g.totalTD > 0 ? g.totalSpend / g.totalTD : null;
+      let label, color;
+      if (winRate > 0.5 && g.winners >= 2) { label = 'hot'; color = 'green'; }
+      else if (lossRate > 0.5 && g.losers >= 2) { label = 'broken'; color = 'red'; }
+      else { label = 'mixed'; color = 'gray'; }
+      scores.push({ dim, tag, ads: g.ads, winners: g.winners, losers: g.losers, avgCPTD, label, color, score: g.winners - g.losers });
+    });
+  });
+  if (!scores.length) { el.classList.add('hidden'); return; }
+  scores.sort((a, b) => b.score - a.score);
+  const top = scores.slice(0, 6);
+  el.classList.remove('hidden');
+  el.innerHTML = `<div class="mb-3">
+    <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-2">Tag scorecards · top patterns by net winners</p>
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+      ${top.map(s => {
+        const _bg = s.color === 'green' ? 'bg-accent-green-light border-green-200' : s.color === 'red' ? 'bg-accent-red-light border-red-200' : 'bg-gray-50 border-gray-200';
+        const _txt = s.color === 'green' ? 'text-green-700' : s.color === 'red' ? 'text-red-700' : 'text-gray-600';
+        const _esc = String(s.tag).replace(/'/g, "\\'");
+        const _dimLabel = (typeof GODFATHER_TAXONOMY !== 'undefined' && GODFATHER_TAXONOMY.getLabel) ? GODFATHER_TAXONOMY.getLabel(s.dim) : s.dim;
+        const _tagLbl = (typeof tagLabel === 'function') ? tagLabel(s.tag) : s.tag;
+        return `<button onclick="_filterTaggerByTag('${s.dim}','${_esc}')" class="text-left ${_bg} border rounded-lg p-2.5 hover:opacity-90 transition cursor-pointer" title="Click to filter Tree to ads with ${_dimLabel}=${_tagLbl}">
+          <p class="text-[9px] text-text-muted uppercase tracking-wider mb-0.5">${_dimLabel}</p>
+          <p class="text-[12px] font-bold ${_txt} mb-1 truncate">${_tagLbl}</p>
+          <p class="text-[10px] text-text-secondary">${s.ads} ads · ${s.winners} winners${s.losers > 0 ? ' · ' + s.losers + ' losers' : ''}${s.avgCPTD ? ' · ' + formatCurrency(s.avgCPTD) + ' CPTD' : ''}</p>
+          <span class="inline-block mt-1.5 text-[9px] font-bold ${_txt}">Pattern is ${s.label}</span>
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
 // ── Funnel Health view ─────────────────────────────────────────────────────
@@ -19106,6 +19172,11 @@ function renderTaggerTable() {
   // — totalAds reflects pre-verdict-filter so the count stays stable across clicks).
   if (typeof renderTaggerHeaderVerdictPill === 'function') {
     try { renderTaggerHeaderVerdictPill(verdictCounts, _dataForPillCounts.length); } catch(_) {}
+  }
+  // Tag scorecards — also drawn from the pre-verdict-filter set so the pattern view stays
+  // consistent regardless of which verdict the operator clicked into.
+  if (typeof renderTaggerTagScorecards === 'function') {
+    try { renderTaggerTagScorecards(_dataForPillCounts); } catch(_) {}
   }
 
   // ── Ad-level flat view ──
