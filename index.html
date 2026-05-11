@@ -3342,8 +3342,9 @@ function init() {
   };
 
   const bootPromises = [
-    // Supabase: metaAdData (primary spend source, 32K rows) — 30s ceiling
-    _withTimeout(loadCachedAdData(), 30000, 'metaAdData')
+    // Supabase: metaAdData (primary spend source, ~43K rows = 44 pages × ~700ms) — 60s ceiling.
+    // Was 30s but hit the edge on slow Supabase responses, leaving auto-hydrate to skip.
+    _withTimeout(loadCachedAdData(), 60000, 'metaAdData')
       .then(ok => { if (ok) console.log(`Boot: ${metaAdData.length} metaAdData rows`); _bootProgress('Meta ads'); return ok; })
       .catch(e => { console.error('Boot metaAdData:', e.message || e); _bootDone.add('Meta ads:fail'); _bootProgress('Meta ads'); return false; }),
     // Supabase: oracle actions (Pause Now/Make More card states) — 15s
@@ -3507,6 +3508,25 @@ function init() {
     if (!state.taggerData.length && metaAdData.length) {
       console.log('Boot: taggerData empty, auto-hydrating from metaAdData + Supabase tags...');
       useDashboardData();
+    } else if (!state.taggerData.length && !metaAdData.length) {
+      // Late-arrival watcher (May 12): if metaAdData timed out at boot but is still loading
+      // in the background, fire useDashboardData when it eventually lands. Polls every 2s
+      // for up to 90s. Without this, Tagger shows "0 creatives — click Load Data" forever
+      // even after metaAdData fully populates.
+      console.log('Boot: metaAdData not ready, scheduling late-arrival watcher');
+      let _watchTicks = 0;
+      const _watchInterval = setInterval(() => {
+        _watchTicks++;
+        if (state.taggerData.length > 0) { clearInterval(_watchInterval); return; }
+        if (metaAdData.length > 0) {
+          console.log(`Boot late-arrival: metaAdData now ${metaAdData.length} rows, hydrating Tagger`);
+          clearInterval(_watchInterval);
+          try { useDashboardData(); } catch(e) { console.error('Late-arrival useDashboardData:', e); }
+        } else if (_watchTicks > 45) { // 45 × 2s = 90s ceiling
+          console.warn('Boot late-arrival: gave up after 90s — metaAdData still empty');
+          clearInterval(_watchInterval);
+        }
+      }, 2000);
     }
 
     // Invalidate any stale caches from Phase 1 localStorage loads
