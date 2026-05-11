@@ -4,6 +4,69 @@ Every fix and change to index.html is logged here. Guard reads this before appro
 
 ---
 
+## Boot — per-fetch timeouts so a slow source can't hang the whole load (2026-05-12)
+
+### Why
+Prod hung indefinitely on the "Loading Godfather — Pulling CRM + Meta data…" overlay (Naina, May 12 00:54). Boot used `Promise.all([...])` with no timeouts — any one slow Supabase / Sheets fetch held the spinner forever. Eventually resolved on its own, but operator-blocking.
+
+### What changed (`index.html`)
+- New `_withTimeout(p, ms, label)` helper at the top of Phase 2 boot (`:3320+`). Wraps each fetch with `Promise.race(fetch, setTimeout(reject))`.
+- Each `bootPromises` entry now has a label + ceiling:
+  - `metaAdData` (Supabase 32K rows) → 30s
+  - `oracle_actions` (Supabase) → 15s
+  - `library_assets` (Supabase) → 15s
+  - `sheets_bundle` (BAU + PLA + India CRM) → 45s
+  - `generation_history` (Supabase) → 15s
+- On timeout: log `Boot <source>: <source> boot timeout after Nms` and `.catch` falls through to the existing fallback (cached / localStorage / empty). Boot completes with partial data instead of hanging.
+
+### Expected effect
+- Worst case: 45s to boot (Sheets bundle) instead of forever. Console shows exactly which source timed out.
+- Cached-data path still works the same — if metaAdData times out but localStorage has yesterday's pull, the dashboard renders against that.
+
+---
+
+## C1 — Tagger Tree absorbs Funnel sub-view (2026-05-12)
+
+### Why
+Funnel sub-view duplicated 80% of what Tree showed. Two tables for one job — operator had to switch tabs to see stage conversions on an ad they were already looking at. Naina's call (May 8, locked May 12): Tree gains TB/TC/% columns plus the Cohort/MTD toggle promoted to header level, and the standalone Funnel view goes away.
+
+### What changed (`index.html`)
+
+**Tree table head — 6 new columns** (`:1019+`)
+- Inserted between TD and CPTQL: `TB`, `TC`, `QL→TB`, `TB→TC`, `TC→TD`, `QL→TD`.
+- Existing CPTQL/CPTD `_colSort` indices rebased (5/6 → 11/12) so column-sort still hits the right cells.
+- Tags column width trimmed (18% → 14%) to absorb the new columns.
+
+**Funnel join in `renderTaggerTable`** (`:19224+`)
+- After the per-market benchmarks block, the renderer now calls `getAdFunnelMetrics(market, from, to, state._funnelMode)` once per render and builds a `_funnelByAd` lookup keyed by `normalizeAdName`.
+- Pipes the lookup to `renderTaggerAdRow` and to a new `_sumFunnelForAds(ads)` helper that aggregates joined stages for campaign/adset rollup rows.
+- Respects the global Cohort/MTD toggle — switching attribution re-renders the Tree with mode-aware TB/TC/% values.
+
+**`renderTaggerAdRow` signature + 6 new cells** (`:19036`)
+- New `funnelByAd` param. For each ad: looks up `f = funnelByAd[normalizeAdName(name)]`. If missing → six em-dash cells. If present → integer TB/TC plus four `_pctCell` calls with the same thresholds Funnel used (60/35, 70/50, 70/50, 25/15).
+- Inline `_pctCell` reuses the colour scale (green ≥ goodAbove, amber ≥ watchAbove, red below).
+
+**`renderTaggerGroupRow` signature + funnel rollup** (`:19174`)
+- New `funnelTotals` param accepts the `_sumFunnelForAds` output. Rolls the six new cells into the campaign/adset group row.
+
+**Funnel UI removed** (`:1101+`)
+- `taggerTab-funnel` container deleted (Tree, Grid, Funnel toggle row + table head + tbody + pager → all gone).
+- Explore-view button row in Grid tab shrunk to two buttons (Tree, Grid).
+- `_exploreView === 'funnel'` legacy state silently falls back to `'tree'` so persisted UI state doesn't break.
+
+**Dead code purged**
+- Deleted: `setFunnelMode`, `setFunnelLevel`, `goFunnelTablePage`, `_funnelChassisByAd`, `_funnelEsc`, `_funnelRecCell`, `_funnelPctCell`, `FUNNEL_PAGE_SIZE`, `renderFunnelHealthTable` (~210 lines).
+- `state._funnelLevel` and `state._funnelTablePage` removed from filter-change resets.
+- `state._funnelMode` kept (legacy name) — still drives `setAttributionMode`, `getMarketMetrics`, `getAdFunnelMetrics`, and the new Tree join.
+- `setAttributionMode` trimmed: dropped the `.funnel-mode-btn` sync and the trailing `renderFunnelHealthTable()` re-render.
+
+### Expected effect
+- Tree row now answers: spend → QL → TB → TC → TD with conversion percentages between each stage, all in one row.
+- Cohort/MTD toggle (header pill) drives the TB/TC/% values in Tree the same way it drove the standalone Funnel.
+- One less tab for the operator to remember. Tab strip simpler.
+
+---
+
 ## C1a — Verdict-layer hardening: evidence-first gate + brand-awareness exclusion + Pause same-message (2026-05-11)
 
 ### Why
