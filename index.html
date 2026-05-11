@@ -18516,6 +18516,17 @@ function getCreativeVerdict(c) {
     return { label: 'Brand-Awareness', key: 'new', color: 'gray', reason: `Brand-awareness / reach objective — optimizes for impressions + frequency, not QL/TD. Excluded from QL-driven verdicts.` };
   }
 
+  // 0b. Already-paused short-circuit (Naina May 11 v6) — if Meta confirms the ad / adset /
+  // campaign is paused, there's no live delivery to evaluate. Skip the QL/TD verdict family
+  // so we don't recommend "Pause" on an ad that's already paused. API status only (source ==
+  // 'api'); the spend-recency heuristic is too noisy for this short-circuit.
+  if (typeof _getAdStatus === 'function') {
+    const _st = _getAdStatus(adName);
+    if (_st && _st.source === 'api' && (_st.label === 'Paused' || _st.label === 'Campaign paused' || _st.label === 'Adset paused')) {
+      return { label: 'Already paused', key: 'new', color: 'gray', reason: `Meta status: ${_st.label}. No active delivery in window — QL/TD verdict not applicable.` };
+    }
+  }
+
   // 1. Too early — not enough spend in the active date window. Floor was calibrated for 30-day
   // windows. Scale proportionally to the active window so a 1-day filter doesn't universally
   // produce "Too early" (Naina May 11 v4). Never drop below ~1-week equivalent (floor / 4)
@@ -20227,17 +20238,22 @@ function extractMarket(c) {
 }
 
 function matchMarketFromText(text) {
+  // US prefix wins FIRST (Naina May 11 v6): otherwise "USA_..._IndianAudience_..." was
+  // matching India because `text.includes('INDIA')` is true inside "INDIANAUDIENCE".
+  // Explicit account prefixes (USA_ / US_ / UNITED STATES / CANADA / STAAR / AMC) take
+  // priority over loose substring matches in audience names.
+  if (/\bUSA\b/.test(text) || /USA[_\s-]/.test(text) || /\bUS[_\s-]/.test(text) || text.includes('UNITED STATES') || text.includes('CANADA') || text.includes('STAAR') || text.includes('AMC')) return 'US';
   // ANZ sub-geos must match BEFORE generic ANZ (which = Australia)
   if (/ANZ[-_]UK/i.test(text) || /\bUK\b/.test(text) || text.includes('UNITED KINGDOM')) return 'UK';
-  if (/ANZ[-_]EU/i.test(text) || /\bEU[_\s-]/.test(text) || text.includes('EUROPE')) return 'EU'; // 1.14: EU market detection
+  if (/ANZ[-_]EU/i.test(text) || /\bEU[_\s-]/.test(text) || text.includes('EUROPE')) return 'EU';
   if (/ANZ[-_]NZ/i.test(text) || text.includes('NEW ZEALAND')) return 'APAC';
   if (/ANZ[-_]SG/i.test(text) || text.includes('SINGAPORE')) return 'APAC';
   if (text.includes('ANZ') || /\bAUS\b/.test(text) || text.includes('AUSTRALIA') || text.includes('NAPLAN') || text.includes('SELECTIVE')) return 'AUS';
-  if (text.includes('INDIA') || /\bIND[_\s-]/.test(text) || text.includes('DEMAND-IND') || text.includes('CBSE') || text.includes('ICSE')) return 'India';
   if (text.includes('MEA') || /\bME[_\s-]/.test(text) || text.includes('MIDDLE EAST') || text.includes('DUBAI') || text.includes('UAE') || text.includes('SAUDI') || text.includes('QATAR') || text.includes('KUWAIT') || text.includes('BAHRAIN') || text.includes('OMAN')) return 'MEA';
-  if (/\bUSA\b/.test(text) || /USA[_\s-]/.test(text) || /\bUS[_\s-]/.test(text) || text.includes('UNITED STATES') || text.includes('CANADA') || text.includes('STAAR') || text.includes('AMC')) return 'US';
+  // India check uses word/separator boundaries so it doesn't match "Indian" embedded in
+  // audience names. "_INDIA_" / "_IND_" / "DEMAND-IND" / curriculum tokens (CBSE, ICSE).
+  if (/[_\s-]INDIA[_\s-]/.test(text) || /[_\s-]IND[_\s-]/.test(text) || text.includes('DEMAND-IND') || text.includes('CBSE') || text.includes('ICSE')) return 'India';
   if (text.includes('APAC') || text.includes('ROW')) return 'APAC';
-  if (text.includes('CANADA')) return 'US';
   return 'Unknown';
 }
 
