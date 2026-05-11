@@ -203,9 +203,9 @@
           <button onclick="setFlowFilter('pla')" data-flow="pla" class="flow-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition">PLA</button>
         </div>
         <div class="h-3 w-px bg-gray-200 shrink-0"></div>
-        <div id="attributionModeGroup" class="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 shrink-0" title="Attribution mode. Cohort = TDs grouped by the date the LEAD came in (apples-to-apples per ad). MTD = TDs grouped by the date the TRIAL happened — wiring in progress, MTD currently affects only Tagger Funnel.">
+        <div id="attributionModeGroup" class="flex items-center gap-0.5 bg-surface-secondary rounded-lg p-0.5 shrink-0" title="Attribution mode. Cohort = TDs grouped by the date the LEAD came in (apples-to-apples per ad). MTD = TDs grouped by the date the TRIAL happened (current operations view). Default Cohort.">
           <button onclick="setAttributionMode('cohort')" data-attr-mode="cohort" class="attr-mode-btn px-2 py-1 rounded-md text-[11px] font-bold text-accent-purple bg-white shadow-sm transition">Cohort</button>
-          <button onclick="setAttributionMode('mtd')" data-attr-mode="mtd" disabled class="attr-mode-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted opacity-50 cursor-not-allowed transition" title="MTD attribution wired only on Tagger Funnel right now. Other surfaces (Pause Now, Match Engine, Tagger Tree, Winning Creatives, Hero KPIs) still aggregate against cohort. Full wiring is the next slice — disabled here until it lands so the toggle doesn't promise a behavior it can't deliver.">MTD</button>
+          <button onclick="setAttributionMode('mtd')" data-attr-mode="mtd" class="attr-mode-btn px-2 py-1 rounded-md text-[11px] font-bold text-text-muted hover:text-text-primary transition" title="MTD attribution — TDs grouped by trial_done_date. Affects Hero CPTD, regional cards, market-health, Tagger Funnel. Per-ad verdicts (Pause Now / Tagger Tree / Match Engine) still compute against cohort — that's a deeper refactor.">MTD</button>
         </div>
         <span class="text-[9px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded shrink-0 cursor-help" title="Godfather scope: Meta only. Google/Influencer/WhatsApp/BTL leads are excluded from KPIs. For all-channel BAU MTD, see the perf tracker leads tab.">Meta only</span>
         <span id="dataDateRange" class="text-[9px] text-text-muted shrink-0" style="display:none"></span>
@@ -5464,12 +5464,20 @@ function getMarketMetrics(market, startDate, endDate) {
   const asian = getAsian(market, startDate, endDate);
   const india_ql = getIndiaQL(market, startDate, endDate);
 
+  // C1c slice 2 (Naina May 11): attribution-mode aware. Default cohort; toggle flips to MTD.
+  // - Cohort: td_cohort (TDs from leads created in the window) — apples-to-apples per ad.
+  // - MTD: td_snap (TDs that happened in the window) — current-operations view.
+  // ql_td_pct stays cohort always (it's the lead-conversion rate by definition).
+  // ts_td_pct stays snapshot always (it's a same-event-window ratio).
+  const _mode = (typeof state !== 'undefined' && state && state._funnelMode === 'mtd') ? 'mtd' : 'cohort';
+  const td_active = _mode === 'mtd' ? td_snap : td_cohort;
+
   return {
-    spend, ql, tql, nri, asian, india_ql, td: td_snap, td_cohort, ts, enrolled, invalid,
+    spend, ql, tql, nri, asian, india_ql, td: td_active, td_cohort, td_snap, ts, enrolled, invalid,
     cpql: safeDivide(spend, ql),
     cptql: safeDivide(spend, tql),
-    cptd: safeDivide(spend, td_snap),
-    ql_td_pct: safeDivide(td_cohort, ql),    // cohort, not snapshot
+    cptd: safeDivide(spend, td_active),
+    ql_td_pct: safeDivide(td_cohort, ql),    // cohort always — measures lead-conversion rate
     ts_td_pct: safeDivide(td_snap, ts),
     t2p_pct: safeDivide(enrolled, td_snap),
     cac: safeDivide(spend, enrolled),
@@ -17379,9 +17387,12 @@ function setFunnelMode(m) {
   setAttributionMode(m);
 }
 
-// Global attribution-mode setter (Cohort vs MTD). Drives every verdict surface that respects
-// the mode, currently the Tagger Funnel. Other surfaces (Pause Now / Match Engine / Tagger Tree)
-// still aggregate against cohort by default — wiring them is the rest of C1c.
+// Global attribution-mode setter (Cohort vs MTD).
+// C1c slice 2 (Naina May 11): getMarketMetrics now reads state._funnelMode and returns
+// mode-aware td / cptd. Toggling re-renders every surface that calls getMarketMetrics —
+// Hero CPTD card, regional cards, market-health, metric ticker, Pause Now (via chassis path).
+// Per-ad TD attribution in getAdPerformanceDaily remains cohort-only — that's a deeper
+// refactor (CRM aggregation loop) saved for slice 3 if needed.
 function setAttributionMode(m) {
   state._funnelMode = (m === 'mtd') ? 'mtd' : 'cohort';
   // Sync both the legacy in-Funnel toggle AND the new global toggle.
@@ -17400,12 +17411,18 @@ function setAttributionMode(m) {
     b.classList.toggle('text-text-muted', !on);
   });
   state._funnelTablePage = 1;
-  // Re-render any surfaces that already respect the mode. Other surfaces will be added in C1c-2+.
-  if (typeof renderFunnelHealthTable === 'function') { try { renderFunnelHealthTable(); } catch(e) {} }
-  // Re-render the dashboard so source-tag pills pick up the new mode label.
-  if (typeof renderOracleCardsV2 === 'function' && document.querySelector('.view:not(.hidden)')?.id === 'view-dashboard') {
-    try { renderOracleCardsV2(); } catch(e) {}
+  // Invalidate any caches that might hold mode-stale aggregates.
+  if (typeof invalidateAdPerfCache === 'function') { try { invalidateAdPerfCache(); } catch(_) {} }
+  // Re-render every surface that consumes getMarketMetrics or the source-pill.
+  const _activeView = document.querySelector('.view:not(.hidden)')?.id?.replace('view-', '') || 'dashboard';
+  if (_activeView === 'dashboard') {
+    if (typeof onDashboardFilterChange === 'function') { try { onDashboardFilterChange(); } catch(_) {} }
+    else if (typeof renderOracleCardsV2 === 'function') { try { renderOracleCardsV2(); } catch(_) {} }
+  } else if (_activeView === 'tagger') {
+    if (typeof showTaggerResults === 'function') { try { showTaggerResults(); } catch(_) {} }
   }
+  // Funnel always re-renders since it owns the toggle's original semantics.
+  if (typeof renderFunnelHealthTable === 'function') { try { renderFunnelHealthTable(); } catch(_) {} }
 }
 function setFunnelLevel(l) {
   state._funnelLevel = ['campaign','adset','ad'].includes(l) ? l : 'ad';
