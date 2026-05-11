@@ -894,6 +894,11 @@
             </div>
           </div>
 
+          <!-- C2 (Naina May 11): Tagger header verdict pill — one-line summary of the active state
+               (winners / fatiguing / quiet / brand-awareness / untagged) so eye lands on what
+               owes a decision. Click any segment to filter the Explore Tree/Grid by that verdict. -->
+          <div id="taggerHeaderVerdictPill" class="mb-3 hidden"></div>
+
           <!-- Section Tabs — 3-group consolidation (Signals / Explore / Patterns) -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex gap-1.5 bg-surface-tertiary rounded-xl p-1 flex-wrap">
@@ -17028,6 +17033,18 @@ function showTaggerResults() {
   // Match tagged ads to Library source assets
   matchAdsToLibrary();
   renderTaggerInsights();
+  // C2 header verdict pill — render against the same filtered set Explore › Tree would use
+  // so the count matches what the operator sees when they click a segment to drill in.
+  try {
+    const _fData = (typeof getFilteredTaggerData === 'function') ? getFilteredTaggerData() : [];
+    const _vc = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0 };
+    _fData.forEach(c => {
+      const v = getCreativeVerdict(c);
+      _vc[v.key] = (_vc[v.key] || 0) + 1;
+      if (v.label === 'Brand-Awareness') _vc.brand = (_vc.brand || 0) + 1;
+    });
+    if (typeof renderTaggerHeaderVerdictPill === 'function') renderTaggerHeaderVerdictPill(_vc, _fData.length);
+  } catch (_) {}
   renderActiveTaggerTab();
   // Auto-run Sentinel on new data — use clean data layer when available
   const _sentinelData = metaAdData.length > 0 ? getAdPerformance(null, null, null, { includeNonLP: true }) : sanitizeTaggerData(state.taggerData || []);
@@ -17375,6 +17392,37 @@ function renderPager(containerId, page, totalItems, onPageChange) {
 function goTaggerTablePage(p) { state._taggerTablePage = p; renderTaggerTable(); }
 function goHeatmapPage(p) { state._heatmapPage = p; renderTaggerHeatmap(); }
 function goGridPage(p) { state._gridPage = p; renderCreativeGrid(); }
+
+// C2 Tagger header verdict pill (Naina May 11): one-line summary above the section tabs
+// so eye lands on what owes a decision before browsing. Each segment is clickable —
+// jumps to Explore › Tree with the matching verdict filter applied. Brand-aware count
+// surfaces separately so operator sees them excluded from the QL/TD verdict family.
+function renderTaggerHeaderVerdictPill(counts, totalAds) {
+  const el = document.getElementById('taggerHeaderVerdictPill');
+  if (!el || !counts) return;
+  const c = counts;
+  const winners = (c.scale || 0) + (c.working || 0);
+  const fatiguing = (c.fatigued || 0) + (c.watch || 0);
+  const pausing = c.pause || 0;
+  const tooEarly = c.new || 0;
+  const brand = c.brand || 0;
+  if (winners + fatiguing + pausing + tooEarly + brand === 0) { el.classList.add('hidden'); return; }
+  // Each segment: emoji + count + label, clickable to filter Explore › Tree.
+  const _goto = (filterValue) => `onclick="(function(){if(typeof switchTaggerTab==='function')switchTaggerTab('explore');setExploreView('tree');const sel=document.getElementById('taggerVerdictFilter');if(sel){sel.value='${filterValue}';state._taggerTablePage=1;}if(typeof renderTaggerTable==='function')renderTaggerTable();window.scrollTo({top:0,behavior:'smooth'});})()"`;
+  const _seg = (count, label, bgClass, textClass, filter, tip) =>
+    `<span ${_goto(filter)} class="cursor-pointer hover:opacity-80 transition flex items-center gap-1 px-2.5 py-1 rounded-full ${bgClass} ${textClass} font-bold text-[11px] border" title="${tip}">${count} ${label}</span>`;
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="flex items-center gap-2 flex-wrap p-2.5 bg-surface-secondary rounded-xl border border-gray-200">
+      <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider mr-1">Now in current filter:</span>
+      ${_seg(winners, 'winners', 'bg-green-50 border-green-200', 'text-green-700', 'working', 'Scale + Working verdicts. Click to filter Explore › Tree.')}
+      ${_seg(fatiguing, 'fatiguing', 'bg-amber-50 border-amber-200', 'text-amber-700', 'fatigued', 'Watch + Fatigued verdicts. Click to filter.')}
+      ${_seg(pausing, 'to pause', 'bg-red-50 border-red-200', 'text-red-700', 'pause', 'Pause verdicts. Click to filter.')}
+      ${_seg(tooEarly, 'too early / testing', 'bg-gray-50 border-gray-200', 'text-gray-600', 'all', 'Below verdict floor or <14d cohort. Click to show all (toggle filter).')}
+      ${brand > 0 ? _seg(brand, 'brand-awareness (excluded)', 'bg-blue-50 border-blue-200', 'text-blue-700', 'all', 'Brand-awareness ads — excluded from QL/TD verdict family. Click to show all.') : ''}
+      <span class="text-[10px] text-text-muted ml-auto">${totalAds} ads total</span>
+    </div>`;
+}
 
 // ── Funnel Health view ─────────────────────────────────────────────────────
 state._funnelMode = state._funnelMode || 'cohort'; // 'cohort' | 'mtd'
@@ -18896,15 +18944,28 @@ function renderTaggerTable() {
   });
   Object.values(_benchmarks).forEach(b => { b.avgCPTD = b.td > 0 ? b.spend / b.td : 0; });
 
-  // Verdict summary
-  const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0 };
-  data.forEach(c => { const v = getCreativeVerdict(c); verdictCounts[v.key] = (verdictCounts[v.key]||0) + 1; });
+  // Verdict summary — pills are now CLICKABLE (C2 Naina May 11). Each segment sets the
+  // taggerVerdictFilter dropdown to the matching key and re-renders the Tree.
+  const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0 };
+  data.forEach(c => {
+    const v = getCreativeVerdict(c);
+    verdictCounts[v.key] = (verdictCounts[v.key]||0) + 1;
+    if (v.label === 'Brand-Awareness') verdictCounts.brand = (verdictCounts.brand || 0) + 1;
+  });
+  // Helper for clickable pill: clicking sets the verdict filter dropdown + re-renders.
+  const _clickPill = (filterValue) => `onclick="(function(){const el=document.getElementById('taggerVerdictFilter');if(el){el.value='${filterValue}';state._taggerTablePage=1;}if(typeof renderTaggerTable==='function')renderTaggerTable();})()" class="cursor-pointer hover:opacity-80 transition"`;
   const summaryEl = document.getElementById('taggerVerdictSummary');
   if (summaryEl) {
-    summaryEl.innerHTML = `<span class="px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-bold border border-green-200">${verdictCounts.scale + verdictCounts.working} Working</span>` +
-      `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">${verdictCounts.watch + verdictCounts.fatigued} Watch</span>` +
-      `<span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold border border-red-200">${verdictCounts.pause} Pause</span>` +
-      `<span class="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 font-medium border border-gray-200">${verdictCounts.new} New</span>`;
+    summaryEl.innerHTML =
+      `<span ${_clickPill('working')} class="cursor-pointer hover:opacity-80 px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-bold border border-green-200" title="Click to filter Tree to Scale + Working verdicts">${verdictCounts.scale + verdictCounts.working} Working</span>` +
+      `<span ${_clickPill('fatigued')} class="cursor-pointer hover:opacity-80 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200" title="Click to filter Tree to Watch + Fatigued verdicts">${verdictCounts.watch + verdictCounts.fatigued} Watch</span>` +
+      `<span ${_clickPill('pause')} class="cursor-pointer hover:opacity-80 px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-bold border border-red-200" title="Click to filter Tree to Pause verdicts">${verdictCounts.pause} Pause</span>` +
+      `<span ${_clickPill('all')} class="cursor-pointer hover:opacity-80 px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 font-medium border border-gray-200" title="Click to clear verdict filter">${verdictCounts.new} New</span>`;
+  }
+
+  // Render the header verdict pill (visible above section tabs, summarizes the active filter set).
+  if (typeof renderTaggerHeaderVerdictPill === 'function') {
+    try { renderTaggerHeaderVerdictPill(verdictCounts, data.length); } catch(_) {}
   }
 
   // ── Ad-level flat view ──
