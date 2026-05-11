@@ -18451,10 +18451,22 @@ function getCreativeVerdict(c) {
     return { label: 'Brand-Awareness', key: 'new', color: 'gray', reason: `Brand-awareness / reach objective — optimizes for impressions + frequency, not QL/TD. Excluded from QL-driven verdicts.` };
   }
 
-  // 1. Too early — not enough spend in the active date window. Floor is calibrated for ≥30-day
-  // windows; with a tight filter (e.g. 1–3 days) most ads sit below floor regardless of quality.
-  // Reason text spells this out so operator knows whether to widen the date range or wait.
-  if (spend < floor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent in this date window — below ${mkt} verdict floor of ${formatCurrency(floor)}. Widen the date range or wait for spend to accumulate.` };
+  // 1. Too early — not enough spend in the active date window. Floor was calibrated for 30-day
+  // windows. Scale proportionally to the active window so a 1-day filter doesn't universally
+  // produce "Too early" (Naina May 11 v4). Never drop below ~1-week equivalent (floor / 4)
+  // to preserve statistical reliability.
+  let _windowDays = 30;
+  let _scaledFloor = floor;
+  if (typeof getGlobalDateRange === 'function') {
+    try {
+      const _r = getGlobalDateRange();
+      if (_r && _r.from && _r.to) {
+        _windowDays = Math.max(1, Math.ceil((new Date(_r.to).getTime() - new Date(_r.from).getTime()) / 86400000) + 1);
+        _scaledFloor = Math.max(Math.round(floor * _windowDays / 30), Math.round(floor / 4));
+      }
+    } catch(_) { /* keep static floor */ }
+  }
+  if (spend < _scaledFloor) return { label: 'Too early', key: 'new', color: 'gray', reason: `${formatCurrency(spend)} spent in this ${_windowDays}d window — below scaled floor ${formatCurrency(_scaledFloor)} (${mkt} 30d base ${formatCurrency(floor)}). Widen date range or wait for spend.` };
 
   // 2. EVIDENCE WINNER — TDs ≥ 3 with both metrics in green, regardless of cohort age.
   // Per `feedback_winner_gate_evidence_first` (May 11): concrete TDs override the 14-day
@@ -18473,9 +18485,12 @@ function getCreativeVerdict(c) {
   if (tql >= 5 && td === 0) return { label: 'Funnel break', key: 'watch', color: 'amber', reason: `${tql} TQL but 0 TDs after ${formatCurrency(spend)} — LP/scheduler issue, fix funnel` };
 
   // 5. Pause — burned 2× floor with zero trials
-  if (spend >= floor * 2 && td === 0) {
+  // Pause threshold scales with the window too — `_scaledFloor * 2` matches the Too-early
+  // floor so a 1-day window can still produce a Pause verdict for ads burning the proportional
+  // budget with 0 TDs.
+  if (spend >= _scaledFloor * 2 && td === 0) {
     if (wrongPause) return { label: 'Watch', key: 'watch', color: 'amber', reason: `${formatCurrency(spend)} spent, 0 TDs — previously misjudged, keeping alive` };
-    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent, 0 TDs — kill` };
+    return { label: 'Pause', key: 'pause', color: 'red', reason: `${formatCurrency(spend)} spent in ${_windowDays}d, 0 TDs — kill` };
   }
 
   // 6. Fatigued (trend-based) — WoW degradation, even if today's metric still in range
