@@ -975,6 +975,8 @@
                   <option value="watch">Watch</option>
                   <option value="fatigued">Fatigued</option>
                   <option value="pause">✗ Pause</option>
+                  <option value="untested">★ Untested winning patterns</option>
+                  <option value="quiet">Quiet (low spend)</option>
                 </select>
                 <select id="taggerFilterCategory" class="px-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] bg-surface-secondary font-medium" onchange="state._taggerTablePage=1;_refreshTaggerValueFilter();renderTaggerTable()">
                   <option value="all">All Tags</option>
@@ -17069,11 +17071,21 @@ function showTaggerResults() {
   // so the count matches what the operator sees when they click a segment to drill in.
   try {
     const _fData = (typeof getFilteredTaggerData === 'function') ? getFilteredTaggerData() : [];
-    const _vc = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0 };
+    const _vc = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0, untested: 0, quiet: 0 };
+    const _untestedNames = new Set();
+    try {
+      const _opps = (typeof _detectCrossMarketOpportunities === 'function') ? _detectCrossMarketOpportunities() : [];
+      _opps.forEach(o => (o.winner_ads || []).forEach(w => { if (w && w.ad_name) _untestedNames.add(normalizeAdName(w.ad_name)); }));
+    } catch (_) {}
     _fData.forEach(c => {
       const v = getCreativeVerdict(c);
       _vc[v.key] = (_vc[v.key] || 0) + 1;
       if (v.label === 'Brand-Awareness') _vc.brand = (_vc.brand || 0) + 1;
+      if (_untestedNames.has(normalizeAdName(c['Ad name'] || c['ad name'] || ''))) _vc.untested++;
+      const _spend = parseNumber(c['Spent'] || c['spent'] || 0);
+      const _mkt = extractMarket(c) || 'US';
+      const _floor = (typeof VERDICT_SPEND_FLOOR !== 'undefined' && VERDICT_SPEND_FLOOR[_mkt]) || 5000;
+      if (_spend > 0 && _spend < (_floor / 2)) _vc.quiet++;
     });
     if (typeof renderTaggerHeaderVerdictPill === 'function') renderTaggerHeaderVerdictPill(_vc, _fData.length);
   } catch (_) {}
@@ -17440,7 +17452,9 @@ function renderTaggerHeaderVerdictPill(counts, totalAds) {
   const pausing = c.pause || 0;
   const tooEarly = c.new || 0;
   const brand = c.brand || 0;
-  if (winners + fatiguing + pausing + tooEarly + brand === 0) { el.classList.add('hidden'); return; }
+  const untested = c.untested || 0;
+  const quiet = c.quiet || 0;
+  if (winners + fatiguing + pausing + tooEarly + brand + untested + quiet === 0) { el.classList.add('hidden'); return; }
   // Each segment: emoji + count + label, clickable to filter Explore › Tree.
   const _goto = (filterValue) => `onclick="(function(){if(typeof switchTaggerTab==='function')switchTaggerTab('explore');setExploreView('tree');const sel=document.getElementById('taggerVerdictFilter');if(sel){sel.value='${filterValue}';state._taggerTablePage=1;}if(typeof renderTaggerTable==='function')renderTaggerTable();window.scrollTo({top:0,behavior:'smooth'});})()"`;
   const _seg = (count, label, bgClass, textClass, filter, tip) =>
@@ -17453,6 +17467,8 @@ function renderTaggerHeaderVerdictPill(counts, totalAds) {
       ${_seg(fatiguing, 'fatiguing', 'bg-amber-50 border-amber-200', 'text-amber-700', 'fatigued', 'Watch + Fatigued verdicts. Click to filter.')}
       ${_seg(pausing, 'to pause', 'bg-red-50 border-red-200', 'text-red-700', 'pause', 'Pause verdicts. Click to filter.')}
       ${_seg(tooEarly, 'too early / testing', 'bg-gray-50 border-gray-200', 'text-gray-600', 'all', 'Below verdict floor or <14d cohort. Click to show all (toggle filter).')}
+      ${untested > 0 ? _seg(untested, 'untested patterns', 'bg-accent-purple-light border-purple-200', 'text-accent-purple', 'untested', 'Ads whose tag tuple wins on another market but not yet tested on theirs. Click to filter Tree to these patterns — direct path to cross-market opportunities.') : ''}
+      ${quiet > 0 ? _seg(quiet, 'quiet (low spend)', 'bg-gray-50 border-gray-200', 'text-gray-500', 'quiet', 'Ads spending below half the market floor — running but not contributing much. Click to filter.') : ''}
       ${brand > 0 ? _seg(brand, 'brand-awareness (excluded)', 'bg-blue-50 border-blue-200', 'text-blue-700', 'all', 'Brand-awareness ads — excluded from QL/TD verdict family. Click to show all.') : ''}
       <span class="text-[10px] text-text-muted ml-auto">${totalAds} ads total</span>
     </div>`;
@@ -18702,7 +18718,29 @@ function getFilteredTaggerDataWithDropdowns() {
   // to 0 because the same `data` was used for both filtering AND pill counts).
   const _dataForPillCounts = data.slice();
   const verdictFilter = document.getElementById('taggerVerdictFilter')?.value || 'all';
-  if (verdictFilter !== 'all') {
+  if (verdictFilter === 'untested') {
+    // C2 keystone preset (Naina May 11): ads whose tag tuple matches a cross-market winner
+    // tuple but the ad's own market hasn't been tested with that tuple yet. Sourced from the
+    // Match Engine's _detectCrossMarketOpportunities — each opportunity's winner_ads are the
+    // seed; we surface them here so operator can drill into the untested patterns directly.
+    const _untestedNames = new Set();
+    try {
+      const _opps = (typeof _detectCrossMarketOpportunities === 'function') ? _detectCrossMarketOpportunities() : [];
+      _opps.forEach(o => (o.winner_ads || []).forEach(w => {
+        if (w && w.ad_name) _untestedNames.add(normalizeAdName(w.ad_name));
+      }));
+    } catch (_) {}
+    data = data.filter(c => _untestedNames.has(normalizeAdName(c['Ad name'] || c['ad name'] || '')));
+  } else if (verdictFilter === 'quiet') {
+    // Quiet ads — spend below market scaled floor / 2, OR low impressions. Surfaces ads
+    // that are running but not contributing much to overall portfolio.
+    data = data.filter(c => {
+      const _spend = parseNumber(c['Spent'] || c['spent'] || 0);
+      const _mkt = extractMarket(c) || 'US';
+      const _floor = (typeof VERDICT_SPEND_FLOOR !== 'undefined' && VERDICT_SPEND_FLOOR[_mkt]) || 5000;
+      return _spend > 0 && _spend < (_floor / 2);
+    });
+  } else if (verdictFilter !== 'all') {
     data = data.filter(c => getCreativeVerdict(c).key === verdictFilter);
   }
 
@@ -19036,11 +19074,22 @@ function renderTaggerTable() {
   // taggerVerdictFilter dropdown to the matching key and re-renders the Tree.
   // Counts come from _dataForPillCounts (pre-verdict-filter) so the totals stay stable
   // regardless of which verdict filter is currently active.
-  const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0 };
+  const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0, untested: 0, quiet: 0 };
+  // Pre-compute untested-pattern name set so we can flag ads inline.
+  const _untestedNamesForCount = new Set();
+  try {
+    const _opps = (typeof _detectCrossMarketOpportunities === 'function') ? _detectCrossMarketOpportunities() : [];
+    _opps.forEach(o => (o.winner_ads || []).forEach(w => { if (w && w.ad_name) _untestedNamesForCount.add(normalizeAdName(w.ad_name)); }));
+  } catch (_) {}
   _dataForPillCounts.forEach(c => {
     const v = getCreativeVerdict(c);
     verdictCounts[v.key] = (verdictCounts[v.key]||0) + 1;
     if (v.label === 'Brand-Awareness') verdictCounts.brand = (verdictCounts.brand || 0) + 1;
+    if (_untestedNamesForCount.has(normalizeAdName(c['Ad name'] || c['ad name'] || ''))) verdictCounts.untested++;
+    const _spend = parseNumber(c['Spent'] || c['spent'] || 0);
+    const _mkt = extractMarket(c) || 'US';
+    const _floor = (typeof VERDICT_SPEND_FLOOR !== 'undefined' && VERDICT_SPEND_FLOOR[_mkt]) || 5000;
+    if (_spend > 0 && _spend < (_floor / 2)) verdictCounts.quiet++;
   });
   // Helper for clickable pill: clicking sets the verdict filter dropdown + re-renders.
   const _clickPill = (filterValue) => `onclick="(function(){const el=document.getElementById('taggerVerdictFilter');if(el){el.value='${filterValue}';state._taggerTablePage=1;}if(typeof renderTaggerTable==='function')renderTaggerTable();})()" class="cursor-pointer hover:opacity-80 transition"`;
