@@ -7562,6 +7562,38 @@ function _filterTaggerByFormat(fmt) {
   if (typeof navigateTo === 'function') navigateTo('tagger');
 }
 
+// Click-from-insight-card: filter Tree by tag category + value. Used by Tagger Insights cards
+// + Recommended Next pills so operator can drill from a tag-level finding into the ad list.
+function _filterTaggerByTag(category, value) {
+  if (typeof switchTaggerTab === 'function') switchTaggerTab('explore');
+  if (typeof setExploreView === 'function') setExploreView('tree');
+  const sc = document.getElementById('taggerFilterCategory');
+  if (sc) {
+    sc.value = category;
+    if (typeof _refreshTaggerValueFilter === 'function') _refreshTaggerValueFilter();
+  }
+  const sv = document.getElementById('taggerFilterValue');
+  if (sv) sv.value = value;
+  state._taggerTablePage = 1;
+  if (typeof renderTaggerTable === 'function') renderTaggerTable();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Click-from-Recommended-Next: tag value alone, no dimension provided. Resolve dimension
+// by scanning the taxonomy; if not found, silently no-op so a broken tag doesn't crash.
+function _filterTaggerByTagValue(tagValue) {
+  if (!tagValue) return;
+  let dim = null;
+  if (typeof GODFATHER_TAXONOMY !== 'undefined' && typeof TAG_DIMS !== 'undefined' && Array.isArray(TAG_DIMS)) {
+    for (const d of TAG_DIMS) {
+      const vals = GODFATHER_TAXONOMY.getValues ? GODFATHER_TAXONOMY.getValues(d) : [];
+      if (vals && vals.indexOf(tagValue) !== -1) { dim = d; break; }
+    }
+  }
+  if (!dim) return;
+  _filterTaggerByTag(dim, tagValue);
+}
+
 // ==================== Sweep helpers (May 10 detective-tax sweep) ====================
 // Detective-tax audit found two cross-cutting gaps: (1) numbers shown without naming their
 // data source / time window, so operators couldn't reconcile against Pulse. (2) "Done X"
@@ -17392,6 +17424,8 @@ function renderPager(containerId, page, totalItems, onPageChange) {
 function goTaggerTablePage(p) { state._taggerTablePage = p; renderTaggerTable(); }
 function goHeatmapPage(p) { state._heatmapPage = p; renderTaggerHeatmap(); }
 function goGridPage(p) { state._gridPage = p; renderCreativeGrid(); }
+function goCreativeReviewWinnerPage(p) { state._crWinnerPage = Math.max(1, p); if (typeof renderCreativeReview === 'function') renderCreativeReview(); }
+function goCreativeReviewLoserPage(p) { state._crLoserPage = Math.max(1, p); if (typeof renderCreativeReview === 'function') renderCreativeReview(); }
 
 // C2 Tagger header verdict pill (Naina May 11): one-line summary above the section tabs
 // so eye lands on what owes a decision before browsing. Each segment is clickable —
@@ -17754,6 +17788,7 @@ function renderTaggerInsights() {
     const metricLabel = useCPTD ? 'CPTD' : 'CPTQL';
     insights.push({
       category: catInfo.label,
+      categoryKey: cat,  // raw key needed for the click-to-filter helper
       color: catInfo.color,
       best: best[0],
       bestMetric: best[1].primaryMetric,
@@ -17771,23 +17806,27 @@ function renderTaggerInsights() {
     const tc = TAG_COLORS[ins.color] || TAG_COLORS.purple;
     const ratio = ins.worstMetric > 0 && ins.bestMetric > 0 ? ins.worstMetric / ins.bestMetric : 1;
     const savingsLabel = ratio >= 2 ? Math.round(ratio * 10) / 10 + 'x cheaper' : ins.improvement + '% cheaper';
+    // Click-to-filter — WINNER and AVOID pills route to Tree filtered by tag value.
+    const _esc = (s) => String(s || '').replace(/'/g, "\\'");
+    const _bestClick = `onclick="_filterTaggerByTag('${_esc(ins.categoryKey)}','${_esc(ins.best)}')"`;
+    const _worstClick = `onclick="_filterTaggerByTag('${_esc(ins.categoryKey)}','${_esc(ins.worst)}')"`;
     container.innerHTML += `<div class="bg-white border border-gray-200/80 rounded-xl p-4 insight-card shadow-sm">
       <div class="flex items-center justify-between mb-3">
         <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold ${tc.bg} ${tc.text}">${ins.category}</span>
         <span class="text-[10px] font-bold gradient-text">${savingsLabel}</span>
       </div>
       <div class="space-y-2">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between cursor-pointer hover:bg-surface-tertiary rounded px-1 -mx-1" ${_bestClick} title="Click to view all ${ins.bestCount} ads with this tag in Tagger Tree">
           <div class="flex items-center gap-1.5">
             <span class="text-[9px] font-bold text-accent-green bg-accent-green-light px-1.5 py-0.5 rounded">WINNER</span>
-            <span class="text-xs font-medium">${tagLabel(ins.best)}</span>
+            <span class="text-xs font-medium hover:underline">${tagLabel(ins.best)}</span>
           </div>
           <span class="text-xs font-bold text-accent-green">${formatCurrency(ins.bestMetric)}</span>
         </div>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between cursor-pointer hover:bg-surface-tertiary rounded px-1 -mx-1" ${_worstClick} title="Click to view all ${ins.worstCount} ads with this tag in Tagger Tree">
           <div class="flex items-center gap-1.5">
             <span class="text-[9px] font-bold text-accent-red bg-accent-red-light px-1.5 py-0.5 rounded">AVOID</span>
-            <span class="text-xs font-medium">${tagLabel(ins.worst)}</span>
+            <span class="text-xs font-medium hover:underline">${tagLabel(ins.worst)}</span>
           </div>
           <span class="text-xs font-bold text-accent-red">${formatCurrency(ins.worstMetric)}</span>
         </div>
@@ -18274,27 +18313,52 @@ function renderCreativeReview() {
       </div>
     </div>`;
 
+  // Pagination state — Naina May 11: section was capped at 6 visible with no way to browse
+  // the remaining 14+. Both lists now paginate 6 at a time with prev/next.
+  const _CR_PAGE_SIZE = 6;
+  state._crWinnerPage = state._crWinnerPage || 1;
+  state._crLoserPage = state._crLoserPage || 1;
+  const _pageNav = (current, total, jsFnName) => {
+    if (total <= 1) return '';
+    const _btn = (page, label, disabled) => disabled
+      ? `<span class="text-[11px] px-2 py-1 text-text-muted opacity-40 cursor-not-allowed">${label}</span>`
+      : `<button onclick="${jsFnName}(${page})" class="text-[11px] px-2 py-1 rounded hover:bg-surface-tertiary text-text-secondary font-semibold">${label}</button>`;
+    return `<div class="flex items-center gap-2 mt-3 justify-end">
+      ${_btn(current - 1, '← Prev', current <= 1)}
+      <span class="text-[11px] text-text-muted">${current} of ${total}</span>
+      ${_btn(current + 1, 'Next →', current >= total)}
+    </div>`;
+  };
+
   // ── SECTION 2: Scale These (Top Performers) ──
   if (scale.length + working.length > 0) {
-    const winners = [...scale, ...working].slice(0, 6);
+    const _allWinners = [...scale, ...working];
+    const _winTotalPages = Math.max(1, Math.ceil(_allWinners.length / _CR_PAGE_SIZE));
+    const _winPage = Math.min(state._crWinnerPage, _winTotalPages);
+    const winners = _allWinners.slice((_winPage - 1) * _CR_PAGE_SIZE, _winPage * _CR_PAGE_SIZE);
     html += `<div class="mb-6">
-      <h3 class="text-base font-bold mb-1 text-green-800">✓ Scale These — ${winners.length} of ${scale.length + working.length} Proven Winners</h3>
+      <h3 class="text-base font-bold mb-1 text-green-800">✓ Scale These — ${winners.length} of ${_allWinners.length} Proven Winners</h3>
       <p class="text-xs text-text-muted mb-3">These creatives are converting well. Make more like them or increase their budget. <span class="italic">Metric arrows compare against portfolio average.</span></p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         ${winners.map(x => creativeCard(x.c, x.v, true)).join('')}
       </div>
+      ${_pageNav(_winPage, _winTotalPages, 'goCreativeReviewWinnerPage')}
     </div>`;
   }
 
   // ── SECTION 3: Pause / Refresh These ──
   if (pause.length + fatigued.length > 0) {
-    const losers = [...pause, ...fatigued].slice(0, 6);
+    const _allLosers = [...pause, ...fatigued];
+    const _losTotalPages = Math.max(1, Math.ceil(_allLosers.length / _CR_PAGE_SIZE));
+    const _losPage = Math.min(state._crLoserPage, _losTotalPages);
+    const losers = _allLosers.slice((_losPage - 1) * _CR_PAGE_SIZE, _losPage * _CR_PAGE_SIZE);
     html += `<div class="mb-6">
-      <h3 class="text-base font-bold mb-1 text-red-800">✗ Pause or Refresh — ${losers.length} of ${pause.length + fatigued.length} Underperforming</h3>
+      <h3 class="text-base font-bold mb-1 text-red-800">✗ Pause or Refresh — ${losers.length} of ${_allLosers.length} Underperforming</h3>
       <p class="text-xs text-text-muted mb-3">These creatives are burning budget without converting. Pause or create new variants. <span class="italic">Metric arrows compare against portfolio average.</span></p>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         ${losers.map(x => creativeCard(x.c, x.v, true)).join('')}
       </div>
+      ${_pageNav(_losPage, _losTotalPages, 'goCreativeReviewLoserPage')}
     </div>`;
   }
 
@@ -18333,7 +18397,10 @@ function renderCreativeReview() {
         ${strongWins.map(([tag, count]) => {
           const tid = 'rec_do:' + tag.replace(/'/g,'');
           const acted = getOracleAction(tid);
-          return `<li class="text-[11px] flex items-center justify-between"><div><span class="font-bold text-green-800">${tagLabel(tag)}</span> <span class="text-green-600">— in ${count} winners</span></div><div class="flex gap-1">${acted?.status==='done' ? '<span class="text-[9px] text-green-600 font-bold">✓ Noted</span>' : `<button onclick="oracleAction('${tid}','recommendation','done','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-green-200 text-green-800 font-bold hover:bg-green-300">Noted</button><button onclick="oracleAction('${tid}','recommendation','dismissed','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Skip</button>`}</div></li>`;
+          const _esc = tag.replace(/'/g,"\\'");
+          // Tag label clickable — opens Tree filtered by the tag value.
+          const _tagBtn = `<button onclick="_filterTaggerByTagValue('${_esc}')" class="font-bold text-green-800 hover:underline cursor-pointer" title="Click to view all ${count} winners with this tag in Tagger Tree">${tagLabel(tag)}</button>`;
+          return `<li class="text-[11px] flex items-center justify-between"><div>${_tagBtn} <span class="text-green-600">— in ${count} winners</span></div><div class="flex gap-1">${acted?.status==='done' ? '<span class="text-[9px] text-green-600 font-bold">✓ Noted</span>' : `<button onclick="oracleAction('${tid}','recommendation','done','${_esc}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-green-200 text-green-800 font-bold hover:bg-green-300">Noted</button><button onclick="oracleAction('${tid}','recommendation','dismissed','${_esc}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Skip</button>`}</div></li>`;
         }).join('')}
       </ul>
     </div>`;
@@ -18345,7 +18412,9 @@ function renderCreativeReview() {
         ${strongLosses.map(([tag, count]) => {
           const tid = 'rec_avoid:' + tag.replace(/'/g,'');
           const acted = getOracleAction(tid);
-          return `<li class="text-[11px] flex items-center justify-between"><div><span class="font-bold text-red-800">${tagLabel(tag)}</span> <span class="text-red-600">— in ${count} underperformers</span></div><div class="flex gap-1">${acted?.status==='done' ? '<span class="text-[9px] text-red-600 font-bold">✓ Noted</span>' : `<button onclick="oracleAction('${tid}','recommendation','done','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-red-200 text-red-800 font-bold hover:bg-red-300">Noted</button><button onclick="oracleAction('${tid}','recommendation','dismissed','${tag.replace(/'/g,"\\\\'")}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Skip</button>`}</div></li>`;
+          const _esc = tag.replace(/'/g,"\\'");
+          const _tagBtn = `<button onclick="_filterTaggerByTagValue('${_esc}')" class="font-bold text-red-800 hover:underline cursor-pointer" title="Click to view all ${count} underperformers with this tag in Tagger Tree">${tagLabel(tag)}</button>`;
+          return `<li class="text-[11px] flex items-center justify-between"><div>${_tagBtn} <span class="text-red-600">— in ${count} underperformers</span></div><div class="flex gap-1">${acted?.status==='done' ? '<span class="text-[9px] text-red-600 font-bold">✓ Noted</span>' : `<button onclick="oracleAction('${tid}','recommendation','done','${_esc}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-red-200 text-red-800 font-bold hover:bg-red-300">Noted</button><button onclick="oracleAction('${tid}','recommendation','dismissed','${_esc}');renderCreativeReview()" class="text-[9px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-bold hover:bg-gray-200">Skip</button>`}</div></li>`;
         }).join('')}
       </ul>
     </div>`;
