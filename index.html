@@ -381,14 +381,17 @@
             <div id="oracleRefreshList" class="mt-2"></div>
           </details>
 
-          <!-- Action Log — demoted to collapsed <details> 2026-05-09: historical, not action-owed. -->
+          <!-- Snoozed & Dismissed roster (Naina May 11 v6): rebuilt from Action Log (which only
+               tracked Sentinel Module 6 Copy/Pause buttons — a workflow Naina doesn't use).
+               Now reads _oracleActions (the store actually populated by Pause Now / Make More /
+               Match Engine snooze/dismiss buttons) and offers Undo + resurface dates. -->
           <details class="mb-6 oracle-accordion">
             <summary class="flex items-center gap-2 cursor-pointer select-none py-2 hover:bg-surface-secondary rounded-lg px-2 -mx-2">
               <svg class="w-4 h-4 text-text-muted chevron shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-              <div class="w-6 h-6 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg></div>
-              <h3 class="text-sm font-bold">Action Log</h3>
-              <span id="actionLogCounter" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple"></span>
-              <span class="text-[10px] text-text-muted">— track what you've acted on</span>
+              <div class="w-6 h-6 rounded-lg bg-surface-tertiary flex items-center justify-center shrink-0"><svg class="w-3.5 h-3.5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg></div>
+              <h3 class="text-sm font-bold">Snoozed &amp; Dismissed</h3>
+              <span id="snoozeRosterCounter" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple"></span>
+              <span class="text-[10px] text-text-muted">— click Undo to bring back to your queue</span>
             </summary>
             <div id="oracleActionLog" class="space-y-1.5 mt-2"></div>
           </details>
@@ -10016,8 +10019,91 @@ async function oracleAction(itemId, cardType, status, name, silent) {
   supabaseUpsert('oracle_actions', [row]);
   if (!silent) {
     renderOracleCardsV2();
+    if (typeof renderSnoozeDismissRoster === 'function') renderSnoozeDismissRoster();
     showToast(status === 'done' ? 'Marked done' : status === 'dismissed' ? 'Dismissed' : 'Snoozed 7 days');
   }
+}
+
+// C2 (Naina May 11 v6): undo an oracle action — removes the row entirely so the underlying
+// item reverts to its pending state. Used by the Snoozed & Dismissed roster Undo button.
+async function undoOracleAction(itemId) {
+  _oracleActions = _oracleActions.filter(a => a.item_id !== itemId);
+  try {
+    if (typeof supabaseDeleteRow === 'function') {
+      await supabaseDeleteRow('oracle_actions', 'item_id', encodeURIComponent(itemId));
+    }
+  } catch(e) { console.warn('undoOracleAction supabase delete:', e.message); }
+  try { renderOracleCardsV2(); } catch(_) {}
+  try { renderSnoozeDismissRoster(); } catch(_) {}
+  if (typeof showToast === 'function') showToast('Restored to your queue');
+}
+
+// Snoozed & Dismissed roster — replaces the old Action Log content.
+// Reads _oracleActions filtered to snoozed (within window) + dismissed entries, sorted by
+// most recently actioned first. Each row: thumb + ad name (click-to-copy) + source-section
+// tag + relative time + Undo button. Snoozed items also show their resurface date.
+function renderSnoozeDismissRoster() {
+  const container = document.getElementById('oracleActionLog');
+  if (!container) return;
+  const counterEl = document.getElementById('snoozeRosterCounter');
+  const _now = Date.now();
+  const rows = _oracleActions.filter(a => {
+    if (a.status === 'dismissed') return true;
+    if (a.status === 'snoozed') {
+      if (!a.snooze_until) return true;
+      return new Date(a.snooze_until).getTime() > _now;  // still within snooze window
+    }
+    return false;
+  }).sort((a, b) => new Date(b.actioned_at || 0) - new Date(a.actioned_at || 0));
+
+  if (counterEl) counterEl.textContent = rows.length > 0 ? rows.length : '';
+  if (!rows.length) {
+    container.innerHTML = '<p class="text-xs text-text-muted italic p-3">Nothing snoozed or dismissed. Snooze/Dismiss on Pause Now or Match Engine cards lands here, with an Undo button to bring items back.</p>';
+    return;
+  }
+
+  // item_id prefixes tell us which surface the action came from
+  const _sourceLabel = (itemId) => {
+    if (!itemId) return 'Unknown';
+    if (itemId.startsWith('pause:')) return 'Pause Now';
+    if (itemId.startsWith('make:ad:')) return 'Make More';
+    if (itemId.startsWith('opp:')) return 'Match Engine';
+    if (itemId.startsWith('perf_top:')) return 'Top performer';
+    if (itemId.startsWith('perf_drain:')) return 'Top drain';
+    if (itemId.startsWith('rec_do:') || itemId.startsWith('rec_avoid:')) return 'Recommendation';
+    if (itemId.startsWith('tagger:')) return 'Tagger';
+    return itemId.split(':')[0] || 'Unknown';
+  };
+  const _sourceColor = (label) => {
+    if (label === 'Pause Now') return 'bg-red-50 text-red-700';
+    if (label === 'Make More') return 'bg-green-50 text-green-700';
+    if (label === 'Match Engine') return 'bg-accent-purple-light text-accent-purple';
+    return 'bg-gray-50 text-gray-600';
+  };
+
+  container.innerHTML = rows.map(a => {
+    const name = a.item_name || (a.item_id || '').split(':').slice(-1)[0] || 'Unknown';
+    const escName = String(name).replace(/'/g, "\\'");
+    const escId = String(a.item_id || '').replace(/'/g, "\\'");
+    const src = _sourceLabel(a.item_id);
+    const srcCls = _sourceColor(src);
+    const statusPill = a.status === 'snoozed'
+      ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-accent-orange-light text-amber-700">Snoozed</span>`
+      : `<span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-gray-100 text-gray-600">Dismissed</span>`;
+    const when = a.actioned_at && typeof _relativeTime === 'function' ? _relativeTime(a.actioned_at) : '';
+    const resurfaces = (a.status === 'snoozed' && a.snooze_until) ? ` · resurfaces ${typeof _relativeTime === 'function' ? _relativeTime(a.snooze_until) : new Date(a.snooze_until).toLocaleDateString()}` : '';
+    const thumb = (typeof _oracleThumbnail === 'function') ? _oracleThumbnail(name) : '';
+    return `<div class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-200/80 bg-surface-secondary/50">
+      ${thumb}
+      ${statusPill}
+      <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold ${srcCls}">${src}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[11px] font-semibold truncate cursor-pointer hover:text-text-primary" title="${name.replace(/"/g,'&quot;')} — click to copy" onclick="navigator.clipboard.writeText('${escName}');this.textContent='Copied — ' + this.textContent;">${typeof shortAdName === 'function' ? shortAdName(name) : name}</p>
+        <p class="text-[9px] text-text-muted">${when}${resurfaces}</p>
+      </div>
+      <button onclick="undoOracleAction('${escId}')" class="shrink-0 text-[9px] px-2 py-0.5 rounded-full bg-accent-purple-light text-accent-purple font-bold hover:bg-purple-200" title="Bring this card back into your active queue">↶ Undo</button>
+    </div>`;
+  }).join('');
 }
 
 function _oracleThumbnail(name) {
@@ -23514,7 +23600,16 @@ function markExistingActionDone(idx) {
   }
 }
 
+// C2 (Naina May 11 v6): renderActionLog is now an alias for the Snoozed & Dismissed roster
+// since the Dashboard accordion was repurposed (the old Action Log only tracked Sentinel
+// Module 6 Copy/Pause buttons — a workflow not used). All existing call sites (boot, toggle
+// changes, action handlers) flow through this single entry point.
 function renderActionLog(useAsync) {
+  if (typeof renderSnoozeDismissRoster === 'function') {
+    try { renderSnoozeDismissRoster(); } catch(_) {}
+  }
+}
+function _renderActionLog_legacy(useAsync) {
   const el = document.getElementById('oracleActionLog');
   if (!el) return;
   if (useAsync) {
