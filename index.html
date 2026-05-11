@@ -18617,7 +18617,10 @@ function getFilteredTaggerDataWithDropdowns() {
     });
   }
 
-  // Verdict filter
+  // Verdict filter. Snapshot pre-filter set so header pill counts stay independent of the
+  // active verdict filter (Naina May 11 v5: clicking "fatiguing" was making other counts go
+  // to 0 because the same `data` was used for both filtering AND pill counts).
+  const _dataForPillCounts = data.slice();
   const verdictFilter = document.getElementById('taggerVerdictFilter')?.value || 'all';
   if (verdictFilter !== 'all') {
     data = data.filter(c => getCreativeVerdict(c).key === verdictFilter);
@@ -18904,9 +18907,14 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount, parentG
     return { text: 'Monitoring', color: 'text-gray-400', icon: '…' };
   })();
 
+  // Level badge — purple for Campaign, blue for Ad Set. Operator could otherwise not tell
+  // whether a row is a campaign rollup or an adset rollup since names look similar.
+  const _levelBadgeClass = level === 'campaign' ? 'bg-accent-purple-light text-accent-purple' : 'bg-accent-blue-light text-accent-blue';
+  const _levelBadgeText = level === 'campaign' ? 'CAMP' : 'ADSET';
   return `<tr class="${bgClass} tagger-group-row${childClass}"${parentAttr} onclick="toggleTaggerGroup('${groupId}')">
     <td class="px-3 py-2.5 ${pl} font-bold">
       <span class="text-[10px] text-text-muted mr-1 tagger-arrow" data-group="${groupId}">&#9654;</span>
+      <span class="text-[8px] font-bold px-1.5 py-0.5 rounded mr-1.5 ${_levelBadgeClass} uppercase tracking-wider">${_levelBadgeText}</span>
       <span title="${label}" class="text-[11px]">${shortLabel}</span>
       <span class="text-[10px] text-text-muted ml-1.5 font-normal">${childCount} ad${childCount !== 1 ? 's' : ''}</span>
     </td>
@@ -18944,10 +18952,12 @@ function renderTaggerTable() {
   });
   Object.values(_benchmarks).forEach(b => { b.avgCPTD = b.td > 0 ? b.spend / b.td : 0; });
 
-  // Verdict summary — pills are now CLICKABLE (C2 Naina May 11). Each segment sets the
+  // Verdict summary — pills are CLICKABLE (C2 Naina May 11). Each segment sets the
   // taggerVerdictFilter dropdown to the matching key and re-renders the Tree.
+  // Counts come from _dataForPillCounts (pre-verdict-filter) so the totals stay stable
+  // regardless of which verdict filter is currently active.
   const verdictCounts = { scale: 0, working: 0, watch: 0, fatigued: 0, pause: 0, new: 0, brand: 0 };
-  data.forEach(c => {
+  _dataForPillCounts.forEach(c => {
     const v = getCreativeVerdict(c);
     verdictCounts[v.key] = (verdictCounts[v.key]||0) + 1;
     if (v.label === 'Brand-Awareness') verdictCounts.brand = (verdictCounts.brand || 0) + 1;
@@ -18963,9 +18973,10 @@ function renderTaggerTable() {
       `<span ${_clickPill('all')} class="cursor-pointer hover:opacity-80 px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 font-medium border border-gray-200" title="Click to clear verdict filter">${verdictCounts.new} New</span>`;
   }
 
-  // Render the header verdict pill (visible above section tabs, summarizes the active filter set).
+  // Render the header verdict pill (visible above section tabs, summarizes the unfiltered set
+  // — totalAds reflects pre-verdict-filter so the count stays stable across clicks).
   if (typeof renderTaggerHeaderVerdictPill === 'function') {
-    try { renderTaggerHeaderVerdictPill(verdictCounts, data.length); } catch(_) {}
+    try { renderTaggerHeaderVerdictPill(verdictCounts, _dataForPillCounts.length); } catch(_) {}
   }
 
   // ── Ad-level flat view ──
