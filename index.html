@@ -3439,29 +3439,36 @@ function init() {
     // fatigued_loser) plus the refresh-winner sibling. They run in parallel with the
     // legacy Pause Now card on Dashboard for parity audit (Week 2 Day 5 will deprecate
     // the old card if parity holds for 24-48hrs). See 02-skills/intelligence-chassis-spec.md.
+    // SAFE MODE: URL ?safe=1 OR localStorage.gf_safe='1' disables all heavy boot
+    // tasks (chassis, auto-hydrate, library, late-arrival watchers) so a hung
+    // page can at least load. Use to clear state from broken sessions.
+    const _SAFE_MODE = (new URLSearchParams(location.search).get('safe') === '1') || (localStorage.getItem('gf_safe') === '1');
+    if (_SAFE_MODE) console.warn('[safe-mode] heavy boot tasks skipped. Remove ?safe=1 or run `localStorage.removeItem("gf_safe")` and reload to restore.');
+
+    // DIAGNOSTIC May 13: chassis runDetection disabled. ~10s sync block, was the
+    // most likely cause of RESULT_CODE_HUNG. Registers stay (cheap) but detection
+    // does not auto-fire. Re-enable after confirming page loads cleanly.
     try {
       const ci = window.cuemathIntelligence;
       if (ci) {
         ci.configure({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
         registerMetaPauseVerdicts(ci);
-        // Make More verdict migrations (Tier 1, Tier 2, Refresh-was-winner).
         if (typeof registerMetaScaleVerdicts === 'function') registerMetaScaleVerdicts(ci);
-        // Defer detection to a background tick — it takes ~10s and shouldn't block
-        // the boot spinner. Dashboard re-renders once detection completes.
-        setTimeout(() => {
-          try {
-            const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
-            state._chassisLastRun = result;
-            console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
-            // Re-render Dashboard once chassis result is ready, so the parity diff has data to compare against.
-            if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
-              try { renderOracleCardsV2(); } catch (e) {}
+        if (false && !_SAFE_MODE) {
+          setTimeout(() => {
+            try {
+              const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
+              state._chassisLastRun = result;
+              console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
+              if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
+                try { renderOracleCardsV2(); } catch (e) {}
+              }
+            } catch (e) {
+              console.error('[chassis] background detection failed:', e);
             }
-          } catch (e) {
-            console.error('[chassis] background detection failed:', e);
-          }
-        }, 100);
-        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · Supabase wired (detection deferred 100ms)`);
+          }, 100);
+        }
+        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · Supabase wired (detection DISABLED for diagnostic)`);
       } else {
         console.warn('[chassis] cuemathIntelligence not loaded — shared/cuemath-intelligence.js missing or failed to parse');
       }
