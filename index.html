@@ -6171,7 +6171,12 @@ function invalidateAdPerfCache() { _adPerfCache.clear(); _dailyCache.clear(); _a
 // Mode = 'mtd'    : each stage filtered by its own event-date column in [start,end]
 // India rolls up to adset (no ad-level UTM). Spend always by metaAdData.date.
 let _adFunnelCache = { key: '', data: [] };
-function getAdFunnelMetrics(market, startDate, endDate, mode) {
+// Async + yield-broken (Day 2 Phase 2, May 13). Walks 43K Meta rows + ~13K
+// CRM leads per uncached call. Used to hog the main thread for 300-500ms,
+// which combined with other boot work crossed Chrome's 5s "Page Unresponsive"
+// threshold. Now yields back to the browser every 5K iterations so no single
+// task exceeds ~50-80ms — same total compute time, but UI stays responsive.
+async function getAdFunnelMetrics(market, startDate, endDate, mode) {
   const start = startDate || COST_DATA_START || '';
   const end = endDate || new Date().toISOString().slice(0, 10);
   const _flow = getFlowFilter();
@@ -6180,23 +6185,27 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
   if (_adFunnelCache.key === cacheKey && _adFunnelCache.data.length) return _adFunnelCache.data;
 
   const inRange = (d) => d && d >= start && d <= end;
+  const _YIELD_EVERY = 5000;
+  const _yield = () => new Promise(r => setTimeout(r, 0));
 
   // Step 1: spend per ad (always by Meta API date — mode-independent).
   // India: roll spend up to adset grain so it joins to funnel rows (India CRM lacks
   // ad-level UTM, so funnel keys India leads by adset name; we mirror that here).
   const spendMap = {}; // key → { spend, impressions, clicks, adName, campaign, adset, ad_id, account, market }
-  metaAdData.forEach(r => {
+  for (let i = 0; i < metaAdData.length; i++) {
+    if (i > 0 && i % _YIELD_EVERY === 0) await _yield();
+    const r = metaAdData[i];
     const d = r.date || '';
-    if (!inRange(d)) return;
+    if (!inRange(d)) continue;
     if (_flow !== 'all') {
       const _isPLA = _isPLACampaignName(r.campaign_name);
-      if (_flow === 'pla' && !_isPLA) return;
-      if (_flow === 'bau' && _isPLA) return;
+      if (_flow === 'pla' && !_isPLA) continue;
+      if (_flow === 'bau' && _isPLA) continue;
     }
     const isIndiaAccount = r._account === 'India';
     const grainName = isIndiaAccount ? (r.adset_name || r.ad_name) : r.ad_name;
     const normName = normalizeAdName(grainName);
-    if (!normName) return;
+    if (!normName) continue;
     if (!spendMap[normName]) {
       const campaignMarket = matchMarketFromText(' ' + (r.campaign_name || '').toUpperCase() + ' ');
       const accountMarket = ({ 'US': 'US', 'India': 'India', 'ROW': 'APAC' })[r._account] || '';
@@ -6214,7 +6223,10 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
     m.spend += r.spend || 0;
     m.impressions += parseInt(r.impressions) || 0;
     m.clicks += parseInt(r.clicks) || 0;
-  });
+  }
+
+  // Yield between the two big loops so the browser can paint/handle clicks.
+  await _yield();
 
   // Step 2: walk leads once, attribute to ad, count stages with mode-aware date filters.
   // India: key by adset (mx_utm_adcontent holds adset name) — no ad-level UTM.
@@ -6222,14 +6234,16 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
   const _flowLeads = _filterLeadsByFlow(leadsData);
   const filtered = market && market !== 'all' ? filterLeadsByMarket(_flowLeads, market) : _flowLeads;
 
-  filtered.forEach(r => {
+  for (let i = 0; i < filtered.length; i++) {
+    if (i > 0 && i % _YIELD_EVERY === 0) await _yield();
+    const r = filtered[i];
     // Resolve ad name (best-name fallback to utm_term, same as getAdPerformanceDaily)
     let adName = r.mx_utm_adcontent || '';
     if ((!adName || /^\d{10,}$/.test(adName.trim())) && r.mx_utm_term && !/^\d+$/.test(r.mx_utm_term)) {
       adName = r.mx_utm_term.replace(/-/g, '_');
     }
     const normName = normalizeAdName(adName);
-    if (!normName) return;
+    if (!normName) continue;
 
     const isIndia = r._source === 'india_crm' || (r.country_bucket || '').toLowerCase() === 'india';
     const key = normName;
@@ -6247,7 +6261,7 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
     // All stages require qls=1 — non-QL leads can't appear in any funnel stage
     // (mirrors getAdPerformanceDaily clamping td≤ql at :5555).
     const isQL = String(r.qls) === '1';
-    if (!isQL) return;
+    if (!isQL) continue;
 
     // QL: by lead_created_date in both modes
     const leadIn = inRange(r.lead_created_date || '');
@@ -6266,7 +6280,7 @@ function getAdFunnelMetrics(market, startDate, endDate, mode) {
       if (_mode === 'cohort') { if (leadIn && inRange(r.trial_done_date || '')) f.td++; }
       else { if (inRange(r.trial_done_date || '')) f.td++; }
     }
-  });
+  }
 
   // Step 3: join spend + funnel; emit one row per ad (or adset for India)
   const results = [];
@@ -19324,7 +19338,7 @@ function renderTaggerGroupRow(label, totals, groupId, level, childCount, parentG
   </tr>`;
 }
 
-function renderTaggerTable() {
+async function renderTaggerTable() {
   const tbody = document.getElementById('taggerTableBody');
   const catFilter = document.getElementById('taggerFilterCategory')?.value || 'all';
   const sortBy = document.getElementById('taggerSortBy')?.value || 'cpql_asc';
@@ -19353,7 +19367,7 @@ function renderTaggerTable() {
   const _funnelByAd = {};
   try {
     const _frows = (typeof getAdFunnelMetrics === 'function')
-      ? getAdFunnelMetrics(_treeMarket, _treeRange.from || null, _treeRange.to || null, _treeMode)
+      ? await getAdFunnelMetrics(_treeMarket, _treeRange.from || null, _treeRange.to || null, _treeMode)
       : [];
     _frows.forEach(r => {
       const k = normalizeAdName(r.ad_name || '');
