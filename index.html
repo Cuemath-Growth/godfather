@@ -3595,17 +3595,23 @@ function init() {
       document.getElementById('dashboardContent').classList.add('hidden');
     }
 
-    // Background: incremental Meta sync (non-blocking, won't cause re-render race)
-    if (_IS_DEPLOYED) {
+    // ── DIAGNOSTIC May 13 ──
+    // Auto-bootstraps DISABLED to isolate the "page unresponsive every 2 min"
+    // freeze Naina is hitting. Three background tasks saturate the main thread:
+    //   - fetchMetaCreatives (Meta API thumbs for every ad)
+    //   - fetchMetaAdInsights (full last-7-day re-pull + redundant loadCachedAdData)
+    //   - _autoBootstrapTagging (Haiku vision calls for every untagged ad)
+    // All three remain available via Settings → Refresh / manual triggers.
+    // Re-enable one at a time once we confirm boot is responsive.
+    if (false && _IS_DEPLOYED) {
       setTimeout(() => {
         fetchMetaCreatives();
         fetchMetaAdInsights();
-      }, 3000); // 3s delay so UI is responsive first
-
-      // Phase 1+2: auto-bootstrap thumbnails + vision tagging for new ads.
-      // Runs once per session, ~10s after boot so primary UI lands first.
-      // Idempotent: zero cost when nothing is new.
+      }, 3000);
       setTimeout(() => { _autoBootstrapTagging(); }, 10000);
+    }
+    if (_IS_DEPLOYED) {
+      console.warn('[diagnostic] auto-bootstraps disabled — see comment near boot end. Use Settings → Refresh to fetch.');
     }
 
     // Legacy: fetch tagger/Meta sheet data + Supabase
