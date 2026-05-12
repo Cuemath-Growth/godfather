@@ -3594,7 +3594,13 @@ function init() {
     updateDataStatusLine();
     try { _updateTagCoveragePill(); } catch(_) {}
     navigateTo('dashboard');
-    await new Promise(r => setTimeout(r, 0)); // yield 6: between dashboard and library renders
+    await new Promise(r => setTimeout(r, 0)); // yield 6: before dashboard cards (renderOracleCardsV2 walks 43K)
+    // Explicit first-render — previously the chassis runDetection callback drove this,
+    // but with chassis disabled for diagnostic the dashboard stays blank without this.
+    if (!_SAFE_MODE) {
+      try { renderOracleCardsV2(); } catch(e) { console.error('[boot] renderOracleCardsV2:', e); }
+    }
+    await new Promise(r => setTimeout(r, 0)); // yield 7: between dashboard cards and library render
     renderLibrary();
 
     if (!leadsData.length && !metaAdData.length && !hasCached) {
