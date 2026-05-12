@@ -3328,15 +3328,21 @@ function init() {
 
   // Live boot progress (May 12 — operator couldn't tell if boot was stuck or just slow).
   // Each source ticks itself off as it resolves. Renders into the overlay's #bootProgress.
-  const _bootSources = ['Meta ads', 'Oracle actions', 'Library', 'CRM sheets', 'Gen history'];
+  const _bootSources = ['Meta ads', 'Oracle actions', 'Library', 'CRM sheets', 'Gen history', 'CRM merge'];
   const _bootDone = new Set();
   const _bootProgress = (label, ok) => {
-    _bootDone.add(label);
+    // Caller convention: pass label only for success, or (label, 'fail') for failure.
+    // Existing call sites that pre-add `${label}:fail` to _bootDone still work — the
+    // render below checks :fail first, so the success marker doesn't override it.
+    if (label) {
+      if (ok === 'fail') _bootDone.add(label + ':fail');
+      else _bootDone.add(label);
+    }
     const el = document.getElementById('bootProgress');
     if (!el) return;
     el.textContent = _bootSources.map(s => {
-      if (_bootDone.has(s)) return `✓ ${s}`;
       if (_bootDone.has(s + ':fail')) return `⚠ ${s}`;
+      if (_bootDone.has(s)) return `✓ ${s}`;
       return `· ${s}`;
     }).join('\n');
   };
@@ -3503,7 +3509,23 @@ function init() {
       console.log(`Post-boot ad resolve: ${termUsed} from utm_term, ${adIdResolved} from ad ID lookup, ${emptyFilled} empty backfilled, ${plaTagged} PLA-tagged | total leadsData: ${leadsData.length}`);
     }
 
-    if (state.taggerData.length && leadsData.length) mergeCRMWithMeta();
+    // Fire-and-forget — _bootProgress ticks the overlay when the worker resolves.
+    // The auto-hydrate gate below only fires when taggerData was empty, so we
+    // don't need to await merge completion before continuing. After merge applies,
+    // soft re-render whichever view is currently active so numbers reflect CRM.
+    if (state.taggerData.length && leadsData.length) {
+      mergeCRMWithMeta((label, ok) => {
+        _bootProgress(label, ok);
+        if (label === 'CRM merge' && ok !== 'fail') {
+          try {
+            if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') renderOracleCardsV2();
+            else if (state.currentView === 'tagger' && typeof showTaggerResults === 'function') showTaggerResults();
+          } catch (e) { console.warn('Post-merge re-render failed:', e); }
+        }
+      });
+    } else {
+      _bootProgress('CRM merge'); // no merge needed → mark done so overlay isn't stuck on `· CRM merge`
+    }
 
     // Auto-hydrate tagger data if localStorage was empty but metaAdData exists
     if (!state.taggerData.length && metaAdData.length) {
@@ -4375,8 +4397,8 @@ async function connectMetaApi() {
     const restored = rehydrateTagsFromCache(state.taggerData);
     // Backfill unknown tags locally
     backfillUnknownTags(state.taggerData);
-    // Merge CRM data
-    if (leadsData.length) mergeCRMWithMeta();
+    // Merge CRM data (worker-based; saveTaggerData below depends on merged TD/NRI being applied)
+    if (leadsData.length) await mergeCRMWithMeta();
     saveTaggerData();
     rebuildTagMap();
     // Sync clean data to Supabase (replaces corrupted data)
@@ -6424,323 +6446,472 @@ async function fetchSheetAsCsv(url, tq) {
 
 // parseCSV + parseNumber moved to shared/cuemath-data.js (Apr 28)
 
-function mergeCRMWithMeta() {
-  // Early-exit: nothing to merge into. Several call sites (post-tag, metaAdData
-  // reload paths) gate only on leadsData.length and call this before taggerData
-  // is hydrated — that fired a noisy "0 creatives" log + a wasted iteration on
-  // every boot. Cheap guard here covers all of them.
-  if (!state.taggerData || state.taggerData.length === 0) return;
-  // Idempotency: skip if already merged with same data version
-  const mergeKey = `${leadsData.length}|${state.taggerData.length}`;
-  if (mergeCRMWithMeta._lastKey === mergeKey) { console.log('CRM merge: skipped (already merged this data version)'); return; }
-  // Single CRM data path: leadsData only (Google Sheets API leads!A:BG)
-  let rows = (typeof leadsData !== 'undefined' && leadsData.length) ? leadsData : null;
-  console.log(`CRM merge: ${rows?.length || 0} leads (leadsData), ${state.taggerData.length} creatives`);
-  // Diagnostic: tagger market distribution + thumbnails
-  const mktDist = {};
-  let thumbCount = 0;
-  state.taggerData.forEach(c => { const m = extractMarket(c); mktDist[m] = (mktDist[m]||0)+1; if (c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url']) thumbCount++; });
-  console.log('Tagger market distribution:', mktDist);
-  console.log('Tagger thumbnails:', thumbCount, 'of', state.taggerData.length, 'have image URLs');
-  if (!rows?.length) return;
-  // Deduplicate CRM leads by prospectid to prevent double-counting
+// ── CRM merge in a Web Worker (Day 1, May 12 architecture migration) ──
+// The 3.6M-iteration token-overlap loop between CRM leads and Meta ads used to
+// run on the main thread and cumulatively contribute 1-2s of synchronous work
+// at boot. Together with chassis prep + funnel join + cross-market detection,
+// boot crossed Chrome's 5s "Page Unresponsive" threshold. We move the pure
+// matching/aggregation into a worker; main thread keeps the state mutation,
+// safety clamp, TQL derivation, and persistence steps (those need globals).
+//
+// Bridge contract:
+//   postMessage in:  { leadsData, taggerSlim }
+//   postMessage out: { patches: [{ idx, fields, leadOrigIdxs? }], stats }
+// `leadOrigIdxs` are indices back into the live leadsData so main thread can
+// rebind `_crmLeads` to the canonical lead objects (downstream date-filtering
+// in crmMetricsForDate iterates them).
+const __CRM_MERGE_WORKER_SRC__ = `
+'use strict';
+
+function parseNumber(val) {
+  if (!val) return 0;
+  return parseFloat(String(val).replace(/[,$%]/g, '')) || 0;
+}
+
+function isNRIEthnicity(row) {
+  const e = (row.ethnicity || row['ethnicity'] || '').trim();
+  return e === 'NRI' || e === 'NRI / Non Native English Speaker';
+}
+
+const NOISE_TOKENS = new Set(['pfx','paren','old','new','lp','na','fb','ig','v2','v3','v4','akt','all','manual','conv','leads','lead','exp','int','signup','enrolled','slotbook','lpfop','fop']);
+const GEO_TOKENS = new Set(['usa','can','mea','uk','aus','ind','anz','row','sng','uae','ad','dh','sha']);
+const PLACEMENT_SUFFIXES = /_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds)_(ig|fb|an)$/i;
+const DATE_SUFFIX = /_\\d{6}$/;
+
+function extractTokens(s) {
+  return (s||'').toLowerCase()
+    .replace(PLACEMENT_SUFFIXES, '')
+    .replace(DATE_SUFFIX, '')
+    .replace(/[+&]/g, '_')
+    .split(/[_\\-\\s]+/)
+    .filter(t => t.length >= 3)
+    .filter(t => !/^\\d+$/.test(t))
+    .filter(t => !/^\\d+to\\d+/.test(t))
+    .filter(t => !NOISE_TOKENS.has(t))
+    .filter(t => !GEO_TOKENS.has(t))
+    .map(t => t.replace(/\\d+/g, ''))
+    .filter(t => t.length >= 3);
+}
+
+function tokenOverlap(a, b) {
+  const setA = new Set(a), setB = new Set(b);
+  let overlap = 0;
+  for (const t of setA) if (setB.has(t)) overlap++;
+  const smaller = Math.min(setA.size, setB.size);
+  return smaller === 0 ? 0 : overlap / smaller;
+}
+
+const normalize = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g, '');
+const campaignCore = s => normalize(s).replace(/\\d{6,}$/,'').replace(/^(usa|can|mea|uk|aus|ind|anz|row)?(pfx)?/,'');
+
+self.onmessage = function(e) {
+  const { leadsData, taggerSlim } = e.data;
+  const start = Date.now();
+
+  // ── Dedup CRM leads by prospectid, track original leadsData indices ──
   const seenProspects = new Set();
-  const preDedup = rows.length;
-  rows = rows.filter(r => {
+  const rows = [];
+  const rowOrigIdx = [];
+  let noPidCount = 0;
+  for (let i = 0; i < leadsData.length; i++) {
+    const r = leadsData[i];
     const pid = r['prospectid'] || r['ProspectId'] || '';
-    if (!pid) return true; // keep rows without prospectid (rare — logged below)
-    if (seenProspects.has(pid)) return false;
+    if (!pid) { rows.push(r); rowOrigIdx.push(i); noPidCount++; continue; }
+    if (seenProspects.has(pid)) continue;
     seenProspects.add(pid);
-    return true;
-  });
-  const noPidCount = rows.filter(r => !(r['prospectid'] || r['ProspectId'])).length;
-  if (noPidCount > 0) console.warn(`CRM dedup: ${noPidCount} rows lack prospectid (${(noPidCount/rows.length*100).toFixed(1)}%) — cannot deduplicate these`);
-  if (preDedup !== rows.length) console.log(`CRM dedup: ${preDedup} → ${rows.length} (removed ${preDedup - rows.length} duplicate prospect IDs)`);
-
-  // ── NORMALIZATION HELPERS ──
-  const NOISE_TOKENS = new Set(['pfx','paren','old','new','lp','na','fb','ig','v2','v3','v4','akt','all','manual','conv','leads','lead','exp','int','signup','enrolled','slotbook','lpfop','fop']);
-  const GEO_TOKENS = new Set(['usa','can','mea','uk','aus','ind','anz','row','sng','uae','ad','dh','sha']);
-  const PLACEMENT_SUFFIXES = /_(instagram|facebook|audience_network|messenger|an|ig|fb)_(stories|feed|reels|right_column|search|marketplace|in_stream|stream|video_feeds)_(ig|fb|an)$/i;
-  const DATE_SUFFIX = /_\d{6}$/; // _DDMMYY at end
-
-  function extractTokens(s) {
-    return (s||'').toLowerCase()
-      .replace(PLACEMENT_SUFFIXES, '')    // strip placement suffix
-      .replace(DATE_SUFFIX, '')           // strip date suffix
-      .replace(/[+&]/g, '_')
-      .split(/[_\-\s]+/)
-      .filter(t => t.length >= 3)
-      .filter(t => !/^\d+$/.test(t))
-      .filter(t => !/^\d+to\d+/.test(t))
-      .filter(t => !NOISE_TOKENS.has(t))
-      .filter(t => !GEO_TOKENS.has(t))
-      .map(t => t.replace(/\d+/g, ''))
-      .filter(t => t.length >= 3);
+    rows.push(r);
+    rowOrigIdx.push(i);
   }
-  function tokenOverlap(a, b) {
-    const setA = new Set(a), setB = new Set(b);
-    let overlap = 0;
-    for (const t of setA) if (setB.has(t)) overlap++;
-    const smaller = Math.min(setA.size, setB.size);
-    return smaller === 0 ? 0 : overlap / smaller;
-  }
-  const normalize = s => (s||'').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const campaignCore = s => normalize(s).replace(/\d{6,}$/,'').replace(/^(usa|can|mea|uk|aus|ind|anz|row)?(pfx)?/,'');
 
-  // ── STEP 1: BUILD AD-LEVEL INDEX FROM CRM ──
-  // Index CRM leads by normalized mx_utm_adcontent tokens for direct creative matching
-  // Falls back to mx_utm_term if adcontent is numeric/empty (post-boot resolution handles most cases)
-  const crmByAdContent = {}; // key: normalized adcontent → array of CRM leads
-  rows.forEach(r => {
+  if (!rows.length) {
+    self.postMessage({ patches: [], stats: { directMatched: 0, campaignMatched: 0, unmatched: 0, taggerCount: taggerSlim.length, leadsCount: leadsData.length, dedupedTo: 0, noPidCount, ms: Date.now() - start } });
+    return;
+  }
+
+  // ── STEP 1: Build ad-content index from CRM ──
+  const crmByAdContent = {};
+  for (let li = 0; li < rows.length; li++) {
+    const r = rows[li];
     let adContent = r['mx_utm_adcontent'] || '';
-    // Fallback: if adcontent is numeric or empty, try mx_utm_term
-    if ((!adContent || adContent.length < 10 || /^\d{10,}$/.test(adContent.trim())) && r['mx_utm_term'] && r['mx_utm_term'].length >= 10 && !/^\d+$/.test(r['mx_utm_term'])) {
+    if ((!adContent || adContent.length < 10 || /^\\d{10,}$/.test(adContent.trim())) && r['mx_utm_term'] && r['mx_utm_term'].length >= 10 && !/^\\d+$/.test(r['mx_utm_term'])) {
       adContent = r['mx_utm_term'].replace(/-/g, '_');
     }
-    if (!adContent || adContent.length < 10) return;
+    if (!adContent || adContent.length < 10) continue;
     const tokens = extractTokens(adContent);
-    const key = tokens.sort().join('|');
-    if (!key) return;
-    if (!crmByAdContent[key]) crmByAdContent[key] = { leads: [], tokens, raw: adContent };
-    crmByAdContent[key].leads.push(r);
-  });
+    const key = tokens.slice().sort().join('|');
+    if (!key) continue;
+    if (!crmByAdContent[key]) crmByAdContent[key] = { leadIdxs: [], tokens, raw: adContent };
+    crmByAdContent[key].leadIdxs.push(li);
+  }
   const adContentKeys = Object.keys(crmByAdContent);
-  console.log(`CRM ad-content index: ${adContentKeys.length} unique ad contents from ${rows.length} leads`);
 
-  // ── STEP 2: DIRECT CREATIVE-LEVEL MATCHING ──
-  // Match tagger creatives to CRM leads via mx_utm_adcontent ↔ Ad name token overlap
+  // Precompute tagger ad tokens
+  const taggerAdTokens = taggerSlim.map(c => extractTokens(c['Ad name'] || c['ad name'] || ''));
+
+  // ── STEP 2: Direct creative-level matching ──
   let directMatched = 0, campaignMatched = 0, unmatched = 0;
-  const sampleDirect = [], sampleCampaign = [], sampleMisses = [];
-  // Track consumed CRM leads to prevent double-counting in campaign fallback
-  const consumedLeadIds = new Set();
+  const consumedLeadPids = new Set();
+  const patches = new Array(taggerSlim.length);
 
-  // Pre-compute token sets for each tagger creative's Ad name
-  const taggerAdTokens = state.taggerData.map(c => {
-    const adName = c['Ad name'] || c['ad name'] || '';
-    return extractTokens(adName);
-  });
-
-  state.taggerData.forEach((c, idx) => {
+  for (let idx = 0; idx < taggerSlim.length; idx++) {
+    const c = taggerSlim[idx];
     const adTokens = taggerAdTokens[idx];
-    if (adTokens.length < 2) return;
+    if (adTokens.length < 2) { patches[idx] = { idx, fields: { _crmMatchType: 'unmatched' } }; continue; }
 
-    // Try ad-content-level match first (most precise)
     let bestAdScore = 0, bestAdKey = '';
-    for (const ak of adContentKeys) {
-      const crmToks = crmByAdContent[ak].tokens;
-      const score = tokenOverlap(adTokens, crmToks);
+    for (let ki = 0; ki < adContentKeys.length; ki++) {
+      const ak = adContentKeys[ki];
+      const score = tokenOverlap(adTokens, crmByAdContent[ak].tokens);
       if (score > bestAdScore) { bestAdScore = score; bestAdKey = ak; }
     }
 
-    if (bestAdScore >= 0.65 && bestAdKey) { // tighter threshold to avoid false matches
-      // DIRECT MATCH: count exact leads, not proportional
-      const leads = crmByAdContent[bestAdKey].leads;
+    if (bestAdScore >= 0.65 && bestAdKey) {
+      const leadIdxs = crmByAdContent[bestAdKey].leadIdxs;
       let nri = 0, ts = 0, td = 0, paid = 0, ql = 0;
       const ethnicities = {};
-      leads.forEach(r => {
+      for (let li = 0; li < leadIdxs.length; li++) {
+        const r = rows[leadIdxs[li]];
         ql += parseNumber(r['qls'] || 0);
         ts += parseNumber(r['trials_sch'] || 0);
         td += parseNumber(r['trials_done'] || 0);
         paid += parseNumber(r['paid'] || 0);
         if (isNRIEthnicity(r)) nri++;
         if (r['ethnicity']) ethnicities[r['ethnicity']] = (ethnicities[r['ethnicity']]||0) + 1;
-      });
+      }
 
-      // Note: Do NOT floor CRM ql to td. CRM qls and trials_done are independent counts.
-      // Flooring caused QL=TD (100% conversion) across the board.
-
-      // Sanity checks: reject likely false matches
       const metaQL = parseNumber(c['QL']||c['ql']||0);
-      const effectiveQL = Math.max(metaQL, ql); // CRM ql or Meta QL (whichever is higher)
+      const effectiveQL = Math.max(metaQL, ql);
       const metaSpend = parseNumber(c['Spent']||c['spent']||0);
-      if (
-        (effectiveQL > 0 && td > effectiveQL * 1.5) ||  // TDs exceed QLs — impossible in real funnel
-        (metaSpend > 0 && td > 0 && metaSpend / td < 1500) // CPTD < ₹1.5K is unrealistic — false match
-      ) {
-        c._crmMatchType = 'unmatched';
-        if (sampleMisses.length < 5) sampleMisses.push({ ad: (c['Ad name']||'').slice(0,60), reason: `TD=${td} QL=${metaQL} CPTD=${metaSpend>0&&td>0?Math.round(metaSpend/td):0}, rejected` });
-        return;
+      // Sanity gates — reject likely false matches
+      if ((effectiveQL > 0 && td > effectiveQL * 1.5) || (metaSpend > 0 && td > 0 && metaSpend / td < 1500)) {
+        patches[idx] = { idx, fields: { _crmMatchType: 'unmatched' } };
+        continue;
       }
+
       const hasSheetData = parseNumber(c['TD']||c['td']||0) > 0 || parseNumber(c['NRI']||c['nri']||0) > 0;
-      if (!hasSheetData) {
-        c['NRI'] = nri;
-        c['TS'] = ts;
-        c['TD'] = td;
-        c['Paid'] = paid;
+      const fields = {
+        _crmMatchType: 'ad_content',
+        _crmMatchScore: bestAdScore,
+        _crmLeadCount: leadIdxs.length,
+      };
+      if (!hasSheetData) { fields.NRI = nri; fields.TS = ts; fields.TD = td; fields.Paid = paid; }
+      if (ql > metaQL) fields.QL = ql;
+      let topEth = null, topCount = 0;
+      for (const e in ethnicities) { if (ethnicities[e] > topCount) { topCount = ethnicities[e]; topEth = e; } }
+      if (topEth) fields.ethnicity = topEth;
+
+      // leadOrigIdxs lets main thread rebind _crmLeads to live leadsData rows
+      patches[idx] = { idx, fields, leadOrigIdxs: leadIdxs.map(li => rowOrigIdx[li]) };
+
+      for (let li = 0; li < leadIdxs.length; li++) {
+        const pid = rows[leadIdxs[li]]['prospectid'] || rows[leadIdxs[li]]['ProspectId'] || '';
+        if (pid) consumedLeadPids.add(pid);
       }
-      // Always backfill QL from CRM if CRM has more leads than Meta reported
-      if (ql > metaQL) c['QL'] = ql;
-      c._crmMatchType = 'ad_content';
-      c._crmMatchScore = bestAdScore;
-      c._crmLeadCount = leads.length;
-      c._crmLeads = leads; // store for date-filtered re-computation
-      // Mark these CRM leads as consumed — prevents double-counting in campaign fallback
-      leads.forEach(r => {
-        const pid = r['prospectid'] || r['ProspectId'] || '';
-        if (pid) consumedLeadIds.add(pid);
-      });
-      const topEth = Object.entries(ethnicities).sort((a,b)=>b[1]-a[1])[0];
-      if (topEth) c['ethnicity'] = topEth[0];
       directMatched++;
-      if (sampleDirect.length < 5) sampleDirect.push({ ad: (c['Ad name']||'').slice(0,60), crm: crmByAdContent[bestAdKey].raw.slice(0,60), score: bestAdScore.toFixed(2), leads: leads.length, td });
-      return; // matched — skip campaign fallback
+      continue;
     }
 
-    // ── CAMPAIGN-LEVEL FALLBACK (proportional allocation for unmatched) ──
-    c._crmMatchType = 'unmatched'; // will be updated if campaign match found
-  });
+    patches[idx] = { idx, fields: { _crmMatchType: 'unmatched' } };
+  }
 
-  // ── STEP 2B: CONSUME LEADS FOR SHEET-PRELOADED TDs ──
-  // Creatives that already have TDs from the Google Sheet (previous CRM merge baked in)
-  // need their corresponding CRM leads consumed to prevent double-counting in campaign fallback.
-  // Use a softer match (0.4 threshold) since we're not writing data, just consuming leads.
-  state.taggerData.forEach((c, idx) => {
-    if (c._crmMatchType === 'ad_content') return; // already handled
+  // ── STEP 2B: Consume leads for sheet-preloaded TDs (softer threshold) ──
+  // Prevents campaign fallback from double-counting leads already baked into
+  // the spreadsheet's TD column from a prior merge.
+  for (let idx = 0; idx < taggerSlim.length; idx++) {
+    if (patches[idx].fields._crmMatchType === 'ad_content') continue;
+    const c = taggerSlim[idx];
     const existingTD = parseNumber(c['TD']||c['td']||0);
-    if (existingTD <= 0) return; // no sheet data to protect
+    if (existingTD <= 0) continue;
     const adTokens = taggerAdTokens[idx];
-    if (adTokens.length < 2) return;
-    // Find best CRM ad-content match even below 0.65
+    if (adTokens.length < 2) continue;
     let bestScore = 0, bestKey = '';
-    for (const ak of adContentKeys) {
+    for (let ki = 0; ki < adContentKeys.length; ki++) {
+      const ak = adContentKeys[ki];
       const score = tokenOverlap(adTokens, crmByAdContent[ak].tokens);
       if (score > bestScore) { bestScore = score; bestKey = ak; }
     }
     if (bestScore >= 0.4 && bestKey) {
-      // Consume these leads — they're already counted in the sheet's TD column
-      crmByAdContent[bestKey].leads.forEach(r => {
-        const pid = r['prospectid'] || r['ProspectId'] || '';
-        if (pid) consumedLeadIds.add(pid);
-      });
+      const leadIdxs = crmByAdContent[bestKey].leadIdxs;
+      for (let li = 0; li < leadIdxs.length; li++) {
+        const pid = rows[leadIdxs[li]]['prospectid'] || rows[leadIdxs[li]]['ProspectId'] || '';
+        if (pid) consumedLeadPids.add(pid);
+      }
     }
-  });
-  console.log(`CRM merge: ${consumedLeadIds.size} leads consumed (direct matches + sheet-preloaded TDs)`);
+  }
 
-  // ── STEP 3: CAMPAIGN-LEVEL FALLBACK for unmatched creatives ──
-  // Aggregate remaining (unmatched by ad content) CRM leads at campaign level
-  const unmatchedCreatives = state.taggerData.filter(c => c._crmMatchType === 'unmatched');
-  if (unmatchedCreatives.length > 0) {
-    // Build campaign aggregation from UNCONSUMED CRM leads only — leads already attributed via direct match are excluded to prevent double-counting
+  // ── STEP 3: Campaign-level fallback for unmatched creatives ──
+  const unmatchedIdxs = [];
+  for (let idx = 0; idx < patches.length; idx++) {
+    if (patches[idx].fields._crmMatchType === 'unmatched') unmatchedIdxs.push(idx);
+  }
+
+  if (unmatchedIdxs.length > 0) {
     const campaignAgg = {};
-    let _skippedConsumed = 0;
-    rows.forEach(r => {
-      // Skip leads already consumed by direct ad-content matches or sheet-preloaded TDs
+    for (let li = 0; li < rows.length; li++) {
+      const r = rows[li];
       const pid = r['prospectid'] || r['ProspectId'] || '';
-      if (pid && consumedLeadIds.has(pid)) { _skippedConsumed++; return; }
+      if (pid && consumedLeadPids.has(pid)) continue;
       const rawCamp = r['mx_utm_campaign'] || '';
       const core = campaignCore(rawCamp);
-      if (!core || core.length < 10) return;
-      if (!campaignAgg[core]) campaignAgg[core] = { nri:0, ts:0, td:0, paid:0, ql:0, ethnicities:{}, rawCampaigns: new Set(), leads: [] };
+      if (!core || core.length < 10) continue;
+      if (!campaignAgg[core]) campaignAgg[core] = { nri:0, ts:0, td:0, paid:0, ql:0, ethnicities:{}, rawCampaigns: new Set(), leadIdxs: [] };
       const a = campaignAgg[core];
       a.rawCampaigns.add(rawCamp);
-      a.leads.push(r);
+      a.leadIdxs.push(li);
       a.ql += parseNumber(r['qls'] || 0);
       if (isNRIEthnicity(r)) a.nri++;
       a.ts += parseNumber(r['trials_sch'] || 0);
       a.td += parseNumber(r['trials_done'] || 0);
       a.paid += parseNumber(r['paid'] || 0);
       if (r['ethnicity']) a.ethnicities[r['ethnicity']] = (a.ethnicities[r['ethnicity']]||0) + 1;
-    });
-    if (_skippedConsumed > 0) console.log(`CRM campaign fallback: skipped ${_skippedConsumed} leads already consumed by direct matches`);
+    }
     const campCores = Object.keys(campaignAgg);
     const crmTokenMap = {};
-    campCores.forEach(ck => {
+    for (let ci = 0; ci < campCores.length; ci++) {
+      const ck = campCores[ci];
       const allTokens = new Set();
       campaignAgg[ck].rawCampaigns.forEach(raw => extractTokens(raw).forEach(t => allTokens.add(t)));
-      crmTokenMap[ck] = [...allTokens];
-    });
+      crmTokenMap[ck] = Array.from(allTokens);
+    }
 
-    // Match and tag unmatched creatives at campaign level
-    unmatchedCreatives.forEach(c => {
+    const matchedCampForCreative = {};
+    for (let ui = 0; ui < unmatchedIdxs.length; ui++) {
+      const idx = unmatchedIdxs[ui];
+      const c = taggerSlim[idx];
       const metaCamp = c['Campaign name'] || c['campaign name'] || '';
       const metaTokens = extractTokens(metaCamp);
-      if (metaTokens.length < 2) return;
+      if (metaTokens.length < 2) continue;
       const metaCore = campaignCore(metaCamp);
-      let match = null, bestScore = 0;
-      if (metaCore && campaignAgg[metaCore]) { match = campaignAgg[metaCore]; bestScore = 1.0; }
-      if (!match) {
-        for (const ck of campCores) {
+      let matchKey = null, bestScore = 0;
+      if (metaCore && campaignAgg[metaCore]) { matchKey = metaCore; bestScore = 1.0; }
+      if (!matchKey) {
+        for (let ci = 0; ci < campCores.length; ci++) {
+          const ck = campCores[ci];
           const score = tokenOverlap(metaTokens, crmTokenMap[ck]);
-          if (score > bestScore) { bestScore = score; match = campaignAgg[ck]; }
+          if (score > bestScore) { bestScore = score; matchKey = ck; }
         }
-        if (bestScore < 0.5) match = null;
+        if (bestScore < 0.5) matchKey = null;
       }
-      if (match) {
-        c._crmMatch = match;
-        c._crmMatchType = 'campaign';
+      if (matchKey) {
+        matchedCampForCreative[idx] = matchKey;
         campaignMatched++;
-        const topEth = Object.entries(match.ethnicities).sort((a,b)=>b[1]-a[1])[0];
-        if (topEth) c['ethnicity'] = topEth[0];
+        let topEth = null, topCount = 0;
+        const ethnicities = campaignAgg[matchKey].ethnicities;
+        for (const e in ethnicities) { if (ethnicities[e] > topCount) { topCount = ethnicities[e]; topEth = e; } }
+        const fields = { _crmMatchType: 'campaign' };
+        if (topEth) fields.ethnicity = topEth;
+        patches[idx].fields = Object.assign({}, patches[idx].fields, fields);
       } else {
         unmatched++;
-        if (sampleMisses.length < 5) sampleMisses.push({ ad: (c['Ad name']||'').slice(0,60), campaign: metaCamp.slice(0,60) });
       }
-    });
+    }
 
-    // Proportional distribution for campaign-matched (same as before)
-    const matchSpend = new Map();
-    state.taggerData.filter(c => c._crmMatchType === 'campaign').forEach(c => {
-      const key = c._crmMatch;
-      if (!matchSpend.has(key)) matchSpend.set(key, { totalSpend: 0, count: 0 });
-      matchSpend.get(key).totalSpend += parseNumber(c['Spent']||c['spent']||0);
-      matchSpend.get(key).count++;
-    });
-    state.taggerData.filter(c => c._crmMatchType === 'campaign').forEach(c => {
-      const match = c._crmMatch;
-      const info = matchSpend.get(match);
-      const share = info.totalSpend > 0 ? parseNumber(c['Spent']||c['spent']||0) / info.totalSpend : 1 / info.count;
-      const hasSheetData = parseNumber(c['TD']||c['td']||0) > 0 || parseNumber(c['NRI']||c['nri']||0) > 0;
+    // Spend share per campaign match
+    const matchSpend = {};
+    const matchedIdxList = Object.keys(matchedCampForCreative);
+    for (let mi = 0; mi < matchedIdxList.length; mi++) {
+      const idx = +matchedIdxList[mi];
+      const key = matchedCampForCreative[idx];
+      if (!matchSpend[key]) matchSpend[key] = { totalSpend: 0, count: 0 };
+      matchSpend[key].totalSpend += parseNumber(taggerSlim[idx]['Spent']||taggerSlim[idx]['spent']||0);
+      matchSpend[key].count++;
+    }
+    for (let mi = 0; mi < matchedIdxList.length; mi++) {
+      const idx = +matchedIdxList[mi];
+      const key = matchedCampForCreative[idx];
+      const match = campaignAgg[key];
+      const info = matchSpend[key];
+      const share = info.totalSpend > 0 ? parseNumber(taggerSlim[idx]['Spent']||taggerSlim[idx]['spent']||0) / info.totalSpend : 1 / info.count;
+      const hasSheetData = parseNumber(taggerSlim[idx]['TD']||taggerSlim[idx]['td']||0) > 0 || parseNumber(taggerSlim[idx]['NRI']||taggerSlim[idx]['nri']||0) > 0;
+      const fields = {};
       if (!hasSheetData) {
-        c['NRI'] = Math.round(match.nri * share);
-        c['TS'] = Math.round(match.ts * share);
-        c['TD'] = Math.round(match.td * share);
-        c['Paid'] = Math.round(match.paid * share);
+        fields.NRI = Math.round(match.nri * share);
+        fields.TS = Math.round(match.ts * share);
+        fields.TD = Math.round(match.td * share);
+        fields.Paid = Math.round(match.paid * share);
       }
-      // Always backfill QL from CRM if CRM has more leads than Meta reported
       const crmQL = Math.round(match.ql * share);
-      const existingQL = parseNumber(c['QL']||c['ql']||0);
-      if (crmQL > existingQL) c['QL'] = crmQL;
-      c._crmLeads = match.leads; // store for date-filtered re-computation
-      c._crmSpendShare = share;  // proportion of campaign spend this creative owns
-      if (sampleCampaign.length < 3) sampleCampaign.push({ ad: (c['Ad name']||'').slice(0,60), td: c['TD'], type: 'proportional' });
-      delete c._crmMatch;
-    });
+      const existingQL = parseNumber(taggerSlim[idx]['QL']||taggerSlim[idx]['ql']||0);
+      if (crmQL > existingQL) fields.QL = crmQL;
+      fields._crmSpendShare = share;
+      patches[idx].fields = Object.assign({}, patches[idx].fields, fields);
+      patches[idx].leadOrigIdxs = match.leadIdxs.map(li => rowOrigIdx[li]);
+    }
   }
 
-  // ── STEP 4: DERIVE TQL + LOG ──
-  state.taggerData.forEach(c => {
-    const market = extractMarket(c);
-    const nriVal = parseNumber(c['NRI']||c['nri']||0);
-    const qlVal = parseNumber(c['QL']||c['ql']||0);
-    const board = c['board'] || c['board (ME)'] || '';
-    c['TQL'] = computeTQL(qlVal, nriVal, market, board);
+  self.postMessage({
+    patches,
+    stats: {
+      directMatched, campaignMatched, unmatched,
+      taggerCount: taggerSlim.length,
+      leadsCount: leadsData.length,
+      dedupedTo: rows.length,
+      adContentKeys: adContentKeys.length,
+      noPidCount,
+      ms: Date.now() - start,
+    },
   });
+};
+`;
 
-  console.log(`CRM merge: ${directMatched} direct ad matches, ${campaignMatched} campaign fallbacks, ${unmatched} unmatched (${(100*directMatched/state.taggerData.length).toFixed(1)}% direct)`);
-  if (sampleDirect.length) console.log('Sample direct matches:', sampleDirect);
-  if (sampleCampaign.length) console.log('Sample campaign matches:', sampleCampaign);
-  if (sampleMisses.length) console.log('Sample misses:', sampleMisses);
+let _crmMergeWorker = null;
+function _getCrmMergeWorker() {
+  if (_crmMergeWorker) return _crmMergeWorker;
+  const blob = new Blob([__CRM_MERGE_WORKER_SRC__], { type: 'application/javascript' });
+  _crmMergeWorker = new Worker(URL.createObjectURL(blob));
+  return _crmMergeWorker;
+}
 
-  const totalMatched = directMatched + campaignMatched;
-  if (totalMatched > 0) {
-    // SAFETY CLAMP: TD can never exceed QL in a real funnel
-    let clamped = 0;
-    state.taggerData.forEach(c => {
-      const ql = parseNumber(c['QL']||c['ql']||0);
-      const td = parseNumber(c['TD']||c['td']||0);
-      const paid = parseNumber(c['Paid']||c['paid']||0);
-      if (td > ql && ql > 0) { c['TD'] = ql; c['td'] = ql; clamped++; }
-      if (paid > Math.min(td, ql)) { const cap = Math.min(td, ql); c['Paid'] = cap; c['paid'] = cap; }
-    });
-    if (clamped) console.warn(`CRM merge: clamped ${clamped} creatives where TD > QL`);
-    // Recompute derived metrics (CPTD, CPNRI) now that CRM added TD/NRI/Paid values
-    state.taggerData = ensureDerivedMetrics(state.taggerData);
-    saveTaggerData();
-    rebuildTagMap();
-  } else {
-    console.warn('CRM merge: 0 matches');
-  }
-  mergeCRMWithMeta._lastKey = mergeKey;
+// Single-flight: collapses concurrent merge requests (boot fires from multiple
+// paths once metaAdData + leadsData both land) into one worker round-trip.
+let _crmMergeInFlight = null;
+
+// Runs one worker round-trip. Resolves with { ok, data } so the wrapper can
+// decide whether to apply or retry. Kept separate from the orchestrator below
+// so the retry loop reads cleanly.
+function _runCrmMergeWorkerOnce(taggerSlim) {
+  return new Promise((resolve) => {
+    const worker = _getCrmMergeWorker();
+    const onMessage = (e) => {
+      worker.removeEventListener('message', onMessage);
+      worker.removeEventListener('error', onError);
+      resolve({ ok: true, data: e.data });
+    };
+    const onError = (err) => {
+      worker.removeEventListener('message', onMessage);
+      worker.removeEventListener('error', onError);
+      resolve({ ok: false, err });
+    };
+    worker.addEventListener('message', onMessage);
+    worker.addEventListener('error', onError);
+    worker.postMessage({ leadsData, taggerSlim });
+  });
+}
+
+async function mergeCRMWithMeta(progressCb) {
+  // Early-exit: nothing to merge into. Several call sites (post-tag, metaAdData
+  // reload paths) gate only on leadsData.length and call this before taggerData
+  // is hydrated — that fired a noisy "0 creatives" log + a wasted iteration on
+  // every boot. Cheap guard here covers all of them.
+  if (!state.taggerData || state.taggerData.length === 0) return;
+  if (!(typeof leadsData !== 'undefined' && leadsData.length)) return;
+
+  // Idempotency: skip if already merged with same data version
+  const initialKey = `${leadsData.length}|${state.taggerData.length}`;
+  if (mergeCRMWithMeta._lastKey === initialKey) { console.log('CRM merge: skipped (already merged this data version)'); return; }
+
+  // Single-flight: if a merge is already running, return the same Promise so
+  // 4 concurrent callers don't spin up 4 worker round-trips on the same data.
+  // The retry loop inside the in-flight Promise picks up any data changes
+  // that happen between the first call and the loop's next iteration.
+  if (_crmMergeInFlight) return _crmMergeInFlight;
+
+  _crmMergeInFlight = (async () => {
+    let attempt = 0;
+    const MAX_RETRIES = 3;
+
+    while (attempt < MAX_RETRIES) {
+      attempt++;
+      // Snapshot the array reference + size at postMessage time. If state.taggerData
+      // gets REPLACED while the worker is running (e.g. Supabase tag cache lands
+      // and tagCreatives swaps in 2,775 ads), the patches indexed for our snapshot
+      // would land on the wrong ads in the new array. Retry on the new ref instead.
+      const refAtSend = state.taggerData;
+      const keyAtSend = `${leadsData.length}|${state.taggerData.length}`;
+
+      console.log(`CRM merge: ${leadsData.length} leads (leadsData), ${refAtSend.length} creatives → worker${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+
+      // Diagnostic — only on first attempt to avoid spammy logs on retry
+      if (attempt === 1) {
+        const mktDist = {};
+        let thumbCount = 0;
+        refAtSend.forEach(c => { const m = extractMarket(c); mktDist[m] = (mktDist[m]||0)+1; if (c['stored_thumbnail'] || c['thumbnail_url'] || c['image_url']) thumbCount++; });
+        console.log('Tagger market distribution:', mktDist);
+        console.log('Tagger thumbnails:', thumbCount, 'of', refAtSend.length, 'have image URLs');
+      }
+
+      // Slim payload — only fields the worker reads. Skips stored_thumbnail
+      // base64 etc., which can be hundreds of KB per ad.
+      const taggerSlim = refAtSend.map(c => ({
+        'Ad name': c['Ad name'] || c['ad name'] || '',
+        'Campaign name': c['Campaign name'] || c['campaign name'] || '',
+        QL: c['QL'] || c['ql'] || 0,
+        Spent: c['Spent'] || c['spent'] || 0,
+        TD: c['TD'] || c['td'] || 0,
+        NRI: c['NRI'] || c['nri'] || 0,
+      }));
+
+      const result = await _runCrmMergeWorkerOnce(taggerSlim);
+      if (!result.ok) {
+        console.error('CRM merge worker error:', result.err && (result.err.message || result.err.filename + ':' + result.err.lineno) || result.err);
+        if (progressCb) progressCb('CRM merge', 'fail');
+        return;
+      }
+
+      // STALE GUARD: if the array reference flipped under us, the patch indices
+      // no longer correspond to the same ads. Retry with the current array.
+      if (state.taggerData !== refAtSend) {
+        console.log(`CRM merge: taggerData changed during worker run (${refAtSend.length} → ${state.taggerData.length}), retrying...`);
+        continue;
+      }
+
+      const { patches, stats } = result.data || {};
+      if (!patches) { console.warn('CRM merge: worker returned no patches'); if (progressCb) progressCb('CRM merge', 'fail'); return; }
+
+      // Apply field patches + rebind _crmLeads to live leadsData rows
+      for (let i = 0; i < patches.length; i++) {
+        const p = patches[i];
+        const c = state.taggerData[p.idx];
+        if (!c) continue;
+        Object.assign(c, p.fields);
+        if (p.leadOrigIdxs && p.leadOrigIdxs.length) {
+          c._crmLeads = p.leadOrigIdxs.map(li => leadsData[li]);
+        }
+      }
+
+      // Safety clamp on main thread — TD can never exceed QL in a real funnel.
+      let clamped = 0;
+      for (let i = 0; i < state.taggerData.length; i++) {
+        const c = state.taggerData[i];
+        const ql = parseNumber(c['QL']||c['ql']||0);
+        const td = parseNumber(c['TD']||c['td']||0);
+        const paid = parseNumber(c['Paid']||c['paid']||0);
+        if (td > ql && ql > 0) { c['TD'] = ql; c['td'] = ql; clamped++; }
+        if (paid > Math.min(td, ql)) { const cap = Math.min(td, ql); c['Paid'] = cap; c['paid'] = cap; }
+      }
+      if (clamped) console.warn(`CRM merge: clamped ${clamped} creatives where TD > QL`);
+
+      // Derive TQL on main thread — uses extractMarket + computeTQL, which we
+      // intentionally don't duplicate inside the worker (they evolve with
+      // market-rule changes; one source of truth on main).
+      for (let i = 0; i < state.taggerData.length; i++) {
+        const c = state.taggerData[i];
+        const market = extractMarket(c);
+        const nriVal = parseNumber(c['NRI']||c['nri']||0);
+        const qlVal = parseNumber(c['QL']||c['ql']||0);
+        const board = c['board'] || c['board (ME)'] || '';
+        c['TQL'] = computeTQL(qlVal, nriVal, market, board);
+      }
+
+      const totalMatched = (stats.directMatched || 0) + (stats.campaignMatched || 0);
+      if (totalMatched > 0) {
+        state.taggerData = ensureDerivedMetrics(state.taggerData);
+        saveTaggerData();
+        rebuildTagMap();
+        console.log(`CRM merge (worker): ${stats.directMatched} direct, ${stats.campaignMatched} campaign, ${stats.unmatched} unmatched (${(100*stats.directMatched/state.taggerData.length).toFixed(1)}% direct) · worker ${stats.ms}ms · adContentKeys ${stats.adContentKeys} · dedup ${stats.leadsCount}→${stats.dedupedTo}${attempt > 1 ? ` · ${attempt} attempts` : ''}`);
+      } else {
+        console.warn('CRM merge: 0 matches');
+      }
+      mergeCRMWithMeta._lastKey = keyAtSend;
+      if (progressCb) progressCb('CRM merge');
+      return;
+    }
+
+    console.warn(`CRM merge: gave up after ${MAX_RETRIES} retries — taggerData kept changing`);
+    if (progressCb) progressCb('CRM merge', 'fail');
+  })().finally(() => { _crmMergeInFlight = null; });
+
+  return _crmMergeInFlight;
 }
 
 async function refreshData() {
@@ -6879,7 +7050,7 @@ async function refreshData() {
   }
 
   // Merge CRM data into tagger data
-  if (leadsData.length && state.taggerData.length) mergeCRMWithMeta();
+  if (leadsData.length && state.taggerData.length) await mergeCRMWithMeta();
 
   // Update indicators — green if sheet loaded OR tagger data exists (from Meta API pull)
   const dataOk = metaOk || state.taggerData.length > 0;
@@ -16614,7 +16785,7 @@ async function tagCreatives(rawData, opts = {}) {
     // Auto-load metaAdData if empty
     if (!metaAdData.length) {
       await loadCachedAdData();
-      if (metaAdData.length) { buildLookupMaps(); if (leadsData.length) mergeCRMWithMeta(); invalidateAdPerfCache(); }
+      if (metaAdData.length) { buildLookupMaps(); if (leadsData.length) await mergeCRMWithMeta(); invalidateAdPerfCache(); }
     }
     showTaggerResults();
     return;
@@ -16634,11 +16805,11 @@ async function tagCreatives(rawData, opts = {}) {
     document.getElementById('taggerProgress').classList.add('hidden');
     const _tcEl = document.getElementById('taggerCount'); if (_tcEl) _tcEl.textContent = `${state.taggerData.length} creatives`;
     showToast(`Loaded ${state.taggerData.length} creatives (${cachedResults.length} with tags, ${needsTagging.length} untagged — 0 API calls)`);
-    if (leadsData.length) mergeCRMWithMeta();
+    if (leadsData.length) await mergeCRMWithMeta();
     // Auto-load metaAdData if empty
     if (!metaAdData.length) {
       await loadCachedAdData();
-      if (metaAdData.length) { buildLookupMaps(); if (leadsData.length) mergeCRMWithMeta(); invalidateAdPerfCache(); }
+      if (metaAdData.length) { buildLookupMaps(); if (leadsData.length) await mergeCRMWithMeta(); invalidateAdPerfCache(); }
     }
     showTaggerResults();
     return;
@@ -16785,7 +16956,7 @@ async function tagCreatives(rawData, opts = {}) {
   const pilotNote = skippedByPilot > 0 ? ` [PILOT: ${skippedByPilot} untagged deferred]` : '';
   showToast(`Tagged ${state.taggerData.length} creatives — ${apiCalls} Haiku calls, ${imagesFetched} images${savings}${pilotNote}`);
   console.log(`Tagger complete: ${apiCalls} API calls (model: claude-haiku-4-5-20251001), ${imagesFetched} images fetched, ${cachedResults.length} cached`);
-  if (leadsData.length) mergeCRMWithMeta();
+  if (leadsData.length) await mergeCRMWithMeta();
 
   // Auto-load metaAdData if empty — Insights/Performance/Combos need it
   if (!metaAdData.length) {
@@ -16793,7 +16964,7 @@ async function tagCreatives(rawData, opts = {}) {
     await loadCachedAdData();
     if (metaAdData.length) {
       buildLookupMaps();
-      if (leadsData.length) mergeCRMWithMeta();
+      if (leadsData.length) await mergeCRMWithMeta();
       invalidateAdPerfCache();
       console.log(`Post-tag: loaded ${metaAdData.length} metaAdData rows, all tabs ready`);
     }
