@@ -3420,9 +3420,15 @@ function init() {
   // Prime the progress display so user sees all sources listed immediately
   _bootProgress(null);
 
-  Promise.all(bootPromises).then(([metaOk, , sheetsResult]) => {
-    // ALL data loaded — now render exactly once
+  Promise.all(bootPromises).then(async ([metaOk, , sheetsResult]) => {
+    // ALL data loaded — now render exactly once.
+    // Body is async + yields macrotasks at 6 points so Chrome's renderer-hung
+    // detector doesn't fire (see project_boot_unresponsive_audit_may13). The
+    // chain below was ~5-12s of unbroken main-thread work; yields don't change
+    // total time but reset the hang timer between chunks.
     console.log(`Boot: ALL data ready — metaAdData:${metaAdData.length}, leadsData:${leadsData.length}, costData:${costData.length}`);
+
+    await new Promise(r => setTimeout(r, 0)); // yield 1: let the boot overlay paint before heavy work
 
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
@@ -3467,11 +3473,13 @@ function init() {
     // UTM nomenclature (Apr 2026+): utm_medium=campaign, utm_campaign=adset, utm_term=ad name
     // Old leads: mx_utm_adcontent has ad name (text). New leads: mx_utm_adcontent has numeric
     // Facebook ad ID, and mx_utm_term has the actual ad name.
+    await new Promise(r => setTimeout(r, 0)); // yield 2: 43K meta walk + 14K leads walk follows
     {
       const adIdToName = {};
       if (metaAdData.length) {
         metaAdData.forEach(r => { if (r.ad_id && (r.ad_name || r.name)) adIdToName[String(r.ad_id)] = r.ad_name || r.name; });
       }
+      await new Promise(r => setTimeout(r, 0)); // yield 3: between 43K meta walk and 14K leads walk
       let termUsed = 0, adIdResolved = 0, emptyFilled = 0, plaTagged = 0;
       leadsData.forEach(r => {
         const adContent = (r.mx_utm_adcontent || '').trim();
@@ -3533,6 +3541,8 @@ function init() {
       _bootProgress('CRM merge'); // no merge needed → mark done so overlay isn't stuck on `· CRM merge`
     }
 
+    await new Promise(r => setTimeout(r, 0)); // yield 4: useDashboardData may walk 43K rows
+
     // Auto-hydrate tagger data if localStorage was empty but metaAdData exists
     if (!state.taggerData.length && metaAdData.length) {
       console.log('Boot: taggerData empty, auto-hydrating from metaAdData + Supabase tags...');
@@ -3571,10 +3581,13 @@ function init() {
     if (_dfrom && !_dfrom.value) _dfrom.value = COST_DATA_START;
     if (_dto && !_dto.value) _dto.value = new Date().toISOString().slice(0, 10);
 
+    await new Promise(r => setTimeout(r, 0)); // yield 5: render pass walks 43K via renderOracleCardsV2
+
     // SINGLE RENDER PASS — all data available, no race conditions
     updateDataStatusLine();
     try { _updateTagCoveragePill(); } catch(_) {}
     navigateTo('dashboard');
+    await new Promise(r => setTimeout(r, 0)); // yield 6: between dashboard and library renders
     renderLibrary();
 
     if (!leadsData.length && !metaAdData.length && !hasCached) {
@@ -4621,16 +4634,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
   costData = allCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
   console.log(`costData: ${allCost.length} total, ${costData.length} meta-only`);
 
-  // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
-  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','trial_conf_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','trials_conf','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term','prospectid'];
-  const slimLeads = leadsData.map(r => {
-    const s = {};
-    LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
-    return s;
-  });
   // Skip localStorage cache for large datasets — fetched fresh from Google Sheets each session
-  // _safeCacheSet('gf_v2_leadsData', JSON.stringify(slimLeads));
-  // _safeCacheSet('gf_v2_costData', JSON.stringify(costData));
   _safeCacheSet('gf_v2_timestamp', Date.now().toString());
   // Clean up old keys
   ['gf_leadsData','gf_costData','gf_dataTimestamp'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
@@ -19109,6 +19113,126 @@ function toggleTaggerGroup(groupId) {
 window.toggleTaggerGroup = toggleTaggerGroup;
 
 // ── Render a single ad row for tagger table ──
+// ── Creative preview panel (May 13) ──
+// Click any tagger row's thumbnail → expandable preview row below, showing the
+// asset (image inline; video on-demand via Meta API) + full V3 tag detail
+// (hook_frame, evidence_*, master_frame, pain_target, close_type, source).
+// Re-click to collapse. Lazy: V3 from in-memory state._tagsV3Map; video fetched only on Play.
+const _META_ACCOUNTS_FOR_PREVIEW = ['act_5215842511824318', 'act_888586384639855', 'act_925205080936963'];
+
+window.toggleCreativePreview = function(adName, anchorEl) {
+  const row = anchorEl.closest('tr');
+  if (!row) return;
+  const next = row.nextElementSibling;
+  if (next && next.classList.contains('tagger-preview-row') && next.dataset.adName === adName) {
+    next.remove();
+    return;
+  }
+  // Close any other open preview before opening a new one
+  document.querySelectorAll('tr.tagger-preview-row').forEach(r => r.remove());
+
+  const c = (state.taggerData || []).find(x => (x['Ad name'] || x['ad name']) === adName);
+  const v3 = (typeof getV3Tags === 'function') ? getV3Tags(adName) : null;
+  const thumbUrl = c ? (c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '') : '';
+  const adNameLower = adName.toLowerCase();
+  const isVideo = adNameLower.includes('video') || adNameLower.includes('reel') || adNameLower.includes('_v_') || adNameLower.includes('testimonial') || adNameLower.includes('influencer') || (c && c['thumbnail_url'] && !c['image_url']);
+
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const vField = (label, val) => val ? `<div class="flex gap-2 py-0.5"><span class="text-text-muted w-24 shrink-0 text-[10px]">${label}</span><span class="flex-1 text-[11px]">${esc(val)}</span></div>` : '';
+
+  const detail = v3 ? `
+    ${vField('Hook frame', v3.hook_frame)}
+    ${vField('Theme', v3.master_frame)}
+    ${vField('Pain target', v3.pain_target)}
+    ${vField('Close type', v3.close_type)}
+    ${vField('Language', v3.language)}
+    <div class="border-t border-gray-200 my-2"></div>
+    ${vField('On-screen text', v3.evidence_hook)}
+    ${vField('Pain evidence', v3.evidence_pain)}
+    ${vField('CTA text', v3.evidence_close)}
+    <div class="border-t border-gray-200 my-2"></div>
+    ${vField('Source', v3.source)}
+    ${vField('Confidence', v3.confidence)}
+    ${vField('Tagged', v3.tagged_at)}
+  ` : '<p class="text-text-muted italic text-[11px]">No V3 tags yet for this creative.</p>';
+
+  const escAdName = adName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const imgBlock = thumbUrl
+    ? `<img src="${esc(thumbUrl)}" class="rounded border border-gray-200 block" style="max-width:280px;max-height:280px;object-fit:contain;background:#fff" onerror="this.outerHTML='<div class=\\'text-text-muted text-[10px] p-4 border rounded\\'>Thumbnail failed to load</div>'" />`
+    : '<div class="text-text-muted text-[10px] p-4 border border-dashed rounded">No thumbnail stored</div>';
+  const videoBtn = isVideo
+    ? `<button onclick="_loadVideoPreview('${escAdName}', this)" class="mt-2 px-2.5 py-1 text-[10px] rounded bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 border border-blue-200 cursor-pointer">▶ Load shipped video</button>`
+    : '';
+
+  const previewRow = document.createElement('tr');
+  previewRow.className = 'tagger-preview-row';
+  previewRow.dataset.adName = adName;
+  previewRow.innerHTML = `
+    <td colspan="13" class="bg-blue-50/30 px-6 py-4 border-b border-blue-200">
+      <div class="flex gap-4 items-start">
+        <div class="shrink-0">${imgBlock}${videoBtn}</div>
+        <div class="flex-1 min-w-0">${detail}</div>
+        <button onclick="this.closest('tr').remove()" class="text-text-muted hover:text-text-primary text-sm px-2 py-0.5 cursor-pointer" title="Close">✕</button>
+      </div>
+      <div class="text-[9px] text-text-muted mt-2 font-mono break-all">${esc(adName)}</div>
+    </td>`;
+  row.after(previewRow);
+};
+
+window._loadVideoPreview = async function(adName, btn) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Resolving…';
+  try {
+    let ad_id = null;
+    for (const acct of _META_ACCOUNTS_FOR_PREVIEW) {
+      const r = await fetch('/api/proxy-meta', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: `${acct}/ads`,
+          params: {
+            fields: 'id,name', limit: 5,
+            filtering: JSON.stringify([{ field: 'ad.name', operator: 'EQUAL', value: adName }])
+          }
+        })
+      });
+      const j = await r.json();
+      const found = (j.data || [])[0];
+      if (found && found.id) { ad_id = found.id; break; }
+    }
+    if (!ad_id) throw new Error('Ad not found in Meta');
+
+    btn.innerHTML = '⏳ Fetching creative…';
+    const cRes = await fetch('/api/proxy-meta', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: ad_id, params: { fields: 'creative{video_id,asset_feed_spec{videos}}' } })
+    });
+    const cJson = await cRes.json();
+    const vids = (cJson.creative && cJson.creative.asset_feed_spec && cJson.creative.asset_feed_spec.videos) || [];
+    const video_id = (vids[0] && vids[0].video_id) || (cJson.creative && cJson.creative.video_id);
+    if (!video_id) throw new Error('No video on this creative');
+
+    btn.innerHTML = '⏳ Getting source…';
+    const sRes = await fetch('/api/proxy-meta', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint: video_id, params: { fields: 'source' } })
+    });
+    const sJson = await sRes.json();
+    const mp4 = sJson.source;
+    if (!mp4) throw new Error('No mp4 source URL');
+
+    const escUrl = String(mp4).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    btn.outerHTML = `<video src="${escUrl}" controls autoplay class="mt-2 rounded border border-gray-200 block" style="max-width:280px;max-height:280px;background:#000"></video>`;
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = '⚠ ' + (e.message || 'Failed');
+    btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200', 'hover:bg-blue-100');
+    btn.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+    btn.title = 'Click to retry';
+    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; btn.classList.remove('bg-red-50','text-red-700','border-red-200'); btn.classList.add('bg-blue-50','text-blue-700','border-blue-200','hover:bg-blue-100'); }, 4000);
+  }
+};
+
 function renderTaggerAdRow(c, catFilter, indent, benchmarks, funnelByAd) {
   const name = c['Ad name'] || c['ad name'] || c['Creative name'] || 'Unknown';
   let type = c['Creative type'] || c['creative type'] || '-';
@@ -19218,7 +19342,9 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks, funnelByAd) {
   return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ${verdictBorder}">
     <td class="${pl} px-3 py-2">
       <div class="flex items-center gap-2">
-        ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0"><span class="text-[8px] text-gray-400">' + (type === 'Video' ? '\u25B6' : '\u25A1') + '</span></div>'}
+        <button onclick="toggleCreativePreview('${_escName}', this)" class="shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 rounded transition p-0 bg-transparent border-0" title="Click to see the creative">
+          ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center"><span class="text-[8px] text-gray-400">' + (type === 'Video' ? '\u25B6' : '\u25A1') + '</span></div>'}
+        </button>
         <div style="max-width:200px">
           <span class="font-medium text-[11px] block leading-tight" title="${name}">${shortAdName(name)}</span>
           <span class="text-[9px] text-text-muted">${market} \u00B7 ${type}</span>
