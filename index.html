@@ -3328,7 +3328,7 @@ function init() {
 
   // Live boot progress (May 12 — operator couldn't tell if boot was stuck or just slow).
   // Each source ticks itself off as it resolves. Renders into the overlay's #bootProgress.
-  const _bootSources = ['Meta ads', 'Oracle actions', 'Library', 'CRM sheets', 'Gen history', 'CRM merge'];
+  const _bootSources = ['Meta ads', 'Oracle actions', 'Library', 'CRM sheets', 'Gen history', 'AdPerf view', 'CRM merge'];
   const _bootDone = new Set();
   const _bootProgress = (label, ok) => {
     // Caller convention: pass label only for success, or (label, 'fail') for failure.
@@ -3409,9 +3409,15 @@ function init() {
         _bootDone.add('Gen history:fail');
         _bootProgress('Gen history');
       }),
+    // Day 2: preload ad_performance materialized view (one Supabase request,
+    // ~6K rows across 4 windows). Independent of the heavy boot sources —
+    // failure is non-fatal, the legacy metaAdData walk continues to work.
+    _withTimeout(preloadAdPerformanceView(), 10000, 'ad_performance_view')
+      .then(ok => { if (ok) _bootProgress('AdPerf view'); else { _bootDone.add('AdPerf view:fail'); _bootProgress('AdPerf view'); } })
+      .catch(e => { console.error('Boot ad_performance view:', e.message || e); _bootDone.add('AdPerf view:fail'); _bootProgress('AdPerf view'); }),
   ];
 
-  // Prime the progress display so user sees all 5 sources listed immediately
+  // Prime the progress display so user sees all sources listed immediately
   _bootProgress(null);
 
   Promise.all(bootPromises).then(([metaOk, , sheetsResult]) => {
@@ -5588,6 +5594,127 @@ let _tagMap = {}; // { normalizedAdName: { tags, type, thumb, campaign, adset } 
 const _adPerfCache = new Map(); // cacheKey → results array
 const _dailyCache = new Map();  // cacheKey → daily rows array
 
+// ── DAY 2: ad_performance materialized view (May 12 evening) ──
+// Pre-aggregated per-ad rollups for 4 rolling windows ('all', '30d', '14d', '7d').
+// Boot fetches all slices in one request (~6K rows); per-call reads from cache
+// instead of walking 43K metaAdData rows on main thread.
+//
+// Flag-gated: `localStorage.gf_use_view = '1'` to enable. Default off so prod
+// behavior is unchanged until parity is confirmed in real conditions.
+//
+// Tonight's scope: 'all' window only. The trailing windows (7d/14d/30d) still
+// fall through to getAdPerformanceDaily because their CRM totals need
+// date-window filtering against leadsData — that refactor is the next step.
+
+async function preloadAdPerformanceView() {
+  try {
+    const rows = await supabaseGet('ad_performance', 'select=*');
+    if (!Array.isArray(rows) || rows.length === 0) {
+      console.warn('[ad_performance view] empty or invalid response — view feature disabled this session');
+      state._adPerfViewCache = null;
+      return false;
+    }
+    const cache = { '7d': [], '14d': [], '30d': [], 'all': [] };
+    for (let i = 0; i < rows.length; i++) {
+      const w = rows[i].window_label;
+      if (cache[w]) cache[w].push(rows[i]);
+    }
+    state._adPerfViewCache = cache;
+    state._adPerfViewLoadedAt = Date.now();
+    console.log(`[ad_performance view] loaded: 7d=${cache['7d'].length} 14d=${cache['14d'].length} 30d=${cache['30d'].length} all=${cache.all.length}`);
+    return true;
+  } catch (e) {
+    console.error('[ad_performance view] load failed:', e.message || e);
+    state._adPerfViewCache = null;
+    return false;
+  }
+}
+
+// Resolve a (startDate, endDate) pair to a rolling-window label, or null if no
+// window applies. For the 'all' window, endDate is irrelevant — the view's
+// totals are bounded by the data's actual MAX(date), so any request whose
+// startDate sits at or before the data origin qualifies regardless of how the
+// browser computed `endDate`. (Earlier version required endDate >= today,
+// which broke on date-rollover when meta_ad_data hadn't been refreshed for
+// the new day yet.)
+function _pickAdPerformanceWindow(startDate, endDate) {
+  if (!startDate || startDate <= '2025-11-01') return 'all';
+  // Trailing windows disabled until CRM-side date filtering is added next
+  // session. When they're enabled, they'll need the endDate-vs-today check
+  // back, with ±2 day tolerance for date-rollover.
+  return null;
+}
+
+// View-based replacement for getAdPerformance — 'all' window only for now.
+// Synchronous (cache lookup, no async). Mirrors the legacy path's post-walk
+// processing: normalize-merge by ad name, layer CRM totals from
+// state.taggerData (already merged in Day 1), apply clamp + filter, return.
+function getAdPerformanceFromView(market, opts) {
+  const cache = state._adPerfViewCache;
+  if (!cache || !cache.all || !cache.all.length) return null;
+  const includeNonLP = opts?.includeNonLP !== undefined ? opts.includeNonLP : true;
+
+  // Filter by market using extractMarket (single source of truth — same
+  // helper the rest of the codebase uses).
+  const rows = cache.all;
+  const adMap = {};
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const rowMkt = extractMarket({
+      _account: r.account || '',
+      'Campaign name': r.campaign_name || '',
+      campaign_name: r.campaign_name || '',
+    });
+    if (market && market !== 'all' && rowMkt !== market) continue;
+
+    const key = normalizeAdName(r.ad_name);
+    if (!key) continue;
+    if (!adMap[key]) adMap[key] = {
+      adName: r.ad_name, campaign: r.campaign_name || '', adset: r.adset_name || '', ad_id: r.ad_id,
+      spend: 0, impressions: 0, clicks: 0,
+      ql: 0, nri: 0, tql: 0, td: 0, paid: 0, invalid: 0, totalLeads: 0,
+      market: rowMkt, source: 'meta_insights', hasMeta: true, hasCRM: false
+    };
+    const a = adMap[key];
+    a.spend += r.spend || 0;
+    a.impressions += r.impressions || 0;
+    a.clicks += r.clicks || 0;
+    if (r.campaign_name && r.campaign_name.length > (a.campaign||'').length) a.campaign = r.campaign_name;
+    if (r.adset_name && !a.adset) a.adset = r.adset_name;
+  }
+
+  // CRM layer — read from state.taggerData where Day 1's worker already
+  // applied CRM totals. For 'all' window this is exact; for trailing windows
+  // it would over-count (CRM totals are all-time), which is why this code path
+  // is gated to 'all' only until the date-window-aware CRM refactor lands.
+  for (let i = 0; i < state.taggerData.length; i++) {
+    const c = state.taggerData[i];
+    const key = normalizeAdName(c['Ad name'] || c['ad name'] || '');
+    if (!key || !adMap[key]) continue;
+    const a = adMap[key];
+    a.ql += parseNumber(c['QL']||c['ql']||0);
+    a.nri += parseNumber(c['NRI']||c['nri']||0);
+    a.tql += parseNumber(c['TQL']||c['tql']||0);
+    a.td += parseNumber(c['TD']||c['td']||0);
+    a.paid += parseNumber(c['Paid']||c['paid']||0);
+    a.totalLeads = a.ql + a.invalid;
+    if (a.ql > 0 || a.td > 0) a.hasCRM = true;
+  }
+
+  // Clamp + spend/lead filter — same rules as legacy path
+  const results = [];
+  Object.entries(adMap).forEach(([key, a]) => {
+    a.td = Math.min(a.td, a.ql);
+    a.paid = Math.min(a.paid, a.td);
+    if (a.ql === 0 && a.spend < 5000) return;
+    if (!_isLPCampaign(a) && !a.hasCRM) {
+      a.ql = 0; a.nri = 0; a.tql = 0; a.td = 0; a.paid = 0;
+    }
+    results.push(a);
+  });
+  return results;
+}
+
 // ── DAILY DATA LAYER: getAdPerformanceDaily() ──
 // Returns one row per ad per day. This is the foundational data model.
 // Meta API → daily spend/impressions/clicks per ad
@@ -5847,6 +5974,23 @@ function getAdPerformance(market, startDate, endDate, opts) {
   const cacheKey = `${market||'all'}|${start}|${end}|${includeNonLP?'all':'lp'}|${_perfFlow}`;
   const _perfHit = _adPerfCache.get(cacheKey);
   if (_perfHit && _perfHit.length) return _perfHit;
+
+  // ── DAY 2 view path ── If the flag is set, route compatible calls through
+  // the pre-aggregated ad_performance view instead of walking 43K daily rows.
+  // Only the 'all' window is wired tonight (trailing windows need date-aware
+  // CRM filtering — next session). Flow filter not yet supported on the view
+  // path; falls through to the legacy walk if active.
+  if (_perfFlow === 'all' && (typeof localStorage !== 'undefined') && localStorage.getItem('gf_use_view') === '1') {
+    const win = _pickAdPerformanceWindow(start, end);
+    if (win === 'all') {
+      const viewResults = getAdPerformanceFromView(market, opts);
+      if (viewResults && viewResults.length) {
+        console.log(`[ad_performance view] getAdPerformance(${market||'all'}, ${start}, ${end}) → ${viewResults.length} ads via view`);
+        _adPerfCache.set(cacheKey, viewResults);
+        return viewResults;
+      }
+    }
+  }
 
   // Aggregate daily rows by ad name
   const daily = getAdPerformanceDaily(market, start, end);
