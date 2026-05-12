@@ -4108,14 +4108,14 @@ async function _autoBootstrapTagging(opts) {
     return true;
   });
 
-  if (adsNeedingThumb.length > 0 && state.metaApi?.token) {
-    try {
-      _updateTagCoveragePill(`capturing ${adsNeedingThumb.length} thumbs…`);
-      showToast(`Capturing thumbnails for ${adsNeedingThumb.length} new ad${adsNeedingThumb.length>1?'s':''}…`);
-      await backfillThumbnails({ limit: Math.min(adsNeedingThumb.length, 50) });
-    } catch (e) {
-      console.warn('[auto-bootstrap] thumb capture failed:', e?.message || e);
-    }
+  // Thumbnail auto-migration disabled May 12 — each ad's fetch + base64 encode + Storage
+  // upload blocks the main thread enough that Chrome flags "Page Unresponsive" while it
+  // runs. Migration is now opt-in via the manual "Fetch Thumbnails" button in Tagger
+  // (`#taggerThumbBtn`, :814). Auto-tagging (Step B below) still runs since it's HTTP-
+  // bounded with no main-thread base64 work.
+  if (adsNeedingThumb.length > 0) {
+    console.log(`[auto-bootstrap] ${adsNeedingThumb.length} ads need thumbs — skipped (use "Fetch Thumbnails" button)`);
+    _updateTagCoveragePill(`${adsNeedingThumb.length} need thumbs · click to fetch`);
   }
 
   // Step B: which ads have a thumbnail but no v3 tag?
