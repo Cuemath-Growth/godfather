@@ -4621,6 +4621,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
   const leadsJson = await leadsRes.json();
   const costJson = await costRes.json();
 
+  await new Promise(r => setTimeout(r, 0)); // yield before 14K × 75-col parse
   const allLeads = parseSheetValues(leadsJson.values);
   // Filter to Meta leads only — matches old CRM query "select * where G='meta'"
   // Column name is utm_medium or mx_utm_medium — check both
@@ -4629,6 +4630,7 @@ async function fetchSheetData(sheetUrl, apiKey) {
     return med === 'meta';
   });
   console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
+  await new Promise(r => setTimeout(r, 0)); // yield between leads parse+filter and cost parse
   const allCost = parseSheetValues(costJson.values);
   // Godfather is Meta-only. Filter costData at source — no Google/other spend anywhere downstream.
   costData = allCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
@@ -5029,8 +5031,12 @@ async function loadCachedAdData() {
       allRows = allRows.concat(page);
       if (page.length < pageSize) break;
       from += pageSize;
+      // Yield between pages — each await response.json() is a ~1MB sync parse;
+      // microtask `await` doesn't let Chrome's renderer run between iterations.
+      await new Promise(r => setTimeout(r, 0));
     }
     if (allRows.length > 0) {
+      await new Promise(r => setTimeout(r, 0)); // yield before 43K-row map
       metaAdData = allRows.map(r => ({
         date: r.date, ad_id: r.ad_id || '', ad_name: r.ad_name || '',
         adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
