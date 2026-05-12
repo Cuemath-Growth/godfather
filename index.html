@@ -3420,15 +3420,9 @@ function init() {
   // Prime the progress display so user sees all sources listed immediately
   _bootProgress(null);
 
-  Promise.all(bootPromises).then(async ([metaOk, , sheetsResult]) => {
-    // ALL data loaded — now render exactly once.
-    // Body is async + yields macrotasks at 6 points so Chrome's renderer-hung
-    // detector doesn't fire (see project_boot_unresponsive_audit_may13). The
-    // chain below was ~5-12s of unbroken main-thread work; yields don't change
-    // total time but reset the hang timer between chunks.
+  Promise.all(bootPromises).then(([metaOk, , sheetsResult]) => {
+    // ALL data loaded — now render exactly once
     console.log(`Boot: ALL data ready — metaAdData:${metaAdData.length}, leadsData:${leadsData.length}, costData:${costData.length}`);
-
-    await new Promise(r => setTimeout(r, 0)); // yield 1: let the boot overlay paint before heavy work
 
     // Build lookup maps (tag map, ad name map)
     buildLookupMaps();
@@ -3439,36 +3433,29 @@ function init() {
     // fatigued_loser) plus the refresh-winner sibling. They run in parallel with the
     // legacy Pause Now card on Dashboard for parity audit (Week 2 Day 5 will deprecate
     // the old card if parity holds for 24-48hrs). See 02-skills/intelligence-chassis-spec.md.
-    // SAFE MODE: URL ?safe=1 OR localStorage.gf_safe='1' disables all heavy boot
-    // tasks (chassis, auto-hydrate, library, late-arrival watchers) so a hung
-    // page can at least load. Use to clear state from broken sessions.
-    const _SAFE_MODE = (new URLSearchParams(location.search).get('safe') === '1') || (localStorage.getItem('gf_safe') === '1');
-    if (_SAFE_MODE) console.warn('[safe-mode] heavy boot tasks skipped. Remove ?safe=1 or run `localStorage.removeItem("gf_safe")` and reload to restore.');
-
-    // DIAGNOSTIC May 13: chassis runDetection disabled. ~10s sync block, was the
-    // most likely cause of RESULT_CODE_HUNG. Registers stay (cheap) but detection
-    // does not auto-fire. Re-enable after confirming page loads cleanly.
     try {
       const ci = window.cuemathIntelligence;
       if (ci) {
         ci.configure({ supabaseUrl: SUPABASE_URL, supabaseKey: SUPABASE_KEY });
         registerMetaPauseVerdicts(ci);
+        // Make More verdict migrations (Tier 1, Tier 2, Refresh-was-winner).
         if (typeof registerMetaScaleVerdicts === 'function') registerMetaScaleVerdicts(ci);
-        if (false && !_SAFE_MODE) {
-          setTimeout(() => {
-            try {
-              const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
-              state._chassisLastRun = result;
-              console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
-              if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
-                try { renderOracleCardsV2(); } catch (e) {}
-              }
-            } catch (e) {
-              console.error('[chassis] background detection failed:', e);
+        // Defer detection to a background tick — it takes ~10s and shouldn't block
+        // the boot spinner. Dashboard re-renders once detection completes.
+        setTimeout(() => {
+          try {
+            const result = ci.runDetection('godfather', { leadsData, costData, metaAdData }, {});
+            state._chassisLastRun = result;
+            console.log(`[chassis] background: v${ci.CHASSIS_VERSION} · ${result.stats.verdicts} verdict(s) · ${result.stats.surfaced} surfaced`);
+            // Re-render Dashboard once chassis result is ready, so the parity diff has data to compare against.
+            if (state.currentView === 'dashboard' && typeof renderOracleCardsV2 === 'function') {
+              try { renderOracleCardsV2(); } catch (e) {}
             }
-          }, 100);
-        }
-        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · Supabase wired (detection DISABLED for diagnostic)`);
+          } catch (e) {
+            console.error('[chassis] background detection failed:', e);
+          }
+        }, 100);
+        console.log(`[chassis] boot: v${ci.CHASSIS_VERSION} · Supabase wired (detection deferred 100ms)`);
       } else {
         console.warn('[chassis] cuemathIntelligence not loaded — shared/cuemath-intelligence.js missing or failed to parse');
       }
@@ -3480,13 +3467,11 @@ function init() {
     // UTM nomenclature (Apr 2026+): utm_medium=campaign, utm_campaign=adset, utm_term=ad name
     // Old leads: mx_utm_adcontent has ad name (text). New leads: mx_utm_adcontent has numeric
     // Facebook ad ID, and mx_utm_term has the actual ad name.
-    await new Promise(r => setTimeout(r, 0)); // yield 2: 43K meta walk + 14K leads walk follows
     {
       const adIdToName = {};
       if (metaAdData.length) {
         metaAdData.forEach(r => { if (r.ad_id && (r.ad_name || r.name)) adIdToName[String(r.ad_id)] = r.ad_name || r.name; });
       }
-      await new Promise(r => setTimeout(r, 0)); // yield 3: between 43K meta walk and 14K leads walk
       let termUsed = 0, adIdResolved = 0, emptyFilled = 0, plaTagged = 0;
       leadsData.forEach(r => {
         const adContent = (r.mx_utm_adcontent || '').trim();
@@ -3548,8 +3533,6 @@ function init() {
       _bootProgress('CRM merge'); // no merge needed → mark done so overlay isn't stuck on `· CRM merge`
     }
 
-    await new Promise(r => setTimeout(r, 0)); // yield 4: useDashboardData may walk 43K rows
-
     // Auto-hydrate tagger data if localStorage was empty but metaAdData exists
     if (!state.taggerData.length && metaAdData.length) {
       console.log('Boot: taggerData empty, auto-hydrating from metaAdData + Supabase tags...');
@@ -3588,19 +3571,10 @@ function init() {
     if (_dfrom && !_dfrom.value) _dfrom.value = COST_DATA_START;
     if (_dto && !_dto.value) _dto.value = new Date().toISOString().slice(0, 10);
 
-    await new Promise(r => setTimeout(r, 0)); // yield 5: render pass walks 43K via renderOracleCardsV2
-
     // SINGLE RENDER PASS — all data available, no race conditions
     updateDataStatusLine();
     try { _updateTagCoveragePill(); } catch(_) {}
     navigateTo('dashboard');
-    await new Promise(r => setTimeout(r, 0)); // yield 6: before dashboard cards (renderOracleCardsV2 walks 43K)
-    // Explicit first-render — previously the chassis runDetection callback drove this,
-    // but with chassis disabled for diagnostic the dashboard stays blank without this.
-    if (!_SAFE_MODE) {
-      try { renderOracleCardsV2(); } catch(e) { console.error('[boot] renderOracleCardsV2:', e); }
-    }
-    await new Promise(r => setTimeout(r, 0)); // yield 7: between dashboard cards and library render
     renderLibrary();
 
     if (!leadsData.length && !metaAdData.length && !hasCached) {
@@ -3608,23 +3582,17 @@ function init() {
       document.getElementById('dashboardContent').classList.add('hidden');
     }
 
-    // ── DIAGNOSTIC May 13 ──
-    // Auto-bootstraps DISABLED to isolate the "page unresponsive every 2 min"
-    // freeze Naina is hitting. Three background tasks saturate the main thread:
-    //   - fetchMetaCreatives (Meta API thumbs for every ad)
-    //   - fetchMetaAdInsights (full last-7-day re-pull + redundant loadCachedAdData)
-    //   - _autoBootstrapTagging (Haiku vision calls for every untagged ad)
-    // All three remain available via Settings → Refresh / manual triggers.
-    // Re-enable one at a time once we confirm boot is responsive.
-    if (false && _IS_DEPLOYED) {
+    // Background: incremental Meta sync (non-blocking, won't cause re-render race)
+    if (_IS_DEPLOYED) {
       setTimeout(() => {
         fetchMetaCreatives();
         fetchMetaAdInsights();
-      }, 3000);
+      }, 3000); // 3s delay so UI is responsive first
+
+      // Phase 1+2: auto-bootstrap thumbnails + vision tagging for new ads.
+      // Runs once per session, ~10s after boot so primary UI lands first.
+      // Idempotent: zero cost when nothing is new.
       setTimeout(() => { _autoBootstrapTagging(); }, 10000);
-    }
-    if (_IS_DEPLOYED) {
-      console.warn('[diagnostic] auto-bootstraps disabled — see comment near boot end. Use Settings → Refresh to fetch.');
     }
 
     // Legacy: fetch tagger/Meta sheet data + Supabase
@@ -4640,7 +4608,6 @@ async function fetchSheetData(sheetUrl, apiKey) {
   const leadsJson = await leadsRes.json();
   const costJson = await costRes.json();
 
-  await new Promise(r => setTimeout(r, 0)); // yield before 14K × 75-col parse
   const allLeads = parseSheetValues(leadsJson.values);
   // Filter to Meta leads only — matches old CRM query "select * where G='meta'"
   // Column name is utm_medium or mx_utm_medium — check both
@@ -4649,13 +4616,21 @@ async function fetchSheetData(sheetUrl, apiKey) {
     return med === 'meta';
   });
   console.log(`Leads: ${allLeads.length} total, ${leadsData.length} meta-only (filtered ${allLeads.length - leadsData.length} non-meta)`);
-  await new Promise(r => setTimeout(r, 0)); // yield between leads parse+filter and cost parse
   const allCost = parseSheetValues(costJson.values);
   // Godfather is Meta-only. Filter costData at source — no Google/other spend anywhere downstream.
   costData = allCost.filter(r => (r.medium || '').trim().toLowerCase() === 'meta');
   console.log(`costData: ${allCost.length} total, ${costData.length} meta-only`);
 
+  // Cache slim version — only fields metric functions need (~500KB vs ~10MB)
+  const LEADS_CACHE_FIELDS = ['lead_created_date','trial_done_date','trial_sch_date','trial_conf_date','paid_date','country_bucket','ethnicity','qls','trials_done','trials_sch','trials_conf','paid','invalid','board (ME)','board','mx_utm_campaign','mx_utm_adcontent','mx_utm_term','prospectid'];
+  const slimLeads = leadsData.map(r => {
+    const s = {};
+    LEADS_CACHE_FIELDS.forEach(f => { if (r[f] !== undefined && r[f] !== '') s[f] = r[f]; });
+    return s;
+  });
   // Skip localStorage cache for large datasets — fetched fresh from Google Sheets each session
+  // _safeCacheSet('gf_v2_leadsData', JSON.stringify(slimLeads));
+  // _safeCacheSet('gf_v2_costData', JSON.stringify(costData));
   _safeCacheSet('gf_v2_timestamp', Date.now().toString());
   // Clean up old keys
   ['gf_leadsData','gf_costData','gf_dataTimestamp'].forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
@@ -5050,12 +5025,8 @@ async function loadCachedAdData() {
       allRows = allRows.concat(page);
       if (page.length < pageSize) break;
       from += pageSize;
-      // Yield between pages — each await response.json() is a ~1MB sync parse;
-      // microtask `await` doesn't let Chrome's renderer run between iterations.
-      await new Promise(r => setTimeout(r, 0));
     }
     if (allRows.length > 0) {
-      await new Promise(r => setTimeout(r, 0)); // yield before 43K-row map
       metaAdData = allRows.map(r => ({
         date: r.date, ad_id: r.ad_id || '', ad_name: r.ad_name || '',
         adset_name: r.adset_name || '', campaign_name: r.campaign_name || '',
@@ -19138,126 +19109,6 @@ function toggleTaggerGroup(groupId) {
 window.toggleTaggerGroup = toggleTaggerGroup;
 
 // ── Render a single ad row for tagger table ──
-// ── Creative preview panel (May 13) ──
-// Click any tagger row's thumbnail → expandable preview row below, showing the
-// asset (image inline; video on-demand via Meta API) + full V3 tag detail
-// (hook_frame, evidence_*, master_frame, pain_target, close_type, source).
-// Re-click to collapse. Lazy: V3 from in-memory state._tagsV3Map; video fetched only on Play.
-const _META_ACCOUNTS_FOR_PREVIEW = ['act_5215842511824318', 'act_888586384639855', 'act_925205080936963'];
-
-window.toggleCreativePreview = function(adName, anchorEl) {
-  const row = anchorEl.closest('tr');
-  if (!row) return;
-  const next = row.nextElementSibling;
-  if (next && next.classList.contains('tagger-preview-row') && next.dataset.adName === adName) {
-    next.remove();
-    return;
-  }
-  // Close any other open preview before opening a new one
-  document.querySelectorAll('tr.tagger-preview-row').forEach(r => r.remove());
-
-  const c = (state.taggerData || []).find(x => (x['Ad name'] || x['ad name']) === adName);
-  const v3 = (typeof getV3Tags === 'function') ? getV3Tags(adName) : null;
-  const thumbUrl = c ? (c['stored_thumbnail'] || c['image_url'] || c['thumbnail_url'] || '') : '';
-  const adNameLower = adName.toLowerCase();
-  const isVideo = adNameLower.includes('video') || adNameLower.includes('reel') || adNameLower.includes('_v_') || adNameLower.includes('testimonial') || adNameLower.includes('influencer') || (c && c['thumbnail_url'] && !c['image_url']);
-
-  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const vField = (label, val) => val ? `<div class="flex gap-2 py-0.5"><span class="text-text-muted w-24 shrink-0 text-[10px]">${label}</span><span class="flex-1 text-[11px]">${esc(val)}</span></div>` : '';
-
-  const detail = v3 ? `
-    ${vField('Hook frame', v3.hook_frame)}
-    ${vField('Theme', v3.master_frame)}
-    ${vField('Pain target', v3.pain_target)}
-    ${vField('Close type', v3.close_type)}
-    ${vField('Language', v3.language)}
-    <div class="border-t border-gray-200 my-2"></div>
-    ${vField('On-screen text', v3.evidence_hook)}
-    ${vField('Pain evidence', v3.evidence_pain)}
-    ${vField('CTA text', v3.evidence_close)}
-    <div class="border-t border-gray-200 my-2"></div>
-    ${vField('Source', v3.source)}
-    ${vField('Confidence', v3.confidence)}
-    ${vField('Tagged', v3.tagged_at)}
-  ` : '<p class="text-text-muted italic text-[11px]">No V3 tags yet for this creative.</p>';
-
-  const escAdName = adName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-  const imgBlock = thumbUrl
-    ? `<img src="${esc(thumbUrl)}" class="rounded border border-gray-200 block" style="max-width:280px;max-height:280px;object-fit:contain;background:#fff" onerror="this.outerHTML='<div class=\\'text-text-muted text-[10px] p-4 border rounded\\'>Thumbnail failed to load</div>'" />`
-    : '<div class="text-text-muted text-[10px] p-4 border border-dashed rounded">No thumbnail stored</div>';
-  const videoBtn = isVideo
-    ? `<button onclick="_loadVideoPreview('${escAdName}', this)" class="mt-2 px-2.5 py-1 text-[10px] rounded bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 border border-blue-200 cursor-pointer">▶ Load shipped video</button>`
-    : '';
-
-  const previewRow = document.createElement('tr');
-  previewRow.className = 'tagger-preview-row';
-  previewRow.dataset.adName = adName;
-  previewRow.innerHTML = `
-    <td colspan="13" class="bg-blue-50/30 px-6 py-4 border-b border-blue-200">
-      <div class="flex gap-4 items-start">
-        <div class="shrink-0">${imgBlock}${videoBtn}</div>
-        <div class="flex-1 min-w-0">${detail}</div>
-        <button onclick="this.closest('tr').remove()" class="text-text-muted hover:text-text-primary text-sm px-2 py-0.5 cursor-pointer" title="Close">✕</button>
-      </div>
-      <div class="text-[9px] text-text-muted mt-2 font-mono break-all">${esc(adName)}</div>
-    </td>`;
-  row.after(previewRow);
-};
-
-window._loadVideoPreview = async function(adName, btn) {
-  const orig = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '⏳ Resolving…';
-  try {
-    let ad_id = null;
-    for (const acct of _META_ACCOUNTS_FOR_PREVIEW) {
-      const r = await fetch('/api/proxy-meta', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          endpoint: `${acct}/ads`,
-          params: {
-            fields: 'id,name', limit: 5,
-            filtering: JSON.stringify([{ field: 'ad.name', operator: 'EQUAL', value: adName }])
-          }
-        })
-      });
-      const j = await r.json();
-      const found = (j.data || [])[0];
-      if (found && found.id) { ad_id = found.id; break; }
-    }
-    if (!ad_id) throw new Error('Ad not found in Meta');
-
-    btn.innerHTML = '⏳ Fetching creative…';
-    const cRes = await fetch('/api/proxy-meta', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: ad_id, params: { fields: 'creative{video_id,asset_feed_spec{videos}}' } })
-    });
-    const cJson = await cRes.json();
-    const vids = (cJson.creative && cJson.creative.asset_feed_spec && cJson.creative.asset_feed_spec.videos) || [];
-    const video_id = (vids[0] && vids[0].video_id) || (cJson.creative && cJson.creative.video_id);
-    if (!video_id) throw new Error('No video on this creative');
-
-    btn.innerHTML = '⏳ Getting source…';
-    const sRes = await fetch('/api/proxy-meta', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ endpoint: video_id, params: { fields: 'source' } })
-    });
-    const sJson = await sRes.json();
-    const mp4 = sJson.source;
-    if (!mp4) throw new Error('No mp4 source URL');
-
-    const escUrl = String(mp4).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
-    btn.outerHTML = `<video src="${escUrl}" controls autoplay class="mt-2 rounded border border-gray-200 block" style="max-width:280px;max-height:280px;background:#000"></video>`;
-  } catch (e) {
-    btn.disabled = false;
-    btn.innerHTML = '⚠ ' + (e.message || 'Failed');
-    btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200', 'hover:bg-blue-100');
-    btn.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
-    btn.title = 'Click to retry';
-    setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; btn.classList.remove('bg-red-50','text-red-700','border-red-200'); btn.classList.add('bg-blue-50','text-blue-700','border-blue-200','hover:bg-blue-100'); }, 4000);
-  }
-};
-
 function renderTaggerAdRow(c, catFilter, indent, benchmarks, funnelByAd) {
   const name = c['Ad name'] || c['ad name'] || c['Creative name'] || 'Unknown';
   let type = c['Creative type'] || c['creative type'] || '-';
@@ -19367,9 +19218,7 @@ function renderTaggerAdRow(c, catFilter, indent, benchmarks, funnelByAd) {
   return `<tr class="border-b border-gray-100 hover:bg-surface-secondary/50 transition border-l-4 ${verdictBorder}">
     <td class="${pl} px-3 py-2">
       <div class="flex items-center gap-2">
-        <button onclick="toggleCreativePreview('${_escName}', this)" class="shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-300 rounded transition p-0 bg-transparent border-0" title="Click to see the creative">
-          ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center"><span class="text-[8px] text-gray-400">' + (type === 'Video' ? '\u25B6' : '\u25A1') + '</span></div>'}
-        </button>
+        ${thumb ? `<img src="${thumb}" class="w-7 h-7 rounded object-cover shrink-0 border border-gray-200" onerror="this.style.display='none'" />` : '<div class="w-7 h-7 rounded bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0"><span class="text-[8px] text-gray-400">' + (type === 'Video' ? '\u25B6' : '\u25A1') + '</span></div>'}
         <div style="max-width:200px">
           <span class="font-medium text-[11px] block leading-tight" title="${name}">${shortAdName(name)}</span>
           <span class="text-[9px] text-text-muted">${market} \u00B7 ${type}</span>
