@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Godfather v2 — Cuemath</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="logo">
+        <span class="logo-square">G</span>
+        <div>
+          <div class="logo-name">Godfather</div>
+          <div class="logo-sub">v2 · Cuemath</div>
+        </div>
+      </div>
+      <div class="filters" id="globalFilters">
+        <label>Market
+          <select id="filterMarket">
+            <option value="all">All</option>
+            <option value="IND">IND</option>
+            <option value="US" selected>US</option>
+            <option value="AU">AU</option>
+            <option value="MEA">MEA</option>
+            <option value="NZ">NZ</option>
+            <option value="UK">UK</option>
+          </select>
+        </label>
+        <label>Window
+          <select id="filterWindow">
+            <option value="7">Last 7 days</option>
+            <option value="14" selected>Last 14 days</option>
+            <option value="28">Last 28 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="all">All time</option>
+          </select>
+        </label>
+        <label>Mode
+          <select id="filterMode">
+            <option value="cohort" selected>Cohort</option>
+            <option value="mtd">MTD</option>
+          </select>
+        </label>
+      </div>
+      <div class="status" id="statusPill">Loading…</div>
+    </header>
+
+    <nav id="sidebar">
+      <a href="#/recent" class="nav-item" data-route="recent">
+        <span class="nav-icon">①</span>
+        <span><strong>Recent performance</strong><br /><small>What's live, what's the verdict</small></span>
+      </a>
+      <a href="#/detail" class="nav-item" data-route="detail">
+        <span class="nav-icon">②</span>
+        <span><strong>Creative detail</strong><br /><small>See the actual creative + tags</small></span>
+      </a>
+      <a href="#/drivers" class="nav-item" data-route="drivers">
+        <span class="nav-icon">③</span>
+        <span><strong>Driver attribution</strong><br /><small>Why is this winning</small></span>
+      </a>
+      <a href="#/patterns" class="nav-item" data-route="patterns">
+        <span class="nav-icon">④</span>
+        <span><strong>Pattern matrix</strong><br /><small>What works where</small></span>
+      </a>
+      <a href="#/replicator" class="nav-item" data-route="replicator">
+        <span class="nav-icon">⑤</span>
+        <span><strong>Brief replicator</strong><br /><small>DNA of a winner</small></span>
+      </a>
+      <a href="#/optimise" class="nav-item" data-route="optimise">
+        <span class="nav-icon">⑥</span>
+        <span><strong>Optimise</strong><br /><small>Pause · Refresh · Kill · Monitor</small></span>
+      </a>
+      <div class="nav-footer">
+        <button id="btnRefresh" title="Refresh data from Supabase + Sheets">↻ Refresh data</button>
+        <div class="nav-tip">Each surface loads on click. Nothing fires at boot beyond the ad summary.</div>
+      </div>
+    </nav>
+
+    <main id="content">
+      <div class="welcome">
+        <h1>Pick a surface →</h1>
+        <p>Six questions. Six surfaces. Nothing else.</p>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="lib/main.js"></script>
+</body>
+</html>
