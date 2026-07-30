@@ -36,7 +36,10 @@ If you cannot reach the site, say so and stop. Do not reconstruct brand rules fr
 | 3 | **Market verified-facts tables** (e.g. `us-google-rsa-verified-facts`) | Every number, price, percentage, date, credential in **paid** copy |
 | 4 | [[cuemath-creative-direction-v1]] | Execution not covered above — register sort, coach-visibility floor, per-market creative rules |
 
-Retired, do not read: `brand-guidelines.md` · `brand-voice.md` · `brand-guidelines-uploadable.md` · `03-guardrails/*`.
+| 5 | [[brand-voice]] | **Demoted, not retired.** Per-market language only — spelling, grade vocabulary, exam references, currency, internal product names, personas, copy atoms. Never brand law |
+| 5 | `03-guardrails/*` | **Kept.** Data integrity (G-01/02/07), structural quality (G-09–G-19), character limits, script lengths, image dimensions — none of which this file covers |
+
+**Deleted 2026-07-30 — these files no longer exist:** `brand-guidelines.md` · `brand-guidelines-uploadable.md` · `icp-guide.md`. Everything unique in them was migrated first: copy atoms and the transformation narrative into [[brand-voice]] · conversion and enrollment figures into [[funnel-definitions]] · the audience model into §8 below. A surviving reference to any of them is rot — fix it.
 
 **The rule that survives every conflict:** a number that is not in a verified-facts table does not ship in paid copy, no matter which document printed it.
 
@@ -380,7 +383,41 @@ Where the bible collided with what this Brain already believed, and how each col
 
 ---
 
-## 8. WHEN YOU CATCH A NEW FAILURE
+## 8. AUDIENCE MODEL — the bible's, and how the old segment names translate
+
+`05-reference/icp-guide.md` was retired 2026-07-30. **Audience strategy comes from the brand bible and nowhere else.**
+
+### The model
+
+**Pillars:** NRI Profile A (first-gen · 35–50 · Texas-heavy · anxiety = *protection*, "will my child fall behind?" · trust via community endorsement) · NRI Profile B (second-gen / 1.5-gen · 28–42 · Bay Area-heavy · anxiety = *advancement*, "will my child get ahead?" · trust via peer testimonial + product evidence) · Asian-American (Chinese competition-oriented · Korean hagwon-familiar · Filipino STEM-career · Vietnamese community-validated · Japanese quality-over-speed).
+
+**Stated parent goals (US trial cohort):** grade improvement **25.8%** · acceleration / gifted track **21.1%** · conceptual understanding **17.3%** · competition prep **10.4%** · SAT / AP **3.4%**. This is the **B1 Goal** beat — pick one, make it specific.
+
+**Geography registers:** Bay Area & Seattle & NC → global, evidence-first, AI-world · Texas & Atlanta → same-coach, community testimonials · NJ/NY → MathFit + 1:1 contrast, Tier-1 framing · Chicago → acceleration for 6–10, switcher angle for K–5.
+
+### Translation from the retired segments
+
+Ten files still name the old personas. They resolve like this:
+
+| Retired persona | Now |
+|---|---|
+| Foundation Rebuilder (28.6%) | **Conceptual understanding** goal (17.3%) |
+| Confidence Builder (18.2%) | Dissolves into **conceptual understanding** / **grade improvement** |
+| Personalization Seeker (12.0%) | **Not an audience.** 1:1 personalisation is a mechanism — Brand Beat B2 |
+| Accelerator (2.3%) | **Acceleration / gifted track** (21.1%) + **competition prep** (10.4%) |
+| — | **Grade improvement (25.8%)** — the largest single goal, which the old model had no segment for at all |
+
+Two things worth noting. The old "primary" segment maps to a 17.3% goal while the actual largest goal went unnamed — the psychographic model was mis-weighted. And **Accelerator's "serve but do NOT target" rule is superseded**: the bible treats acceleration as the second-largest goal, with competition prep a named track. Do not carry the old avoidance rule forward.
+
+The 4:3:2:1 content mix goes with the old model. Weight by stated goal instead.
+
+### One carve-out from the bible — ⚠️ CONFIRM WITH NAINA
+
+The bible's Texas section permits **`"Indian rigor" (Lane 1)`**. **This file still bans it** (§1.1) and that ban holds until Naina says otherwise, on two grounds the bible cannot override: Google Ads' personalised-advertising policy on national origin is platform law, and Naina hard-confirmed the ban on May 19–20 after it was caught in market. Rank 2 beating rank 1 is the documented exception, not a precedent — see §0.
+
+---
+
+## 9. WHEN YOU CATCH A NEW FAILURE
 
 When Naina catches something not on this list:
 

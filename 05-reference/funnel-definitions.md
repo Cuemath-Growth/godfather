@@ -97,6 +97,45 @@ Paid stage: T2P% (trial-to-paid), Revenue, ROAS, CAC measured
 
 ---
 
+## Conversion by Audience and Channel
+
+Migrated from the retired `icp-guide.md` on 2026-07-30. **These are measurements, not positioning** — audience *strategy* comes from the brand bible (https://cuemath-brand-book.netlify.app/) and nowhere else. Kept here because the bible carries no conversion or enrollment figures by design.
+
+### Enrollment rate by ethnicity
+
+| Audience | Share of leads | Enrollment rate |
+|---|---|---|
+| NRI | 70% | **19.4%** — 6× Non-NRI |
+| Non-NRI | 30% | **3.2%** |
+
+74% of organic-content leads are Non-NRI, and they convert at 0.1%. Volume without intent.
+
+### Conversion by channel
+
+| Channel | NRI | Non-NRI |
+|---|---|---|
+| Referrals | **41.6%** (94% of referral leads are NRI) | 37.3% (tiny volume) |
+| Organic brand | 34.0% | — |
+| Google brand paid | 28.4% | — |
+| Meta ads | 15.1% | **0.6%** — essentially non-converting |
+| Organic non-brand | — | **0.1%** |
+
+The Non-NRI Meta and organic-non-brand rows are the strongest argument in this file: spend reaching Non-NRI through those two channels does not convert.
+
+### Pain points, from negative reviews
+
+Billing / pricing friction **42.8%** · post-payment silence **42.8%** · tutor quality inconsistency **40.4%** · app or platform issues **33.2%**.
+
+Retention signal, not an acquisition input. Useful when a creative promises something onboarding can't deliver.
+
+### Attribution texture
+
+60.8% of parents mention the tutor by name or role; 34.5% credit the Cuemath brand. Lead with the coach relationship, build the brand around the system. 26.6% use "we" language — the mother is lead researcher, don't exclude the father.
+
+> **Historical, superseded:** the four behavioural segments (Foundation Rebuilder 28.6% · Personalization Seeker 12.0% · Confidence Builder 18.2% · Accelerator 2.3%) and the 4:3:2:1 content mix came from the same study. The brand bible replaced that psychographic model with **stated parent goal × audience pillar × geography**. Segment sizes are kept only as a record of the original study. See [[forbidden-patterns]] §8 for the translation.
+
+---
+
 ## Tracker Dimensions (Filter Structure)
 
 The performance tracker allows slicing data by:

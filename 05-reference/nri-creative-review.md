@@ -9,7 +9,7 @@ sources:
   - Cuemath Performance Creative Strategy K-12 (`Downloads/index.html`)
   - High School Performance Marketing Brief (`05-reference/hs-performance-marketing-brief.md`)
   - Cuemath ICP & Audience Intelligence — CEO Review (`Downloads/Cuemath Icp & Audience Intelligence .docx`)
-  - ICP Guide (`05-reference/icp-guide.md`)
+  - ICP Guide (`05-reference/icp-guide.md` — RETIRED 2026-07-30, superseded by the brand bible)
   - Creative Direction v1.0 (`05-reference/cuemath-creative-direction-v1.md`)
   - Brand Voice (`05-reference/brand-voice.md`)
   - Master Guardrails (`03-guardrails/00-master-guardrails.md`)
@@ -94,7 +94,7 @@ A claim about "a tutor" / "1:1 sessions" / "personalised teaching" is not the Cu
 
 ## The four ICP segments (use these — they are NRI-grounded)
 
-These are the four behavioural segments from `icp-guide.md` and the CEO ICP & Audience Intelligence doc. They are the segments. Do not import DM1 / DM2 / DM3 from the CN+KR doc — that vocabulary is for a different audience.
+These four behavioural segments came from the retired `icp-guide.md` and the CEO ICP & Audience Intelligence doc. **Superseded 2026-07-30** — the brand bible replaced this psychographic model with stated parent goal × audience pillar × geography. Translation table in [[forbidden-patterns]] §8. Do not import DM1 / DM2 / DM3 from the CN+KR doc — that vocabulary is for a different audience.
 
 | # | Segment | Trigger | What they're buying | MathFit dimension to lead with |
 |---|---|---|---|---|
@@ -103,9 +103,9 @@ These are the four behavioural segments from `icp-guide.md` and the CEO ICP & Au
 | 3 | **Confidence Restorer / Builder** (SUPPORTING — 18.2%) | Child is scared / avoids math / shuts down | Fear reduction. Confidence before performance. | **Confidence** |
 | 4 | **Accelerator** (TERTIARY — 2.3%) | Exam pressure, advanced ambitions | Rigour, ceiling, exam alignment | **Application** — but reframe toward thinking depth, not marks |
 
-**Hard rule on Accelerator:** serve, do not target. The ICP doc flags this segment as the highest churn risk. A creative that leads with marks / guaranteed grades / "ace the exam" is misrouted, even when it claims Accelerator. *(icp-guide.md.)*
+**Accelerator — rule REVERSED 2026-07-30.** The old "serve, do not target" rule is superseded: the brand bible treats acceleration / gifted track as the second-largest stated goal (21.1%) with competition prep a named track (10.4%). Target it. The churn-risk caveat still applies to retention planning, not to targeting. A creative that leads with marks / guaranteed grades / "ace the exam" is misrouted, even when it claims Accelerator. *(was icp-guide.md; see [[forbidden-patterns]] §8.)*
 
-**Anti-ICP — actively repel:** the **Shortcut Seeker.** Wants quick results, guaranteed marks, tricks. Highly price-sensitive. High churn / complaint risk. Marketing should filter this parent, not attract her. *(icp-guide.md + ICP CEO Review §5.)*
+**Anti-ICP — actively repel:** the **Shortcut Seeker.** Wants quick results, guaranteed marks, tricks. Highly price-sensitive. High churn / complaint risk. Marketing should filter this parent, not attract her. *(was icp-guide.md + ICP CEO Review §5. Anti-ICP is NOT in the bible — this is the surviving definition.)*
 
 ---
 
@@ -738,7 +738,7 @@ If your audit cannot be read aloud to Naina without sounding like an AI report, 
 
 1. The overlay attached to this Project (per market × channel)
 2. Creative Direction v1.0 (`05-reference/cuemath-creative-direction-v1.md`)
-3. ICP Guide (`05-reference/icp-guide.md`) and ICP CEO Review (`Downloads/Cuemath Icp & Audience Intelligence .docx`)
+3. ICP Guide (`05-reference/icp-guide.md` — RETIRED 2026-07-30, superseded by the brand bible) and ICP CEO Review (`Downloads/Cuemath Icp & Audience Intelligence .docx`)
 4. Cuemath Brand Doc (`Downloads/Cuemath_Brand_Doc.docx`)
 5. K-12 Performance Creative Strategy (`Downloads/index.html`) — for the 30 reference ads
 6. High School Performance Marketing Brief (`05-reference/hs-performance-marketing-brief.md`)
