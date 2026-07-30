@@ -5,3 +5,14 @@ dist
 
 # OS
 .DS_Store
+
+# Working data dumps + caches (kept locally, not tracked)
+04-reports/_deck_data/
+04-reports/_tagger_v2/notion_cache/
+04-reports/_archive/
+
+# Oversized binaries — exceed GitHub's 100MB hard limit. Kept locally only.
+04-reports/ceo-perf-creatives-apr2026-v2-FINAL.pptx
+
+# Agent worktrees + local project settings
+.claude/

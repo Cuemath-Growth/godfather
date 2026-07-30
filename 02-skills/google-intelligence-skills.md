@@ -31,7 +31,7 @@
 ## 1. Architecture
 
 ```
-~/Documents/Brain/godfather/
+~/Documents/CM Brain /godfather/
 ├── index.html                       # Godfather (Meta) — unchanged
 ├── google.html                      # NEW — Google Creative Dashboard
 ├── google-ads-script.js             # NEW — runs daily inside Google Ads, writes to Sheet

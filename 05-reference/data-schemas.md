@@ -1,5 +1,5 @@
 # Godfather Data Schemas
-Updated: 2026-03-28
+Updated: 2026-05-05 (added creative_tags_v3, tagged_creatives notes, Tier-2 derived variables)
 
 ## Currency
 ALL spend data is in **INR (₹)** across all sheets and all markets (US, India, AUS, MEA, UK).
@@ -264,6 +264,28 @@ Examples:
 - All PLA cost rows get `_source: 'pla'`
 - Eval campaigns (`_eval_` in name) treated same as PLA for flow filtering
 - `normalizeAdName()` handles em dashes + spaces in PLA UTM content (fixed Apr 14)
+
+---
+
+---
+
+## Supabase Tables (added May 5, 2026)
+
+### `creative_tags_v3` — content-verified creative tags
+Built Apr 30, 2026. 2,804 ads, fully tagged, 72% High confidence. Schema:
+- `ad_name` PK · `hook_frame` · `master_frame` · `close_type` · `specificity` · `pain_target` · `production_cue` · `language` · `evidence_hook` · `evidence_close` · `evidence_pain` · `confidence` · `notes` · `source` · `tagged_at`
+Replaces ad-name-pattern tagging in legacy `creative_tags`. See `~/.claude/projects/-Users-nainajethalia/memory/reference_creative_tags_v3.md` for source priority + sample queries. Indexed on hook_frame, master_frame, pain_target, source.
+
+### `tagged_creatives` — creative-layer rollup (STALE — Mar 23, 2026 cap)
+Spend + QL + NRI + TS + TD + Paid + ethnicity + market per ad-day. 21,761 rows. **Do not trust for live analysis** — re-pull from Meta API + CRM Sheet at run time. Memory rule: "tagged_creatives is stale rollup. TQL/TD lives in CRM not Supabase."
+- `ad_name` · `campaign_name` · `ad_set_name` · `creative_type` · `spent` · `ql` · `nri` · `td` · `ts` · `paid` · `cptd` · `cpnri` · `ethnicity` · `market` · `date` · `thumbnail_url`
+- Ethnicity values: `NRI`, `NRI / Non Native English Speaker`, `Non NRI`, `Asian (Others)`, `Asian (Korean/Chinese/Vietnamese)`, `African-American`, `Hispanic`, `Others`, `Undetected`, blank.
+
+### `meta_ad_data` — raw Meta API spend (no funnel data)
+Daily ad-level spend, impressions, clicks, CTR, CPC, CPM, frequency. 41,876 rows. Joined to CRM via `ad_name`.
+
+### Tier-2 derived variables — see `02-skills/creative-variable-extraction.md`
+`mathfit_dimension` · `coach_tenure_signal` · `three_beat_compliance` · `outcome_anchor` · `badge_variant` · `video_length_bucket` · `ost_density` · `holiday_cohort_flag`. Currently runs as inline SQL CTE on `evidence_*` text fields. Quarterly re-run promotes to materialised view.
 
 ---
 

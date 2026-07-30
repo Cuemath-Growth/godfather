@@ -331,16 +331,16 @@ oracle_digest.json additions:
 
 ## Skills Invoked
 
-- [[02-skills/data-intelligence-skills]] — combine multi-agent outputs
-- [[02-skills/data-intelligence-skills]] — rank by impact × confidence
-- [[02-skills/data-intelligence-skills]] — executable recommendations
-- [[02-skills/influencer-pattern-recognition]] — NEW
-- [[02-skills/geo-breakdown]] — NEW
+- [[02-skills/data-intelligence-skills|Data Intelligence Skills]] — synthesise multi-agent outputs, rank by impact × confidence, write executable recommendations
+- [[02-skills/segwise-intelligence-skills|Segwise Intelligence Skills]] — creative pattern correlation that feeds Oracle's verdicts
+- [[02-skills/system-skills|System Skills]] — agent routing table and dashboard rendering pipeline Oracle outputs into
+- [[02-skills/infrastructure-skills-v2|Infrastructure Skills v2]] — recommendation feedback loop (Skill 12) Oracle reads from
+- [[02-skills/daily-playbook|Daily Playbook]] — operating rhythm Oracle's digest is timed to
 
 ---
 
 ## See Also
 
-- [[01-agents/00-agent-architecture]]
-- [[01-agents/00-agent-architecture]] — orchestration
+- [[01-agents/00-agent-architecture|Agent Architecture]] — orchestration model and data flow
+- [[01-agents/01-sentinel|Sentinel]] / [[01-agents/02-lens|Lens]] / [[01-agents/03-forge|Forge]] / [[01-agents/05-scout|Scout]] — domain agents Oracle reads from
 - See Creators tab in Godfather for influencer Track A (US) and Track B (India)

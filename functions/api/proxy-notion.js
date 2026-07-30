@@ -1,5 +1,9 @@
-// Cloudflare Pages Function — extracts first image from a Notion page
-// Notion integration token stored in Cloudflare env vars, never exposed to browser
+// Cloudflare Pages Function — Notion page reader.
+// Two modes:
+//   default: returns { image_url, page_id } — first image found in page (legacy thumb path)
+//   mode='blocks': returns { blocks, page_id } — full recursive block tree (Library Phase 1.5)
+//
+// Notion integration token stored in Cloudflare env vars, never exposed to browser.
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -26,21 +30,62 @@ export async function onRequest(context) {
     }
 
     const body = await request.json();
-    const { page_id } = body;
+    // Accept either page_id (legacy) or url (new) — extract ID from URL if given.
+    let { page_id, url, mode } = body;
+    if (!page_id && url) {
+      // Notion URLs end with `<title>-<32hex>` or `<title>-<8-4-4-4-12 dashed>`.
+      const m = String(url).match(/([a-f0-9]{32})|([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/i);
+      if (m) page_id = m[0];
+    }
 
     if (!page_id) {
-      return Response.json({ error: true, message: 'page_id required' }, { status: 400 });
+      return Response.json({ error: true, message: 'page_id or url required' }, { status: 400 });
     }
 
     // Clean page ID (remove dashes if needed, extract from URL)
     const cleanId = page_id.replace(/-/g, '');
 
-    // Fetch all blocks from the page to find the first image
+    const notionHeaders = {
+      'Authorization': `Bearer ${NOTION_TOKEN}`,
+      'Notion-Version': '2022-06-28',
+    };
+
+    // mode='blocks' → walk the full block tree recursively. Returns raw Notion
+    // API block objects with `.children` arrays inlined for blocks where
+    // has_children=true. Browser parser walks paragraphs, image/file embeds,
+    // bookmarks, and rich-text links to find Drive URLs and ad-copy pairings.
+    // Depth-limited to 4 levels (column_list → column → toggle → content).
+    if (mode === 'blocks') {
+      async function fetchTree(blockId, depth = 0) {
+        if (depth > 4) return [];
+        const res = await fetch(`https://api.notion.com/v1/blocks/${blockId}/children?page_size=100`, { headers: notionHeaders });
+        if (!res.ok) return [];
+        const data = await res.json();
+        const results = data.results || [];
+        for (const b of results) {
+          if (b.has_children) {
+            b.children = await fetchTree(b.id, depth + 1);
+          }
+        }
+        return results;
+      }
+      try {
+        const blocks = await fetchTree(cleanId, 0);
+        return Response.json(
+          { blocks, page_id: cleanId },
+          { headers: { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=3000' } }
+        );
+      } catch (e) {
+        return Response.json(
+          { error: true, message: 'block tree fetch failed: ' + e.message },
+          { status: 500, headers: { 'Access-Control-Allow-Origin': '*' } }
+        );
+      }
+    }
+
+    // Default mode: legacy first-image-only path used by the Library thumb cache.
     const blocksRes = await fetch(`https://api.notion.com/v1/blocks/${cleanId}/children?page_size=100`, {
-      headers: {
-        'Authorization': `Bearer ${NOTION_TOKEN}`,
-        'Notion-Version': '2022-06-28',
-      },
+      headers: notionHeaders,
     });
 
     if (!blocksRes.ok) {
@@ -72,12 +117,7 @@ export async function onRequest(context) {
       for (const block of (blocksData.results || [])) {
         if (block.has_children) {
           try {
-            const childRes = await fetch(`https://api.notion.com/v1/blocks/${block.id}/children?page_size=50`, {
-              headers: {
-                'Authorization': `Bearer ${NOTION_TOKEN}`,
-                'Notion-Version': '2022-06-28',
-              },
-            });
+            const childRes = await fetch(`https://api.notion.com/v1/blocks/${block.id}/children?page_size=50`, { headers: notionHeaders });
             if (childRes.ok) {
               const childData = await childRes.json();
               imageUrl = findFirstImage(childData.results || []);
@@ -87,12 +127,7 @@ export async function onRequest(context) {
               for (const child of (childData.results || [])) {
                 if (child.has_children) {
                   try {
-                    const grandchildRes = await fetch(`https://api.notion.com/v1/blocks/${child.id}/children?page_size=50`, {
-                      headers: {
-                        'Authorization': `Bearer ${NOTION_TOKEN}`,
-                        'Notion-Version': '2022-06-28',
-                      },
-                    });
+                    const grandchildRes = await fetch(`https://api.notion.com/v1/blocks/${child.id}/children?page_size=50`, { headers: notionHeaders });
                     if (grandchildRes.ok) {
                       const gcData = await grandchildRes.json();
                       imageUrl = findFirstImage(gcData.results || []);

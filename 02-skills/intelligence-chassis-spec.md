@@ -9,7 +9,7 @@
 
 | # | Decision | Resolution |
 |---|---|---|
-| 1 | Where shared code lives | **Same git repo as Godfather**, in `~/Documents/Brain/godfather/shared/`. Deploys with same Cloudflare project. |
+| 1 | Where shared code lives | **Same git repo as Godfather**, in `~/Documents/CM Brain /godfather/shared/`. Deploys with same Cloudflare project. |
 | 2 | Outcome tracking storage | **Existing Cuemath Supabase project** (same one Godfather uses). Add 2 tables: `recommendation_log` + `recommendation_dismissals`. |
 | 3 | Brand keyword list | Deferred to Week 5 (Google work). Naina to share when Google dashboard begins. |
 | 4 | Severity weighting per market | **CLOSED Apr 28** — no ABV needed. Markets are independent strategies per annual plan; no cross-market budget reallocation ever. Severity is computed in-market using `SENTINEL_THRESHOLDS[market]` (CPQL ceilings from annual plan §4.7: US ₹18K, APAC ₹8.5K, MEA ₹7.5K, India ₹1.2K). Action queue is per-market by default; "All markets" view interleaves top-N from each market. |
@@ -61,7 +61,7 @@ Shared module ≈ 2,000 lines. Per-tool = verdict catalog + data adapters + tool
 ## Architecture
 
 ```
-~/Documents/Brain/godfather/
+~/Documents/CM Brain /godfather/
 ├── shared/
 │   ├── cuemath-data.js              # ~1,500 lines — extracted from index.html
 │   └── cuemath-intelligence.js      # ~2,000 lines — chassis

@@ -1,5 +1,21 @@
 # CUEMATH MATHFIT™ BRAND GUIDELINES
 
+> ## ⚠️ SUPERSEDED — v1
+>
+> **[[brand-book-v2]] is the canonical brand authority.** Source: https://cuemath-brand-book.netlify.app/
+>
+> This file is retained for two things v2 does not restate:
+> - **Copy Atoms** (below) — still usable
+> - **Transformation Narrative** (before → after) — still usable
+>
+> Everything else here is out of date. Specifically **do not use**:
+> - The colour values — navy `#1A1A2E` and yellow `#F5A623` are retired. Current: Sunlit Gold `#F4AB52` · Warm Charcoal `#292827` · Warm Off-White `#FAF8F5`
+> - The 4 USPs and 6 messaging pillars — v2 ships **six** USPs with different wording
+> - The messaging hierarchy — replaced by the **Brand Beats (B1 Goal / B2 Mechanism / B3 MathFit)**
+> - Anything about tone, imagery, or vocabulary — v2 is stricter and more specific
+>
+> Precedence ladder, and the open conflict ledger between this file and v2, live in [[brand-book-v2]] §Precedence and §9.
+
 ## Brand Essence & Promise
 - **Core Promise:** A personalized math ecosystem building deep understanding, confidence, and real-world problem-solving—for school, competitions, and life.
 - **Tagline:** "Making Kids MathFit™"

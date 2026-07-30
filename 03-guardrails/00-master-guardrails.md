@@ -109,8 +109,10 @@ Every piece of generated content must include a brief note explaining which data
 |---|---|
 | **Sentinel** | G-01, G-02, G-04, G-07 |
 | **Lens** | G-02, G-11, G-12 |
-| **Forge** | G-03, G-04, G-05, G-06, G-08, G-09, G-10, G-14, G-15, G-16, G-17, G-18, G-19 |
+| **Forge** | G-03, G-04, G-05, G-05b, G-06, G-08, G-09, G-10, G-14, G-15, G-16, G-17, G-18, G-19 |
 | **Oracle** | G-01, G-02, G-07, G-13, G-19 |
+| **Scout** | G-12 (regional accuracy on calendar/events), G-19 (every Context Card includes a Why) |
+| **Curator** | None — read-only auditor; flags guardrail violations elsewhere but does not produce content. |
 
 ---
 
