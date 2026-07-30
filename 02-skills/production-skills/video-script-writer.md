@@ -60,7 +60,7 @@ Output format:
 | 4 | [Proof or outcome] | [Number/testimonial visual] | |
 | 5 | [CTA] | [Logo + button mock] | |
 
-Plus: Background music direction, colour palette notes (Yellow #F5A623, Navy #1A1A2E).
+Plus: Background music direction, colour palette notes (Sunlit Gold #F4AB52 as accent only · Warm Charcoal #292827 · Warm Off-White #FAF8F5).
 
 ## ALWAYS ALSO INCLUDE — META AD COPY
 
@@ -159,7 +159,7 @@ Longer is NOT better. Attention drops sharply after 30s on Meta.
 
 ## GEO RULES
 
-US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC, NRI hook = "Indian tutors"
+US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC, NRI: substitute the signal, never the identifier — `"Indian tutors"` is a HARD BAN (forbidden-patterns §1.1). Use `Built by IIT & Stanford alumni`
 India: "Tuition", "Maths", CBSE/ICSE/IB, Olympiad, currency in Lakhs
 Australia: "Tutoring", "Maths", Year 2-8, NAPLAN, reversed seasons
 MEA: Overlapping calendars, Islamic calendar priority, multi-language

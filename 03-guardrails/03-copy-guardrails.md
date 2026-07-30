@@ -60,7 +60,7 @@ Scan for second-person pronouns addressing children: "you will learn", "practice
 These checks produce warnings. The user sees the output but with a flag.
 
 ### F-05: Headline Variety Check
-In a set of 3 headlines, at least 2 must use different hook types. Three variations of "Indian tutors" is not A/B testable. Flag: "All three headlines use the same hook. Consider diversifying."
+In a set of 3 headlines, at least 2 must use different hook types. Three variations of the same claim is not A/B testable. Flag: "All three headlines use the same hook. Consider diversifying."
 
 ### F-06: ICP Distinctiveness Check
 If generating copy for multiple ICPs in one session, Forge compares outputs. If >60% of words overlap between two ICP variants, flag: "These two ICP variants are too similar. The Foundation Builder version should sound noticeably different from the Accelerator version."
@@ -112,15 +112,20 @@ Longer ≠ better. Attention drops sharply after 30 seconds on Meta.
 ### F-12: Meta Text Policy
 Generated images must have <20% text coverage. Text overlay (headline, CTA, badge) is added post-generation, not baked into the AI prompt. The image itself should be text-free or text-minimal.
 
-### F-13: No Identifiable Children
-AI-generated images must never depict identifiable children's faces. Use: abstract math visuals, parent focus, illustration style, or environmental shots (desk, books, screen).
+### F-13: No AI-Generated Children
+**AI-generated** images must never depict identifiable children's faces. Use: abstract math visuals, parent focus, illustration style, or environmental shots (desk, books, screen).
+
+Real photography with released talent **may** show children's faces — the [brand bible](https://cuemath-brand-book.netlify.app/) permits it and specifies the casting. The ban is on synthetic children, not on children. The bible independently rejects "the AI look" (uncanny lighting, over-smooth skin, plastic surfaces), so shoot rather than generate wherever a face carries the frame.
 
 ### F-14: Brand Colour Anchoring
-Every generated image must incorporate at least one of:
-- Yellow #F5A623 (primary)
-- Navy #1A1A2E (secondary)
+Palette per the [brand bible](https://cuemath-brand-book.netlify.app/):
+- **Sunlit Gold `#F4AB52`** — accent and CTA only, never a flood
+- **Warm Charcoal `#292827`** — type and dark surfaces
+- **Warm Off-White `#FAF8F5`** — ground
 
-As a dominant or accent colour. Never generate images with no brand colour presence.
+70%+ neutral ground, gold as punctuation. Never pure black, pure white, cool greys, or red accents of any kind.
+
+> **Retired:** yellow `#F5A623` and navy `#1A1A2E` are dead. Any asset still carrying them is out of date.
 
 ### F-15: Format Compliance
 Images are generated at exact Meta-compliant dimensions:

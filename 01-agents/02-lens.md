@@ -231,11 +231,12 @@ This section gives Forge the strategic context it needs to generate the right co
 
 **What works:**
 
-- Indian tutors / Indian teaching approach as the lead hook
+- Indian teaching approach as the lead hook — **tagging only, never a brief.** `Indian tutors` is a HARD BAN ([[02-skills/forbidden-patterns]] §1.1); the substitute signal is curriculum lineage
 - Telugu and Tamil vernacular testimonials (highest efficiency, most underrepresented)
 - Math-anchored hooks outperform lifestyle hooks by 3–5x on QL→TD%
 - "Same tutor every class" resonates strongly (looping model)
-- Static + NRI targeting + Indian tutors = best CPTD combo in US data
+- Static + NRI targeting + curriculum-lineage proof = best CPTD combo in US data
+  (historical winners used an `Indian tutors` hook — that is now a HARD BAN, [[02-skills/forbidden-patterns]] §1.1. Tag it on old creative, never brief it on new)
 
 **What to avoid:**
 

@@ -56,7 +56,9 @@ If ALL creatives in a targeting segment degrade simultaneously, the problem is a
 ## Output Rules
 
 ### C-10: Winning Signals Include Actionable Brief
-Every winning signal in Lens's output must include a concrete creative brief suggestion. Not just "math-anchored hooks work" but "Create 3 new statics: math-anchored headline + NRI audience + Indian tutor visual. Format: 1:1 for Instagram, 1.91:1 for Facebook."
+Every winning signal in Lens's output must include a concrete creative brief suggestion. Not just "math-anchored hooks work" but "Create 3 new statics: math-anchored headline + NRI audience + curriculum-lineage proof (`Built by IIT & Stanford alumni`). Format: 1:1 for Instagram, 1.91:1 for Facebook."
+
+> **Note:** never brief an "Indian tutor" visual or headline — HARD BAN, [[forbidden-patterns]] §1.1. The India-origin signal comes from curriculum lineage and the Cuemath brand itself, never from tutor ethnicity. Same rule applies to wardrobe: no saris or kurtas on coaches ([[forbidden-patterns]] §1.5).
 
 ### C-11: Losing Signals Include Kill/Fix Recommendation
 Every losing signal must recommend either:

@@ -17,7 +17,6 @@ Distinct from the agent-internal skills in the parent `02-skills/` folder (e.g.,
 | `campaign-concept.md` | Translate brief into hooks and big idea. |
 | `sound-human.md` | De-corporatise generated copy. |
 | `brand-validator.md` | Final pass against brand voice + creative direction v1. |
-| `brand-guidelines-uploadable.md` | Cuemath voice constraints, used at generation time inside other skills. |
 
 ## How they relate to Forge
 

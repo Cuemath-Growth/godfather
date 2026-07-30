@@ -56,7 +56,7 @@ For each file in `02-skills/`:
 - Does it list the skills it covers (named list)?
 - Does the skill reference an agent that owns it?
 - Is the skill cited in `MEMORY.md` or `ROADMAP.md`?
-- Is it duplicated elsewhere (e.g., `production-skills/brand-guidelines.md` vs `05-reference/brand-guidelines.md`)? Flag duplicates.
+- Is it duplicated elsewhere? Flag duplicates. **Watch specifically for any local file re-asserting itself as the brand bible** — the bible is a website (https://cuemath-brand-book.netlify.app/) and there is deliberately no local copy. A new `brand-*.md` claiming authority is drift, not documentation.
 
 ### Pass 4 — Guardrails Audit
 For each file in `03-guardrails/`:
@@ -66,7 +66,7 @@ For each file in `03-guardrails/`:
 ### Pass 5 — Reference Audit
 For each file in `05-reference/`:
 - Is it referenced by ≥1 agent, skill, or memory?
-- For brand docs (`brand-guidelines.md`, `brand-voice.md`, `cuemath-creative-direction-v1.md`): are precedence rules clear? (Memory says creative-direction wins on creative; brand-voice wins on language. Verify the docs themselves say so.)
+- For brand docs: is the precedence ladder in [[02-skills/forbidden-patterns]] §0 still accurate, and does every doc below it defer upward? Current ladder: **brand bible (website) → forbidden-patterns → market verified-facts tables → cuemath-creative-direction-v1 → brand-voice** (demoted to per-market language, products, personas, copy atoms). Flag any doc that claims to be a "single source of truth" for brand language — only the bible is.
 - LP planning subdirs (`briefs/`, `calendar/`, `inputs/`, `media-plan/`, `narratives/`): each should have a README or be listed in lp-planning/README.md.
 
 ### Pass 6 — Reports Audit

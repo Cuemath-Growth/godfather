@@ -196,22 +196,22 @@ Forge writes `forge_output.json` for each generation:
     "creative_copy": {
       "headlines": [
         "Your Child Deserves a Math Tutor Who Gets It",
-        "Indian Math Tutors. 1:1. Online.",
+        "Built by IIT & Stanford Alumni",
         "Real Math Skills Start with Real Teaching"
       ],
-      "subline": "Cuemath pairs your child with a dedicated tutor who builds understanding — not just answers.",
-      "cta": "Start Free Trial",
-      "badge": "Trusted by 4 Lakh+ Parents"
+      "subline": "Cuemath pairs your child with the same tutor every class — one who builds understanding before answers.",
+      "cta": "Book a Free 1-on-1 Class",
+      "badge": "4.9★ from 10K+ reviews"
     },
     "meta_copy": {
-      "primary_text": "Your child doesn't need another math app. They need a tutor who teaches them to think. Cuemath's 1:1 program builds real mathematical fitness — the kind that shows up in school, in tests, and in life.",
+      "primary_text": "When your child says \"I just don't get it,\" another app won't help. Cuemath pairs them with the same 1:1 tutor every class — the one who knows where they actually are.",
       "headline": "1:1 Math Tutoring — MathFit™ Program",
-      "description": "Book a Free Trial Today"
+      "description": "Book a Free 1-on-1 Class"
     },
-    "why_this_works": "NRI + Indian tutors + 1:1 format is the highest-performing combo in Feb US data (CPQL $7k, CPTD $24k). Math-anchored headline avoids the lifestyle trap that collapses QL→TD.",
+    "why_this_works": "NRI + curriculum-lineage proof + 1:1 format is the highest-performing combo in Feb US data (CPQL $7k, CPTD $24k). Math-anchored headline avoids the lifestyle trap that collapses QL→TD. Note: the historical winner used an 'Indian tutors' hook, now a HARD BAN — curriculum lineage is the substitute signal per forbidden-patterns §1.1.",
     "data_grounding": {
       "sentinel_reference": "top_5[0]",
-      "lens_signals_used": ["H-MATH", "PB-TUTOR", "PB-INDIAN"]
+      "lens_signals_used": ["H-MATH", "PB-TUTOR", "PB-LINEAGE"]
     }
   }
 }
@@ -406,7 +406,7 @@ Apply on every influencer/UGC script. These are *principles*, not verbatim-inser
 - [[02-skills/production-skills/campaign-concept|Campaign Concept]] — translate brief into hooks and big idea
 - [[02-skills/production-skills/sound-human|Sound Human]] — de-corporatise generated copy
 - [[02-skills/production-skills/brand-validator|Brand Validator]] — final pass against brand voice + creative direction v1
-- [[02-skills/production-skills/brand-guidelines-uploadable|Brand Guidelines (uploadable)]] — Cuemath voice constraints used at generation time
+- **The brand bible** — https://cuemath-brand-book.netlify.app/ — read live at generation time. Replaced the retired `brand-guidelines-uploadable.md`; for a Claude.ai Project, paste the URL rather than a snapshot
 
 **Voice canons (final tonal pass per audience cell):**
 - [[02-skills/voice-canons/voice-india-parent|India parent voice]]

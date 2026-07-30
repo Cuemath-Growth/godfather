@@ -166,7 +166,7 @@ CTA sits above or beside the close, never inside it: **"Book a free 1:1 class."*
 - **No offers, discounts, or limited-time framing in the close.** Free 1:1 class is the close. Always.
 - **No multi-USP cards.** One USP per asset. If two USPs both seem essential, you have two assets, not one.
 - **Never say "MathFit" without showing what it looks like.** Repetition without definition fails. Show the parent a child being clear, applying, or staying confident — then name it.
-- **No India-specific cues in non-Indian markets.** ₹ pricing, Bangalore references, Hindi voice-over, Indian tutor visuals — these belong in NRI US and India creative only. Never in ANZ, UK, MEA non-Indian.
+- **No India-specific cues in non-Indian markets.** ₹ pricing, Bangalore references, Hindi voice-over, Indian tutor visuals — these belong in India creative only. Never in ANZ, UK, MEA non-Indian — and **no longer in NRI US either.** The `Indian tutors` / Indian-visual framing was confirmed a HARD BAN on May 19-20 ([[02-skills/forbidden-patterns]] §1.1), which closes the Apr-25-DBS vs May-12-global-pivot question. Substitute the signal: curriculum lineage, Cuemath brand, price, rating, competition results.
 
 ---
 

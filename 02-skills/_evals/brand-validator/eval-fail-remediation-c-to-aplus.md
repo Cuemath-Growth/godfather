@@ -48,4 +48,4 @@ If validator flags the parent-testimonial version as HARD violation, that's over
 
 - `feedback_enrichment_not_remediation_us.md` (the original May 19 catch) — now absorbed into forbidden-patterns §1.2
 - ICP guide — confirms 96%+ enrichment audience
-- `reference_creative_direction_doc.md` — brand-guidelines: "Make math meaningful, not easy"
+- `reference_creative_direction_doc.md` — brand bible: "Make math meaningful, not easy"

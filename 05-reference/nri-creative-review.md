@@ -512,7 +512,7 @@ These come from the Master Guardrails (Tier 1) + Creative Direction v1 + Brand V
 10. **The word "classroom" / "centre" / "learning center"** — Cuemath is digital. *(Master Guardrails G-03, G-04.)*
 11. **"Children" instead of "kids" or "child."** *(Naina's brand voice rule, May 5.)*
 12. **"Specialist" instead of "tutor."** *(Naina's brand voice rule, May 5.)*
-13. **Any product or competitor specific not verified in `cuemath-creative-direction-v1.md` or `brand-guidelines.md`.** *(May 4 IB LP fabrication incident.)*
+13. **Any product or competitor specific not verified in `cuemath-creative-direction-v1.md` or the brand bible.** *(May 4 IB LP fabrication incident.)*
 14. **Time-bound, numeric, or event-claim copy without a verified source from `seasonal-calendar.md` or another canonical doc.** *(May 6 — "30 days to Math Kangaroo" written when MK was 316 days away.)* Specifically:
     - "N days to [event]" / "before [exam]" / "[month] is coming" — must trace to a real event date in `seasonal-calendar.md` Verified Exact Dates table. Today's date + claimed days must match.
     - "From X to Y in N months" / "scored X" / specific student outcome — must be CMS / Acads / Trustpilot verified, not guessed or borrowed.

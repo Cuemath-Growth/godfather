@@ -19,7 +19,7 @@ For each campaign, produce:
 
 **Creative Direction:**
 - Visual mood: [2-3 words]
-- Colour palette: [Cuemath yellow #F5A623, Navy #1A1A2E, plus accent]
+- Colour palette: [Sunlit Gold #F4AB52 accent only · Warm Charcoal #292827 · Warm Off-White #FAF8F5 · 70%+ neutral]
 - Photography/video style: [description]
 
 **Content Matrix:**
@@ -77,7 +77,7 @@ For each campaign, produce:
 
 ## GEO RULES
 
-US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC, NRI hook = "Indian tutors"
+US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC, NRI: substitute the signal, never the identifier — `"Indian tutors"` is a HARD BAN (forbidden-patterns §1.1). Use `Built by IIT & Stanford alumni`
 India: "Tuition", "Maths", CBSE/ICSE/IB, Olympiad, Lakhs
 Australia: "Tutoring", "Maths", Year 2-8, NAPLAN, reversed seasons
 MEA: Overlapping calendars, Islamic calendar priority, multi-language

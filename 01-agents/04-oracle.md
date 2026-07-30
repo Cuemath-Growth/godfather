@@ -53,7 +53,9 @@ last updated [timestamp]."
 
 Patterns that only emerge by combining agents:
 
-Example: "Static + NRI + Indian tutors hook = best CPTD this month"
+Example: "Static + NRI + curriculum-lineage hook = best CPTD this month"
+
+> Historical data may show an `Indian tutors` hook winning. Never surface it as a recommendation — HARD BAN, [[02-skills/forbidden-patterns]] §1.1. Report the pattern as `NRI + curriculum lineage` and name the substitute.
 → Sentinel (metrics) + Lens (attribute tags)
 
 Example: "Forge generated 3 variants last week.  Or or new creative uploaded on library. None deployed yet."

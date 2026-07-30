@@ -1,6 +1,12 @@
-# Brand Voice Bible — Cuemath
+# Brand Language & Market Reference — Cuemath
 
-This is the single source of truth for Cuemath's brand language rules. Every agent in Godfather validates output against this document.
+> **This is NOT the brand bible.** The brand bible is a website: **https://cuemath-brand-book.netlify.app/** — read it live for voice, tone, taglines, colour, typography, photography, casting, attire, vocabulary, brand beats, USPs, and trust numbers.
+>
+> This file survives for the operational detail the bible doesn't carry: **per-market language** (spelling, grade vocabulary, exam references, currency), **internal product names**, **audience personas and their ICP mapping**, the **MathFit mindset dimension**, **approved copy atoms**, and the **copy principles**.
+>
+> Where this file and the bible disagree, **the bible wins.** Where this file and [[forbidden-patterns]] disagree, **forbidden-patterns wins** — it records what has actually failed in market. Precedence ladder: [[forbidden-patterns]] §0.
+>
+> ⚠️ Sections below dated to March 2026 that are **superseded and must not be used**: the 5 USPs (the bible ships six, differently worded) · the Visual Brand palette and typography · anything presenting *"cue don't tell"*, *productive struggle*, *interleaving*, or *retrieval practice* as external copy language (all internal-only now — [[forbidden-patterns]] §3.3).
 
 ---
 
@@ -145,9 +151,21 @@ If someone sees **only one Cuemath ad** in their life, they should walk away thi
 
 ---
 
+## Transformation Narrative (Before → After)
+
+Inherited from the retired `brand-guidelines.md`. The sanctioned before/after frame — use it as a structure, not as verbatim copy.
+
+- Math anxiety → Math confidence
+- Passive calculation → Active reasoning
+- Fragile memorisation → Deep understanding
+- School struggle → Confident problem-solving
+- Average performance → Outlier thinking
+
+---
+
 ## Copy Atoms (from Constitution)
 
-Approved short-form copy lines for use across channels:
+Approved short-form copy lines for use across channels. **Slot discipline applies** — several of these are close-card or brand-atom lines that die in a headline slot. See [[forbidden-patterns]] §3.2 before placing one.
 
 - "MathFit isn't about getting answers faster. It's about thinking better."
 - "In a world where AI calculates, children must learn to think."
@@ -250,7 +268,7 @@ Approved short-form copy lines for use across channels:
 - Grade levels: Grade 2, Grade 3... Grade 12
 - "Math" (not "Maths")
 - References: SAT, AP, AMC, MATHCOUNTS, college readiness
-- NRI audience: "Indian tutors" / "tutors from India" is a winning hook
+- NRI audience: **`"Indian tutors"` / `"tutors from India"` is a HARD BAN** — see [[forbidden-patterns]] §1.1. It tests well and is still forbidden: it breaks the global-brand pivot and trips Google Ads' national-origin policy. Substitute the *signal*, not the identifier — `Built by IIT & Stanford alumni` (curriculum lineage) · `Certified math tutors` · the Cuemath brand is itself the India-origin cue
 
 ### India Market
 - "Tuition" (not "tutoring")
@@ -273,14 +291,13 @@ Approved short-form copy lines for use across channels:
 
 ---
 
-## Visual Brand
+## Visual Brand — ⚠️ SUPERSEDED, DO NOT USE
 
-- **Primary colour:** Yellow #F5A623
-- **Secondary colour:** Navy #1A1A2E
-- **Background:** White with generous whitespace
-- **Typography:** DM Sans (or similar clean sans-serif)
-- **Logo placement:** Top-left (default), bottom-right (testimonial cards)
-- **Imagery:** Modern, clean, parent-appropriate. No cartoons. No childish aesthetics.
+Every value in this section is retired. **Visual identity lives only in the [brand bible](https://cuemath-brand-book.netlify.app/).**
+
+For the record, so nobody reintroduces them: yellow `#F5A623`, navy `#1A1A2E`, pure-white backgrounds, and DM Sans are all dead. Current palette is Sunlit Gold `#F4AB52` (accent only) · Warm Charcoal `#292827` · Warm Off-White `#FAF8F5`, 70%+ neutral. Typography is Athletics + Untitled Sans. Photography, casting, and attire rules are in the bible; the ban list is [[forbidden-patterns]] §1.5.
+
+Logo placement (top-left default, bottom-right on testimonial cards) still holds.
 
 ---
 

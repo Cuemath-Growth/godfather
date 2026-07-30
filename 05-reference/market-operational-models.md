@@ -168,7 +168,7 @@ Last updated: 2026-05-12 (late evening) — verified pricing tables added for al
 - **Don't** put "teacher" in any parent-facing copy in any market. Use coach (brand) or tutor (performance).
 - **Don't** put NCEA / PSLE packaged-prep claims anywhere. They don't exist as packaged products.
 - **Don't** put NAPLAN / OC / Selective / 11+ outside the relevant market. They're geo-specific.
-- **Don't** put ₹ pricing, Bangalore references, Hindi VO, Indian tutor visuals on ANZ / UK / MEA non-Indian creative. NRI US is the exception (and even there, the Indian-method positioning is currently unresolved between Apr 25 founder DBS and May 12 global-pivot feedback — see open Naina decision).
+- **Don't** put ₹ pricing, Bangalore references, Hindi VO, Indian tutor visuals on ANZ / UK / MEA non-Indian creative. **NRI US is no longer an exception** — the Apr-25-DBS vs May-12-global-pivot question was closed on May 19-20: `Indian tutors` and Indian-tutor visuals are a HARD BAN in every market ([[02-skills/forbidden-patterns]] §1.1). Substitute the signal, never the identifier.
 - **Don't** quote specific discount percentages yourself in any market. Defer to academic counsellor.
 
 ## Public website vs brand locks — known non-compliance (May 12 2026)

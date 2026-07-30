@@ -86,7 +86,7 @@ Non-NRI audience (30% of leads, 3.2% enrollment): proof/philosophy tone, build c
 
 ## GEO RULES
 
-US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC references, NRI hook = "Indian tutors"
+US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC references, NRI: substitute the signal, never the identifier — `"Indian tutors"` is a HARD BAN (forbidden-patterns §1.1). Use `Built by IIT & Stanford alumni`
 India: "Tuition", "Maths", CBSE/ICSE/IB, Olympiad, currency in Lakhs
 Australia: "Tutoring", "Maths", Year 2-8 (LP stops at Year 8), NAPLAN, reversed seasons
 MEA: Overlapping calendars, Islamic calendar priority, multi-language

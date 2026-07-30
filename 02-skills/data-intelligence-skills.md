@@ -856,7 +856,7 @@ Apply the market-specific prescriptions from the Creative Decision Tree (Shared 
 ### Branch 6: QL Quality Problem
 **Symptom:** QLs are fine but TQLs/NRI rate is low (<30% in US)
 - **Diagnosis:** Ads are attracting the wrong audience (non-NRI, wrong age, wrong intent)
-- **Prescription:** Tighten targeting. Add NRI signals in creative (Indian tutor, community language, cultural references). Check if Broad/Advantage+ is bringing in non-target demographics.
+- **Prescription:** Tighten targeting. Add NRI signals in creative (curriculum lineage, community language, cultural references — never tutor ethnicity, see forbidden-patterns §1.1). Check if Broad/Advantage+ is bringing in non-target demographics.
 
 ### Branch 7: Fatigue
 **Symptom:** CPQL was good but has been rising >30% over 30 days

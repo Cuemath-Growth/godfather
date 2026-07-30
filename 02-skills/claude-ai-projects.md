@@ -7,7 +7,7 @@ These are standalone system prompts for Claude.ai Projects. Each is self-contain
 ## Skill 1: Meta Ad Copy Engine
 
 **Project Name:** Cuemath Forge — Meta Ads
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md, seasonal-calendar.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md, seasonal-calendar.md
 
 ### System Prompt:
 
@@ -93,7 +93,7 @@ Non-NRI audience (30% of leads, 3.2% enrollment): proof/philosophy tone, build c
 
 ## GEO RULES
 
-US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC references, NRI hook = "Indian tutors"
+US: "Tutoring", "Math", Grade 2-12, SAT/AP/AMC references, NRI: substitute the signal, never the identifier — `"Indian tutors"` is a HARD BAN (forbidden-patterns §1.1). Use `Built by IIT & Stanford alumni`
 India: "Tuition", "Maths", CBSE/ICSE/IB, Olympiad, currency in Lakhs
 Australia: "Tutoring", "Maths", Year 2-8 (LP stops at Year 8), NAPLAN, reversed seasons
 MEA: Overlapping calendars, Islamic calendar priority, multi-language
@@ -125,7 +125,7 @@ Then generate 3 options in the exact format above. Count every character. Verify
 ## Skill 2: Video Script Writer
 
 **Project Name:** Cuemath Forge — Video Scripts
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md, seasonal-calendar.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md, seasonal-calendar.md
 
 ### System Prompt:
 
@@ -272,7 +272,7 @@ Generate 2 complete script options per brief, each with a different hook type. I
 ## Skill 3: Google Ads RSA Generator
 
 **Project Name:** Cuemath Forge — Google RSA
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md
 
 ### System Prompt:
 
@@ -354,7 +354,7 @@ Ask for: Ad group/intent, Market, Audience type. Then generate the full headline
 ## Skill 4: Brand Validator
 
 **Project Name:** Cuemath Brand Gate
-**Project Knowledge Files:** brand-guidelines.md, brand-voice.md, icp-guide.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), brand-voice.md, icp-guide.md
 
 ### System Prompt:
 
@@ -428,7 +428,7 @@ Be direct. Name every violation. Suggest specific rewrites. Don't soften bad new
 ## Skill 5: Sound Human
 
 **Project Name:** Cuemath Humanizer
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md
 
 ### System Prompt:
 
@@ -522,7 +522,7 @@ If the copy already sounds human, say so and suggest only minor tweaks.
 ## Skill 6: Brand Guidelines Reference
 
 **Project Name:** Cuemath Brand Bible
-**Project Knowledge Files:** brand-guidelines.md, brand-voice.md, icp-guide.md, seasonal-calendar.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), brand-voice.md, icp-guide.md, seasonal-calendar.md
 
 ### System Prompt:
 
@@ -621,7 +621,7 @@ Keep answers practical — the person asking is probably in the middle of making
 ## Skill 7: Testimonial Script Writer
 
 **Project Name:** Cuemath Forge — Testimonials
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md
 
 ### System Prompt:
 
@@ -689,7 +689,7 @@ Take whatever raw material they have (call transcript, review text, brief notes)
 ## Skill 8: Campaign Concept Generator
 
 **Project Name:** Cuemath Forge — Campaigns
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md, seasonal-calendar.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md, seasonal-calendar.md
 
 ### System Prompt:
 
@@ -710,7 +710,7 @@ For each campaign, produce:
 
 **Creative Direction:**
 - Visual mood: [2-3 words]
-- Colour palette: [Cuemath yellow #F5A623, Navy #1A1A2E, plus accent]
+- Colour palette: [Sunlit Gold #F4AB52 accent only · Warm Charcoal #292827 · Warm Off-White #FAF8F5 · 70%+ neutral]
 - Photography/video style: [description]
 
 **Content Matrix:**
@@ -763,7 +763,7 @@ Then produce 2-3 campaign concepts with full detail above. Make them genuinely d
 ## Skill 9: Landing Page & Email Copy
 
 **Project Name:** Cuemath Forge — LP & Email
-**Project Knowledge Files:** brand-guidelines.md, icp-guide.md, seasonal-calendar.md
+**Project Knowledge Files:** the brand bible (https://cuemath-brand-book.netlify.app/), icp-guide.md, seasonal-calendar.md
 
 ### System Prompt:
 
