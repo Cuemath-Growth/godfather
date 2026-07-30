@@ -6,7 +6,9 @@
 >
 > The "Tab / Surface" column and the shared-data-layer JSON contract describe a system that no longer runs. Treat them as history until the roster decision lands.
 >
-> **Agents that actually run today**, each with a live invocation: **Forge** (`/write`) · **Scout** (`/brief`) · **Curator** (`/curator`) · **Marquee** (`/marquee`). Plus two commands with no agent file: `/agent007` (data analysis) and `/radar` (ship gate).
+> **Agents that actually run from this folder:** **Forge** (`/write`) · **Scout** (`/brief`) · **Curator** (`/curator`). Plus two commands with no agent file: `/agent007` (data analysis) and `/radar` (ship gate).
+>
+> **Organic social moved out.** `/yt` and `/insta` now live in `~/Documents/CM Brain /social/` with their own brand stack, and they deliberately read nothing from this folder — paid rules (CPTD gates, RSA limits, ad-format manuals) are wrong for organic. This folder is paid + LP only.
 
 ## System Design Principle
 
@@ -26,7 +28,6 @@ With the dashboard retired, the surviving agents are CLI-invoked and hand off th
 | 4 | **Oracle** | Master insights agent — synthesises Sentinel + Lens + Forge + influencer feed into a single digest | Now (what to do today) | Tab 0 |
 | 5 | **Scout** | Forward-look context agent — reads calendar 3–6 weeks out, outputs Context Cards that brief Forge | Forward (what's coming) | LP planning |
 | 6 | **Curator** | Structural audit agent — read-only check on folder/role/reference integrity | Meta (is the system itself healthy?) | CLI only (`/curator`) |
-| 7 | **Marquee** | Owned-channel agent — YouTube channel audience, packaging, playlists, slate | Forward (what the channel recruits) | CLI only (`/marquee`) |
 
 ---
 
@@ -71,7 +72,6 @@ External feeds:
 - Claude API + Gemini → Forge
 - LP planning sheet + seasonal calendar + market briefs → Scout
 - Influencer dashboard feed → Oracle direct
-- YouTube Studio audience reports (geography, age, traffic sources) → Marquee
 
 ---
 
@@ -110,16 +110,6 @@ Scout produces Context Cards 3–6 weeks ahead of each market moment so Forge ca
 **What flows:**
 - Per-moment Context Card: market, audience, hook, channel, priority, signal, why, action, LP status
 - LP gap detection — which moments have no asset live yet
-
-### Marquee → Forge
-Marquee owns the owned-channel packaging layer and briefs scripts the way Scout briefs LPs. It does not write.
-
-**What flows:**
-- Per-video **Video Card**: format, primary KPI, the metric it's allowed to lose, audience cell, who the packaging recruits *and repels*, Brand Beats, register, spine, route (playlist + position + end screen + LP/UTM), what Forge must write
-- Packaging Blocks go to design/edit, not to Forge
-
-### Marquee ← Lens
-Marquee reads Lens output so the channel doesn't re-test hooks and frames paid already settled.
 
 ### All domain agents → Oracle
 Oracle reads the latest state from all domain agents on every dashboard refresh.
@@ -163,7 +153,6 @@ Each domain agent writes structured output after every run. Oracle reads all fou
 | Lens | After Sentinel completes (needs performance data) |
 | Forge | On-demand (user triggers generation) |
 | Scout | Weekly — calendar review for next 3–6 weeks |
-| Marquee | Weekly — channel state line. Per-upload at 72h for the wrong-audience alarm |
 | Oracle | On every dashboard tab load (reads latest outputs) |
 | Curator | On-demand (`/curator`) — suggested weekly Friday |
 
@@ -177,6 +166,4 @@ Each domain agent writes structured output after every run. Oracle reads all fou
 - [[01-agents/04-oracle|Oracle — Master Insights Agent]]
 - [[01-agents/05-scout|Scout — Forward-Look Context Agent]]
 - [[01-agents/06-curator|Curator — Brain Organisational Agent]]
-- [[01-agents/07-marquee|Marquee — Owned-Channel Agent (YouTube)]]
 - [the brand bible](https://cuemath-brand-book.netlify.app/) — canonical brand authority for every agent that touches creative
-- [[06-channels/README|06-channels]] — owned-channel practice, fenced from the paid rulebook

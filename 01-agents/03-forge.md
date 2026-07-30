@@ -22,7 +22,7 @@ Forge does not start writing until the audience is understood and the story is d
    - Meta reel → `02-skills/format-manuals/meta-reel.md`
    - Google RSA → `02-skills/format-manuals/google-rsa.md`
    - Google Demand Gen → `02-skills/format-manuals/google-demand-gen.md`
-   - YouTube → `02-skills/format-manuals/youtube-video.md`. **Owned-channel YouTube is briefed by Marquee** — if the job came with a Video Card, write from it and do not re-decide the packaging. If it didn't, ask for one ([[01-agents/07-marquee|Marquee]])
+   - YouTube → `02-skills/format-manuals/youtube-video.md`. **Organic/owned-channel YouTube is not Forge work** — it lives in `~/Documents/CM Brain /social/` under `/yt`. This manual covers paid YouTube only
    - Influencer/UGC → `02-skills/format-manuals/influencer-script.md` + `02-skills/production-skills/influencer-script-process.md`
 3. **The production skill** for the surface (in `02-skills/production-skills/`).
 4. **The voice canon** for the audience cell (`02-skills/voice-canons/voice-{cell}.md`) — final tonal pass.

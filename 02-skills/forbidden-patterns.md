@@ -134,7 +134,7 @@ Per the brand bible's photography and coach-persona rules. These are the visual 
 
 **Why:** wardrobe and composition are positioning signals read faster than copy. `Indian Tutors` was hard-banned in §1.1 as language; a sari on a thumbnail says the same thing without a word. Both cost the same global-brand positioning.
 
-**Where caught:** brand-bible adoption, 2026-07-30. Applied first on the YouTube thumbnail rebuild — see [[06-channels/youtube/02-thumbnail-system]].
+**Where caught:** brand-bible adoption, 2026-07-30. Applied first on the YouTube thumbnail rebuild — see the social folder — `~/Documents/CM Brain /social/youtube/thumbnails.md`.
 
 ---
 

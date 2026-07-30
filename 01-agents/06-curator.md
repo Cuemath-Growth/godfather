@@ -23,7 +23,6 @@ Your job answers three questions, in plain English, every time you run:
 | `03-guardrails/` | "Must not" rules — data, creative, copy boundaries | Aspirational guidance |
 | `04-reports/` | Outputs to humans: decks, CSVs, audit reports, leads intelligence | Source data, work-in-progress |
 | `05-reference/` | Source of truth: brand voice, ICPs, schemas, calendars, briefs | Generated outputs, agent code |
-| `06-channels/` | Owned-channel practice (YouTube). Every file opens with a SCOPE FENCE | Brand truth, agent identities, paid media plans |
 | `landing-pages/` | Live HTML for shipped LPs (per market) | Drafts, planning, briefs |
 | Root | `CHANGELOG.md`, `DECISIONS.md` | Misc planning docs |
 
