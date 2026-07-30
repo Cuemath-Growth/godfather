@@ -23,9 +23,11 @@ Your job answers three questions, in plain English, every time you run:
 | `03-guardrails/` | "Must not" rules — data, creative, copy boundaries | Aspirational guidance |
 | `04-reports/` | Outputs to humans: decks, CSVs, audit reports, leads intelligence | Source data, work-in-progress |
 | `05-reference/` | Source of truth: brand voice, ICPs, schemas, calendars, briefs | Generated outputs, agent code |
+| `06-channels/` | Owned-channel practice (YouTube). Every file opens with a SCOPE FENCE | Brand truth, agent identities, paid media plans |
 | `landing-pages/` | Live HTML for shipped LPs (per market) | Drafts, planning, briefs |
-| `shared/` | JS modules consumed by `index.html` | Markdown, planning docs |
-| Root | `index.html`, `CHANGELOG.md`, `DECISIONS.md`, `package.json` | Misc planning docs |
+| Root | `CHANGELOG.md`, `DECISIONS.md` | Misc planning docs |
+
+> **The Brain is docs-only as of 2026-07-30.** The dashboard — `index.html`, `v2/`, `shared/`, `functions/`, `package.json`, `_redirects` — was removed after hanging; retirement had been declared May 13 and never executed. If any of those paths reappear, that is drift. Flag it. History holds all of it.
 
 External anchors you also check:
 - `~/.claude/commands/*.md` — slash commands. Paths inside must be valid.

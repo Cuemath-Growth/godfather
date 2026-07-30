@@ -1,8 +1,18 @@
-# Agent Architecture — How the Six Agents Work Together
+# Agent Architecture
+
+> ## ⚠️ The dashboard is gone — this document is mid-migration
+>
+> Removed 2026-07-30: `index.html`, `v2/`, `shared/`, `functions/`. The mesh below was designed around a dashboard with numbered tabs, and **three agents existed only as tabs** — Sentinel (Tab 1), Lens (Tab 2), Oracle (Tab 0). They have no surface now.
+>
+> The "Tab / Surface" column and the shared-data-layer JSON contract describe a system that no longer runs. Treat them as history until the roster decision lands.
+>
+> **Agents that actually run today**, each with a live invocation: **Forge** (`/write`) · **Scout** (`/brief`) · **Curator** (`/curator`) · **Marquee** (`/marquee`). Plus two commands with no agent file: `/agent007` (data analysis) and `/radar` (ship gate).
 
 ## System Design Principle
 
-Godfather is **not** a stack of independent tools sharing a UI. It's an **agent mesh** — each agent produces structured outputs that become inputs for others. Oracle is the orchestration layer that reads from the four domain agents and synthesises a unified intelligence view. Scout feeds the mesh forward-look context. Curator watches the mesh itself.
+Godfather was **not** a stack of independent tools sharing a UI. It was an **agent mesh** — each agent producing structured outputs that became inputs for others. Oracle orchestrated, reading the domain agents into a unified view. Scout fed forward-look context. Curator watched the mesh itself.
+
+With the dashboard retired, the surviving agents are CLI-invoked and hand off through documents rather than JSON files.
 
 ---
 
