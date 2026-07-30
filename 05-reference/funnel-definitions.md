@@ -122,6 +122,14 @@ Migrated from the retired `icp-guide.md` on 2026-07-30. **These are measurements
 
 The Non-NRI Meta and organic-non-brand rows are the strongest argument in this file: spend reaching Non-NRI through those two channels does not convert.
 
+### Close type — the offer-led margin leak
+
+Free-class close: **₹13K CPTD.** Offer-led close: **₹43K CPTD.** A ~3× efficiency gap.
+
+Discount-led closes cost more per trial *and* cheapen the premium frame. There is no upside case for them — this is the performance argument behind the locked `Book a free 1-on-1 class` CTA. The brand reason and the money reason point the same way.
+
+*(Preserved from a deleted brand memory file. Not in the bible, which carries no cost data.)*
+
 ### Pain points, from negative reviews
 
 Billing / pricing friction **42.8%** · post-payment silence **42.8%** · tutor quality inconsistency **40.4%** · app or platform issues **33.2%**.

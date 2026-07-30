@@ -62,15 +62,27 @@ If you can't complete steps 1–3 in <60 seconds, you don't have enough groundin
 
 These violate the brand category. Hard fails — never ship.
 
-### 1.1 Ethnicity-led tutor framing — HARD BAN
+### 1.1 Ethnicity-led framing — banned, with one geo carve-out
 
-❌ `Indian Tutors` · `Indian Experts` · `Indian-Trained Math Coaches` · `India's Best Tutor` · `Indian rigour` · `Indian-pedagogy`
+**Banned everywhere, no exceptions — tutor-ethnicity / marketplace framing:**
+
+❌ `Indian Tutors` · `Indian Experts` · `Indian-Trained Math Coaches` · `India's Best Tutor` · `Indian-pedagogy`
 
 ✅ `Built by IIT & Stanford alumni` (curriculum lineage, defensible) · `Certified math tutors` · `Top 1:1 math tutors`
 
-**Why:** (a) violates global brand pivot — Cuemath markets the program, not tutor ethnicity (marketplace logic the playbook moats against). (b) Triggers Google Ads personalized-advertising policy on national origin. (c) Cultural credibility lives in curriculum lineage, not tutor ID.
+**Why:** Cuemath markets the program, not tutor ethnicity — that's marketplace logic the playbook moats against. Cultural credibility lives in curriculum lineage, not tutor ID.
 
-**Where caught:** US RSA audit May 19, AUS statics May 12. Confirmed HARD BAN. See [[us-google-rsa-verified-facts]].
+**Permitted in Texas-specific campaigns only — Indian-method framing:**
+
+✅ `Indian rigour` / `Indian rigor` and Indian-method descriptors — **Texas-targeted campaigns only.** Naina's ruling, 2026-07-30, confirming the brand bible's Texas *Lane 1* register (same-coach narrative + Indian rigor + community testimonials, against Bhanzu and local home tutors).
+
+❌ Still banned in: broad US · NRI-generic ad groups · every other state · ANZ · UK · MEA · India-as-export-signal. **This is where it was actually caught** — the May 19 US RSA audit and the NRI generic ad group, neither of which was Texas-scoped.
+
+**The discriminator is the campaign's geo targeting, not the audience's ethnicity.** A Texas-targeted campaign may use it. An NRI campaign that happens to reach Texas parents may not — if the targeting isn't Texas-specific, the carve-out doesn't apply.
+
+**Note, not a veto:** on Google Ads specifically, copy that implies knowledge of the *user's* national origin can trip the personalised-advertising policy at review. Describing the *method* ("built on Indian rigour") reads as product description and is far safer than addressing the parent as Indian. Watch disapprovals on Texas RSAs; this is a platform behaviour to monitor, not a brand rule.
+
+**Where caught:** US RSA audit May 19, AUS statics May 12, NRI generic May 20. Geo carve-out added July 30. See [[us-google-rsa-verified-facts]].
 
 ### 1.2 Remediation framing — banned in enrichment category
 
@@ -411,9 +423,13 @@ Two things worth noting. The old "primary" segment maps to a 17.3% goal while th
 
 The 4:3:2:1 content mix goes with the old model. Weight by stated goal instead.
 
-### One carve-out from the bible — ⚠️ CONFIRM WITH NAINA
+### The Texas carve-out — RULED 2026-07-30
 
-The bible's Texas section permits **`"Indian rigor" (Lane 1)`**. **This file still bans it** (§1.1) and that ban holds until Naina says otherwise, on two grounds the bible cannot override: Google Ads' personalised-advertising policy on national origin is platform law, and Naina hard-confirmed the ban on May 19–20 after it was caught in market. Rank 2 beating rank 1 is the documented exception, not a precedent — see §0.
+**`Indian rigour` is permitted in Texas-specific campaigns.** Naina's ruling, confirming the bible's Texas *Lane 1* register. It stays banned everywhere else — broad US, NRI-generic, all other states, ANZ, UK, MEA. Full scope in §1.1.
+
+The discriminator is **campaign geo targeting**, not audience ethnicity. `Indian Tutors` and tutor-ethnicity framing remain banned in Texas too — that ban is about marketplace positioning, not geography, and the ruling was about *method* language.
+
+No rank-2-beats-rank-1 exception exists any more. The bible and this file agree.
 
 ---
 
