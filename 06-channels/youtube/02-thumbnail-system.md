@@ -1,6 +1,6 @@
 ---
 name: YouTube Thumbnail System
-description: Art direction, composition matrix, copy rules, and copy bank for @CuemathStudio thumbnails. The targeting instrument for the parent pivot. Owner Marquee. Built on brand-book-v2 photography and casting rules.
+description: Art direction, composition matrix, copy rules, and copy bank for @CuemathStudio thumbnails. The targeting instrument for the parent pivot. Owner Marquee. Built on the brand bible's photography and casting rules.
 metadata:
   type: skill
   layer: owned-channel
@@ -12,7 +12,7 @@ metadata:
 
 ## SCOPE FENCE
 
-Organic YouTube thumbnails. **Meta's <20% text-on-image rule does not apply** — wrong platform. Neither do RSA character limits. What applies in full: [[forbidden-patterns]] and [[brand-book-v2]] §3 (colour) and §4 (photography, casting, attire).
+Organic YouTube thumbnails. **Meta's <20% text-on-image rule does not apply** — wrong platform. Neither do RSA character limits. What applies in full: [[forbidden-patterns]] and the brand bible (colour, photography, casting, attire) and [[forbidden-patterns]] §1.5.
 
 ---
 
@@ -40,13 +40,13 @@ Two consequences that govern everything below:
 | Face size | 25–40% of frame, on the third opposite the text block |
 | Text | Max **4 words.** 2–3 is better. Never a sentence, never two competing text blocks |
 
-**Consistency is a compounding asset.** Same accent treatment, same type, same crop logic across every upload means the channel reads as one shelf and a returning parent recognises us in a crowded feed before reading a word. This is [[brand-book-v2]]'s *Hidden Logic* applied to a thumbnail grid.
+**Consistency is a compounding asset.** Same accent treatment, same type, same crop logic across every upload means the channel reads as one shelf and a returning parent recognises us in a crowded feed before reading a word. This is the brand bible's *Hidden Logic* applied to a thumbnail grid.
 
 ---
 
 ## Composition matrix — who is in frame
 
-Per [[brand-book-v2]] §4. Note the hard constraint: **coach and child are never in the same physical room.** The split-screen is the brand's online signature, and it rules out the obvious "coach sitting beside child" shot.
+Per the brand bible. Note the hard constraint: **coach and child are never in the same physical room.** The split-screen is the brand's online signature, and it rules out the obvious "coach sitting beside child" shot.
 
 | Video format | In frame | Composition |
 |---|---|---|
@@ -66,7 +66,7 @@ Per [[brand-book-v2]] §4. Note the hard constraint: **coach and child are never
 
 ## Casting
 
-Straight from [[brand-book-v2]] §4 — reproduced because thumbnails are where casting is most visible:
+Straight from the brand bible — reproduced because thumbnails are where casting is most visible:
 
 - **Mix:** 40% South Asian / NRI · 40% other Asian · 20% non-Asian. Lead face matches the targeted cell; supporting cast always includes one non-Asian face.
 - **K–5 content:** women coaches only. **Middle + HS:** 50/50. **HS:** slight male lean.
@@ -96,7 +96,7 @@ That last rule is the same brand logic as the `Indian Tutors` hard ban, extended
 2. **Never repeat the title.** Title = the specific. Thumbnail = the stake.
 3. **Parent's language, not ours.** Would a parent say this at school pickup? If not, cut it.
 4. **US grade vocabulary.** `6th Grade`, never `Class 6` or `Year 6`. Grade words are a geography signal the algorithm reads.
-5. **No framework language.** No FUAR, no MathFit dimensions, no "productive struggle." ([[brand-book-v2]] §8 — internal-only.)
+5. **No framework language.** No FUAR, no MathFit dimensions, no "productive struggle." ([[forbidden-patterns]] §3.3 — internal-only.)
 6. **No close-card lines in the thumbnail slot.** *"Same Cuemath Coach. Every Single Class."* is an end-frame line. Hoisting it to a thumbnail is the slot mismatch in [[forbidden-patterns]] §3.2.
 7. **No numbers as hooks.** No stats, no percentages, no "99%."
 8. **No `X — not Y` constructions.** [[forbidden-patterns]] §6.1.
@@ -206,4 +206,4 @@ Free inventory, and the fastest visible movement in the whole revamp: YouTube re
 
 ## Related
 
-[[00-channel-revamp-brief]] · [[01-video-plan]] · [[03-playlist-architecture]] · [[01-agents/07-marquee|Marquee]] · [[05-reference/brand-book-v2|Brand Book v2]] · [[02-skills/forbidden-patterns|Forbidden Patterns]]
+[[00-channel-revamp-brief]] · [[01-video-plan]] · [[03-playlist-architecture]] · [[01-agents/07-marquee|Marquee]] · [the brand bible](https://cuemath-brand-book.netlify.app/) · [[02-skills/forbidden-patterns|Forbidden Patterns]]

@@ -168,5 +168,5 @@ Each domain agent writes structured output after every run. Oracle reads all fou
 - [[01-agents/05-scout|Scout — Forward-Look Context Agent]]
 - [[01-agents/06-curator|Curator — Brain Organisational Agent]]
 - [[01-agents/07-marquee|Marquee — Owned-Channel Agent (YouTube)]]
-- [[05-reference/brand-book-v2|Brand Book v2]] — canonical brand authority for every agent that touches creative
+- [the brand bible](https://cuemath-brand-book.netlify.app/) — canonical brand authority for every agent that touches creative
 - [[06-channels/README|06-channels]] — owned-channel practice, fenced from the paid rulebook

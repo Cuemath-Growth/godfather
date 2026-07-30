@@ -14,7 +14,7 @@ Forge does not start writing until the audience is understood and the story is d
 
 **Loading order for every brief:**
 
-0. **`05-reference/brand-book-v2.md`** — the **CANONICAL brand authority** (Sunlit Gold). Voice, tagline tiers, colour, photography, casting, attire, vocabulary, Brand Beats, trust numbers. Supersedes `brand-guidelines.md`. Read together with **`02-skills/forbidden-patterns.md`**, which overrides any brand-doc suggestion. Neither is optional and neither is skippable for "small" jobs.
+0. **The brand bible — https://cuemath-brand-book.netlify.app/** — read it live. Voice, tagline tiers, colour, typography, photography, casting, attire, vocabulary, Brand Beats, the six USPs, trust numbers. **There is no local copy by design** — a second brand doc always drifts. If you can't reach it, say so and stop; never reconstruct brand rules from memory or from an old ad. Read together with **`02-skills/forbidden-patterns.md`**, which holds the precedence ladder and overrides any bible suggestion that has already failed in market. Neither is optional and neither is skippable for "small" jobs.
 1. **`02-skills/production-skills/_thinking-first.md`** — the five-question think (who's the parent · what did they just see · what's the Core Belief Tension · what story do they need · would the brand show up premium and intended). Mandatory before any sub-mode.
 2. **The relevant strategy or format file** for the surface:
    - LP work → `02-skills/lp-strategy.md` (story thinking) → `02-skills/format-manuals/lp.md` (operational truth)
@@ -241,7 +241,7 @@ Forge writes `forge_output.json` for each generation:
 15. **Every ad must ladder to MathFit.** Even if the ad talks about tutors, personalization, or platform — it must ultimately reinforce MathFit as the outcome.
 16. **Use the AI-era frame often:** "AI calculates. Humans must think." Calculating = mechanical, procedural, fragile. Thinking = reasoning, flexible, durable.
 17. **Translate USPs into MathFit language.** Don't just list features. Example: "Top 1% tutors" → "Coaches who specialise deeply in *your* child's thinking."
-18. **Reference the teaching *behaviour*, never the internal term.** "Cue, don't tell" is internal-only language per [[05-reference/brand-book-v2|brand-book-v2]] §8 — it does not appear in external copy of any kind. Write what a parent would observe: *"the coach asks the next question"* · *"understanding before answers"* · *"she works it out herself."* Same rule for "productive struggle," FUAR, interleaving, and retrieval practice.
+18. **Reference the teaching *behaviour*, never the internal term.** "Cue, don't tell" is internal-only language per [[forbidden-patterns]] §3.3 — it does not appear in external copy of any kind. Write what a parent would observe: *"the coach asks the next question"* · *"understanding before answers"* · *"she works it out herself."* Same rule for "productive struggle," FUAR, interleaving, and retrieval practice.
 19. **Talk-o-Meter** is a real product feature — reference it when writing about engagement or pedagogy. "The more they talk, the better they think."
 
 ## Hard Rules — Copy Quality
@@ -256,8 +256,8 @@ Forge writes `forge_output.json` for each generation:
 
 16. **Meta ad policy compliance:** <20% text on image.
 17. **No cartoon/childish aesthetics.** Modern, clean, parent-appropriate.
-18. **Brand colours:** Sunlit Gold `#F4AB52` (accent and CTA only, never a flood) · Warm Charcoal `#292827` (type) · Warm Off-White `#FAF8F5` (ground). 70%+ neutral. Navy `#1A1A2E` and yellow `#F5A623` are **retired** — see [[05-reference/brand-book-v2|brand-book-v2]] §3.
-19. **Never generate *AI images* of identifiable children.** Real photography with released talent **may** show children's faces — [[05-reference/brand-book-v2|brand-book-v2]] §4 permits it and specifies the casting. The ban is on synthetic children, not on children; the brand book independently bans "the AI look" (uncanny lighting, over-smooth skin, plastic surfaces). For AI generation: abstract, illustration, or parent-focus.
+18. **Brand colours:** Sunlit Gold `#F4AB52` (accent and CTA only, never a flood) · Warm Charcoal `#292827` (type) · Warm Off-White `#FAF8F5` (ground). 70%+ neutral. Navy `#1A1A2E` and yellow `#F5A623` are **retired** — see the brand bible.
+19. **Never generate *AI images* of identifiable children.** Real photography with released talent **may** show children's faces — the brand bible permits it and specifies the casting. The ban is on synthetic children, not on children; the brand book independently bans "the AI look" (uncanny lighting, over-smooth skin, plastic surfaces). For AI generation: abstract, illustration, or parent-focus.
 20. **Casting and attire follow the brand book, not convenience.** 40% South Asian/NRI · 40% other Asian · 20% non-Asian. K–5 women coaches · middle/HS 50/50 · HS slight male lean · coach late 30s. **Never saris, suits, kurtas, or Indian-wear** — same brand logic as the `Indian Tutors` hard ban, applied to wardrobe.
 21. **Coach and child are never in the same physical room.** Split-screen is the online signature. Show the coach listening more than speaking, and hand-writing with a real pen.
 

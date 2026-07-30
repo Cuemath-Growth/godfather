@@ -10,7 +10,7 @@ So the channel practice gets a fenced folder, and **every file in it opens with 
 
 ## What does NOT fork
 
-Brand truth. [[05-reference/brand-book-v2|Brand Book v2]], [[02-skills/forbidden-patterns|Forbidden Patterns]], the voice canons, and the market verified-facts tables govern every surface Cuemath publishes on, owned or paid. There is one brand root and it stays in `05-reference/`. Two brand roots is the drift Curator exists to catch.
+Brand truth. The [brand bible](https://cuemath-brand-book.netlify.app/) — a website, not a file in this repo — plus [[02-skills/forbidden-patterns|Forbidden Patterns]], the voice canons, and the market verified-facts tables govern every surface Cuemath publishes on, owned or paid. One bible, read live, with no local snapshot to drift from it. That is the drift Curator exists to catch.
 
 The agents also don't fork — Marquee lives in `01-agents/07-marquee.md` with the rest of the mesh.
 

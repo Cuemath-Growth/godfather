@@ -2,7 +2,7 @@
 
 > ## ⚠️ SUPERSEDED — v1
 >
-> **[[brand-book-v2]] is the canonical brand authority.** Source: https://cuemath-brand-book.netlify.app/
+> **the [brand bible](https://cuemath-brand-book.netlify.app/) is the canonical brand authority.** Source: https://cuemath-brand-book.netlify.app/
 >
 > This file is retained for two things v2 does not restate:
 > - **Copy Atoms** (below) — still usable
@@ -14,7 +14,7 @@
 > - The messaging hierarchy — replaced by the **Brand Beats (B1 Goal / B2 Mechanism / B3 MathFit)**
 > - Anything about tone, imagery, or vocabulary — v2 is stricter and more specific
 >
-> Precedence ladder, and the open conflict ledger between this file and v2, live in [[brand-book-v2]] §Precedence and §9.
+> Precedence ladder, and the open conflict ledger between this file and v2, live in the [brand bible](https://cuemath-brand-book.netlify.app/) §Precedence and §9.
 
 ## Brand Essence & Promise
 - **Core Promise:** A personalized math ecosystem building deep understanding, confidence, and real-world problem-solving—for school, competitions, and life.

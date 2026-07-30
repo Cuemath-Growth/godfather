@@ -33,7 +33,7 @@ Organic YouTube is not a paid surface. These rules govern paid and must **never*
 | Fatigue-by-frequency (>2 in 30 days) | Organic reach is not frequency-capped. Evergreen video *appreciates* |
 | "One stat per ad" | Applies to ad copy. Video descriptions and playlist copy have room |
 
-These **do** apply, unchanged: [[forbidden-patterns]] (all six categories) · [[brand-book-v2]] (voice, casting, photography, colour, vocabulary) · the market verified-facts tables for anything numeric · the coach/tutor surface rule.
+These **do** apply, unchanged: [[forbidden-patterns]] (all six categories) · the [brand bible](https://cuemath-brand-book.netlify.app/) (voice, casting, photography, colour, vocabulary) · the market verified-facts tables for anything numeric · the coach/tutor surface rule.
 
 ---
 
@@ -146,10 +146,10 @@ Title and thumbnail are **one two-part sentence.** The title carries the specifi
 1. **Never diagnose a channel from engagement rate.** ER is the metric that hid this problem for months. Geography, age, and subs-per-1000-views first, always.
 2. **Every packaging decision names who it repels.** If you cannot say who a thumbnail turns away, it is not targeting anything.
 3. **No equations, no chalkboards, no symbol walls on any thumbnail.** This is the single mechanism that acquired the wrong audience. Non-negotiable, no exceptions for "explainer" content.
-4. **Coach and child are never in the same physical room** ([[brand-book-v2]] §4). Split-screen, screen-in-frame, or over-the-shoulder-at-a-laptop only.
+4. **Coach and child are never in the same physical room** (the brand bible). Split-screen, screen-in-frame, or over-the-shoulder-at-a-laptop only.
 5. **Thumbnail copy is tested at 210×118px.** If it is unreadable at mobile-suggested size, it does not exist. Max 4 words.
 6. **Grade names in the target market's language.** `6th Grade`, never `Class 6` or `Year 6`, for US. Grade vocabulary is a geography signal the algorithm reads.
-7. **Never name a playlist or a title after a framework.** No FUAR, no MathFit dimensions, no "productive struggle." Parent search language only ([[brand-book-v2]] §8).
+7. **Never name a playlist or a title after a framework.** No FUAR, no MathFit dimensions, no "productive struggle." Parent search language only ([[forbidden-patterns]] §3.3).
 8. **Every conversion-format video routes somewhere specific** — a named LP with a UTM. A video with no route is a brand video; label it as one and change its KPI.
 9. **Paid seeding is part of the organic plan, not a separate thing.** You cannot wait out a poisoned audience graph. Say so in every plan.
 10. **The wrong-audience alarm is checked at 72h on every upload.** Thresholds in the revamp brief. A tripped alarm means re-package — not "make better content."
@@ -164,7 +164,7 @@ Title and thumbnail are **one two-part sentence.** The title carries the specifi
 - **Not a paid-media planner.** The DBS map, TrueView, and Demand Gen buying live with the paid surfaces. Marquee specifies *seeding intent* for organic uploads and hands the buy off.
 - **Not a creative scorer.** Lens tags and correlates. Marquee packages.
 - **Not a performance analyst.** Sentinel owns funnel metrics. Marquee reads YouTube Studio's own audience reports, which Sentinel does not ingest.
-- **Not a brand authority.** [[brand-book-v2]] is. Marquee applies it to one surface.
+- **Not a brand authority.** The [brand bible](https://cuemath-brand-book.netlify.app/) is. Marquee applies it to one surface.
 
 ---
 
@@ -220,7 +220,7 @@ Marquee consumes Scout's Context Cards the same way Forge does — a calendar mo
 
 ## See Also
 
-- [[05-reference/brand-book-v2|Brand Book v2]] — the authority Marquee applies
+- [the brand bible](https://cuemath-brand-book.netlify.app/) — the authority Marquee applies
 - [[02-skills/forbidden-patterns|Forbidden Patterns]] — applies in full
 - [[02-skills/format-manuals/youtube-video|YouTube Video format manual]] — script-level truth, incl. the organic-channel layer
 - [[01-agents/03-forge|Forge]] — writes from the Video Card

@@ -17,6 +17,31 @@ This is the source of truth for what's off-brand. [[brand-validator]] scores aga
 
 ---
 
+## 0. THE BRAND BIBLE — and what wins when docs disagree
+
+### The brand bible is a website, not a file in this folder
+
+# https://cuemath-brand-book.netlify.app/
+
+**Read it live. There is no local copy, no digest, and no versioned snapshot of it — by design.** A second brand document always drifts from the first, and then nobody knows which one is true. Positioning, voice, tagline tiers, colour, typography, photography, casting, attire, vocabulary, the brand beats, the six USPs, and the trust numbers all live there and only there.
+
+If you cannot reach the site, say so and stop. Do not reconstruct brand rules from memory, from an old ad, or from any file in this folder.
+
+### Precedence ladder
+
+| Rank | Authority | Wins on |
+|---|---|---|
+| 1 | **The brand bible** (link above) | Voice, tone, taglines, visual identity, colour, photography, casting, attire, vocabulary, brand beats, USPs |
+| 2 | **This file** | What is banned. The bible describes the brand; this file records what has actually failed in market. A bible suggestion never unbans a forbidden pattern |
+| 3 | **Market verified-facts tables** (e.g. `us-google-rsa-verified-facts`) | Every number, price, percentage, date, credential in **paid** copy |
+| 4 | [[cuemath-creative-direction-v1]] | Execution not covered above — register sort, coach-visibility floor, per-market creative rules |
+
+Retired, do not read: `brand-guidelines.md` · `brand-voice.md` · `brand-guidelines-uploadable.md` · `03-guardrails/*`.
+
+**The rule that survives every conflict:** a number that is not in a verified-facts table does not ship in paid copy, no matter which document printed it.
+
+---
+
 ## How to use this file
 
 **Pre-write check (run before any draft):**
@@ -80,6 +105,22 @@ These violate the brand category. Hard fails — never ship.
 
 **Where caught:** Performance audit, repeated catches. Naina's clarification May 19: not a ban, a context rule. See [[us-google-rsa-verified-facts]].
 
+### 1.5 Casting, attire, and imagery bans
+
+Per the brand bible's photography and coach-persona rules. These are the visual equivalent of §1.1 — the same positioning logic applied to what a parent sees before reading a word.
+
+❌ **Attire:** saris · kurtas · suits · any Indian-wear on a coach on camera
+❌ **Composition:** coach and child in the same physical room — breaks the split-screen online signature
+❌ **Register:** staged smiles · thumbs-up · stock-photo energy · institutional or classroom backdrops · cartoon characters or infantilising illustration · luxury-brand distancing · dashboard-as-hero
+❌ **Colour:** pure black · pure white · cool greys · red accents of any kind (fear signal)
+❌ **Synthetic humans:** AI-generated faces, adult or child. The bible names "the AI look" — uncanny lighting, over-smooth skin, plastic surfaces — as a failure mode
+
+✅ Smart casuals, global professional, solid warm neutrals or a gold accent · split-screen or screen-in-frame when coach and child both appear · warm directional morning window light, lived-in room, *the moment before understanding* · real released talent, children's faces permitted · casting mix and grade-tier gender rules per the bible
+
+**Why:** wardrobe and composition are positioning signals read faster than copy. `Indian Tutors` was hard-banned in §1.1 as language; a sari on a thumbnail says the same thing without a word. Both cost the same global-brand positioning.
+
+**Where caught:** brand-bible adoption, 2026-07-30. Applied first on the YouTube thumbnail rebuild — see [[06-channels/youtube/02-thumbnail-system]].
+
 ---
 
 ## 2. STAT / FACT BANS
@@ -111,6 +152,17 @@ Any number, price, percentage, date, or credential in copy must trace to a verif
 ✅ Verify dates and event windows against [[seasonal-calendar]] Verified Exact Dates table BEFORE using time-bound copy. Past Cuemath ad names are not valid sources.
 
 **Where caught:** May 6 NRI session. See [[verify-event-dates-before-writing]].
+
+### 2.4 Brand-bible numbers are not automatically cleared for paid
+
+The bible carries trust numbers that have never been through a verified-facts table: **97.2%** parent-reported improvement · **2,500+** competition wins · **<1%** refund rate · **4,000** tutors · **80+** countries.
+
+✅ Usable on **organic brand surfaces** — channel copy, films, playlist descriptions, About pages.
+❌ Blocked in **paid** copy until Naina confirms the source and they enter the market table.
+
+Separately: **`#1 Tutoring service`** — the bible's Trustpilot line — must stay out of Google Ads text assets regardless of brand approval. Google disapproves unsubstantiated `#1` / `Best` superlatives at review. That is platform policy, not a brand call, and it is distinct from the §1.4 `Top 1%` positioning rule.
+
+**Why:** the bible is the authority on *what the brand is*, not on what has been legally and operationally cleared for a paid auction. Those are different gates. §3 of the precedence ladder holds.
 
 ---
 
@@ -171,11 +223,15 @@ Test before placing: would a parent scanning a SERP / feed *pause* on this line 
 
 ❌ Parent voice-over using framework terms: `She has fluency, understanding, and reasoning now` · `MathFit Application that lifts grades` · `FUAR-based learning`
 
-✅ Frameworks live in on-screen text only. Parent VO uses outcome language: `she samajh ke solve karti hai` · `she actually gets it now` · `he can show his work`. MathFit™ as brand term IS OK in VO; the dimensions (Fluency, Understanding, Application, Reasoning) are not.
+✅ Outcome language instead: `she samajh ke solve karti hai` · `she actually gets it now` · `he can show his work`. MathFit™ as a brand term IS OK; the dimensions (Fluency, Understanding, Application, Reasoning) are not.
 
-**Why:** Parents don't speak in frameworks. A parent saying "fluency" out loud breaks the testimonial spell.
+**Scope widened 2026-07-30 — now all external copy, not just VO.** The bible classes `productive struggle`, `cuing not telling`, `FUAR`, `interleaving`, and `retrieval practice` as internal-only language. They no longer get a pass in on-screen text or end cards either. Frameworks are how we brief, not how we speak — to anyone, anywhere a parent can read it.
 
-**Where caught:** May 12 video scripts. See [[frameworks-not-in-vo]].
+Translate rather than name: *"cuing, not telling"* → **"the coach asks the next question."** *"Productive struggle"* → **"she works it out herself."**
+
+**Why:** Parents don't speak in frameworks. A parent reading "fluency" breaks the same spell as a parent saying it.
+
+**Where caught:** May 12 video scripts (VO). Widened to all external copy at brand-bible adoption, 2026-07-30. See [[frameworks-not-in-vo]].
 
 ### 3.4 "Teacher" parent-facing
 
@@ -243,6 +299,15 @@ Specific phrases caught in past sessions. Each one fails the *sister test* (woul
 | `Amazing` / `incredible` / `powerful` | empty intensifiers | cut, or replace with specific |
 | `Kiddish` | dismissive, off-tone | omit |
 | `Classroom` / `center` / `centre` | wrong category (school/tuition-centre framing) | `1-on-1 online` / `at home` / `program` |
+| `Crush math` | bible bans outright, no exception | `make math click` |
+| `Remedial` / `catch-up` | category violation — see §1.2 | `get ahead` / `build foundations` |
+| `Speed math` / `quick fix` | violates MathFit (depth, not speed) | `lasting understanding` |
+| `Master math` / `ace the test` **unpaired** | only ever ships paired with pedagogy | `master math by understanding why` |
+| `Gamified` / `holistic` / `AI-powered learning journey` | generic edtech, bleached | name the actual mechanism |
+| `AI-powered` as the positioning | AI is a tool, not the product | `AI calculates. Humans must think.` |
+| `Genius` / `prodigy` / `gifted only` | excludes the buyer — breaks bible Pillar 1 | `every child` framing |
+| `Limited time` / `only 3 seats left` | manufactured urgency; red-accent fear signal | the actual offer, or nothing |
+| `Fun` outside K–2 | bible restricts to junior; never HS | `interesting` / drop it |
 
 ---
 
@@ -296,7 +361,26 @@ Specific phrases caught in past sessions. Each one fails the *sister test* (woul
 
 ---
 
-## 7. WHEN YOU CATCH A NEW FAILURE
+## 7. BRAND-BIBLE RECONCILIATION
+
+Where the bible collided with what this Brain already believed, and how each collision was settled on 2026-07-30. Two still need Naina.
+
+| # | Collision | Settled as |
+|---|---|---|
+| A | Bible trust numbers absent from any verified-facts table | Organic-only, blocked in paid. **⚠️ NEEDS NAINA** — see §2.4 |
+| B | Bible permits children's faces; Forge banned images of identifiable children | Scope split. Real released talent may show faces; **AI-generated children stay banned.** Forge rule 19 rescoped |
+| C | Two different frameworks both called "three beats" — bible's Goal/Mechanism/MathFit vs NRI's situation→shift→proof | Renamed. Bible's are **Brand Beats (B1/B2/B3)**; NRI's are **Narrative Beats.** Never write "three-beat" unqualified |
+| D | Forge required naming "Cue, don't tell"; bible classes it internal-only | Reference the behaviour, never the term. Forge rule 18 rewritten · §3.3 widened |
+| E | Navy `#1A1A2E` + yellow `#F5A623` | **Retired.** Palette now lives only in the bible. Propagated into Forge. `index.html` still carries the old values — moot, the dashboard is being removed |
+| F | Coach and child in the same physical room | **New rule, adopted.** Split-screen is the online signature. §1.5 |
+| G | Coach attire and casting mix | **New rules, adopted.** §1.5. Same logic as the §1.1 hard ban, applied to wardrobe |
+| H | Bible ships `Top 1% global tutors` as USP 1; §1.4 restricts it | **No change.** The bible attaches proof and mechanism, which is exactly what §1.4 requires. The bare-badge ban stands |
+| I | Coach vs tutor on YouTube | Proposed: `tutor` in titles and search metadata (lexical match), `coach` on screen and in thumbnail/playlist copy. **⚠️ NEEDS NAINA** |
+| J | `brand-guidelines.md` · `brand-voice.md` · `brand-guidelines-uploadable.md` · `03-guardrails/*` | **Retired.** Anything unique extracted here first. Do not read them |
+
+---
+
+## 8. WHEN YOU CATCH A NEW FAILURE
 
 When Naina catches something not on this list:
 

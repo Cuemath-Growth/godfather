@@ -12,7 +12,7 @@ metadata:
 
 ## SCOPE FENCE
 
-Organic slate. No CPTD gate on any slot — organic has no spend denominator. No frequency-fatigue rule; evergreen video appreciates. [[forbidden-patterns]] and [[brand-book-v2]] apply in full.
+Organic slate. No CPTD gate on any slot — organic has no spend denominator. No frequency-fatigue rule; evergreen video appreciates. [[forbidden-patterns]] and the [brand bible](https://cuemath-brand-book.netlify.app/) apply in full.
 
 ---
 

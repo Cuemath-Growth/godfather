@@ -15,7 +15,7 @@ metadata:
 
 Organic owned-channel work. The paid-performance rulebook does **not** apply here — no CPTD gates, no RSA character limits, no [[rsa-preflight-audit]], no Meta text-on-image rule, no frequency-based fatigue. Full fence in [[01-agents/07-marquee|Marquee]].
 
-What **does** apply, in full: [[forbidden-patterns]] · [[brand-book-v2]] · market verified-facts tables for anything numeric.
+What **does** apply, in full: [[forbidden-patterns]] · the [brand bible](https://cuemath-brand-book.netlify.app/) · market verified-facts tables for anything numeric.
 
 ---
 
@@ -33,7 +33,7 @@ Accepted as the objective. Three things get added to it below, because the brief
 
 The current channel presents as *"Math is simple, fun, beautiful and easy to master"* — edutainment for people who already like math. That positioning is doing exactly what it says, and it is recruiting exactly who it promises: enthusiasts.
 
-Note that this one line breaks three [[brand-book-v2]] rules on its own — **"easy"** (banned: we make math *meaningful*, not easy), **"fun"** (K–2 only, never HS), and **"simple"** as a claim about the subject rather than about the teaching. The positioning line is the first thing to go.
+Note that this one line breaks three brand-bible rules on its own — **"easy"** (banned: we make math *meaningful*, not easy), **"fun"** (K–2 only, never HS), and **"simple"** as a claim about the subject rather than about the teaching. The positioning line is the first thing to go.
 
 ### The mechanism was the thumbnails
 
@@ -188,12 +188,12 @@ A tripped alarm means **re-package** — new thumbnail, new title. It does not m
 
 **D4 · Handle.** "Studio" reads as a content brand, not a parent destination. Worth changing *if* D1 resolves toward this channel — but the rename buys naming clarity only, not an audience reset. *Does not block anything.*
 
-**D5 · The new trust numbers.** `97.2%` · `2,500+ competition wins` · `<1% refund` · `4,000 tutors` · `80+ countries` are in the brand book but not in any verified-facts table. Cleared for organic channel copy on your confirmation; blocked in paid until then. `#1 on Trustpilot` stays out of Google Ads text regardless — platform superlative policy, not a brand call. See [[brand-book-v2]] §9.A. *Blocks: some playlist and About copy — drafted both ways.*
+**D5 · The new trust numbers.** `97.2%` · `2,500+ competition wins` · `<1% refund` · `4,000 tutors` · `80+ countries` are in the brand bible but not in any verified-facts table. Cleared for organic channel copy on your confirmation; blocked in paid until then. `#1 on Trustpilot` stays out of Google Ads text regardless — platform superlative policy, not a brand call. See [[forbidden-patterns]] §2.4. *Blocks: some playlist and About copy — drafted both ways.*
 
-**D6 · Coach vs tutor on YouTube.** Proposed: `tutor` in titles and search-facing metadata (lexical match — YouTube search behaves like Google), `coach` on screen, in thumbnail copy, and in playlist titles (brand surface). Extends the existing surface rule rather than contradicting it. Needs sign-off before it is treated as locked. See [[brand-book-v2]] §9.J.
+**D6 · Coach vs tutor on YouTube.** Proposed: `tutor` in titles and search-facing metadata (lexical match — YouTube search behaves like Google), `coach` on screen, in thumbnail copy, and in playlist titles (brand surface). Extends the existing surface rule rather than contradicting it. Needs sign-off before it is treated as locked. See [[forbidden-patterns]] §7 item I.
 
 ---
 
 ## Related
 
-[[01-video-plan]] · [[02-thumbnail-system]] · [[03-playlist-architecture]] · [[01-agents/07-marquee|Marquee]] · [[05-reference/brand-book-v2|Brand Book v2]] · [[02-skills/format-manuals/youtube-video|YouTube format manual]]
+[[01-video-plan]] · [[02-thumbnail-system]] · [[03-playlist-architecture]] · [[01-agents/07-marquee|Marquee]] · [the brand bible](https://cuemath-brand-book.netlify.app/) · [[02-skills/format-manuals/youtube-video|YouTube format manual]]

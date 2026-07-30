@@ -12,7 +12,7 @@ metadata:
 
 ## SCOPE FENCE
 
-Organic channel copy. No RSA character limits, no Meta limits, no CPTD gates. [[forbidden-patterns]] and [[brand-book-v2]] apply in full. Any number used here is gated on decision D5 in [[00-channel-revamp-brief]] §7 — both variants drafted below.
+Organic channel copy. No RSA character limits, no Meta limits, no CPTD gates. [[forbidden-patterns]] and the [brand bible](https://cuemath-brand-book.netlify.app/) apply in full. Any number used here is gated on decision D5 in [[00-channel-revamp-brief]] §7 — both variants drafted below.
 
 ---
 
@@ -134,7 +134,7 @@ For a **returning subscriber:** spotlight the most recent long-form, then `Insid
 >
 > Book a free 1-on-1 class → [LP]
 
-### Variant B — with brand-book numbers *(needs D5)*
+### Variant B — with brand-bible numbers *(needs D5)*
 
 > Cuemath is a 1-on-1 math program for kids in grades K–12. One coach, who stays with your child for years.
 >
@@ -146,7 +146,7 @@ For a **returning subscriber:** spotlight the most recent long-form, then `Insid
 >
 > Book a free 1-on-1 class → [LP]
 
-Both drop the current positioning line — *"Math is simple, fun, beautiful and easy to master"* — which breaks three brand-book rules at once (`easy`, `fun` outside K–2, and `simple` as a claim about the subject).
+Both drop the current positioning line — *"Math is simple, fun, beautiful and easy to master"* — which breaks three brand-bible rules at once (`easy`, `fun` outside K–2, and `simple` as a claim about the subject).
 
 ### Banner line
 
@@ -158,7 +158,7 @@ Close to the locked brand-film close card but not the card itself — the banner
 
 ## Channel trailer — Video Card
 
-Marquee briefs; Forge writes. Per [[02-skills/format-manuals/youtube-video|youtube-video.md]] and the brand-book 3-second rule.
+Marquee briefs; Forge writes. Per [[02-skills/format-manuals/youtube-video|youtube-video.md]] and the brand bible's 3-second rule.
 
 ```
 VIDEO:        Channel trailer — parent-facing
@@ -219,4 +219,4 @@ One line + the LP link. On conversion-format videos, phrase it as the next step 
 
 ## Related
 
-[[00-channel-revamp-brief]] · [[01-video-plan]] · [[02-thumbnail-system]] · [[01-agents/07-marquee|Marquee]] · [[05-reference/brand-book-v2|Brand Book v2]]
+[[00-channel-revamp-brief]] · [[01-video-plan]] · [[02-thumbnail-system]] · [[01-agents/07-marquee|Marquee]] · [the brand bible](https://cuemath-brand-book.netlify.app/)
